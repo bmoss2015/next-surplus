@@ -67,14 +67,23 @@ async def login(page: Page) -> None:
         print("[!] Login timed out — continuing.")
 
 
-async def scroll_and_heart(page: Page) -> int:
+async def scroll_and_heart(page: Page, context) -> int:
     """
     Scroll the virtual list container and heart every property.
     auction.com renders only visible cards; we must scroll to expose all of them.
     Heart icons:  i[data-elm-id^="save_property_icon_asset_"].far  = un-hearted
                   class changes to .fas after saving
+
+    Clicks bubble up to the <a target="_blank"> card link and open new tabs —
+    we close those immediately via the context 'page' event.
     """
     HEART_SEL = 'i[data-elm-id^="save_property_icon_asset_"]'
+
+    # Auto-close any new tab that opens (prevents computer slowdown)
+    def _close_new_tab(new_page):
+        asyncio.ensure_future(new_page.close())
+
+    context.on("page", _close_new_tab)
 
     total   = 0
     seen    = set()   # track elm-ids we've already clicked
@@ -108,12 +117,15 @@ async def scroll_and_heart(page: Page) -> int:
             if not elm_id or elm_id in seen:
                 continue
             cls = await heart.get_attribute("class") or ""
-            if "fas" in cls:          # already hearted (solid icon)
+            if "fas" in cls:          # already hearted (solid icon) — skip
                 seen.add(elm_id)
                 continue
             try:
-                # Force-click via JS to bypass pointer-events on the <i> tag
-                await page.evaluate("(el) => el.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true}))", heart)
+                # Click without bubbling so the <a> link never fires
+                await page.evaluate(
+                    "(el) => el.dispatchEvent(new MouseEvent('click', {bubbles:false, cancelable:true}))",
+                    heart
+                )
                 seen.add(elm_id)
                 new_this_pass += 1
                 total += 1
@@ -166,7 +178,7 @@ async def run(search_url: str) -> None:
         await dismiss_popups(page)
 
         print("[*] Scrolling and hearting all properties …\n")
-        total = await scroll_and_heart(page)
+        total = await scroll_and_heart(page, context)
 
         await browser.close()
 
