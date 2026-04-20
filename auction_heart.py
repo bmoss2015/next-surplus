@@ -121,11 +121,16 @@ async def scroll_and_heart(page: Page, context) -> int:
                 seen.add(elm_id)
                 continue
             try:
-                # Click without bubbling so the <a> link never fires
-                await page.evaluate(
-                    "(el) => el.dispatchEvent(new MouseEvent('click', {bubbles:false, cancelable:true}))",
-                    heart
-                )
+                # Block the parent <a> from navigating, then click with bubbles so
+                # React's save handler fires correctly
+                await page.evaluate("""(el) => {
+                    const a = el.closest('a');
+                    if (a) {
+                        const block = (e) => { e.preventDefault(); e.stopImmediatePropagation(); };
+                        a.addEventListener('click', block, {once: true, capture: true});
+                    }
+                    el.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+                }""", heart)
                 seen.add(elm_id)
                 new_this_pass += 1
                 total += 1
