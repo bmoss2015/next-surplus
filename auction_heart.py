@@ -67,50 +67,34 @@ async def login(page: Page) -> None:
         print("[!] Login timed out — continuing.")
 
 
-# Find the virtual scroll container by walking up from a property card
-FIND_SCROLL_JS = """
+GET_SCROLL_STATE_JS = """
 () => {
-    // Walk up from any property card root to find the scrollable container
     var card = document.querySelector('[data-elm-id^="asset_"][data-elm-id$="_root"]');
-    if (!card) return null;
+    if (!card) return {error: 'no cards in DOM'};
     var el = card.parentElement;
-    while (el && el !== document.body) {
+    var depth = 0;
+    while (el && el !== document.body && depth < 20) {
         var st = window.getComputedStyle(el);
-        if ((st.overflow === 'auto' || st.overflowY === 'auto') && el.scrollHeight > el.clientHeight) {
-            return true;   // found — we'll scroll it separately
+        var ov = st.overflow + ' ' + st.overflowY;
+        if (ov.indexOf('auto') !== -1 || ov.indexOf('scroll') !== -1) {
+            if (el.scrollHeight > el.clientHeight + 10) {
+                return {
+                    scrollTop:    el.scrollTop,
+                    scrollHeight: el.scrollHeight,
+                    clientHeight: el.clientHeight,
+                    cls: el.className.substring(0, 60)
+                };
+            }
         }
         el = el.parentElement;
+        depth++;
     }
-    return null;
+    return {error: 'no scrollable parent found'};
 }
-"""
-
-SCROLL_JS = f"""
-() => {{
-    var card = document.querySelector('[data-elm-id^="asset_"][data-elm-id$="_root"]');
-    if (!card) return null;
-    var el = card.parentElement;
-    while (el && el !== document.body) {{
-        var st = window.getComputedStyle(el);
-        if ((st.overflow === 'auto' || st.overflowY === 'auto') && el.scrollHeight > el.clientHeight) {{
-            var before = el.scrollTop;
-            el.scrollTop += {SCROLL_PX};
-            return {{
-                before: before,
-                after: el.scrollTop,
-                scrollHeight: el.scrollHeight,
-                clientHeight: el.clientHeight
-            }};
-        }}
-        el = el.parentElement;
-    }}
-    return null;
-}}
 """
 
 
 async def heart_visible(page: Page, seen: set) -> int:
-    """Click all un-hearted hearts currently in the DOM. Returns count clicked."""
     hearts = await page.query_selector_all('i[data-elm-id^="save_property_icon_asset_"]')
     clicked = 0
     for heart in hearts:
@@ -118,11 +102,11 @@ async def heart_visible(page: Page, seen: set) -> int:
         if not elm_id or elm_id in seen:
             continue
         cls = await heart.get_attribute("class") or ""
-        if "fas" in cls:        # solid heart = already saved
+        if "fas" in cls:
             seen.add(elm_id)
             continue
         try:
-            await heart.click(force=True)   # force bypasses aria-hidden check
+            await heart.click(force=True)
             seen.add(elm_id)
             clicked += 1
             await page.wait_for_timeout(ACTION_DELAY_MS)
@@ -132,7 +116,6 @@ async def heart_visible(page: Page, seen: set) -> int:
 
 
 async def scroll_and_heart(page: Page, context) -> int:
-    # Instantly close any tab the click accidentally opens
     def _close_tab(p):
         asyncio.ensure_future(p.close())
     context.on("page", _close_tab)
@@ -140,7 +123,27 @@ async def scroll_and_heart(page: Page, context) -> int:
     total = 0
     seen  = set()
 
-    while True:
+    # Position mouse over the list panel so mouse wheel scrolls it
+    list_panel = await page.query_selector('[data-elm-id="asset-list_content_v2"]')
+    mouse_x, mouse_y = 400, 400   # fallback coords
+    if list_panel:
+        box = await list_panel.bounding_box()
+        if box:
+            mouse_x = box['x'] + box['width'] * 0.3   # left 30% = list, not map
+            mouse_y = box['y'] + box['height'] * 0.5
+    await page.mouse.move(mouse_x, mouse_y)
+
+    # Diagnostic: check scroll container once at start
+    info = await page.evaluate(GET_SCROLL_STATE_JS)
+    if 'error' in info:
+        print(f"    [!] Scroll container issue: {info['error']}")
+    else:
+        print(f"    [i] List height: {info['scrollHeight']}px  |  visible: {info['clientHeight']}px")
+
+    last_scroll_top = -1
+    no_progress = 0
+
+    while no_progress < 5:
         await dismiss_popups(page)
 
         n = await heart_visible(page, seen)
@@ -148,24 +151,39 @@ async def scroll_and_heart(page: Page, context) -> int:
             total += n
             print(f"    +{n} hearted  (total: {total})")
 
-        # Scroll the virtual list
-        state = await page.evaluate(SCROLL_JS)
+        info = await page.evaluate(GET_SCROLL_STATE_JS)
 
-        if state is None:
-            # No virtual scroll container found — nothing more to do
-            print("    [!] Could not find scroll container — stopping.")
+        if 'error' in info:
+            print(f"    [!] {info['error']} — stopping.")
             break
 
+        scroll_top    = info['scrollTop']
+        scroll_height = info['scrollHeight']
+        client_height = info['clientHeight']
+
+        # At bottom?
+        if scroll_top + client_height >= scroll_height - 20:
+            print(f"    [i] Reached bottom at {scroll_top}px")
+            break
+
+        # No progress?
+        if scroll_top == last_scroll_top:
+            no_progress += 1
+            print(f"    [i] No scroll progress ({no_progress}/5) at {scroll_top}px")
+        else:
+            no_progress = 0
+
+        last_scroll_top = scroll_top
+
+        # Scroll via mouse wheel (most natural, triggers virtual list re-render)
+        await page.mouse.wheel(0, SCROLL_PX)
         await page.wait_for_timeout(SCROLL_DELAY_MS)
 
-        # If scroll position didn't move, we're at the bottom
-        if state["after"] == state["before"]:
-            # One final pass to catch the last visible cards
-            n = await heart_visible(page, seen)
-            if n:
-                total += n
-                print(f"    +{n} hearted  (total: {total})")
-            break
+    # Final pass after reaching end
+    n = await heart_visible(page, seen)
+    if n:
+        total += n
+        print(f"    +{n} hearted  (total: {total})")
 
     return total
 
@@ -181,7 +199,6 @@ async def run(search_url: str) -> None:
             )
         )
         page = await context.new_page()
-
         await login(page)
 
         print(f"\n[*] Loading: {search_url}")
