@@ -29,9 +29,9 @@ EMAIL    = os.getenv("AUCTION_EMAIL", "")
 PASSWORD = os.getenv("AUCTION_PASSWORD", "")
 BASE_URL = "https://www.auction.com"
 HEADLESS        = False
-ACTION_DELAY_MS = 400   # ms between heart clicks
-SCROLL_DELAY_MS = 800   # ms to wait after each scroll
-SCROLL_PX       = 400   # pixels to scroll per step
+ACTION_DELAY_MS = 300
+SCROLL_DELAY_MS = 1200
+SCROLL_PX       = 500
 
 
 async def dismiss_popups(page: Page) -> None:
@@ -67,98 +67,105 @@ async def login(page: Page) -> None:
         print("[!] Login timed out — continuing.")
 
 
-async def scroll_and_heart(page: Page, context) -> int:
-    """
-    Scroll the virtual list container and heart every property.
-    auction.com renders only visible cards; we must scroll to expose all of them.
-    Heart icons:  i[data-elm-id^="save_property_icon_asset_"].far  = un-hearted
-                  class changes to .fas after saving
+# Find the virtual scroll container by walking up from a property card
+FIND_SCROLL_JS = """
+() => {
+    // Walk up from any property card root to find the scrollable container
+    var card = document.querySelector('[data-elm-id^="asset_"][data-elm-id$="_root"]');
+    if (!card) return null;
+    var el = card.parentElement;
+    while (el && el !== document.body) {
+        var st = window.getComputedStyle(el);
+        if ((st.overflow === 'auto' || st.overflowY === 'auto') && el.scrollHeight > el.clientHeight) {
+            return true;   // found — we'll scroll it separately
+        }
+        el = el.parentElement;
+    }
+    return null;
+}
+"""
 
-    Clicks bubble up to the <a target="_blank"> card link and open new tabs —
-    we close those immediately via the context 'page' event.
-    """
-    HEART_SEL = 'i[data-elm-id^="save_property_icon_asset_"]'
-
-    # Auto-close any new tab that opens (prevents computer slowdown)
-    def _close_new_tab(new_page):
-        asyncio.ensure_future(new_page.close())
-
-    context.on("page", _close_new_tab)
-
-    total   = 0
-    seen    = set()   # track elm-ids we've already clicked
-
-    # The virtual scroll container
-    scroll_js = """
-        (function() {
-            var el = document.querySelector('.b__list--GbooP');
-            if (!el) return null;
-            el.scrollTop += """ + str(SCROLL_PX) + """;
-            return {
-                scrollTop:    el.scrollTop,
+SCROLL_JS = f"""
+() => {{
+    var card = document.querySelector('[data-elm-id^="asset_"][data-elm-id$="_root"]');
+    if (!card) return null;
+    var el = card.parentElement;
+    while (el && el !== document.body) {{
+        var st = window.getComputedStyle(el);
+        if ((st.overflow === 'auto' || st.overflowY === 'auto') && el.scrollHeight > el.clientHeight) {{
+            var before = el.scrollTop;
+            el.scrollTop += {SCROLL_PX};
+            return {{
+                before: before,
+                after: el.scrollTop,
                 scrollHeight: el.scrollHeight,
                 clientHeight: el.clientHeight
-            };
-        })()
-    """
+            }};
+        }}
+        el = el.parentElement;
+    }}
+    return null;
+}}
+"""
 
-    at_bottom = False
-    stall_count = 0   # consecutive scrolls with 0 new hearts
 
-    while stall_count < 4:
+async def heart_visible(page: Page, seen: set) -> int:
+    """Click all un-hearted hearts currently in the DOM. Returns count clicked."""
+    hearts = await page.query_selector_all('i[data-elm-id^="save_property_icon_asset_"]')
+    clicked = 0
+    for heart in hearts:
+        elm_id = await heart.get_attribute("data-elm-id")
+        if not elm_id or elm_id in seen:
+            continue
+        cls = await heart.get_attribute("class") or ""
+        if "fas" in cls:        # solid heart = already saved
+            seen.add(elm_id)
+            continue
+        try:
+            await heart.click(force=True)   # force bypasses aria-hidden check
+            seen.add(elm_id)
+            clicked += 1
+            await page.wait_for_timeout(ACTION_DELAY_MS)
+        except Exception as exc:
+            print(f"    [!] click error: {exc}")
+    return clicked
+
+
+async def scroll_and_heart(page: Page, context) -> int:
+    # Instantly close any tab the click accidentally opens
+    def _close_tab(p):
+        asyncio.ensure_future(p.close())
+    context.on("page", _close_tab)
+
+    total = 0
+    seen  = set()
+
+    while True:
         await dismiss_popups(page)
 
-        # Click all currently visible un-hearted hearts
-        hearts = await page.query_selector_all(HEART_SEL)
-        new_this_pass = 0
-
-        for heart in hearts:
-            elm_id = await heart.get_attribute("data-elm-id")
-            if not elm_id or elm_id in seen:
-                continue
-            cls = await heart.get_attribute("class") or ""
-            if "fas" in cls:          # already hearted (solid icon) — skip
-                seen.add(elm_id)
-                continue
-            try:
-                # Block the parent <a> from navigating, then click with bubbles so
-                # React's save handler fires correctly
-                await page.evaluate("""(el) => {
-                    const a = el.closest('a');
-                    if (a) {
-                        const block = (e) => { e.preventDefault(); e.stopImmediatePropagation(); };
-                        a.addEventListener('click', block, {once: true, capture: true});
-                    }
-                    el.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
-                }""", heart)
-                seen.add(elm_id)
-                new_this_pass += 1
-                total += 1
-                await page.wait_for_timeout(ACTION_DELAY_MS)
-            except Exception as exc:
-                print(f"    [!] {exc}")
-
-        if new_this_pass:
-            print(f"    +{new_this_pass} hearted  (running total: {total})")
-            stall_count = 0
-        else:
-            stall_count += 1
-
-        if at_bottom:
-            break
+        n = await heart_visible(page, seen)
+        if n:
+            total += n
+            print(f"    +{n} hearted  (total: {total})")
 
         # Scroll the virtual list
-        state = await page.evaluate(scroll_js)
+        state = await page.evaluate(SCROLL_JS)
+
         if state is None:
-            # Fallback: scroll the window
-            await page.evaluate(f"window.scrollBy(0, {SCROLL_PX})")
-            at_bottom = await page.evaluate(
-                "window.scrollY + window.innerHeight >= document.body.scrollHeight - 20"
-            )
-        else:
-            at_bottom = (state["scrollTop"] + state["clientHeight"]) >= (state["scrollHeight"] - 20)
+            # No virtual scroll container found — nothing more to do
+            print("    [!] Could not find scroll container — stopping.")
+            break
 
         await page.wait_for_timeout(SCROLL_DELAY_MS)
+
+        # If scroll position didn't move, we're at the bottom
+        if state["after"] == state["before"]:
+            # One final pass to catch the last visible cards
+            n = await heart_visible(page, seen)
+            if n:
+                total += n
+                print(f"    +{n} hearted  (total: {total})")
+            break
 
     return total
 
@@ -184,7 +191,6 @@ async def run(search_url: str) -> None:
 
         print("[*] Scrolling and hearting all properties …\n")
         total = await scroll_and_heart(page, context)
-
         await browser.close()
 
     print(f"\n[+] Done! Total properties hearted: {total}")
