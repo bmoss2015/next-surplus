@@ -1,7 +1,5 @@
 """
-auction.com DEBUG tool
-Opens the search page, saves a screenshot, and dumps all button/link info
-so we can identify the correct heart/save button selector.
+auction.com DEBUG tool — saves screenshot + button dump to identify selectors.
 
 Run:
     python auction_debug.py
@@ -9,22 +7,50 @@ Run:
 
 import asyncio
 import os
-from dotenv import load_dotenv
+from pathlib import Path
 from playwright.async_api import async_playwright, Page, TimeoutError as PWTimeout
 
-load_dotenv()
+
+def _load_env():
+    env_path = Path(__file__).parent / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8-sig").splitlines():
+        line = line.strip()
+        if line and "=" in line and not line.startswith("#"):
+            key, _, val = line.partition("=")
+            os.environ.setdefault(key.strip(), val.strip())
+
+_load_env()
 
 EMAIL    = os.getenv("AUCTION_EMAIL", "")
 PASSWORD = os.getenv("AUCTION_PASSWORD", "")
 BASE_URL = "https://www.auction.com"
 
 
+async def dismiss_popups(page: Page) -> None:
+    for sel in [
+        'button.save-preference-btn-handler',
+        'button.ot-pc-refuse-all-handler',
+        '[data-elm-id="onboarding_drawer_get_started_button"]',
+        '[aria-label="Close"]',
+    ]:
+        try:
+            el = await page.query_selector(sel)
+            if el and await el.is_visible():
+                await el.click()
+                await page.wait_for_timeout(600)
+        except Exception:
+            pass
+
+
 async def login(page: Page) -> None:
     if not EMAIL or not PASSWORD:
-        print("[!] No credentials — skipping login.")
+        print("[!] No credentials found in .env — running without login.")
         return
-    print("[*] Logging in …")
+    print(f"[*] Logging in as {EMAIL} …")
     await page.goto(f"{BASE_URL}/login/", wait_until="networkidle")
+    await dismiss_popups(page)
     await page.fill('input[type="email"], input[name="email"], #email', EMAIL)
     await page.fill('input[type="password"], input[name="password"], #password', PASSWORD)
     await page.click('button[type="submit"], input[type="submit"], .login-btn')
@@ -32,7 +58,7 @@ async def login(page: Page) -> None:
         await page.wait_for_url(lambda u: "/login" not in u, timeout=15_000)
         print("[+] Logged in.")
     except PWTimeout:
-        print("[!] Login timed out — continuing.")
+        print("[!] Login timed out.")
 
 
 async def debug(search_url: str) -> None:
@@ -51,66 +77,49 @@ async def debug(search_url: str) -> None:
 
         print(f"\n[*] Loading: {search_url}")
         await page.goto(search_url, wait_until="networkidle", timeout=30_000)
-        await page.wait_for_timeout(3_000)  # extra wait for lazy content
+        await page.wait_for_timeout(3_000)
+        await dismiss_popups(page)
+        await page.wait_for_timeout(1_000)
 
-        # Save screenshot
         await page.screenshot(path="debug_screenshot.png", full_page=False)
         print("[+] Screenshot saved: debug_screenshot.png")
 
-        # Dump every button and svg-containing element to a file
         elements = await page.evaluate("""() => {
             const results = [];
-
-            // All buttons
-            document.querySelectorAll('button').forEach(el => {
+            document.querySelectorAll('button, [data-elm-id]').forEach(el => {
+                const elmId = el.getAttribute('data-elm-id') || '';
+                const label = el.getAttribute('aria-label') || '';
+                const title = el.getAttribute('title') || '';
+                const text  = (el.innerText || '').trim().substring(0, 80);
+                const cls   = el.className?.toString().substring(0, 120) || '';
+                const tid   = el.getAttribute('data-testid') || '';
                 results.push({
-                    tag: 'button',
-                    text: el.innerText.trim().substring(0, 80),
-                    ariaLabel: el.getAttribute('aria-label') || '',
-                    ariaPressed: el.getAttribute('aria-pressed') || '',
-                    className: el.className.toString().substring(0, 120),
-                    dataTestId: el.getAttribute('data-testid') || '',
-                    outerHTML: el.outerHTML.substring(0, 300),
+                    tag: el.tagName,
+                    text, label, title, elmId, cls, tid,
+                    html: el.outerHTML.substring(0, 350),
                 });
             });
-
-            // All elements with data-testid containing save/heart/favorite/watch
-            document.querySelectorAll('[data-testid]').forEach(el => {
-                const tid = el.getAttribute('data-testid') || '';
-                if (/save|heart|fav|watch/i.test(tid)) {
-                    results.push({
-                        tag: el.tagName,
-                        text: el.innerText?.trim().substring(0, 80) || '',
-                        ariaLabel: el.getAttribute('aria-label') || '',
-                        ariaPressed: el.getAttribute('aria-pressed') || '',
-                        className: el.className.toString().substring(0, 120),
-                        dataTestId: tid,
-                        outerHTML: el.outerHTML.substring(0, 300),
-                    });
-                }
-            });
-
             return results;
         }""")
 
-        with open("debug_elements.txt", "w", encoding="utf-8") as f:
+        out_path = Path("debug_elements.txt")
+        with out_path.open("w", encoding="utf-8") as f:
             f.write(f"URL: {page.url}\n")
-            f.write(f"Total elements found: {len(elements)}\n")
+            f.write(f"Logged in as: {EMAIL or '(not logged in)'}\n")
+            f.write(f"Total elements: {len(elements)}\n")
             f.write("=" * 80 + "\n\n")
             for i, el in enumerate(elements):
                 f.write(f"[{i}] tag={el['tag']}\n")
-                f.write(f"     text       : {el['text']}\n")
-                f.write(f"     aria-label : {el['ariaLabel']}\n")
-                f.write(f"     aria-pressed: {el['ariaPressed']}\n")
-                f.write(f"     class      : {el['className']}\n")
-                f.write(f"     data-testid: {el['dataTestId']}\n")
-                f.write(f"     html       : {el['outerHTML']}\n\n")
+                f.write(f"     text        : {el['text']}\n")
+                f.write(f"     aria-label  : {el['label']}\n")
+                f.write(f"     title       : {el['title']}\n")
+                f.write(f"     data-elm-id : {el['elmId']}\n")
+                f.write(f"     class       : {el['cls']}\n")
+                f.write(f"     data-testid : {el['tid']}\n")
+                f.write(f"     html        : {el['html']}\n\n")
 
-        print(f"[+] Element dump saved: debug_elements.txt  ({len(elements)} elements)")
-        print("\nOpen debug_screenshot.png to see the page.")
-        print("Open debug_elements.txt and look for the heart/save button.")
-        print("Share debug_elements.txt and I will fix the selector.\n")
-
+        print(f"[+] debug_elements.txt saved  ({len(elements)} elements)")
+        print("\nPaste the contents of debug_elements.txt here so the selector can be fixed.")
         await browser.close()
 
 
@@ -118,7 +127,13 @@ if __name__ == "__main__":
     print("=" * 50)
     print("  auction.com Selector Debugger")
     print("=" * 50)
-    url = input("\nPaste the auction.com search URL:\n> ").strip()
+
+    if not EMAIL:
+        print("\n[!] No credentials in .env — will run without login\n")
+    else:
+        print(f"\n[+] Credentials loaded: {EMAIL}\n")
+
+    url = input("Paste the auction.com search URL:\n> ").strip()
     if not url:
         url = f"{BASE_URL}/real-estate-foreclosures/"
     asyncio.run(debug(url))
