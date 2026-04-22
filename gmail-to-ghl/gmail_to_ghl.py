@@ -134,25 +134,6 @@ def create_ghl_note(contact_id, subject, body, user_id):
     return resp.status_code in (200, 201), resp.json()
 
 
-def create_ghl_activity(contact_id, subject, body):
-    today = datetime.now().strftime("%b %d, %Y")
-    full_address = extract_full_address(subject)
-    payload = {
-        "contactId": contact_id,
-        "activityType": "CustomActivity",
-        "title": f"Property Sold: {full_address}",
-        "body": build_activity_body(subject, body),
-        "date": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
-    resp = requests.post(
-        f"{GHL_BASE_URL}/contacts/{contact_id}/activity",
-        headers=ghl_headers(),
-        json=payload,
-    )
-    logger.info(f"Activity API response: {resp.status_code} {resp.text}")
-    return resp.status_code in (200, 201), resp.json() if resp.text else {}
-
-
 def connect_to_gmail():
     mail = imaplib.IMAP4_SSL("imap.gmail.com", 993)
     mail.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
@@ -230,12 +211,6 @@ def poll_gmail(assigned_user_id):
                     logger.info("Note added to GHL contact")
                 else:
                     logger.error(f"Failed to create note: {note_result}")
-
-                activity_ok, activity_result = create_ghl_activity(contact_id, subject, body)
-                if activity_ok:
-                    logger.info("Activity added to GHL contact")
-                else:
-                    logger.warning(f"Activity endpoint returned: {activity_result}")
             else:
                 logger.error("Could not create contact — skipping")
 
