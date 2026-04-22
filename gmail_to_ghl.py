@@ -110,17 +110,20 @@ def create_ghl_task(contact_id, subject, assigned_user_id):
     return resp.status_code in (200, 201), resp.json()
 
 
-def create_ghl_note(contact_id, subject, body, user_id):
+def build_activity_body(subject, body):
     today = datetime.now().strftime("%b %d, %Y")
     full_address = extract_full_address(subject)
     sold_amount = extract_sold_amount(body)
-    note_body = (
+    return (
         f"Sold Date: {today}\n"
         f"Address: {full_address}\n"
         f"Sold Amount: {sold_amount}\n"
         f"Link: https://www.auction.com"
     )
-    payload = {"body": note_body}
+
+
+def create_ghl_note(contact_id, subject, body, user_id):
+    payload = {"body": build_activity_body(subject, body)}
     if user_id:
         payload["userId"] = user_id
     resp = requests.post(
@@ -129,6 +132,25 @@ def create_ghl_note(contact_id, subject, body, user_id):
         json=payload,
     )
     return resp.status_code in (200, 201), resp.json()
+
+
+def create_ghl_activity(contact_id, subject, body):
+    today = datetime.now().strftime("%b %d, %Y")
+    full_address = extract_full_address(subject)
+    payload = {
+        "contactId": contact_id,
+        "activityType": "CustomActivity",
+        "title": f"Property Sold: {full_address}",
+        "body": build_activity_body(subject, body),
+        "date": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    resp = requests.post(
+        f"{GHL_BASE_URL}/contacts/{contact_id}/activity",
+        headers=ghl_headers(),
+        json=payload,
+    )
+    logger.info(f"Activity API response: {resp.status_code} {resp.text}")
+    return resp.status_code in (200, 201), resp.json() if resp.text else {}
 
 
 def connect_to_gmail():
@@ -205,9 +227,15 @@ def poll_gmail(assigned_user_id):
 
                 note_ok, note_result = create_ghl_note(contact_id, subject, body, assigned_user_id)
                 if note_ok:
-                    logger.info("Note added to GHL contact activity")
+                    logger.info("Note added to GHL contact")
                 else:
                     logger.error(f"Failed to create note: {note_result}")
+
+                activity_ok, activity_result = create_ghl_activity(contact_id, subject, body)
+                if activity_ok:
+                    logger.info("Activity added to GHL contact")
+                else:
+                    logger.warning(f"Activity endpoint returned: {activity_result}")
             else:
                 logger.error("Could not create contact — skipping")
 
