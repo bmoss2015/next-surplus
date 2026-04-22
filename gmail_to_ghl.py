@@ -87,7 +87,7 @@ def find_ghl_contact(email_address):
 def create_ghl_task(contact_id, subject, body, sender):
     due_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
-        "title": f"Email: {subject}",
+        "title": f"Auction Sale {datetime.now().strftime('%b %d, %Y')}: {subject}",
         "body": f"From: {sender}\n\n{body[:1000]}",
         "dueDate": due_date,
         "completed": False,
