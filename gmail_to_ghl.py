@@ -78,6 +78,12 @@ def find_or_create_ghl_contact(email_address, sender_name):
         logger.info(f"Created new GHL contact for {email_address}")
         return contact_id
 
+    if resp.status_code == 400:
+        existing_id = resp.json().get("meta", {}).get("contactId")
+        if existing_id:
+            logger.info(f"Contact already exists for {email_address}, using existing ID")
+            return existing_id
+
     logger.error(f"Failed to create contact for {email_address}: {resp.text}")
     return None
 
@@ -89,7 +95,6 @@ def create_ghl_task(contact_id, subject, body, sender, assigned_user_id):
         "body": f"From: {sender}\n\n{body[:1000]}",
         "dueDate": due_date,
         "completed": False,
-        "contactId": contact_id,
     }
     if assigned_user_id:
         payload["assignedTo"] = assigned_user_id
