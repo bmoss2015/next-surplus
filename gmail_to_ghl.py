@@ -1,24 +1,22 @@
 import os
-import base64
+import imaplib
+import email
 import time
 import logging
+from email.header import decode_header
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import requests
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 
 load_dotenv()
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
-GMAIL_LABEL = os.getenv("GMAIL_LABEL", "INBOX")
+GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+GMAIL_FOLDER = os.getenv("GMAIL_FOLDER", "INBOX")
 GHL_API_KEY = os.getenv("GHL_API_KEY")
 GHL_LOCATION_ID = os.getenv("GHL_LOCATION_ID")
 GHL_BASE_URL = "https://services.leadconnectorhq.com"
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", 300))
-PROCESSED_LABEL_NAME = "GHL-Processed"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,57 +25,34 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_gmail_service():
-    creds = None
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+def connect_to_gmail():
+    mail = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+    mail.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+    return mail
+
+
+def decode_subject(raw_subject):
+    parts = decode_header(raw_subject)
+    subject = ""
+    for part, encoding in parts:
+        if isinstance(part, bytes):
+            subject += part.decode(encoding or "utf-8", errors="replace")
         else:
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open("token.json", "w") as f:
-            f.write(creds.to_json())
-    return build("gmail", "v1", credentials=creds)
-
-
-def get_or_create_label(service, name):
-    labels = service.users().labels().list(userId="me").execute().get("labels", [])
-    for label in labels:
-        if label["name"] == name:
-            return label["id"]
-    result = service.users().labels().create(
-        userId="me",
-        body={
-            "name": name,
-            "labelListVisibility": "labelShow",
-            "messageListVisibility": "show",
-        },
-    ).execute()
-    logger.info(f"Created Gmail label: {name}")
-    return result["id"]
-
-
-def get_header(headers, name):
-    for h in headers:
-        if h["name"].lower() == name.lower():
-            return h["value"]
-    return ""
+            subject += part
+    return subject
 
 
 def get_email_body(msg):
-    payload = msg.get("payload", {})
-    parts = payload.get("parts", [])
-    if parts:
-        for part in parts:
-            if part.get("mimeType") == "text/plain":
-                data = part["body"].get("data", "")
-                if data:
-                    return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
-    data = payload.get("body", {}).get("data", "")
-    if data:
-        return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == "text/plain":
+                payload = part.get_payload(decode=True)
+                if payload:
+                    return payload.decode("utf-8", errors="replace")
+    else:
+        payload = msg.get_payload(decode=True)
+        if payload:
+            return payload.decode("utf-8", errors="replace")
     return ""
 
 
@@ -85,6 +60,14 @@ def extract_email_address(sender):
     if "<" in sender:
         return sender.split("<")[1].strip(">").strip()
     return sender.strip()
+
+
+def ghl_headers():
+    return {
+        "Authorization": f"Bearer {GHL_API_KEY}",
+        "Content-Type": "application/json",
+        "Version": "2021-07-28",
+    }
 
 
 def find_ghl_contact(email_address):
@@ -117,34 +100,28 @@ def create_ghl_task(contact_id, subject, body, sender):
     return resp.status_code in (200, 201), resp.json()
 
 
-def ghl_headers():
-    return {
-        "Authorization": f"Bearer {GHL_API_KEY}",
-        "Content-Type": "application/json",
-        "Version": "2021-07-28",
-    }
+def poll_gmail():
+    logger.info("Connecting to Gmail...")
+    mail = connect_to_gmail()
+    mail.select(GMAIL_FOLDER)
 
+    _, data = mail.search(None, "UNSEEN")
+    email_ids = data[0].split()
 
-def poll_gmail(service, processed_label_id):
-    logger.info("Checking for new emails...")
-    query = f"label:{GMAIL_LABEL} is:unread -label:{PROCESSED_LABEL_NAME}"
-    results = service.users().messages().list(userId="me", q=query).execute()
-    messages = results.get("messages", [])
-
-    if not messages:
+    if not email_ids:
         logger.info("No new emails.")
+        mail.logout()
         return
 
-    logger.info(f"Found {len(messages)} new email(s)")
+    logger.info(f"Found {len(email_ids)} new email(s)")
 
-    for meta in messages:
-        msg = service.users().messages().get(
-            userId="me", id=meta["id"], format="full"
-        ).execute()
+    for eid in email_ids:
+        _, msg_data = mail.fetch(eid, "(RFC822)")
+        raw = msg_data[0][1]
+        msg = email.message_from_bytes(raw)
 
-        headers = msg["payload"]["headers"]
-        subject = get_header(headers, "Subject") or "(no subject)"
-        sender = get_header(headers, "From") or "unknown"
+        subject = decode_subject(msg.get("Subject", "(no subject)"))
+        sender = msg.get("From", "unknown")
         body = get_email_body(msg)
         email_address = extract_email_address(sender)
 
@@ -159,32 +136,25 @@ def poll_gmail(service, processed_label_id):
             else:
                 logger.error(f"Failed to create GHL task: {result}")
         else:
-            logger.warning(
-                f"No GHL contact found for {email_address} — email logged but no task created"
-            )
+            logger.warning(f"No GHL contact found for {email_address} — skipping task creation")
 
-        # Mark processed so it won't be picked up again
-        service.users().messages().modify(
-            userId="me",
-            id=meta["id"],
-            body={
-                "addLabelIds": [processed_label_id],
-                "removeLabelIds": ["UNREAD"],
-            },
-        ).execute()
+        # Mark as read so it won't be picked up again
+        mail.store(eid, "+FLAGS", "\\Seen")
+
+    mail.logout()
 
 
 def main():
+    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
+        raise EnvironmentError("GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set in .env")
     if not GHL_API_KEY or not GHL_LOCATION_ID:
         raise EnvironmentError("GHL_API_KEY and GHL_LOCATION_ID must be set in .env")
 
     logger.info("Starting Gmail -> GoHighLevel automation")
-    service = get_gmail_service()
-    processed_label_id = get_or_create_label(service, PROCESSED_LABEL_NAME)
 
     while True:
         try:
-            poll_gmail(service, processed_label_id)
+            poll_gmail()
         except Exception as e:
             logger.error(f"Error during poll: {e}")
         logger.info(f"Sleeping {POLL_INTERVAL}s until next check...")
