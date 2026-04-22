@@ -1,6 +1,7 @@
 import os
 import imaplib
 import email
+import re
 import time
 import logging
 from email.header import decode_header
@@ -50,23 +51,34 @@ def get_assigned_user_id():
     return None
 
 
-def find_or_create_ghl_contact(email_address, sender_name):
-    resp = requests.get(
-        f"{GHL_BASE_URL}/contacts/",
-        headers=ghl_headers(),
-        params={"email": email_address, "locationId": GHL_LOCATION_ID},
-    )
-    if resp.status_code == 200:
-        contacts = resp.json().get("contacts", [])
-        if contacts:
-            return contacts[0]["id"]
+def extract_full_address(subject):
+    match = re.search(r'Transaction Update:\s*(.+?)\s*-\s*Sold', subject, re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return ""
 
-    name_parts = sender_name.split(" ", 1)
+
+def extract_street_address(subject):
+    full = extract_full_address(subject)
+    if "," in full:
+        return full.split(",")[0].strip()
+    return full
+
+
+def extract_sold_amount(body):
+    match = re.search(r'for \$([0-9,]+)', body, re.IGNORECASE)
+    if match:
+        return f"${match.group(1)}"
+    return "Not found"
+
+
+def create_ghl_contact(subject):
+    today = datetime.now().strftime("%b %d, %Y")
+    street = extract_street_address(subject) or "Auction Property"
     payload = {
         "locationId": GHL_LOCATION_ID,
-        "email": email_address,
-        "firstName": name_parts[0] if name_parts else email_address,
-        "lastName": name_parts[1] if len(name_parts) > 1 else "",
+        "firstName": today,
+        "lastName": street,
     }
     resp = requests.post(
         f"{GHL_BASE_URL}/contacts/",
@@ -75,32 +87,44 @@ def find_or_create_ghl_contact(email_address, sender_name):
     )
     if resp.status_code in (200, 201):
         contact_id = resp.json().get("contact", {}).get("id")
-        logger.info(f"Created new GHL contact for {email_address}")
+        logger.info(f"Created GHL contact: {today} {street}")
         return contact_id
-
-    if resp.status_code == 400:
-        existing_id = resp.json().get("meta", {}).get("contactId")
-        if existing_id:
-            logger.info(f"Contact already exists for {email_address}, using existing ID")
-            return existing_id
-
-    logger.error(f"Failed to create contact for {email_address}: {resp.text}")
+    logger.error(f"Failed to create contact: {resp.text}")
     return None
 
 
-def create_ghl_task(contact_id, subject, body, sender, assigned_user_id):
+def create_ghl_task(contact_id, subject, assigned_user_id):
     due_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
         "title": f"Auction Sale {datetime.now().strftime('%b %d, %Y')}: {subject}",
-        "body": f"From: {sender}\n\n{body[:1000]}",
         "dueDate": due_date,
         "completed": False,
     }
     if assigned_user_id:
         payload["assignedTo"] = assigned_user_id
-
     resp = requests.post(
         f"{GHL_BASE_URL}/contacts/{contact_id}/tasks",
+        headers=ghl_headers(),
+        json=payload,
+    )
+    return resp.status_code in (200, 201), resp.json()
+
+
+def create_ghl_note(contact_id, subject, body, user_id):
+    today = datetime.now().strftime("%b %d, %Y")
+    full_address = extract_full_address(subject)
+    sold_amount = extract_sold_amount(body)
+    note_body = (
+        f"Sold Date: {today}\n"
+        f"Address: {full_address}\n"
+        f"Sold Amount: {sold_amount}\n"
+        f"Link: https://www.auction.com"
+    )
+    payload = {"body": note_body}
+    if user_id:
+        payload["userId"] = user_id
+    resp = requests.post(
+        f"{GHL_BASE_URL}/contacts/{contact_id}/notes",
         headers=ghl_headers(),
         json=payload,
     )
@@ -114,6 +138,8 @@ def connect_to_gmail():
 
 
 def decode_subject(raw_subject):
+    if not raw_subject:
+        return "(no subject)"
     parts = decode_header(raw_subject)
     subject = ""
     for part, encoding in parts:
@@ -138,65 +164,63 @@ def get_email_body(msg):
     return ""
 
 
-def extract_sender_info(sender):
-    if "<" in sender:
-        name = sender.split("<")[0].strip().strip('"')
-        email_address = sender.split("<")[1].strip(">").strip()
-    else:
-        name = sender.strip()
-        email_address = sender.strip()
-    return name, email_address
-
-
 def poll_gmail(assigned_user_id):
     logger.info("Connecting to Gmail...")
     mail = connect_to_gmail()
     mail.select(f'"{GMAIL_FOLDER}"')
 
-    _, data = mail.search(None, "UNSEEN")
-    email_ids = data[0].split()
+    _, data = mail.uid("search", None, "UNSEEN")
+    uids = data[0].split()
 
-    if not email_ids:
+    if not uids:
         logger.info("No new emails.")
         mail.logout()
         return
 
-    logger.info(f"Found {len(email_ids)} new email(s)")
+    logger.info(f"Found {len(uids)} new email(s)")
 
-    for eid in email_ids:
+    for uid in uids:
         try:
-            _, msg_data = mail.fetch(eid, "(RFC822)")
+            _, msg_data = mail.uid("fetch", uid, "(RFC822)")
             if not msg_data or not msg_data[0]:
-                logger.warning(f"Could not fetch email ID {eid}, skipping.")
+                logger.warning(f"Could not fetch UID {uid}, skipping.")
                 continue
 
             raw = msg_data[0][1]
             msg = email.message_from_bytes(raw)
 
-            subject = decode_subject(msg.get("Subject", "(no subject)"))
-            sender = msg.get("From", "unknown")
+            subject = decode_subject(msg.get("Subject", ""))
             body = get_email_body(msg)
-            sender_name, email_address = extract_sender_info(sender)
 
-            logger.info(f'Processing: "{subject}" from {sender}')
+            logger.info(f'Processing: "{subject}"')
 
-            contact_id = find_or_create_ghl_contact(email_address, sender_name)
+            contact_id = create_ghl_contact(subject)
 
             if contact_id:
-                success, result = create_ghl_task(contact_id, subject, body, sender, assigned_user_id)
-                if success:
-                    logger.info(f"Task created in GHL for {email_address}")
+                task_ok, task_result = create_ghl_task(contact_id, subject, assigned_user_id)
+                if task_ok:
+                    logger.info("Task created in GHL")
                 else:
-                    logger.error(f"Failed to create GHL task: {result}")
-            else:
-                logger.error(f"Could not find or create contact for {email_address} — skipping")
+                    logger.error(f"Failed to create task: {task_result}")
 
-            mail.store(eid, "+FLAGS", "\\Seen")
-            mail.copy(eid, f'"{GMAIL_PROCESSED_FOLDER}"')
-            mail.store(eid, "+FLAGS", "\\Deleted")
+                note_ok, note_result = create_ghl_note(contact_id, subject, body, assigned_user_id)
+                if note_ok:
+                    logger.info("Note added to GHL contact activity")
+                else:
+                    logger.error(f"Failed to create note: {note_result}")
+            else:
+                logger.error("Could not create contact — skipping")
+
+            mail.uid("store", uid, "+FLAGS", "\\Seen")
+            copy_result = mail.uid("copy", uid, f'"{GMAIL_PROCESSED_FOLDER}"')
+            if copy_result[0] == "OK":
+                mail.uid("store", uid, "+FLAGS", "\\Deleted")
+                logger.info(f"Email moved to {GMAIL_PROCESSED_FOLDER}")
+            else:
+                logger.warning(f"Could not move email to {GMAIL_PROCESSED_FOLDER}: {copy_result}")
 
         except Exception as e:
-            logger.error(f"Error processing email {eid}: {e}")
+            logger.error(f"Error processing UID {uid}: {e}")
 
     mail.expunge()
     mail.logout()
