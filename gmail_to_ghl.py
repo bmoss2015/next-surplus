@@ -13,6 +13,7 @@ load_dotenv()
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 GMAIL_FOLDER = os.getenv("GMAIL_FOLDER", "INBOX")
+GMAIL_PROCESSED_FOLDER = os.getenv("GMAIL_PROCESSED_FOLDER", "Pushed to GHL")
 GHL_API_KEY = os.getenv("GHL_API_KEY")
 GHL_LOCATION_ID = os.getenv("GHL_LOCATION_ID")
 GHL_BASE_URL = "https://services.leadconnectorhq.com"
@@ -139,8 +140,13 @@ def poll_gmail():
             logger.warning(f"No GHL contact found for {email_address} — skipping task creation")
 
         # Mark as read so it won't be picked up again
+        # Mark as read
         mail.store(eid, "+FLAGS", "\\Seen")
+        # Move to processed folder
+        mail.copy(eid, f'"{GMAIL_PROCESSED_FOLDER}"')
+        mail.store(eid, "+FLAGS", "\\Deleted")
 
+    mail.expunge()
     mail.logout()
 
 
