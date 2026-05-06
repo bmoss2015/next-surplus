@@ -1,0 +1,269 @@
+{
+  "_comment": "Static reference data for Maryland circuit court clerks and county land record offices. Populate each entry with the clerk's name, phone, email, mailing address, filing fee schedule, and surplus claim procedure URL before the first production run.",
+  "counties": [
+    {
+      "name": "Allegany",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Anne Arundel",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Baltimore City",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Baltimore County",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Calvert",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Caroline",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Carroll",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Cecil",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Charles",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Dorchester",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Frederick",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Garrett",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Harford",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Howard",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Kent",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Montgomery",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Prince George's",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Queen Anne's",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Somerset",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "St. Mary's",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Talbot",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Washington",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Wicomico",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    },
+    {
+      "name": "Worcester",
+      "circuit_court": {
+        "clerk": "",
+        "phone": "",
+        "email": "",
+        "address": "",
+        "surplus_claim_url": ""
+      },
+      "land_records_url": ""
+    }
+  ]
+}
