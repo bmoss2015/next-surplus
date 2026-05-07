@@ -8,6 +8,7 @@ street name) and returns a structured assessment record for the matched property
 
 import asyncio
 import logging
+import os
 import re
 from typing import Optional
 
@@ -101,8 +102,8 @@ async def search_sdat(property_address: str, county: str) -> dict:
     """
     street_number, street_name = _parse_address(property_address)
     logger.info(
-        "SDAT search | county=%r  street_number=%r  street_name=%r",
-        county, street_number, street_name,
+        "SDAT search | raw_address=%r  county=%r  -> street_number=%r  street_name=%r",
+        property_address, county, street_number, street_name,
     )
 
     async with async_playwright() as pw:
@@ -188,11 +189,35 @@ async def _accept_disclaimer(page: Page) -> None:
             continue
 
 
+# -- County normalization ----------------------------------------------------
+
+def _normalize_county(county: str) -> list[str]:
+    """
+    Return candidate labels to try in the SDAT county dropdown.
+
+    SDAT uses ALL CAPS names.  Prince George's County is tricky because the
+    apostrophe may or may not appear in the dropdown option text.
+    We return multiple candidates so the caller can try each one.
+    """
+    raw = county.strip()
+    # Drop trailing " County" if present (SDAT dropdown usually omits it)
+    normed = re.sub(r"\s+County$", "", raw, flags=re.IGNORECASE).strip()
+    upper = normed.upper()
+    # Variant without apostrophe (SDAT sometimes uses PRINCE GEORGES)
+    no_apos = upper.replace("'", "")
+    candidates: list[str] = []
+    for variant in [upper, no_apos, raw.upper(), raw]:
+        if variant not in candidates:
+            candidates.append(variant)
+    return candidates
+
+
 # -- Page 1: county + search type -------------------------------------------
 
 async def _fill_page1(page: Page, county: str) -> None:
     """Select county and search type, then advance."""
-    county_upper = county.upper().strip()
+    county_candidates = _normalize_county(county)
+    logger.info("SDAT county candidates: %s", county_candidates)
 
     # County dropdown — try a few ID patterns used by SDAT's ASP.NET controls
     county_selectors = [
@@ -202,21 +227,29 @@ async def _fill_page1(page: Page, county: str) -> None:
         "select[name*='County']",
         "select[id*='County']",
     ]
+    county_selected = False
     for sel in county_selectors:
         try:
             loc = page.locator(sel)
-            if await loc.count() > 0:
-                # Try uppercase label first (SDAT uses ALL CAPS county names)
+            if await loc.count() == 0:
+                continue
+            for label in county_candidates:
                 try:
-                    await loc.select_option(label=county_upper)
+                    await loc.select_option(label=label)
+                    logger.info("Selected county %r via %s", label, sel)
+                    county_selected = True
+                    break
                 except Exception:
-                    await loc.select_option(label=county)
-                logger.debug("Selected county via: %s", sel)
+                    continue
+            if county_selected:
                 break
         except Exception:
             continue
 
-    # Search type dropdown
+    if not county_selected:
+        logger.warning("Could not select county from dropdown — will attempt to continue")
+
+    # Search type dropdown — SDAT uses "STREET ADDRESS" (all caps)
     search_type_selectors = [
         "#SearchType",
         "#ddlSearchType",
@@ -225,18 +258,32 @@ async def _fill_page1(page: Page, county: str) -> None:
         "select[id*='SearchType']",
         "select[name*='Type']",
     ]
+    search_type_labels = ["STREET ADDRESS", "Street Address", "street address"]
     for sel in search_type_selectors:
         try:
             loc = page.locator(sel)
-            if await loc.count() > 0:
-                await loc.select_option(label="Street Address")
-                logger.debug("Selected search type via: %s", sel)
-                break
+            if await loc.count() == 0:
+                continue
+            for label in search_type_labels:
+                try:
+                    await loc.select_option(label=label)
+                    logger.info("Selected search type %r via %s", label, sel)
+                    break
+                except Exception:
+                    continue
+            break
         except Exception:
             continue
 
     await _click_submit(page)
-    await page.wait_for_load_state("domcontentloaded", timeout=20_000)
+    # Wait for page 2 inputs to appear rather than just domcontentloaded
+    try:
+        await page.wait_for_selector(
+            "input[id*='StNo'], input[name*='StNo'], input[id*='StreetNumber'], input[name*='StreetNumber']",
+            timeout=20_000,
+        )
+    except PlaywrightTimeoutError:
+        await page.wait_for_load_state("domcontentloaded", timeout=10_000)
 
 
 # -- Page 2: street number + name -------------------------------------------
@@ -284,7 +331,16 @@ async def _fill_page2(page: Page, street_number: str, street_name: str) -> None:
             continue
 
     await _click_submit(page)
-    await page.wait_for_load_state("domcontentloaded", timeout=20_000)
+    # Wait for results table OR no-results text rather than just domcontentloaded
+    try:
+        await page.wait_for_selector(
+            "table a[href*='Account'], table a[href*='account'], "
+            "table a[href*='Detail'], table a[href*='detail'], "
+            "table tr td",
+            timeout=25_000,
+        )
+    except PlaywrightTimeoutError:
+        await page.wait_for_load_state("domcontentloaded", timeout=10_000)
 
 
 async def _click_submit(page: Page) -> None:
@@ -460,10 +516,31 @@ async def _extract_detail(page: Page) -> dict:
     result = {k: v for k, v in result.items() if v is not None and v != []}
 
     if len(result) <= 2:  # only source_url and maybe historical_owners
+        # --- Debug capture ---
+        current_url = page.url
+        try:
+            screenshot_path = "/tmp/sdat_debug_screenshot.png"
+            await page.screenshot(path=screenshot_path, full_page=True)
+            logger.error("SDAT parse_failed | URL: %s | screenshot: %s", current_url, screenshot_path)
+        except Exception as ss_err:
+            logger.error("SDAT parse_failed | URL: %s | screenshot failed: %s", current_url, ss_err)
+
+        try:
+            html_path = "/tmp/sdat_debug_page.html"
+            html = await page.content()
+            with open(html_path, "w", encoding="utf-8") as fh:
+                fh.write(html)
+            body_text = await page.inner_text("body")
+            logger.error("SDAT page body (first 500 chars): %s", body_text[:500])
+            logger.error("SDAT HTML saved: %s", html_path)
+        except Exception as html_err:
+            logger.error("SDAT HTML capture failed: %s", html_err)
+        # --- End debug ---
+
         return {
             "error": "parse_failed",
             "message": "Could not extract property data — page structure may have changed",
-            "source_url": page.url,
+            "source_url": current_url,
         }
 
     return result
