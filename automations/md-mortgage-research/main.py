@@ -151,6 +151,95 @@ async def oauth_google_start():
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+# ---------------------------------------------------------------------------
+# Test endpoints — synchronous component testing
+# ---------------------------------------------------------------------------
+
+class SDATTestRequest(BaseModel):
+    property_address: str
+    county: str
+
+
+class LandRecordsTestRequest(BaseModel):
+    owner_first_name: str
+    owner_last_name: str
+    county: str
+
+
+class CaseSearchTestRequest(BaseModel):
+    owner_first_name: str
+    owner_last_name: str
+    county: str
+
+
+@app.post("/test/sdat")
+async def test_sdat(req: SDATTestRequest):
+    """Call search_sdat() synchronously and return the full result or error."""
+    import traceback
+    try:
+        from scrapers.sdat import search_sdat
+        result = await search_sdat(req.property_address, req.county)
+        return {"ok": True, "result": result}
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": str(exc), "traceback": traceback.format_exc()},
+        )
+
+
+@app.post("/test/land_records_search")
+async def test_land_records_search(req: LandRecordsTestRequest):
+    """Call search_grantor_index() synchronously and return instruments or error."""
+    import traceback
+    try:
+        from scrapers.land_records import search_grantor_index
+        instruments = await search_grantor_index(
+            grantor_last=req.owner_last_name,
+            grantor_first=req.owner_first_name,
+            county=req.county,
+        )
+        return {"ok": True, "instruments": instruments, "count": len(instruments)}
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": str(exc), "traceback": traceback.format_exc()},
+        )
+
+
+@app.post("/test/case_search_by_owner")
+async def test_case_search_by_owner(req: CaseSearchTestRequest):
+    """Call search_by_owner() synchronously and return cases or error."""
+    import traceback
+    try:
+        from scrapers.case_search import search_by_owner
+        cases = await search_by_owner(
+            owner_first_name=req.owner_first_name,
+            owner_last_name=req.owner_last_name,
+            county=req.county,
+        )
+        return {"ok": True, "cases": cases, "count": len(cases)}
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": str(exc), "traceback": traceback.format_exc()},
+        )
+
+
+@app.post("/test/save_lead")
+async def test_save_lead(lead_data: dict):
+    """Call create_lead() synchronously and return lead_id or error."""
+    import traceback
+    try:
+        from storage.supabase_client import create_lead
+        lead_id = await create_lead(lead_data)
+        return {"ok": True, "lead_id": lead_id}
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": str(exc), "traceback": traceback.format_exc()},
+        )
+
+
 @app.get("/oauth/google/callback")
 async def oauth_google_callback(
     code: str = Query(..., description="Authorization code from Google"),
