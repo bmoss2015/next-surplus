@@ -25,14 +25,14 @@ from typing import Optional
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 
 logger = logging.getLogger(__name__)
 
 _SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
-    "https://www.googleapis.com/auth/drive.metadata",
+    "https://www.googleapis.com/auth/gmail.compose",
 ]
 _DRIVE_ROOT_FOLDER = "Moss Equity Partners"
 _RESEARCH_SUBFOLDER = "Lead Research"
@@ -45,28 +45,52 @@ _folder_cache: dict[str, str] = {}
 # OAuth helpers
 # ---------------------------------------------------------------------------
 
-def authorize_oauth_flow() -> str:
+def get_oauth_authorization_url() -> str:
     """
-    Run the OAuth 2.0 installed-app flow.
+    Generate the Google OAuth 2.0 authorization URL for the user to open.
 
-    Prints the authorization URL, waits for the user to paste the auth code,
-    and returns the refresh token.  Store the returned value in the
-    ``GOOGLE_REFRESH_TOKEN`` environment variable.
-
-    Reads OAuth client credentials from ``GOOGLE_OAUTH_CREDENTIALS_JSON``.
+    Uses the OOB (out-of-band) redirect URI so the user receives an auth code
+    to copy/paste rather than being redirected to a server callback.
 
     Returns:
-        Refresh token string.
+        Authorization URL string.
     """
     creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS_JSON", "")
     if not creds_json:
         raise RuntimeError("GOOGLE_OAUTH_CREDENTIALS_JSON environment variable not set")
 
     creds_info = json.loads(creds_json)
-    flow = InstalledAppFlow.from_client_config(creds_info, scopes=_SCOPES)
-    creds: Credentials = flow.run_local_server(port=0)
-    refresh_token = creds.refresh_token
-    print(f"\nRefresh token obtained.  Store this in GOOGLE_REFRESH_TOKEN:\n{refresh_token}\n")
+    flow = Flow.from_client_config(
+        creds_info,
+        scopes=_SCOPES,
+        redirect_uri="urn:ietf:wg:oauth:2.0:oob",
+    )
+    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
+    return auth_url
+
+
+def complete_oauth_flow(code: str) -> str:
+    """
+    Exchange an authorization code for tokens and return the refresh token.
+
+    Args:
+        code: The authorization code the user copied from Google's consent page.
+
+    Returns:
+        Refresh token string. Store in GOOGLE_REFRESH_TOKEN environment variable.
+    """
+    creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS_JSON", "")
+    if not creds_json:
+        raise RuntimeError("GOOGLE_OAUTH_CREDENTIALS_JSON environment variable not set")
+
+    creds_info = json.loads(creds_json)
+    flow = Flow.from_client_config(
+        creds_info,
+        scopes=_SCOPES,
+        redirect_uri="urn:ietf:wg:oauth:2.0:oob",
+    )
+    flow.fetch_token(code=code)
+    refresh_token = flow.credentials.refresh_token
     return refresh_token
 
 

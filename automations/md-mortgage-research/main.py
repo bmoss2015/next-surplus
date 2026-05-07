@@ -135,29 +135,48 @@ async def get_status(job_id: str):
 @app.post("/oauth/google/start")
 async def oauth_google_start():
     """
-    Start the Google OAuth 2.0 flow for Drive and Gmail.
+    Start the Google OAuth 2.0 flow.
 
-    This launches the installed-app OAuth flow which opens a browser window.
-    Run this endpoint from a local environment (not Railway) and copy the
-    returned refresh token into the ``GOOGLE_REFRESH_TOKEN`` environment
-    variable.
+    Returns an authorization URL the user opens in their own browser.
+    After authorizing, Google shows a code to copy. Pass that code to
+    POST /oauth/google/callback to exchange it for a refresh token.
     """
     try:
-        from storage.google_drive import authorize_oauth_flow
-        refresh_token = authorize_oauth_flow()
+        from storage.google_drive import get_oauth_authorization_url
+        auth_url = get_oauth_authorization_url()
         return {
-            "status": "success",
-            "refresh_token": refresh_token,
-            "message": "Store this in GOOGLE_REFRESH_TOKEN environment variable.",
+            "authorization_url": auth_url,
+            "instructions": (
+                "Open the authorization_url in your browser, authorize access, "
+                "then copy the code Google shows and POST it to /oauth/google/callback "
+                "as JSON: {\"code\": \"<paste-code-here>\"}"
+            ),
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+class OAuthCallbackRequest(BaseModel):
+    code: str
+
+
 @app.post("/oauth/google/callback")
-async def oauth_google_callback(code: str, state: Optional[str] = None):
-    """Placeholder for OAuth callback handling (used when redirect_uri is this server)."""
-    return {"status": "received", "code": code[:8] + "...", "state": state}
+async def oauth_google_callback(body: OAuthCallbackRequest):
+    """
+    Exchange the Google authorization code for a refresh token.
+
+    Accepts the code the user copied from Google's consent screen.
+    Returns the refresh token — store it as GOOGLE_REFRESH_TOKEN in Railway.
+    """
+    try:
+        from storage.google_drive import complete_oauth_flow
+        refresh_token = complete_oauth_flow(body.code)
+        return {
+            "refresh_token": refresh_token,
+            "message": "Store this value as GOOGLE_REFRESH_TOKEN in your Railway environment variables.",
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ---------------------------------------------------------------------------
