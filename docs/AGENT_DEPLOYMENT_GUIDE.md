@@ -216,21 +216,24 @@ jobs:
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com)
 2. Enable **Google Drive API** and **Gmail API**
-3. Create OAuth 2.0 credentials → Desktop application type
-4. Set authorized redirect URI to `urn:ietf:wg:oauth:2.0:oob` (for copy-paste flow) **or** your service URL + `/oauth/google/callback`
-5. Download `credentials.json` and store values as Railway env vars:
-   - `GOOGLE_CLIENT_ID`
-   - `GOOGLE_CLIENT_SECRET`
-6. Hit `POST /oauth/google/start` on the running service → get authorization URL
-7. Open URL in browser, authorize, copy the code
-8. `POST /oauth/google/callback` with `{"code": "<paste-code>"}` → get refresh token
-9. Add refresh token as `GOOGLE_REFRESH_TOKEN` Railway env var
+3. Create OAuth 2.0 credentials → **Web application** type (not Desktop)
+4. Under **Authorized redirect URIs**, add: `https://[your-agent-url]/oauth/google/callback`
+   - e.g. `https://md-mortgage-research-production.up.railway.app/oauth/google/callback`
+5. Download the client JSON and store the entire JSON string as a Railway env var:
+   - `GOOGLE_OAUTH_CREDENTIALS_JSON` — paste the full JSON blob as the value
+6. Optionally set `GOOGLE_OAUTH_REDIRECT_URI` if the callback URL differs from the default
+7. Hit `POST /oauth/google/start` on the running service → returns `{"authorization_url": "..."}`
+8. Open the authorization URL in your browser and authorize access
+9. Google redirects to `/oauth/google/callback` — the page displays the refresh token
+10. Copy the refresh token and add it to Railway as `GOOGLE_REFRESH_TOKEN`
 
-**Common OAuth bugs:**
-- Using `redirect_uri=http://localhost` when the service is remote — use `urn:ietf:wg:oauth:2.0:oob` for the copy-paste flow
-- Forgetting to enable the API in Google Cloud Console (separate from creating credentials)
-- Expired or revoked tokens — re-run the OAuth flow to get a new refresh token
-- Scopes mismatch — ensure `GOOGLE_OAUTH_SCOPES` matches what you request
+**Common OAuth pitfalls:**
+- **Google deprecated the OOB flow.** Never use `redirect_uri=urn:ietf:wg:oauth:2.0:oob` — Google returns Error 400 for all OOB requests as of 2022.
+- **Use Web application client type, not Desktop.** Desktop clients only support `localhost` or OOB (deprecated). Web application clients support HTTPS redirect URIs.
+- **Redirect URI must match exactly.** The URI in Google Cloud Console must be character-for-character identical to what the app sends — including trailing slashes and protocol.
+- Forgetting to enable the API in Google Cloud Console (separate from creating credentials).
+- Expired or revoked tokens — re-run the OAuth flow from step 7 to get a new refresh token.
+- `invalid_grant` on callback — the authorization code expired (~10 min) or was already used. Re-run `/oauth/google/start`.
 
 ---
 
