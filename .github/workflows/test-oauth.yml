@@ -1,0 +1,263 @@
+name: Test OAuth Endpoint
+
+on:
+  push:
+    branches:
+      - claude/setup-md-mortgage-automation-VQ7KG
+    paths-ignore:
+      - 'test-results.json'
+      - 'deploy-status.json'
+
+jobs:
+  test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/setup-md-mortgage-automation-VQ7KG
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve Railway service URL
+        id: url
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          SERVICE_ID="73341e75-b9ea-412c-b0ff-2aa623b26c7b"
+          ENVIRONMENT_ID="b5f83c4b-0081-460a-8038-c63e9caa3f78"
+
+          DOMAIN_QUERY=$(python3 -c "
+          import json
+          q = {
+              'query': '''query(\$serviceId: String!, \$environmentId: String!) {
+                  serviceInstance(serviceId: \$serviceId, environmentId: \$environmentId) {
+                      domains {
+                          serviceDomains { domain }
+                          customDomains { domain }
+                      }
+                  }
+              }''',
+              'variables': {'serviceId': '$SERVICE_ID', 'environmentId': '$ENVIRONMENT_ID'}
+          }
+          print(json.dumps(q))
+          ")
+
+          DOMAIN_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$DOMAIN_QUERY")
+
+          echo "Domain response: $DOMAIN_RESP"
+
+          SERVICE_URL=$(echo "$DOMAIN_RESP" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          inst = data.get('data', {}).get('serviceInstance', {}) or {}
+          domains = inst.get('domains', {}) or {}
+          for d in (domains.get('serviceDomains') or []):
+              if d.get('domain'):
+                  print('https://' + d['domain'])
+                  break
+          for d in (domains.get('customDomains') or []):
+              if d.get('domain'):
+                  print('https://' + d['domain'])
+                  break
+          " 2>/dev/null || echo "")
+
+          # Fall back to RAILWAY_SERVICE_URL secret if API lookup fails
+          if [ -z "$SERVICE_URL" ]; then
+            SERVICE_URL="${{ secrets.RAILWAY_SERVICE_URL }}"
+          fi
+
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "Resolved service URL: $SERVICE_URL"
+
+      - name: Wait for Railway deploy to complete
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          SERVICE_ID="73341e75-b9ea-412c-b0ff-2aa623b26c7b"
+          ENVIRONMENT_ID="b5f83c4b-0081-460a-8038-c63e9caa3f78"
+          MAX_WAIT=600  # 10 minutes
+          ELAPSED=0
+          INTERVAL=20
+
+          echo "Waiting for deployment to leave BUILDING/DEPLOYING state..."
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            DEPLOY_QUERY=$(python3 -c "
+          import json
+          q = {
+              'query': '''query(\$serviceId: String!, \$environmentId: String!) {
+                  deployments(
+                      input: { serviceId: \$serviceId, environmentId: \$environmentId }
+                      first: 1
+                  ) {
+                      edges { node { id status createdAt } }
+                  }
+              }''',
+              'variables': {'serviceId': '$SERVICE_ID', 'environmentId': '$ENVIRONMENT_ID'}
+          }
+          print(json.dumps(q))
+            ")
+
+            DEPLOY_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$DEPLOY_QUERY")
+
+            STATUS=$(echo "$DEPLOY_RESP" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          edges = data.get('data', {}).get('deployments', {}).get('edges', [])
+          print(edges[0]['node']['status'] if edges else 'UNKNOWN')
+            " 2>/dev/null || echo "UNKNOWN")
+
+            echo "Deploy status: $STATUS (${ELAPSED}s elapsed)"
+
+            if [ "$STATUS" = "SUCCESS" ]; then
+              echo "Deploy succeeded."
+              break
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CRASHED" ]; then
+              echo "Deploy failed with status $STATUS — aborting test."
+              python3 -c "
+          import json
+          with open('test-results.json', 'w') as f:
+              json.dump({'passed': False, 'error': 'Deploy $STATUS before test could run',
+                         'checked_at': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+                         'trigger_sha': '${{ github.sha }}'}, f, indent=2)
+              "
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git add test-results.json
+              git diff --cached --quiet || git commit -m "chore: update test-results.json [skip ci]"
+              git push origin claude/setup-md-mortgage-automation-VQ7KG || true
+              exit 0
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+      - name: Test /oauth/google/start endpoint
+        id: test
+        env:
+          SERVICE_URL: ${{ steps.url.outputs.service_url }}
+        run: |
+          if [ -z "$SERVICE_URL" ]; then
+            echo "ERROR: Could not resolve Railway service URL."
+            python3 -c "
+          import json
+          with open('test-results.json', 'w') as f:
+              json.dump({'passed': False,
+                         'error': 'Could not resolve Railway service URL. Set RAILWAY_SERVICE_URL secret.',
+                         'checked_at': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+                         'trigger_sha': '${{ github.sha }}'}, f, indent=2)
+            "
+            exit 0
+          fi
+
+          echo "Testing $SERVICE_URL/oauth/google/start ..."
+
+          RESPONSE=$(curl -s -w '\n%{http_code}' -X POST "$SERVICE_URL/oauth/google/start" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP $HTTP_CODE"
+          echo "Body: $BODY"
+
+          python3 - <<'PYEOF'
+          import json, sys, re, os
+
+          body_raw = """$BODY"""
+          http_code = "$HTTP_CODE"
+          sha = "${{ github.sha }}"
+          url = os.environ.get("SERVICE_URL", "")
+
+          result = {
+              "checked_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "trigger_sha": sha,
+              "service_url": url,
+              "http_code": http_code,
+          }
+
+          try:
+              data = json.loads(body_raw)
+          except Exception as e:
+              result["passed"] = False
+              result["error"] = f"Response is not valid JSON: {e}"
+              result["raw_body"] = body_raw[:500]
+              with open("test-results.json", "w") as f:
+                  json.dump(result, f, indent=2)
+              sys.exit(0)
+
+          if http_code != "200":
+              result["passed"] = False
+              result["error"] = f"HTTP {http_code}: {data}"
+              with open("test-results.json", "w") as f:
+                  json.dump(result, f, indent=2)
+              sys.exit(0)
+
+          auth_url = data.get("authorization_url", "")
+          if not auth_url:
+              result["passed"] = False
+              result["error"] = "Response missing 'authorization_url' field"
+              result["response"] = data
+              with open("test-results.json", "w") as f:
+                  json.dump(result, f, indent=2)
+              sys.exit(0)
+
+          # Extract state= param
+          m = re.search(r'[?&]state=([^&]+)', auth_url)
+          if not m:
+              result["passed"] = False
+              result["error"] = "No state= parameter found in authorization_url"
+              result["authorization_url"] = auth_url
+              with open("test-results.json", "w") as f:
+                  json.dump(result, f, indent=2)
+              sys.exit(0)
+
+          state_val = m.group(1)
+          placeholders = ["<state_token>", "%3Cstate_token%3E", "state_token", "<state>"]
+          for p in placeholders:
+              if p in state_val:
+                  result["passed"] = False
+                  result["error"] = f"state= is a literal placeholder: {state_val!r}"
+                  result["authorization_url"] = auth_url
+                  with open("test-results.json", "w") as f:
+                      json.dump(result, f, indent=2)
+                  sys.exit(0)
+
+          # state must be at least 8 chars of real token
+          if len(state_val) < 8:
+              result["passed"] = False
+              result["error"] = f"state= value too short to be a real token: {state_val!r}"
+              result["authorization_url"] = auth_url
+              with open("test-results.json", "w") as f:
+                  json.dump(result, f, indent=2)
+              sys.exit(0)
+
+          result["passed"] = True
+          result["state_value"] = state_val
+          result["authorization_url_prefix"] = auth_url[:80] + "..."
+          with open("test-results.json", "w") as f:
+              json.dump(result, f, indent=2)
+          PYEOF
+
+      - name: Commit and push test-results.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin claude/setup-md-mortgage-automation-VQ7KG || true
+          git add test-results.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update test-results.json [skip ci]"
+            git push origin claude/setup-md-mortgage-automation-VQ7KG
+          fi

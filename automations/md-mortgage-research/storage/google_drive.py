@@ -20,6 +20,7 @@ Folder structure created in Drive:
 import json
 import logging
 import os
+import secrets
 from typing import Optional
 
 from googleapiclient.discovery import build
@@ -65,7 +66,8 @@ def get_oauth_authorization_url() -> str:
         scopes=_SCOPES,
         redirect_uri="urn:ietf:wg:oauth:2.0:oob",
     )
-    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
+    state = secrets.token_urlsafe(32)
+    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent", state=state)
     return auth_url
 
 
