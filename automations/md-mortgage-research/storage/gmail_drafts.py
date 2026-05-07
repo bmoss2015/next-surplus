@@ -87,29 +87,18 @@ def poll_for_mdlandrec_code(max_wait: int = 60, poll_interval: int = 10) -> str:
     """
     Poll Gmail inbox for an MDLandRec access-code email and return the code.
 
-    Searches for recent messages from msa.maryland.gov / maryland.gov that
-    contain "access code" in the subject or body.  Retries every
-    ``poll_interval`` seconds up to ``max_wait`` seconds.
-
     Args:
         max_wait:      Maximum seconds to wait before raising TimeoutError.
         poll_interval: Seconds between Gmail poll attempts.
 
     Returns:
-        The extracted numeric access code string (4–8 digits).
+        6-character alphanumeric access code string.
 
     Raises:
         TimeoutError: If no code email arrives within max_wait seconds.
-        RuntimeError: If Gmail credentials are not configured.
     """
     service = get_gmail_service()
-
-    # Gmail search query — broad enough to survive minor subject-line variation
-    query = (
-        "(from:msa.maryland.gov OR from:maryland.gov) "
-        "(subject:\"access code\" OR subject:\"verification code\" OR subject:\"MDLandRec\") "
-        "newer_than:5m"
-    )
+    query = 'from:maryland.gov "access code" newer_than:10m'
 
     deadline = time.time() + max_wait
     attempt = 0
@@ -131,11 +120,16 @@ def poll_for_mdlandrec_code(max_wait: int = 60, poll_interval: int = 10) -> str:
                 format="full",
             ).execute()
 
+            # Check subject first (code appears there too), then body
+            headers = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}
+            subject = headers.get("subject", "")
             body = _extract_body(msg)
-            code = _extract_code(body)
-            if code:
-                logger.info("Found MDLandRec access code in email %s", msg_ref["id"])
-                return code
+
+            for text in (subject, body):
+                code = _extract_code(text)
+                if code:
+                    logger.info("Found MDLandRec access code in message %s", msg_ref["id"])
+                    return code
 
         if time.time() >= deadline:
             break
@@ -147,9 +141,7 @@ def poll_for_mdlandrec_code(max_wait: int = 60, poll_interval: int = 10) -> str:
             time.sleep(sleep_for)
 
     raise TimeoutError(
-        f"No MDLandRec access code email found within {max_wait} seconds. "
-        "Check that GOOGLE_REFRESH_TOKEN has gmail.readonly scope and the email "
-        "address matches the MDLandRec account."
+        f"No MDLandRec access code email found within {max_wait} seconds."
     )
 
 
@@ -171,24 +163,9 @@ def _extract_body(msg: dict) -> str:
 
 
 def _extract_code(text: str) -> str:
-    """
-    Pull a 4–8 digit access / verification code from email body text.
-
-    Tries labelled patterns first (e.g. "access code: 123456"), then falls
-    back to any isolated 6–8 digit number.
-    """
-    patterns = [
-        r"access\s+code[:\s]+([0-9]{4,8})",
-        r"verification\s+code[:\s]+([0-9]{4,8})",
-        r"one.?time\s+(?:pass)?code[:\s]+([0-9]{4,8})",
-        r"\bcode[:\s]+([0-9]{4,8})",
-        r"\b([0-9]{6,8})\b",  # bare 6-8 digit number as last resort
-    ]
-    for pattern in patterns:
-        m = re.search(pattern, text, re.IGNORECASE)
-        if m:
-            return m.group(1)
-    return ""
+    """Extract a 6-character alphanumeric access code following 'access code' or 'code:'."""
+    m = re.search(r'(?:access\s*code[:\s]+)([A-Z0-9]{6})', text, re.IGNORECASE)
+    return m.group(1).upper() if m else ""
 
 
 # ---------------------------------------------------------------------------
