@@ -28,82 +28,18 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          # Get project by name "zestful-comfort" via me { projects }
-          PROJECTS=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"query":"{ me { projects { edges { node { id name } } } } }"}')
+          # Hardcoded IDs — no lookup needed
+          PROJECT_ID="c6b32bb9-cb3c-454e-aab3-1b8ecefa320a"
+          SERVICE_ID="73341e75-b9ea-412c-b0ff-2aa623b26c7b"
+          ENVIRONMENT_ID="b5f83c4b-0081-460a-8038-c63e9caa3f78"
 
-          echo "Projects response: $PROJECTS"
-
-          PROJECT_ID=$(echo "$PROJECTS" | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          # Try both top-level projects and me.projects
-          edges = (data.get('data', {}).get('me', {}).get('projects', {}).get('edges')
-                   or data.get('data', {}).get('projects', {}).get('edges', []))
-          for e in edges:
-              if e['node']['name'] == 'zestful-comfort':
-                  print(e['node']['id'])
-                  break
-          " 2>/dev/null || echo "")
-
-          echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
-
-          if [ -z "$PROJECT_ID" ]; then
-            python3 -c "
-          import json, sys
-          with open('deploy-status.json', 'w') as f:
-              json.dump({'status':'error','error_log':'Could not find project zestful-comfort','api_response': sys.argv[1],'checked_at':'$(date -u +%Y-%m-%dT%H:%M:%SZ)'}, f, indent=2)
-            " "$PROJECTS"
-            exit 0
-          fi
-
-          # Get service "md-mortgage-research" within project
-          SERVICE_QUERY=$(python3 -c "
-          import json
-          q = {
-              'query': '''query(\$projectId: String!) {
-                  project(id: \$projectId) {
-                      services { edges { node { id name } } }
-                  }
-              }''',
-              'variables': {'projectId': '$PROJECT_ID'}
-          }
-          print(json.dumps(q))
-          ")
-
-          SERVICES=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$SERVICE_QUERY")
-
-          echo "Services response: $SERVICES"
-
-          SERVICE_ID=$(echo "$SERVICES" | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          edges = data.get('data', {}).get('project', {}).get('services', {}).get('edges', [])
-          for e in edges:
-              if e['node']['name'] == 'md-mortgage-research':
-                  print(e['node']['id'])
-                  break
-          " 2>/dev/null || echo "")
-
-          echo "service_id=$SERVICE_ID" >> $GITHUB_OUTPUT
-
-          if [ -z "$SERVICE_ID" ]; then
-            echo '{"status":"error","error_log":"Could not find service md-mortgage-research","checked_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > deploy-status.json
-            exit 0
-          fi
-
-          # Get latest deployment for service
+          # Get latest deployment for service + environment
           DEPLOY_QUERY=$(python3 -c "
           import json
           q = {
-              'query': '''query(\$serviceId: String!) {
+              'query': '''query(\$serviceId: String!, \$environmentId: String!) {
                   deployments(
-                      input: { serviceId: \$serviceId }
+                      input: { serviceId: \$serviceId, environmentId: \$environmentId }
                       first: 1
                   ) {
                       edges {
@@ -115,7 +51,7 @@ jobs:
                       }
                   }
               }''',
-              'variables': {'serviceId': '$SERVICE_ID'}
+              'variables': {'serviceId': '$SERVICE_ID', 'environmentId': '$ENVIRONMENT_ID'}
           }
           print(json.dumps(q))
           ")
@@ -189,8 +125,8 @@ jobs:
           result = {
               'status': status,
               'deploy_id': deploy_id,
-              'project_id': '$PROJECT_ID',
-              'service_id': '$SERVICE_ID',
+              'project_id': 'c6b32bb9-cb3c-454e-aab3-1b8ecefa320a',
+              'service_id': '73341e75-b9ea-412c-b0ff-2aa623b26c7b',
               'checked_at': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
               'trigger_sha': '${{ github.sha }}'
           }
