@@ -1,1 +1,6 @@
-{"status":"error","error_log":"Could not find project zestful-comfort","checked_at":"2026-05-07T02:48:47Z"}
+{
+  "status": "error",
+  "error_log": "Could not find project zestful-comfort",
+  "api_response": "{\"errors\":[{\"message\":\"Not Authorized\",\"locations\":[{\"line\":1,\"column\":3}],\"path\":[\"me\"],\"extensions\":{\"code\":\"INTERNAL_SERVER_ERROR\"},\"traceId\":\"7198726985766810085\"}],\"data\":null}",
+  "checked_at": "2026-05-07T02:51:11Z"
+}
