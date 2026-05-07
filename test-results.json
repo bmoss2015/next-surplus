@@ -1,0 +1,9 @@
+{
+  "checked_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "trigger_sha": "f57bb97ae3fdaf732564fbcd8817d798aba8f6b5",
+  "service_url": "https://md-mortgage-research-production.up.railway.app",
+  "http_code": "$HTTP_CODE",
+  "passed": false,
+  "error": "Response is not valid JSON: Expecting value: line 1 column 1 (char 0)",
+  "raw_body": "$BODY"
+}
