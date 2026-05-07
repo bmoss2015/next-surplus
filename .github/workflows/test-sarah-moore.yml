@@ -1,0 +1,428 @@
+name: Test Lead - Sarah Moore
+
+on:
+  push:
+    branches:
+      - claude/setup-md-mortgage-automation-VQ7KG
+    paths-ignore:
+      - 'test-sarah-moore.json'
+      - 'deploy-status.json'
+      - 'test-failure.json'
+      - 'test-results.json'
+      - 'CLAUDE.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      SERVICE_URL: https://md-mortgage-research-production.up.railway.app
+      SERVICE_ID: 73341e75-b9ea-412c-b0ff-2aa623b26c7b
+      ENVIRONMENT_ID: b5f83c4b-0081-460a-8038-c63e9caa3f78
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/setup-md-mortgage-automation-VQ7KG
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # Load iteration history from previous runs
+      # -----------------------------------------------------------------------
+      - name: Load iteration history
+        id: history
+        run: |
+          ITERATION=1
+          ERROR_HISTORY="[]"
+          if [ -f test-sarah-moore.json ]; then
+            ITERATION=$(python3 -c "
+import json
+try:
+    d=json.load(open('test-sarah-moore.json'))
+    print(d.get('iteration',0)+1)
+except:
+    print(1)
+" 2>/dev/null || echo 1)
+            ERROR_HISTORY=$(python3 -c "
+import json
+try:
+    d=json.load(open('test-sarah-moore.json'))
+    print(json.dumps(d.get('error_history',[])))
+except:
+    print('[]')
+" 2>/dev/null || echo "[]")
+          fi
+          echo "iteration=$ITERATION" >> $GITHUB_OUTPUT
+          echo "Iteration: $ITERATION"
+          # Write to file for Python steps
+          echo "$ERROR_HISTORY" > /tmp/error_history.json
+
+      # -----------------------------------------------------------------------
+      # Wait for Railway deploy to complete
+      # -----------------------------------------------------------------------
+      - name: Wait for Railway deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          MAX_WAIT=600
+          ELAPSED=0
+          INTERVAL=20
+          echo "Waiting for Railway deployment..."
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"query\":\"query(\$s:String!,\$e:String!){deployments(input:{serviceId:\$s,environmentId:\$e},first:1){edges{node{id status}}}}\",\"variables\":{\"s\":\"$SERVICE_ID\",\"e\":\"$ENVIRONMENT_ID\"}}")
+            STATUS=$(echo "$RESP" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+edges=d.get('data',{}).get('deployments',{}).get('edges',[])
+print(edges[0]['node']['status'] if edges else 'UNKNOWN')
+" 2>/dev/null || echo UNKNOWN)
+            DEPLOY_ID=$(echo "$RESP" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+edges=d.get('data',{}).get('deployments',{}).get('edges',[])
+print(edges[0]['node']['id'] if edges else '')
+" 2>/dev/null || echo "")
+            echo "[${ELAPSED}s] deploy=$STATUS deploy_id=$DEPLOY_ID"
+            echo "$DEPLOY_ID" > /tmp/deploy_id.txt
+            if [ "$STATUS" = "SUCCESS" ]; then break; fi
+            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CRASHED" ]; then
+              echo "DEPLOY_FAILED=$STATUS" >> $GITHUB_ENV
+              break
+            fi
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+      # -----------------------------------------------------------------------
+      # Submit test lead
+      # -----------------------------------------------------------------------
+      - name: Submit test lead
+        id: submit
+        run: |
+          if [ -n "$DEPLOY_FAILED" ]; then
+            echo "Skipping submit — deploy failed."
+            echo "job_id=" >> $GITHUB_OUTPUT
+            echo "http_code=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "=== Submitting: Sarah Moore, 4044 Hanson Oaks Drive ==="
+          RESP=$(curl -s -w '\n%{http_code}' -X POST "$SERVICE_URL/research/maryland" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "property_address": "4044 Hanson Oaks Drive",
+              "county": "Prince George'\''s",
+              "owner_first_name": "Sarah",
+              "owner_last_name": "Moore",
+              "sale_type": "mortgage_foreclosure"
+            }' --max-time 30)
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "HTTP $HTTP_CODE | $BODY"
+          echo "$BODY" > /tmp/submit_body.json
+          JOB_ID=$(echo "$BODY" | python3 -c "
+import json,sys
+try: print(json.loads(sys.stdin.read()).get('job_id',''))
+except: print('')
+" 2>/dev/null || echo "")
+          echo "job_id=$JOB_ID" >> $GITHUB_OUTPUT
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+
+      # -----------------------------------------------------------------------
+      # Poll /status/{job_id} every 30s up to 10 min
+      # -----------------------------------------------------------------------
+      - name: Poll research status
+        id: poll
+        run: |
+          JOB_ID="${{ steps.submit.outputs.job_id }}"
+          HTTP_CODE="${{ steps.submit.outputs.http_code }}"
+
+          if [ -n "$DEPLOY_FAILED" ]; then
+            echo "pipeline_status=deploy_failed" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [ "$HTTP_CODE" != "200" ] || [ -z "$JOB_ID" ]; then
+            echo "pipeline_status=submit_failed" >> $GITHUB_OUTPUT
+            cat /tmp/submit_body.json
+            exit 0
+          fi
+
+          echo "Polling /status/$JOB_ID every 30s up to 10 minutes..."
+          MAX=600; ELAPSED=0; INTERVAL=30
+          FINAL_STATUS="timeout"
+          while [ $ELAPSED -lt $MAX ]; do
+            SR=$(curl -s -w '\n%{http_code}' "$SERVICE_URL/status/$JOB_ID" --max-time 15)
+            SC=$(echo "$SR" | tail -1)
+            SB=$(echo "$SR" | head -n -1)
+            RSTATUS=$(echo "$SB" | python3 -c "
+import json,sys
+try: print(json.loads(sys.stdin.read()).get('status',''))
+except: print('')
+" 2>/dev/null || echo "")
+            echo "[${ELAPSED}s] HTTP $SC status=$RSTATUS | ${SB:0:300}"
+            if [ "$SC" = "200" ]; then
+              echo "$SB" > /tmp/status_body.json
+              if [ "$RSTATUS" = "completed" ]; then FINAL_STATUS="completed"; break; fi
+              if [ "$RSTATUS" = "failed" ]; then FINAL_STATUS="failed"; break; fi
+            fi
+            sleep $INTERVAL; ELAPSED=$((ELAPSED+INTERVAL))
+          done
+          echo "pipeline_status=$FINAL_STATUS" >> $GITHUB_OUTPUT
+          echo "Final status: $FINAL_STATUS"
+
+      # -----------------------------------------------------------------------
+      # On success: verify Supabase + parse result
+      # -----------------------------------------------------------------------
+      - name: Verify result on success
+        id: verify
+        if: steps.poll.outputs.pipeline_status == 'completed'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          JOB_ID: ${{ steps.submit.outputs.job_id }}
+        run: |
+          STATUS_BODY=$(cat /tmp/status_body.json 2>/dev/null || echo "{}")
+          export STATUS_BODY JOB_ID
+
+          python3 - <<'PYEOF'
+import json, os, urllib.request, urllib.parse
+
+status_body = os.environ.get("STATUS_BODY", "{}")
+job_id = os.environ.get("JOB_ID", "")
+supabase_url = os.environ.get("SUPABASE_URL", "")
+supabase_key = os.environ.get("SUPABASE_SECRET_KEY", "")
+
+try:
+    run = json.loads(status_body)
+except:
+    run = {}
+
+summary = run.get("output_summary") or {}
+decision = summary.get("decision", "")
+decision_reason = summary.get("decision_reason", "")
+error_msg = run.get("error_message", "")
+
+checks = {
+    "run_status": run.get("status", ""),
+    "has_completed_at": bool(run.get("completed_at")),
+    "decision": decision,
+    "decision_reason": decision_reason,
+    "decision_valid": decision in ("KEEP", "SKIP", "HOLD"),
+    "has_sdat": "sdat" in summary,
+    "has_cases": "cases" in summary,
+    "has_instruments": "instruments" in summary,
+    "drive_urls": summary.get("drive_urls", {}),
+    "has_drive": bool(summary.get("drive_urls")),
+}
+
+# Supabase verification (optional — skip if no creds)
+if supabase_url and supabase_key:
+    try:
+        addr_enc = urllib.parse.quote("4044 Hanson Oaks Drive")
+        req = urllib.request.Request(
+            f"{supabase_url}/rest/v1/leads?property_address=ilike.{addr_enc}&select=id,property_address,decision,status",
+            headers={"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            leads = json.loads(r.read())
+        checks["supabase_lead_found"] = len(leads) > 0
+        checks["supabase_lead"] = leads[0] if leads else {}
+
+        # Check research_run
+        req2 = urllib.request.Request(
+            f"{supabase_url}/rest/v1/research_runs?id=eq.{job_id}&select=id,status,completed_at,error_message",
+            headers={"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
+        )
+        with urllib.request.urlopen(req2, timeout=10) as r:
+            runs = json.loads(r.read())
+        checks["supabase_run_found"] = len(runs) > 0
+        checks["supabase_run"] = runs[0] if runs else {}
+    except Exception as e:
+        checks["supabase_error"] = str(e)
+else:
+    checks["supabase_skipped"] = "No SUPABASE_URL/SUPABASE_SECRET_KEY secrets configured"
+
+with open("/tmp/verify_checks.json", "w") as f:
+    json.dump(checks, f, indent=2)
+
+print(f"Decision: {decision}")
+print(f"Decision reason: {decision_reason}")
+print(f"Checks: {json.dumps(checks, indent=2)}")
+PYEOF
+
+      # -----------------------------------------------------------------------
+      # On failure: fetch Railway logs
+      # -----------------------------------------------------------------------
+      - name: Fetch Railway logs on failure
+        if: steps.poll.outputs.pipeline_status != 'completed'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          DEPLOY_ID=$(cat /tmp/deploy_id.txt 2>/dev/null || echo "")
+          if [ -z "$DEPLOY_ID" ]; then
+            echo "No deploy ID available" > /tmp/railway_logs.txt
+            exit 0
+          fi
+          echo "Fetching logs for deployment $DEPLOY_ID..."
+          LOG_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"query(\$id:String!){deploymentLogs(deploymentId:\$id,limit:200){message severity timestamp}}\",\"variables\":{\"id\":\"$DEPLOY_ID\"}}")
+          echo "$LOG_RESP" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+entries=d.get('data',{}).get('deploymentLogs',[]) or []
+lines=[e.get('message','') for e in entries if e.get('message')]
+print('\n'.join(lines))
+" 2>/dev/null > /tmp/railway_logs.txt || echo "Could not parse logs" > /tmp/railway_logs.txt
+          echo "--- Last 20 log lines ---"
+          tail -20 /tmp/railway_logs.txt
+
+      # -----------------------------------------------------------------------
+      # Write test-sarah-moore.json
+      # -----------------------------------------------------------------------
+      - name: Write test-sarah-moore.json
+        env:
+          SHA: ${{ github.sha }}
+          ITERATION: ${{ steps.history.outputs.iteration }}
+          JOB_ID: ${{ steps.submit.outputs.job_id }}
+          PIPELINE_STATUS: ${{ steps.poll.outputs.pipeline_status }}
+        run: |
+          export CHECKED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          STATUS_BODY=$(cat /tmp/status_body.json 2>/dev/null || echo "{}")
+          RAILWAY_LOGS=$(cat /tmp/railway_logs.txt 2>/dev/null || echo "")
+          VERIFY_CHECKS=$(cat /tmp/verify_checks.json 2>/dev/null || echo "{}")
+          ERROR_HISTORY=$(cat /tmp/error_history.json 2>/dev/null || echo "[]")
+          DEPLOY_ID=$(cat /tmp/deploy_id.txt 2>/dev/null || echo "")
+          DEPLOY_FAILED_VAL="${DEPLOY_FAILED:-}"
+
+          export STATUS_BODY RAILWAY_LOGS VERIFY_CHECKS ERROR_HISTORY DEPLOY_ID DEPLOY_FAILED_VAL
+
+          python3 - <<'PYEOF'
+import json, os, re
+
+sha = os.environ["SHA"]
+iteration = int(os.environ.get("ITERATION", 1))
+job_id = os.environ.get("JOB_ID", "")
+pipeline_status = os.environ.get("PIPELINE_STATUS", "unknown")
+checked_at = os.environ["CHECKED_AT"]
+service_url = os.environ.get("SERVICE_URL", "")
+deploy_id = os.environ.get("DEPLOY_ID", "")
+deploy_failed = os.environ.get("DEPLOY_FAILED_VAL", "")
+
+try:
+    run = json.loads(os.environ.get("STATUS_BODY", "{}"))
+except:
+    run = {}
+
+try:
+    verify = json.loads(os.environ.get("VERIFY_CHECKS", "{}"))
+except:
+    verify = {}
+
+try:
+    error_history = json.loads(os.environ.get("ERROR_HISTORY", "[]"))
+except:
+    error_history = []
+
+railway_logs = os.environ.get("RAILWAY_LOGS", "")
+summary = run.get("output_summary") or {}
+decision = summary.get("decision", "")
+error_msg = run.get("error_message", "") or ""
+
+# Extract error fingerprint for duplicate detection
+error_fingerprint = ""
+if error_msg:
+    # First meaningful line, stripped of addresses/uuids
+    first_line = error_msg.split("\n")[0][:200]
+    error_fingerprint = re.sub(r'[0-9a-f-]{8,}', 'ID', first_line)
+elif railway_logs:
+    # Find ERROR lines in logs
+    for line in reversed(railway_logs.split("\n")):
+        if "ERROR" in line or "Error" in line or "Traceback" in line:
+            error_fingerprint = re.sub(r'[0-9a-f-]{8,}', 'ID', line.strip()[:200])
+            break
+
+passed = pipeline_status == "completed" and decision in ("KEEP", "SKIP", "HOLD")
+
+# Append to error history if failed
+if not passed and error_fingerprint:
+    error_history.append({
+        "iteration": iteration,
+        "sha": sha,
+        "pipeline_status": pipeline_status,
+        "error_fingerprint": error_fingerprint,
+        "error_message": error_msg[:500],
+        "checked_at": checked_at,
+    })
+
+# Check for 3 consecutive same errors
+consecutive_same = 0
+if len(error_history) >= 3:
+    last3 = [e["error_fingerprint"] for e in error_history[-3:]]
+    if last3[0] == last3[1] == last3[2] and last3[0]:
+        consecutive_same = 3
+
+result = {
+    "iteration": iteration,
+    "last_run_at": checked_at,
+    "trigger_sha": sha,
+    "service_url": service_url,
+    "deploy_id": deploy_id,
+    "job_id": job_id,
+    "passed": passed,
+    "pipeline_status": pipeline_status,
+    "decision": decision,
+    "decision_reason": summary.get("decision_reason", ""),
+    "error_message": error_msg,
+    "error_fingerprint": error_fingerprint,
+    "consecutive_same_errors": consecutive_same,
+    "hard_stop": consecutive_same >= 3 or iteration >= 10,
+    "hard_stop_reason": (
+        "Same error 3 times in a row" if consecutive_same >= 3 else
+        "10 fix attempts reached" if iteration >= 10 else
+        ""
+    ),
+    "summary_keys": list(summary.keys()),
+    "sdat_result": summary.get("sdat", {}),
+    "cases_found": len([c for c in (summary.get("cases") or []) if "error" not in c]),
+    "instruments_found": len([i for i in (summary.get("instruments") or []) if "error" not in i]),
+    "verify_checks": verify,
+    "railway_logs": railway_logs[-8000:] if railway_logs else "",
+    "error_history": error_history,
+}
+
+with open("test-sarah-moore.json", "w") as f:
+    json.dump(result, f, indent=2)
+
+status_icon = "PASS" if passed else "FAIL"
+print(f"\n=== [{status_icon}] Iteration {iteration}: pipeline_status={pipeline_status}, decision={decision} ===")
+if not passed:
+    print(f"Error: {error_msg[:300] or error_fingerprint or 'no error message'}")
+if consecutive_same >= 3:
+    print(f"HARD STOP: Same error 3 times in a row: {error_history[-1]['error_fingerprint']}")
+PYEOF
+
+      # -----------------------------------------------------------------------
+      # Commit and push
+      # -----------------------------------------------------------------------
+      - name: Commit and push test-sarah-moore.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin claude/setup-md-mortgage-automation-VQ7KG || true
+          git add test-sarah-moore.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update test-sarah-moore.json [skip ci]"
+            git push origin claude/setup-md-mortgage-automation-VQ7KG
+          fi

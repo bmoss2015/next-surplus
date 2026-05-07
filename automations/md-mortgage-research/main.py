@@ -321,13 +321,24 @@ async def _run_research_pipeline(job_id: str, lead: MarylandLeadRequest) -> None
                 sale_date_estimate=lead.sale_date_estimate,
             )
             first = cases[0] if cases else {}
-            if first.get("error") == "too_many_results" and lead.trustee_last:
-                logger.info("[%s] Too many owner results — falling back to trustee search", job_id)
-                cases = await search_by_trustee(
-                    trustee_first=lead.trustee_first or "",
-                    trustee_last=lead.trustee_last,
-                    county=lead.county,
-                )
+            if first.get("error") == "too_many_results":
+                # Prefer trustee from request; otherwise extract from land records
+                trustee_last = lead.trustee_last or ""
+                trustee_first = lead.trustee_first or ""
+                if not trustee_last and instruments:
+                    trustee_last, trustee_first = _extract_trustee_from_instruments(instruments)
+                if trustee_last:
+                    logger.info(
+                        "[%s] Too many owner results — falling back to trustee search: %s %s",
+                        job_id, trustee_first, trustee_last,
+                    )
+                    cases = await search_by_trustee(
+                        trustee_first=trustee_first,
+                        trustee_last=trustee_last,
+                        county=lead.county,
+                    )
+                else:
+                    logger.warning("[%s] Too many owner results and no trustee found — cannot narrow search", job_id)
             foreclosure_cases = [c for c in cases if "error" not in c and "status" not in c]
             summary["cases"] = cases
         except Exception as exc:
@@ -619,6 +630,44 @@ def _apply_decision_logic(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _extract_trustee_from_instruments(instruments: list[dict]) -> tuple[str, str]:
+    """
+    Pull a trustee last/first name from land records instrument grantee fields.
+
+    Prefers a Substitution of Trustee record (most specific), falls back to
+    Deed of Trust grantee.  Returns (last, first) or ("", "").
+    """
+    sub_grantee = None
+    dot_grantee = None
+    for inst in instruments:
+        if not isinstance(inst, dict) or "error" in inst:
+            continue
+        itype = inst.get("instrument_type", "").lower()
+        grantee = (inst.get("grantee") or "").strip()
+        if not grantee:
+            continue
+        if "substitut" in itype and not sub_grantee:
+            sub_grantee = grantee
+        elif ("deed of trust" in itype or "mortgage" in itype) and not dot_grantee:
+            dot_grantee = grantee
+
+    raw = sub_grantee or dot_grantee
+    if not raw:
+        return "", ""
+
+    # Strip common role suffixes so they don't pollute the name
+    cleaned = re.sub(r"\b(TRUSTEE|SUBSTITUTE|SUCCESSOR|TRUSTEES|TR)\b", "", raw, flags=re.IGNORECASE).strip(" ,")
+    # Try "Last, First" comma form
+    if "," in cleaned:
+        parts = [p.strip() for p in cleaned.split(",", 1)]
+        return parts[0], parts[1] if len(parts) > 1 else ""
+    # Otherwise "First [Middle] Last"
+    tokens = cleaned.split()
+    if len(tokens) >= 2:
+        return tokens[-1], tokens[0]
+    return tokens[0] if tokens else "", ""
+
 
 def _infer_doc_type(label: str) -> str:
     label_lower = label.lower()
