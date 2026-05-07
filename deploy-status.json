@@ -1,6 +1,9 @@
 {
-  "status": "error",
-  "error_log": "Could not find project zestful-comfort",
-  "api_response": "{\"errors\":[{\"message\":\"Not Authorized\",\"locations\":[{\"line\":1,\"column\":3}],\"path\":[\"me\"],\"extensions\":{\"code\":\"INTERNAL_SERVER_ERROR\"},\"traceId\":\"7198726985766810085\"}],\"data\":null}",
-  "checked_at": "2026-05-07T02:51:11Z"
+  "status": "FAILED",
+  "deploy_id": "1ff53cf7-ecfe-4035-b1a6-691f92b5dd79",
+  "project_id": "c6b32bb9-cb3c-454e-aab3-1b8ecefa320a",
+  "service_id": "73341e75-b9ea-412c-b0ff-2aa623b26c7b",
+  "checked_at": "2026-05-07T02:59:28Z",
+  "trigger_sha": "9dbb248bc6b07812d47ccf06aa78d77228aadf8b",
+  "error_log": "Usage: uvicorn [OPTIONS] APP\nTry 'uvicorn --help' for help.\nError: Invalid value for '--port': '$PORT' is not a valid integer.\nUsage: uvicorn [OPTIONS] APP\nTry 'uvicorn --help' for help.\nError: Invalid value for '--port': '$PORT' is not a valid integer.\nStarting Container\nUsage: uvicorn [OPTIONS] APP\nTry 'uvicorn --help' for help.\nError: Invalid value for '--port': '$PORT' is not a valid integer.\nUsage: uvicorn [OPTIONS] APP\nTry 'uvicorn --help' for help.\nError: Invalid value for '--port': '$PORT' is not a valid integer."
 }
