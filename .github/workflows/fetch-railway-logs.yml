@@ -7,6 +7,11 @@ on:
         description: "How many minutes back to show (default 10)"
         required: false
         default: "10"
+  push:
+    branches:
+      - claude/setup-md-mortgage-automation-VQ7KG
+    paths:
+      - '.github/workflows/fetch-railway-logs.yml'
 
 jobs:
   fetch-logs:
@@ -27,7 +32,7 @@ jobs:
       - name: Fetch and display logs
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          MINUTES: ${{ github.event.inputs.minutes }}
+          MINUTES: ${{ github.event.inputs.minutes || '10' }}
         run: |
           # Step 1 – get latest deployment ID
           DEPLOY_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
