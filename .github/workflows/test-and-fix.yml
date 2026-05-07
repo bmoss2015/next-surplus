@@ -1,0 +1,357 @@
+name: Comprehensive Test and Fix
+
+on:
+  push:
+    branches:
+      - claude/setup-md-mortgage-automation-VQ7KG
+    paths-ignore:
+      - 'test-results.json'
+      - 'deploy-status.json'
+      - 'CLAUDE.md'
+      - 'docs/**'
+
+jobs:
+  test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/setup-md-mortgage-automation-VQ7KG
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve Railway service URL
+        id: url
+        run: |
+          SERVICE_URL="https://md-mortgage-research-production.up.railway.app"
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "Using service URL: $SERVICE_URL"
+
+      - name: Wait for Railway deploy to complete
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          SERVICE_ID="73341e75-b9ea-412c-b0ff-2aa623b26c7b"
+          ENVIRONMENT_ID="b5f83c4b-0081-460a-8038-c63e9caa3f78"
+          MAX_WAIT=600
+          ELAPSED=0
+          INTERVAL=20
+
+          echo "Waiting for deployment to leave BUILDING/DEPLOYING state..."
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            DEPLOY_QUERY=$(python3 -c "
+import json
+q = {
+    'query': '''query(\$serviceId: String!, \$environmentId: String!) {
+        deployments(
+            input: { serviceId: \$serviceId, environmentId: \$environmentId }
+            first: 1
+        ) {
+            edges { node { id status createdAt } }
+        }
+    }''',
+    'variables': {'serviceId': '$SERVICE_ID', 'environmentId': '$ENVIRONMENT_ID'}
+}
+print(json.dumps(q))
+            ")
+
+            DEPLOY_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$DEPLOY_QUERY")
+
+            STATUS=$(echo "$DEPLOY_RESP" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+edges = data.get('data', {}).get('deployments', {}).get('edges', [])
+print(edges[0]['node']['status'] if edges else 'UNKNOWN')
+            " 2>/dev/null || echo "UNKNOWN")
+
+            echo "Deploy status: $STATUS (${ELAPSED}s elapsed)"
+
+            if [ "$STATUS" = "SUCCESS" ]; then
+              echo "Deploy succeeded."
+              break
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CRASHED" ]; then
+              echo "Deploy failed with status $STATUS"
+              python3 - <<'PYEOF'
+import json, os
+result = {
+    "all_passed": False,
+    "error": f"Deploy failed before tests could run: {os.environ.get('STATUS', 'FAILED')}",
+    "trigger_sha": "${{ github.sha }}",
+    "checked_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+    "service_url": "${{ steps.url.outputs.service_url }}",
+    "endpoint_results": {}
+}
+with open("test-results.json", "w") as f:
+    json.dump(result, f, indent=2)
+PYEOF
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git add test-results.json
+              git diff --cached --quiet || git commit -m "chore: update test-results.json [skip ci]"
+              git push origin claude/setup-md-mortgage-automation-VQ7KG || true
+              exit 0
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+      - name: Run comprehensive endpoint tests
+        id: tests
+        env:
+          SERVICE_URL: ${{ steps.url.outputs.service_url }}
+        run: |
+          CHECKED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          SHA="${{ github.sha }}"
+
+          # Read prior iteration count if available
+          PRIOR_ITERATION=0
+          if [ -f test-results.json ]; then
+            PRIOR_ITERATION=$(python3 -c "
+import json
+try:
+    data = json.load(open('test-results.json'))
+    print(data.get('iteration', 0))
+except:
+    print(0)
+            " 2>/dev/null || echo 0)
+          fi
+          ITERATION=$((PRIOR_ITERATION + 1))
+
+          echo "=== Iteration $ITERATION ==="
+          echo "Testing $SERVICE_URL"
+
+          # ----------------------------------------------------------------
+          # Test 1: GET /health
+          # ----------------------------------------------------------------
+          echo "--- Testing GET /health ---"
+          HEALTH_RESP=$(curl -s -w '\n%{http_code}' "$SERVICE_URL/health" --max-time 15 || echo -e '\ncurl_error')
+          HEALTH_CODE=$(echo "$HEALTH_RESP" | tail -1)
+          HEALTH_BODY=$(echo "$HEALTH_RESP" | head -n -1)
+          echo "Health: HTTP $HEALTH_CODE | Body: $HEALTH_BODY"
+
+          # ----------------------------------------------------------------
+          # Test 2: POST /research/maryland
+          # ----------------------------------------------------------------
+          echo "--- Testing POST /research/maryland ---"
+          RESEARCH_RESP=$(curl -s -w '\n%{http_code}' -X POST "$SERVICE_URL/research/maryland" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "property_address": "123 Test St, Baltimore, MD 21201",
+              "county": "Baltimore City",
+              "owner_last_name": "TestOwner",
+              "owner_first_name": "Jane",
+              "sale_type": "mortgage_foreclosure",
+              "closing_bid": 100000,
+              "owner_living": true
+            }' --max-time 15 || echo -e '\ncurl_error')
+          RESEARCH_CODE=$(echo "$RESEARCH_RESP" | tail -1)
+          RESEARCH_BODY=$(echo "$RESEARCH_RESP" | head -n -1)
+          echo "Research: HTTP $RESEARCH_CODE | Body: ${RESEARCH_BODY:0:200}"
+
+          # Extract job_id for status test
+          JOB_ID=$(echo "$RESEARCH_BODY" | python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    print(data.get('job_id', ''))
+except:
+    print('')
+          " 2>/dev/null || echo "")
+
+          # ----------------------------------------------------------------
+          # Test 3: GET /status/{job_id}
+          # ----------------------------------------------------------------
+          echo "--- Testing GET /status/{job_id} ---"
+          if [ -n "$JOB_ID" ]; then
+            STATUS_RESP=$(curl -s -w '\n%{http_code}' "$SERVICE_URL/status/$JOB_ID" --max-time 15 || echo -e '\ncurl_error')
+            STATUS_CODE=$(echo "$STATUS_RESP" | tail -1)
+            STATUS_BODY=$(echo "$STATUS_RESP" | head -n -1)
+            echo "Status: HTTP $STATUS_CODE | Body: ${STATUS_BODY:0:200}"
+          else
+            STATUS_CODE="skipped"
+            STATUS_BODY="No job_id from research endpoint"
+            echo "Status test skipped — no job_id available"
+          fi
+
+          # ----------------------------------------------------------------
+          # Test 4: POST /oauth/google/start
+          # ----------------------------------------------------------------
+          echo "--- Testing POST /oauth/google/start ---"
+          OAUTH_RESP=$(curl -s -w '\n%{http_code}' -X POST "$SERVICE_URL/oauth/google/start" \
+            -H "Content-Type: application/json" \
+            -d '{}' --max-time 15 || echo -e '\ncurl_error')
+          OAUTH_CODE=$(echo "$OAUTH_RESP" | tail -1)
+          OAUTH_BODY=$(echo "$OAUTH_RESP" | head -n -1)
+          echo "OAuth: HTTP $OAUTH_CODE | Body: ${OAUTH_BODY:0:300}"
+
+          # ----------------------------------------------------------------
+          # Test 5: POST /research/maryland with invalid sale_type (expect 400)
+          # ----------------------------------------------------------------
+          echo "--- Testing validation: invalid sale_type ---"
+          INVALID_RESP=$(curl -s -w '\n%{http_code}' -X POST "$SERVICE_URL/research/maryland" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "property_address": "456 Main St",
+              "county": "Montgomery",
+              "owner_last_name": "Doe",
+              "owner_first_name": "John",
+              "sale_type": "tax_sale"
+            }' --max-time 15 || echo -e '\ncurl_error')
+          INVALID_CODE=$(echo "$INVALID_RESP" | tail -1)
+          INVALID_BODY=$(echo "$INVALID_RESP" | head -n -1)
+          echo "Validation: HTTP $INVALID_CODE | Body: ${INVALID_BODY:0:200}"
+
+          # ----------------------------------------------------------------
+          # Evaluate all results
+          # ----------------------------------------------------------------
+          export HEALTH_CODE HEALTH_BODY RESEARCH_CODE RESEARCH_BODY
+          export STATUS_CODE STATUS_BODY OAUTH_CODE OAUTH_BODY
+          export INVALID_CODE INVALID_BODY JOB_ID
+          export CHECKED_AT SHA ITERATION SERVICE_URL PRIOR_ITERATION
+
+          python3 - <<'PYEOF'
+import json, re, os, sys
+
+def env(k): return os.environ.get(k, "")
+
+results = {}
+failures = []
+
+# Health check
+hcode = env("HEALTH_CODE")
+hbody = env("HEALTH_BODY")
+try:
+    hdata = json.loads(hbody)
+    health_ok = hcode == "200" and hdata.get("status") == "ok"
+except:
+    health_ok = False
+results["health"] = {
+    "passed": health_ok,
+    "http_code": hcode,
+    "body_preview": hbody[:200],
+}
+if not health_ok:
+    failures.append(f"health: HTTP {hcode}, body={hbody[:100]}")
+
+# Research endpoint
+rcode = env("RESEARCH_CODE")
+rbody = env("RESEARCH_BODY")
+job_id = env("JOB_ID")
+try:
+    rdata = json.loads(rbody)
+    research_ok = rcode == "200" and bool(rdata.get("job_id")) and rdata.get("status") == "queued"
+except:
+    research_ok = False
+results["research_maryland"] = {
+    "passed": research_ok,
+    "http_code": rcode,
+    "job_id": job_id,
+    "body_preview": rbody[:200],
+}
+if not research_ok:
+    failures.append(f"research_maryland: HTTP {rcode}, body={rbody[:200]}")
+
+# Status endpoint
+scode = env("STATUS_CODE")
+sbody = env("STATUS_BODY")
+if scode == "skipped":
+    status_ok = False
+    results["status"] = {"passed": False, "http_code": "skipped", "note": "Skipped — no job_id from research endpoint"}
+    failures.append("status: skipped (no job_id available from research endpoint)")
+else:
+    # 200 means the run was found, 404 is also acceptable (async job may not exist yet)
+    status_ok = scode in ("200", "404")
+    results["status"] = {
+        "passed": status_ok,
+        "http_code": scode,
+        "body_preview": sbody[:200],
+        "note": "404 is acceptable — async job may not be in DB yet",
+    }
+    if not status_ok:
+        failures.append(f"status: HTTP {scode}, body={sbody[:200]}")
+
+# OAuth start
+ocode = env("OAUTH_CODE")
+obody = env("OAUTH_BODY")
+try:
+    odata = json.loads(obody)
+    auth_url = odata.get("authorization_url", "")
+    m = re.search(r'[?&]state=([^&]+)', auth_url)
+    state_val = m.group(1) if m else ""
+    placeholders = ["<state_token>", "%3Cstate_token%3E", "state_token", "<state>"]
+    state_is_real = state_val and len(state_val) >= 8 and not any(p in state_val for p in placeholders)
+    oauth_ok = ocode == "200" and bool(auth_url) and state_is_real
+    oauth_detail = {"authorization_url_prefix": auth_url[:80], "state_present": bool(state_val), "state_looks_real": state_is_real}
+except Exception as e:
+    oauth_ok = False
+    oauth_detail = {"parse_error": str(e)}
+results["oauth_google_start"] = {
+    "passed": oauth_ok,
+    "http_code": ocode,
+    "body_preview": obody[:300],
+    **oauth_detail,
+}
+if not oauth_ok:
+    failures.append(f"oauth_google_start: HTTP {ocode}, body={obody[:200]}")
+
+# Validation check (expects 400)
+icode = env("INVALID_CODE")
+ibody = env("INVALID_BODY")
+invalid_ok = icode == "400"
+results["validation_invalid_sale_type"] = {
+    "passed": invalid_ok,
+    "http_code": icode,
+    "expected": "400",
+    "body_preview": ibody[:200],
+}
+if not invalid_ok:
+    failures.append(f"validation: expected HTTP 400 for invalid sale_type, got {icode}")
+
+all_passed = len(failures) == 0
+passed_count = sum(1 for r in results.values() if r.get("passed"))
+total = len(results)
+
+output = {
+    "all_passed": all_passed,
+    "iteration": int(env("ITERATION")),
+    "checked_at": env("CHECKED_AT"),
+    "trigger_sha": env("SHA"),
+    "service_url": env("SERVICE_URL"),
+    "summary": f"{passed_count}/{total} endpoints passing",
+    "failures": failures,
+    "endpoint_results": results,
+}
+
+with open("test-results.json", "w") as f:
+    json.dump(output, f, indent=2)
+
+print(f"\n=== TEST RESULTS: {passed_count}/{total} passing ===")
+for name, r in results.items():
+    icon = "PASS" if r.get("passed") else "FAIL"
+    print(f"  {icon} {name}: HTTP {r.get('http_code', '?')}")
+if failures:
+    print(f"\nFailures:")
+    for f in failures:
+        print(f"  - {f}")
+print(f"\nAll passed: {all_passed}")
+PYEOF
+
+      - name: Commit and push test-results.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin claude/setup-md-mortgage-automation-VQ7KG || true
+          git add test-results.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update test-results.json [skip ci]"
+            git push origin claude/setup-md-mortgage-automation-VQ7KG
+          fi

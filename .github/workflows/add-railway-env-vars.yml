@@ -1,0 +1,117 @@
+name: Add Railway Environment Variables
+
+# One-shot workflow — adds MDLANDREC credentials to the md-mortgage-research Railway service.
+# Run manually via workflow_dispatch from GitHub Actions UI.
+on:
+  workflow_dispatch:
+
+jobs:
+  add-env-vars:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add MDLANDREC_EMAIL and MDLANDREC_PASSWORD via Railway GraphQL API
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          PROJECT_ID="c6b32bb9-cb3c-454e-aab3-1b8ecefa320a"
+          SERVICE_ID="73341e75-b9ea-412c-b0ff-2aa623b26c7b"
+          ENVIRONMENT_ID="b5f83c4b-0081-460a-8038-c63e9caa3f78"
+
+          echo "Upserting MDLANDREC credentials into Railway service..."
+
+          RESULT=$(python3 - <<'PYEOF'
+import json, urllib.request, os
+
+token = os.environ["RAILWAY_TOKEN"]
+
+mutation = {
+    "query": """mutation($input: VariableCollectionUpsertInput!) {
+        variableCollectionUpsert(input: $input)
+    }""",
+    "variables": {
+        "input": {
+            "projectId": "c6b32bb9-cb3c-454e-aab3-1b8ecefa320a",
+            "environmentId": "b5f83c4b-0081-460a-8038-c63e9caa3f78",
+            "serviceId": "73341e75-b9ea-412c-b0ff-2aa623b26c7b",
+            "variables": {
+                "MDLANDREC_EMAIL": "bree@mossequitypartners.com",
+                "MDLANDREC_PASSWORD": "Tretre16!$"
+            }
+        }
+    }
+}
+
+body = json.dumps(mutation).encode()
+req = urllib.request.Request(
+    "https://backboard.railway.app/graphql/v2",
+    data=body,
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    },
+    method="POST"
+)
+with urllib.request.urlopen(req) as resp:
+    data = json.loads(resp.read())
+
+errors = data.get("errors", [])
+if errors:
+    print(f"ERROR: {errors}")
+    raise SystemExit(1)
+
+print("SUCCESS — variableCollectionUpsert returned:", data.get("data", {}).get("variableCollectionUpsert"))
+PYEOF
+          )
+
+          echo "$RESULT"
+          if echo "$RESULT" | grep -q "ERROR"; then
+            echo "Failed to upsert env vars"
+            exit 1
+          fi
+
+      - name: Verify MDLANDREC keys exist in Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          python3 - <<'PYEOF'
+import json, urllib.request, os
+
+token = os.environ["RAILWAY_TOKEN"]
+
+query = {
+    "query": """query($serviceId: String!, $environmentId: String!) {
+        variables(serviceId: $serviceId, environmentId: $environmentId)
+    }""",
+    "variables": {
+        "serviceId": "73341e75-b9ea-412c-b0ff-2aa623b26c7b",
+        "environmentId": "b5f83c4b-0081-460a-8038-c63e9caa3f78"
+    }
+}
+
+body = json.dumps(query).encode()
+req = urllib.request.Request(
+    "https://backboard.railway.app/graphql/v2",
+    data=body,
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    },
+    method="POST"
+)
+with urllib.request.urlopen(req) as resp:
+    data = json.loads(resp.read())
+
+variables = data.get("data", {}).get("variables", {})
+if isinstance(variables, dict):
+    all_keys = list(variables.keys())
+    mdlandrec_keys = [k for k in all_keys if "MDLANDREC" in k]
+    print(f"Total env vars: {len(all_keys)}")
+    print(f"MDLANDREC keys found: {mdlandrec_keys}")
+    if not mdlandrec_keys:
+        print("WARNING: MDLANDREC keys not found! Keys present:", all_keys[:30])
+        raise SystemExit(1)
+    print("Verification PASSED — MDLANDREC credentials confirmed in Railway.")
+else:
+    print("Could not parse variables response:", data)
+    raise SystemExit(1)
+PYEOF
