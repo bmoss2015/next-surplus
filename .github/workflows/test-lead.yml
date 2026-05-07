@@ -1,0 +1,324 @@
+name: Test Lead Research Pipeline
+
+on:
+  push:
+    branches:
+      - claude/setup-md-mortgage-automation-VQ7KG
+    paths-ignore:
+      - 'test-results.json'
+      - 'deploy-status.json'
+      - 'test-failure.json'
+      - 'CLAUDE.md'
+      - 'docs/**'
+
+jobs:
+  test-lead:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      SERVICE_URL: https://md-mortgage-research-production.up.railway.app
+      SERVICE_ID: 73341e75-b9ea-412c-b0ff-2aa623b26c7b
+      ENVIRONMENT_ID: b5f83c4b-0081-460a-8038-c63e9caa3f78
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/setup-md-mortgage-automation-VQ7KG
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for Railway deploy to complete
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          MAX_WAIT=600
+          ELAPSED=0
+          INTERVAL=20
+
+          echo "Waiting for deployment to complete..."
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            DEPLOY_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"query\":\"query(\$serviceId:String!,\$environmentId:String!){deployments(input:{serviceId:\$serviceId,environmentId:\$environmentId},first:1){edges{node{id status}}}}\",\"variables\":{\"serviceId\":\"$SERVICE_ID\",\"environmentId\":\"$ENVIRONMENT_ID\"}}")
+
+            STATUS=$(echo "$DEPLOY_RESP" | python3 -c "
+import json,sys
+data=json.load(sys.stdin)
+edges=data.get('data',{}).get('deployments',{}).get('edges',[])
+print(edges[0]['node']['status'] if edges else 'UNKNOWN')
+" 2>/dev/null || echo "UNKNOWN")
+
+            echo "Deploy status: $STATUS (${ELAPSED}s elapsed)"
+
+            if [ "$STATUS" = "SUCCESS" ]; then
+              echo "Deploy succeeded."
+              break
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CRASHED" ]; then
+              echo "Deploy $STATUS — writing failure and exiting."
+              python3 -c "
+import json
+with open('test-failure.json','w') as f:
+    json.dump({'stage':'deploy','deploy_status':'$STATUS',
+               'trigger_sha':'${{ github.sha }}',
+               'checked_at':'$(date -u +%Y-%m-%dT%H:%M:%SZ)'},f,indent=2)
+"
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git pull --rebase origin claude/setup-md-mortgage-automation-VQ7KG || true
+              git add test-failure.json
+              git diff --cached --quiet || git commit -m "chore: update test-failure.json [skip ci]"
+              git push origin claude/setup-md-mortgage-automation-VQ7KG || true
+              exit 0
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+      - name: Submit test lead
+        id: submit
+        run: |
+          echo "Submitting test lead: Sarah P Moore, 4044 Hanson Oaks Drive..."
+
+          RESPONSE=$(curl -s -w '\n%{http_code}' -X POST "$SERVICE_URL/research/maryland" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "property_address": "4044 Hanson Oaks Drive",
+              "county": "Prince Georges",
+              "owner_last_name": "Moore",
+              "owner_first_name": "Sarah",
+              "owner_middle_initial": "P",
+              "sale_type": "mortgage_foreclosure",
+              "closing_bid": 285000,
+              "sale_date_estimate": "2024-06-15",
+              "owner_living": true,
+              "trustee_last": "Smith",
+              "trustee_first": "John"
+            }' --max-time 30)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP $HTTP_CODE"
+          echo "Body: $BODY"
+
+          JOB_ID=$(echo "$BODY" | python3 -c "
+import json,sys
+try:
+    data=json.loads(sys.stdin.read())
+    print(data.get('job_id',''))
+except:
+    print('')
+" 2>/dev/null || echo "")
+
+          echo "job_id=$JOB_ID" >> $GITHUB_OUTPUT
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "submit_body=$BODY" >> $GITHUB_OUTPUT
+
+      - name: Poll for research completion
+        id: poll
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          JOB_ID="${{ steps.submit.outputs.job_id }}"
+          HTTP_CODE="${{ steps.submit.outputs.http_code }}"
+
+          if [ "$HTTP_CODE" != "200" ] || [ -z "$JOB_ID" ]; then
+            echo "Submit failed: HTTP $HTTP_CODE, job_id='$JOB_ID'"
+            echo "final_status=submit_failed" >> $GITHUB_OUTPUT
+            echo "final_body=${{ steps.submit.outputs.submit_body }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Polling /status/$JOB_ID every 30s for up to 10 minutes..."
+          MAX_POLL=600
+          ELAPSED=0
+          INTERVAL=30
+          FINAL_STATUS="timeout"
+          FINAL_BODY=""
+
+          while [ $ELAPSED -lt $MAX_POLL ]; do
+            STATUS_RESP=$(curl -s -w '\n%{http_code}' "$SERVICE_URL/status/$JOB_ID" --max-time 15)
+            SCODE=$(echo "$STATUS_RESP" | tail -1)
+            SBODY=$(echo "$STATUS_RESP" | head -n -1)
+
+            echo "[${ELAPSED}s] HTTP $SCODE: ${SBODY:0:200}"
+
+            if [ "$SCODE" = "200" ]; then
+              RUN_STATUS=$(echo "$SBODY" | python3 -c "
+import json,sys
+try:
+    data=json.loads(sys.stdin.read())
+    print(data.get('status',''))
+except:
+    print('')
+" 2>/dev/null || echo "")
+
+              if [ "$RUN_STATUS" = "completed" ]; then
+                FINAL_STATUS="completed"
+                FINAL_BODY="$SBODY"
+                break
+              elif [ "$RUN_STATUS" = "failed" ]; then
+                FINAL_STATUS="failed"
+                FINAL_BODY="$SBODY"
+                break
+              fi
+            elif [ "$SCODE" = "404" ]; then
+              echo "Job not found in DB yet — will retry"
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "final_status=$FINAL_STATUS" >> $GITHUB_OUTPUT
+          # Write body to file to avoid shell escaping issues
+          echo "$FINAL_BODY" > /tmp/final_body.json
+
+      - name: Fetch Railway logs on failure
+        id: logs
+        if: steps.poll.outputs.final_status != 'completed'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "Fetching Railway deployment logs..."
+
+          DEPLOY_ID=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"query(\$serviceId:String!,\$environmentId:String!){deployments(input:{serviceId:\$serviceId,environmentId:\$environmentId},first:1){edges{node{id}}}}\",\"variables\":{\"serviceId\":\"$SERVICE_ID\",\"environmentId\":\"$ENVIRONMENT_ID\"}}" \
+            | python3 -c "
+import json,sys
+data=json.load(sys.stdin)
+edges=data.get('data',{}).get('deployments',{}).get('edges',[])
+print(edges[0]['node']['id'] if edges else '')
+" 2>/dev/null || echo "")
+
+          if [ -n "$DEPLOY_ID" ]; then
+            LOG_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"query\":\"query(\$id:String!){deploymentLogs(deploymentId:\$id,limit:150){message severity timestamp}}\",\"variables\":{\"id\":\"$DEPLOY_ID\"}}")
+
+            LOGS=$(echo "$LOG_RESP" | python3 -c "
+import json,sys
+data=json.load(sys.stdin)
+entries=data.get('data',{}).get('deploymentLogs',[]) or []
+lines=[e.get('message','') for e in entries if e.get('message')]
+print('\n'.join(lines[-100:]))
+" 2>/dev/null || echo "Could not fetch logs")
+          else
+            LOGS="Could not determine deployment ID"
+          fi
+
+          echo "$LOGS" > /tmp/railway_logs.txt
+          echo "deploy_id=$DEPLOY_ID" >> $GITHUB_OUTPUT
+
+      - name: Write test-failure.json
+        if: steps.poll.outputs.final_status != 'completed'
+        run: |
+          FINAL_STATUS="${{ steps.poll.outputs.final_status }}"
+          JOB_ID="${{ steps.submit.outputs.job_id }}"
+          RAILWAY_LOGS=$(cat /tmp/railway_logs.txt 2>/dev/null || echo "")
+          FINAL_BODY=$(cat /tmp/final_body.json 2>/dev/null || echo "")
+
+          export FINAL_STATUS JOB_ID RAILWAY_LOGS FINAL_BODY
+          export SHA="${{ github.sha }}"
+          export DEPLOY_ID="${{ steps.logs.outputs.deploy_id }}"
+          export CHECKED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          python3 - <<'PYEOF'
+import json, os
+
+status = os.environ["FINAL_STATUS"]
+job_id = os.environ["JOB_ID"]
+logs = os.environ["RAILWAY_LOGS"]
+sha = os.environ["SHA"]
+deploy_id = os.environ.get("DEPLOY_ID", "")
+checked_at = os.environ["CHECKED_AT"]
+service_url = os.environ.get("SERVICE_URL", "")
+
+try:
+    run_data = json.loads(os.environ.get("FINAL_BODY", "") or "{}")
+except:
+    run_data = {}
+
+result = {
+    "passed": False,
+    "stage": "research_pipeline",
+    "final_status": status,
+    "job_id": job_id,
+    "trigger_sha": sha,
+    "deploy_id": deploy_id,
+    "service_url": service_url,
+    "checked_at": checked_at,
+    "run_data": run_data,
+    "railway_logs": logs,
+    "summary": (
+        "Research pipeline returned 'failed' status — see run_data.error_message and railway_logs"
+        if status == "failed" else
+        f"Research pipeline did not complete within timeout (status={status})"
+    ),
+}
+
+with open("test-failure.json", "w") as f:
+    json.dump(result, f, indent=2)
+
+print(f"Written test-failure.json: status={status}, job_id={job_id}")
+PYEOF
+
+      - name: Write test-results.json on success
+        if: steps.poll.outputs.final_status == 'completed'
+        run: |
+          export SHA="${{ github.sha }}"
+          export JOB_ID="${{ steps.submit.outputs.job_id }}"
+          export CHECKED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          FINAL_BODY=$(cat /tmp/final_body.json 2>/dev/null || echo "{}")
+          export FINAL_BODY
+
+          python3 - <<'PYEOF'
+import json, os
+
+sha = os.environ["SHA"]
+job_id = os.environ["JOB_ID"]
+checked_at = os.environ["CHECKED_AT"]
+service_url = os.environ.get("SERVICE_URL", "")
+
+try:
+    run_data = json.loads(os.environ.get("FINAL_BODY", "") or "{}")
+except:
+    run_data = {}
+
+summary = run_data.get("output_summary", {})
+decision = summary.get("decision", "unknown")
+
+result = {
+    "passed": True,
+    "trigger_sha": sha,
+    "job_id": job_id,
+    "checked_at": checked_at,
+    "service_url": service_url,
+    "decision": decision,
+    "summary_keys": list(summary.keys()),
+}
+
+with open("test-results.json", "w") as f:
+    json.dump(result, f, indent=2)
+print(f"Research completed successfully. Decision: {decision}")
+PYEOF
+
+      - name: Commit and push results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin claude/setup-md-mortgage-automation-VQ7KG || true
+          git add test-failure.json test-results.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update test results [skip ci]"
+            git push origin claude/setup-md-mortgage-automation-VQ7KG
+          fi

@@ -236,17 +236,17 @@ async def _run_research_pipeline(job_id: str, lead: MarylandLeadRequest) -> None
             logger.info("Updating existing lead %s", lead_id)
         else:
             lead_id = await db.create_lead({
-                "address": lead.property_address,
+                "property_address": lead.property_address,
                 "county": lead.county,
-                "owner_last_name": lead.owner_last_name,
                 "owner_first_name": lead.owner_first_name,
+                "owner_middle_initial": lead.owner_middle_initial,
+                "owner_last_name": lead.owner_last_name,
                 "sale_type": lead.sale_type,
+                "closing_bid": lead.closing_bid,
                 "status": "researching",
             })
 
-        run_id = await db.create_research_run(lead_id, status="running")
-        # Store job_id in run so /status/{job_id} works
-        await db.update_lead(lead_id, {"current_run_id": run_id})
+        run_id = await db.create_research_run(lead_id, status="running", run_id=job_id)
 
         # ------------------------------------------------------------------
         # Step 2 – SDAT verification
@@ -452,13 +452,13 @@ async def _run_research_pipeline(job_id: str, lead: MarylandLeadRequest) -> None
         # ------------------------------------------------------------------
         await db.update_lead(lead_id, {
             "status": decision.lower(),
-            "surplus_estimate": surplus.get("net_surplus"),
+            "estimated_surplus_low": surplus.get("net_surplus"),
             "decision": decision,
             "decision_reason": decision_reason,
             "drive_folder_url": drive_folder_url,
         })
         await db.complete_research_run(
-            run_id=job_id,
+            run_id=run_id,
             status="completed",
             summary=summary,
         )
@@ -470,7 +470,7 @@ async def _run_research_pipeline(job_id: str, lead: MarylandLeadRequest) -> None
             try:
                 from storage import supabase_client as db2
                 await db2.complete_research_run(
-                    run_id=job_id,
+                    run_id=run_id,
                     status="failed",
                     summary=summary,
                     error=str(exc),

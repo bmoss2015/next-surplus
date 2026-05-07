@@ -2,29 +2,31 @@
 Supabase client wrapper for the Maryland mortgage research pipeline.
 
 Environment variables required:
-  SUPABASE_URL              – project URL  (e.g. https://xyz.supabase.co)
-  SUPABASE_PUBLISHABLE_KEY  – anon/public key
-  SUPABASE_SECRET_KEY       – service-role key (used for all backend writes)
+  SUPABASE_URL          – project URL  (e.g. https://xyz.supabase.co)
+  SUPABASE_SECRET_KEY   – service-role key (not anon)
 
 All public functions are async.  Blocking supabase-py calls are wrapped in
 asyncio.run_in_executor so they can be awaited from FastAPI endpoints.
 
-Expected Supabase tables
-------------------------
+Actual Supabase schema
+----------------------
 leads
-  id uuid PK, address text, county text, owner_last_name text,
-  owner_first_name text, status text, sale_type text,
-  surplus_estimate numeric, decision text, decision_reason text,
-  drive_folder_url text, created_at timestamptz, updated_at timestamptz
+  id, created_at, updated_at, source, external_id,
+  property_address, property_city, property_state, property_zip,
+  county, owner_first_name, owner_middle_initial, owner_last_name,
+  owner_full_name, owner_deceased, sale_type, sale_date,
+  opening_bid, closing_bid, case_number, case_status, case_filed_date,
+  trustee_names, lender_name, original_mortgage_amount,
+  estimated_mortgage_payoff, estimated_surplus_low, estimated_surplus_high,
+  confirmed_surplus, status, decision, decision_reason,
+  drive_folder_url, notes
 
 liens
-  id uuid PK, lead_id uuid FK→leads.id, lien_holder text,
-  lien_amount numeric, lien_type text, recorded_date text,
-  debtor_name text, created_at timestamptz
+  id, lead_id, created_at, lien_type, lien_holder, lien_amount,
+  recorded_date, document_url
 
 research_runs
-  id uuid PK, lead_id uuid FK→leads.id, status text,
-  summary jsonb, error text, started_at timestamptz, completed_at timestamptz
+  id, lead_id, started_at, completed_at, status, error_message, output_summary
 """
 
 import asyncio
@@ -38,6 +40,29 @@ logger = logging.getLogger(__name__)
 
 _client = None  # module-level singleton
 
+# Valid columns per table — used to strip unknown fields before inserts/updates
+_LEAD_COLUMNS = {
+    "id", "created_at", "updated_at", "source", "external_id",
+    "property_address", "property_city", "property_state", "property_zip",
+    "county", "owner_first_name", "owner_middle_initial", "owner_last_name",
+    "owner_full_name", "owner_deceased", "sale_type", "sale_date",
+    "opening_bid", "closing_bid", "case_number", "case_status", "case_filed_date",
+    "trustee_names", "lender_name", "original_mortgage_amount",
+    "estimated_mortgage_payoff", "estimated_surplus_low", "estimated_surplus_high",
+    "confirmed_surplus", "status", "decision", "decision_reason",
+    "drive_folder_url", "notes",
+}
+
+_LIEN_COLUMNS = {
+    "id", "lead_id", "created_at",
+    "lien_type", "lien_holder", "lien_amount", "recorded_date", "document_url",
+}
+
+_RUN_COLUMNS = {
+    "id", "lead_id", "started_at", "completed_at",
+    "status", "error_message", "output_summary",
+}
+
 
 def get_supabase_client():
     """
@@ -50,15 +75,14 @@ def get_supabase_client():
     if _client is not None:
         return _client
 
-    from supabase import create_client, Client
+    from supabase import create_client
 
     url = os.environ.get("SUPABASE_URL", "")
     key = os.environ.get("SUPABASE_SECRET_KEY", "") or os.environ.get("SUPABASE_PUBLISHABLE_KEY", "")
 
     if not url or not key:
         raise RuntimeError(
-            "SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_PUBLISHABLE_KEY) "
-            "must be set in environment variables."
+            "SUPABASE_URL and SUPABASE_SECRET_KEY must be set in environment variables."
         )
 
     _client = create_client(url, key)
@@ -71,6 +95,11 @@ def _run(coro_or_fn):
     return loop.run_in_executor(None, coro_or_fn)
 
 
+def _filter(data: dict, allowed: set) -> dict:
+    """Strip keys not in the table schema to prevent insert/update errors."""
+    return {k: v for k, v in data.items() if k in allowed}
+
+
 # ---------------------------------------------------------------------------
 # Leads
 # ---------------------------------------------------------------------------
@@ -80,20 +109,20 @@ async def create_lead(lead_data: dict) -> str:
     Insert a new lead record.
 
     Args:
-        lead_data: Dict with at minimum ``address``, ``county``,
-                   ``owner_last_name``, ``sale_type``.
+        lead_data: Dict using actual column names from the leads schema.
+                   Must include at minimum ``property_address``.
 
     Returns:
         UUID string of the created lead.
     """
     client = get_supabase_client()
-    payload = {
+    payload = _filter({
         "id": str(uuid.uuid4()),
         "created_at": _now(),
         "updated_at": _now(),
         "status": "new",
         **lead_data,
-    }
+    }, _LEAD_COLUMNS)
     result = await _run(lambda: client.table("leads").insert(payload).execute())
     row = result.data[0] if result.data else payload
     logger.info("Created lead %s", row["id"])
@@ -104,8 +133,9 @@ async def update_lead(lead_id: str, updates: dict) -> dict:
     """Update an existing lead by ID and return the updated row."""
     client = get_supabase_client()
     updates["updated_at"] = _now()
+    payload = _filter(updates, _LEAD_COLUMNS)
     result = await _run(
-        lambda: client.table("leads").update(updates).eq("id", lead_id).execute()
+        lambda: client.table("leads").update(payload).eq("id", lead_id).execute()
     )
     row = result.data[0] if result.data else {}
     logger.debug("Updated lead %s", lead_id)
@@ -123,7 +153,7 @@ async def get_lead(lead_id: str) -> dict:
 
 async def get_lead_by_address(address: str) -> Optional[dict]:
     """
-    Fetch a lead by normalized property address (for deduplication).
+    Fetch a lead by property_address (for deduplication).
 
     Returns ``None`` if no match found.
     """
@@ -132,7 +162,7 @@ async def get_lead_by_address(address: str) -> Optional[dict]:
     result = await _run(
         lambda: client.table("leads")
             .select("*")
-            .ilike("address", normalized)
+            .ilike("property_address", normalized)
             .limit(1)
             .execute()
     )
@@ -141,11 +171,10 @@ async def get_lead_by_address(address: str) -> Optional[dict]:
 
 async def list_leads(filters: Optional[dict] = None) -> list[dict]:
     """
-    List leads, optionally filtered.
+    List leads, optionally filtered by column equality.
 
     Args:
-        filters: Optional dict of column→value equality filters,
-                 e.g. ``{"county": "Prince George's", "status": "active"}``.
+        filters: Optional dict of column→value equality filters.
     """
     client = get_supabase_client()
 
@@ -170,19 +199,18 @@ async def add_lien(lead_id: str, lien_data: dict) -> str:
 
     Args:
         lead_id:   UUID of the parent lead.
-        lien_data: Dict with ``lien_holder``, ``lien_amount``, ``lien_type``,
-                   ``recorded_date``, ``debtor_name``.
+        lien_data: Dict with lien fields. Unknown keys are silently dropped.
 
     Returns:
         UUID string of the created lien record.
     """
     client = get_supabase_client()
-    payload = {
+    payload = _filter({
         "id": str(uuid.uuid4()),
         "lead_id": lead_id,
         "created_at": _now(),
         **lien_data,
-    }
+    }, _LIEN_COLUMNS)
     result = await _run(lambda: client.table("liens").insert(payload).execute())
     row = result.data[0] if result.data else payload
     logger.debug("Added lien %s for lead %s", row["id"], lead_id)
@@ -193,15 +221,25 @@ async def add_lien(lead_id: str, lien_data: dict) -> str:
 # Research runs
 # ---------------------------------------------------------------------------
 
-async def create_research_run(lead_id: str, status: str = "running") -> str:
+async def create_research_run(
+    lead_id: str,
+    status: str = "running",
+    run_id: Optional[str] = None,
+) -> str:
     """
     Create a new research run record.
 
+    Args:
+        lead_id: UUID of the parent lead.
+        status:  Initial status string.
+        run_id:  Optional explicit UUID; generated if not provided.
+                 Pass the API job_id here so GET /status/{job_id} resolves correctly.
+
     Returns:
-        UUID run_id string.
+        The run_id used.
     """
     client = get_supabase_client()
-    run_id = str(uuid.uuid4())
+    run_id = run_id or str(uuid.uuid4())
     payload = {
         "id": run_id,
         "lead_id": lead_id,
@@ -225,17 +263,17 @@ async def complete_research_run(
     Args:
         run_id:  UUID of the run to update.
         status:  Final status string, e.g. ``"completed"`` or ``"failed"``.
-        summary: Dict of research findings to store as JSONB.
-        error:   Optional error message if the run failed.
+        summary: Dict of research findings stored in output_summary (JSONB).
+        error:   Optional error message stored in error_message.
     """
     client = get_supabase_client()
-    payload = {
+    payload: dict = {
         "status": status,
-        "summary": summary,
+        "output_summary": summary,
         "completed_at": _now(),
     }
     if error:
-        payload["error"] = error
+        payload["error_message"] = error
     await _run(
         lambda: client.table("research_runs").update(payload).eq("id", run_id).execute()
     )
