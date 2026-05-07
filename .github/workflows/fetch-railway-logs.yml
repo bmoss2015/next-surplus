@@ -1,0 +1,162 @@
+name: Fetch Railway Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "How many minutes back to show (default 10)"
+        required: false
+        default: "10"
+
+jobs:
+  fetch-logs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      SERVICE_ID: 73341e75-b9ea-412c-b0ff-2aa623b26c7b
+      ENVIRONMENT_ID: b5f83c4b-0081-460a-8038-c63e9caa3f78
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/setup-md-mortgage-automation-VQ7KG
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch and display logs
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          MINUTES: ${{ github.event.inputs.minutes }}
+        run: |
+          # Step 1 – get latest deployment ID
+          DEPLOY_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"query(\$s:String!,\$e:String!){deployments(input:{serviceId:\$s,environmentId:\$e},first:1){edges{node{id status createdAt}}}}\",\"variables\":{\"s\":\"$SERVICE_ID\",\"e\":\"$ENVIRONMENT_ID\"}}")
+
+          DEPLOY_ID=$(echo "$DEPLOY_RESP" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+edges=d.get('data',{}).get('deployments',{}).get('edges',[])
+if edges:
+    n=edges[0]['node']
+    import sys
+    print(f\"Deploy: {n['id']}  status={n['status']}  created={n['createdAt']}\", file=sys.stderr)
+    print(n['id'])
+else:
+    print('ERROR: no deployments', file=sys.stderr)
+    print('')
+" 2>&1 | tee /tmp/deploy_info.txt | tail -1)
+
+          DEPLOY_ID=$(echo "$DEPLOY_ID" | grep -v 'Deploy:\|ERROR' | head -1)
+          cat /tmp/deploy_info.txt
+          echo "Deploy ID: $DEPLOY_ID"
+
+          if [ -z "$DEPLOY_ID" ]; then
+            echo "Cannot continue without a deployment ID."
+            exit 1
+          fi
+
+          # Step 2 – fetch logs (limit=500 is the Railway max)
+          LOG_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"query(\$id:String!){deploymentLogs(deploymentId:\$id,limit:500){message severity timestamp}}\",\"variables\":{\"id\":\"$DEPLOY_ID\"}}")
+
+          echo "$LOG_RESP" > /tmp/log_resp.json
+
+          # Step 3 – parse, display, write railway-logs.json
+          export DEPLOY_ID MINUTES
+          export CHECKED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          python3 - <<'PYEOF'
+import json, os, sys
+from datetime import datetime, timezone, timedelta
+
+data = json.load(open("/tmp/log_resp.json"))
+entries = data.get("data", {}).get("deploymentLogs", []) or []
+
+if not entries:
+    print("WARNING: No log entries returned from Railway.")
+    print("Raw response:", json.dumps(data, indent=2)[:1000])
+
+minutes = int(os.environ.get("MINUTES") or "10")
+cutoff  = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+
+recent = []
+for e in entries:
+    try:
+        ts = datetime.fromisoformat(e["timestamp"].replace("Z", "+00:00"))
+        if ts >= cutoff:
+            recent.append(e)
+    except Exception:
+        recent.append(e)
+
+ERROR_KEYS = [
+    "error", "exception", "traceback", "crash", "fatal", "502",
+    "timeout", "killed", "oom", "signal", "playwright", "failed",
+    "bad gateway", "uvicorn", "worker", "exit", "7MaoeMi",
+]
+errors = [
+    e for e in entries
+    if e.get("severity") in ("ERROR", "CRITICAL")
+    or any(k in e.get("message", "").lower() for k in ERROR_KEYS)
+]
+
+# ---- stdout (visible in Actions log) ----------------------------------------
+print(f"\n{'='*70}")
+print(f"  Railway deployment logs  |  deploy={os.environ.get('DEPLOY_ID','')}")
+print(f"  Total entries: {len(entries)}   |   Last {minutes} min: {len(recent)}   |   Errors: {len(errors)}")
+print(f"{'='*70}\n")
+
+print(f"--- ALL LINES (last {minutes} min) ---")
+for e in recent:
+    sev = (e.get("severity") or "").ljust(7)
+    ts  = e.get("timestamp", "")[:19]
+    print(f"{ts}  {sev}  {e.get('message','')}")
+
+print(f"\n--- ERRORS / WARNINGS / STACK TRACES (all time) ---")
+if errors:
+    for e in errors:
+        sev = (e.get("severity") or "").ljust(7)
+        ts  = e.get("timestamp", "")[:19]
+        print(f"{ts}  {sev}  {e.get('message','')}")
+else:
+    print("  (none found)")
+
+# ---- write railway-logs.json ------------------------------------------------
+result = {
+    "fetched_at":       os.environ["CHECKED_AT"],
+    "deploy_id":        os.environ.get("DEPLOY_ID", ""),
+    "service_id":       os.environ.get("SERVICE_ID", ""),
+    "total_entries":    len(entries),
+    "minutes_window":   minutes,
+    "recent_count":     len(recent),
+    "error_count":      len(errors),
+    "recent_logs": [
+        {"ts": e["timestamp"][:19], "severity": e.get("severity",""), "message": e["message"]}
+        for e in recent
+    ],
+    "errors_and_warnings": [
+        {"ts": e["timestamp"][:19], "severity": e.get("severity",""), "message": e["message"]}
+        for e in errors
+    ],
+}
+with open("railway-logs.json", "w") as f:
+    json.dump(result, f, indent=2)
+print(f"\nWrote railway-logs.json ({len(recent)} recent lines, {len(errors)} errors)")
+PYEOF
+
+      - name: Commit railway-logs.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin claude/setup-md-mortgage-automation-VQ7KG || true
+          git add railway-logs.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update railway-logs.json [skip ci]"
+            git push origin claude/setup-md-mortgage-automation-VQ7KG
+          fi
