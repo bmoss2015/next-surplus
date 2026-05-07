@@ -1,9 +1,8 @@
 {
-  "status": "FAILED",
-  "deploy_id": "1ff53cf7-ecfe-4035-b1a6-691f92b5dd79",
+  "status": "DEPLOYING",
+  "deploy_id": "42264ff4-4437-42f8-ad0d-66da52e98143",
   "project_id": "c6b32bb9-cb3c-454e-aab3-1b8ecefa320a",
   "service_id": "73341e75-b9ea-412c-b0ff-2aa623b26c7b",
-  "checked_at": "2026-05-07T02:59:28Z",
-  "trigger_sha": "9dbb248bc6b07812d47ccf06aa78d77228aadf8b",
-  "error_log": "Usage: uvicorn [OPTIONS] APP\nTry 'uvicorn --help' for help.\nError: Invalid value for '--port': '$PORT' is not a valid integer.\nUsage: uvicorn [OPTIONS] APP\nTry 'uvicorn --help' for help.\nError: Invalid value for '--port': '$PORT' is not a valid integer.\nStarting Container\nUsage: uvicorn [OPTIONS] APP\nTry 'uvicorn --help' for help.\nError: Invalid value for '--port': '$PORT' is not a valid integer.\nUsage: uvicorn [OPTIONS] APP\nTry 'uvicorn --help' for help.\nError: Invalid value for '--port': '$PORT' is not a valid integer."
+  "checked_at": "2026-05-07T03:01:55Z",
+  "trigger_sha": "6f11da9b797989c5a1478098023ea9ef98f66cb7"
 }
