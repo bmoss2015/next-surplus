@@ -23,57 +23,11 @@ jobs:
 
       - name: Resolve Railway service URL
         id: url
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          SERVICE_ID="73341e75-b9ea-412c-b0ff-2aa623b26c7b"
-          ENVIRONMENT_ID="b5f83c4b-0081-460a-8038-c63e9caa3f78"
-
-          DOMAIN_QUERY=$(python3 -c "
-          import json
-          q = {
-              'query': '''query(\$serviceId: String!, \$environmentId: String!) {
-                  serviceInstance(serviceId: \$serviceId, environmentId: \$environmentId) {
-                      domains {
-                          serviceDomains { domain }
-                          customDomains { domain }
-                      }
-                  }
-              }''',
-              'variables': {'serviceId': '$SERVICE_ID', 'environmentId': '$ENVIRONMENT_ID'}
-          }
-          print(json.dumps(q))
-          ")
-
-          DOMAIN_RESP=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$DOMAIN_QUERY")
-
-          echo "Domain response: $DOMAIN_RESP"
-
-          SERVICE_URL=$(echo "$DOMAIN_RESP" | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          inst = data.get('data', {}).get('serviceInstance', {}) or {}
-          domains = inst.get('domains', {}) or {}
-          for d in (domains.get('serviceDomains') or []):
-              if d.get('domain'):
-                  print('https://' + d['domain'])
-                  break
-          for d in (domains.get('customDomains') or []):
-              if d.get('domain'):
-                  print('https://' + d['domain'])
-                  break
-          " 2>/dev/null || echo "")
-
-          # Fall back to RAILWAY_SERVICE_URL secret if API lookup fails
-          if [ -z "$SERVICE_URL" ]; then
-            SERVICE_URL="${{ secrets.RAILWAY_SERVICE_URL }}"
-          fi
-
+          # Discovered from first run; kept hardcoded for reliability
+          SERVICE_URL="https://md-mortgage-research-production.up.railway.app"
           echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
-          echo "Resolved service URL: $SERVICE_URL"
+          echo "Using service URL: $SERVICE_URL"
 
       - name: Wait for Railway deploy to complete
         env:
@@ -122,13 +76,7 @@ jobs:
               break
             elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CRASHED" ]; then
               echo "Deploy failed with status $STATUS — aborting test."
-              python3 -c "
-          import json
-          with open('test-results.json', 'w') as f:
-              json.dump({'passed': False, 'error': 'Deploy $STATUS before test could run',
-                         'checked_at': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
-                         'trigger_sha': '${{ github.sha }}'}, f, indent=2)
-              "
+              python3 -c "import json; open('test-results.json','w').write(json.dumps({'passed':False,'error':'Deploy failed before test could run','trigger_sha':'${{ github.sha }}'},indent=2))"
               git config user.name "github-actions[bot]"
               git config user.email "github-actions[bot]@users.noreply.github.com"
               git add test-results.json
@@ -148,14 +96,7 @@ jobs:
         run: |
           if [ -z "$SERVICE_URL" ]; then
             echo "ERROR: Could not resolve Railway service URL."
-            python3 -c "
-          import json
-          with open('test-results.json', 'w') as f:
-              json.dump({'passed': False,
-                         'error': 'Could not resolve Railway service URL. Set RAILWAY_SERVICE_URL secret.',
-                         'checked_at': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
-                         'trigger_sha': '${{ github.sha }}'}, f, indent=2)
-            "
+            python3 -c "import json; open('test-results.json','w').write(json.dumps({'passed':False,'error':'Could not resolve Railway service URL','trigger_sha':'${{ github.sha }}'},indent=2))"
             exit 0
           fi
 
@@ -171,83 +112,88 @@ jobs:
           echo "HTTP $HTTP_CODE"
           echo "Body: $BODY"
 
+          # Pass values to Python via environment to avoid heredoc interpolation issues
+          export TEST_BODY="$BODY"
+          export TEST_HTTP_CODE="$HTTP_CODE"
+          export TEST_SHA="${{ github.sha }}"
+          export TEST_CHECKED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
           python3 - <<'PYEOF'
-          import json, sys, re, os
+import json, sys, re, os
 
-          body_raw = """$BODY"""
-          http_code = "$HTTP_CODE"
-          sha = "${{ github.sha }}"
-          url = os.environ.get("SERVICE_URL", "")
+body_raw = os.environ["TEST_BODY"]
+http_code = os.environ["TEST_HTTP_CODE"]
+sha = os.environ["TEST_SHA"]
+url = os.environ.get("SERVICE_URL", "")
+checked_at = os.environ["TEST_CHECKED_AT"]
 
-          result = {
-              "checked_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-              "trigger_sha": sha,
-              "service_url": url,
-              "http_code": http_code,
-          }
+result = {
+    "checked_at": checked_at,
+    "trigger_sha": sha,
+    "service_url": url,
+    "http_code": http_code,
+}
 
-          try:
-              data = json.loads(body_raw)
-          except Exception as e:
-              result["passed"] = False
-              result["error"] = f"Response is not valid JSON: {e}"
-              result["raw_body"] = body_raw[:500]
-              with open("test-results.json", "w") as f:
-                  json.dump(result, f, indent=2)
-              sys.exit(0)
+try:
+    data = json.loads(body_raw)
+except Exception as e:
+    result["passed"] = False
+    result["error"] = f"Response is not valid JSON: {e}"
+    result["raw_body"] = body_raw[:500]
+    with open("test-results.json", "w") as f:
+        json.dump(result, f, indent=2)
+    sys.exit(0)
 
-          if http_code != "200":
-              result["passed"] = False
-              result["error"] = f"HTTP {http_code}: {data}"
-              with open("test-results.json", "w") as f:
-                  json.dump(result, f, indent=2)
-              sys.exit(0)
+if http_code != "200":
+    result["passed"] = False
+    result["error"] = f"HTTP {http_code}: {data}"
+    with open("test-results.json", "w") as f:
+        json.dump(result, f, indent=2)
+    sys.exit(0)
 
-          auth_url = data.get("authorization_url", "")
-          if not auth_url:
-              result["passed"] = False
-              result["error"] = "Response missing 'authorization_url' field"
-              result["response"] = data
-              with open("test-results.json", "w") as f:
-                  json.dump(result, f, indent=2)
-              sys.exit(0)
+auth_url = data.get("authorization_url", "")
+if not auth_url:
+    result["passed"] = False
+    result["error"] = "Response missing 'authorization_url' field"
+    result["response"] = data
+    with open("test-results.json", "w") as f:
+        json.dump(result, f, indent=2)
+    sys.exit(0)
 
-          # Extract state= param
-          m = re.search(r'[?&]state=([^&]+)', auth_url)
-          if not m:
-              result["passed"] = False
-              result["error"] = "No state= parameter found in authorization_url"
-              result["authorization_url"] = auth_url
-              with open("test-results.json", "w") as f:
-                  json.dump(result, f, indent=2)
-              sys.exit(0)
+m = re.search(r'[?&]state=([^&]+)', auth_url)
+if not m:
+    result["passed"] = False
+    result["error"] = "No state= parameter found in authorization_url"
+    result["authorization_url"] = auth_url
+    with open("test-results.json", "w") as f:
+        json.dump(result, f, indent=2)
+    sys.exit(0)
 
-          state_val = m.group(1)
-          placeholders = ["<state_token>", "%3Cstate_token%3E", "state_token", "<state>"]
-          for p in placeholders:
-              if p in state_val:
-                  result["passed"] = False
-                  result["error"] = f"state= is a literal placeholder: {state_val!r}"
-                  result["authorization_url"] = auth_url
-                  with open("test-results.json", "w") as f:
-                      json.dump(result, f, indent=2)
-                  sys.exit(0)
+state_val = m.group(1)
+placeholders = ["<state_token>", "%3Cstate_token%3E", "state_token", "<state>"]
+for p in placeholders:
+    if p in state_val:
+        result["passed"] = False
+        result["error"] = f"state= is a literal placeholder: {state_val!r}"
+        result["authorization_url"] = auth_url
+        with open("test-results.json", "w") as f:
+            json.dump(result, f, indent=2)
+        sys.exit(0)
 
-          # state must be at least 8 chars of real token
-          if len(state_val) < 8:
-              result["passed"] = False
-              result["error"] = f"state= value too short to be a real token: {state_val!r}"
-              result["authorization_url"] = auth_url
-              with open("test-results.json", "w") as f:
-                  json.dump(result, f, indent=2)
-              sys.exit(0)
+if len(state_val) < 8:
+    result["passed"] = False
+    result["error"] = f"state= value too short to be a real token: {state_val!r}"
+    result["authorization_url"] = auth_url
+    with open("test-results.json", "w") as f:
+        json.dump(result, f, indent=2)
+    sys.exit(0)
 
-          result["passed"] = True
-          result["state_value"] = state_val
-          result["authorization_url_prefix"] = auth_url[:80] + "..."
-          with open("test-results.json", "w") as f:
-              json.dump(result, f, indent=2)
-          PYEOF
+result["passed"] = True
+result["state_value"] = state_val
+result["authorization_url_prefix"] = auth_url[:80] + "..."
+with open("test-results.json", "w") as f:
+    json.dump(result, f, indent=2)
+PYEOF
 
       - name: Commit and push test-results.json
         run: |
