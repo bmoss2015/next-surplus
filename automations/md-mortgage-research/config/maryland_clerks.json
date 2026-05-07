@@ -1,269 +1,221 @@
 {
-  "_comment": "Static reference data for Maryland circuit court clerks and county land record offices. Populate each entry with the clerk's name, phone, email, mailing address, filing fee schedule, and surplus claim procedure URL before the first production run.",
-  "counties": [
-    {
-      "name": "Allegany",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+  "_comment": "Maryland Circuit Court Clerk contact information for public records requests. Keys use PascalCase county names without apostrophes. Emails marked VERIFY should be confirmed before use. Phone numbers are for direct clerk offices.",
+  "counties": {
+    "Allegany": {
+      "display_name": "Allegany County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Allegany County",
+      "circuit_court_clerk_email": "clerk_allegany@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "301-777-5922",
+      "circuit_court_address": "30 Washington Street, Cumberland, MD 21502",
+      "auditor_office_phone": "301-777-5922"
     },
-    {
-      "name": "Anne Arundel",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "AnneArundel": {
+      "display_name": "Anne Arundel County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Anne Arundel County",
+      "circuit_court_clerk_email": "clerk_annearundel@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-222-1397",
+      "circuit_court_address": "8 Church Circle, Annapolis, MD 21401",
+      "auditor_office_phone": "410-222-1397"
     },
-    {
-      "name": "Baltimore City",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "BaltimoreCity": {
+      "display_name": "Baltimore City",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Baltimore City",
+      "circuit_court_clerk_email": "clerk_baltimorecity@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-333-3722",
+      "circuit_court_address": "111 N. Calvert Street, Baltimore, MD 21202",
+      "auditor_office_phone": "410-333-3722"
     },
-    {
-      "name": "Baltimore County",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "BaltimoreCounty": {
+      "display_name": "Baltimore County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Baltimore County",
+      "circuit_court_clerk_email": "clerk_baltimorecounty@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-887-2601",
+      "circuit_court_address": "401 Bosley Avenue, Towson, MD 21204",
+      "auditor_office_phone": "410-887-2601"
     },
-    {
-      "name": "Calvert",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Calvert": {
+      "display_name": "Calvert County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Calvert County",
+      "circuit_court_clerk_email": "clerk_calvert@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-535-1600",
+      "circuit_court_address": "175 Main Street, Prince Frederick, MD 20678",
+      "auditor_office_phone": "410-535-1600"
     },
-    {
-      "name": "Caroline",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Caroline": {
+      "display_name": "Caroline County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Caroline County",
+      "circuit_court_clerk_email": "clerk_caroline@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-479-1811",
+      "circuit_court_address": "109 Market Street, Denton, MD 21629",
+      "auditor_office_phone": "410-479-1811"
     },
-    {
-      "name": "Carroll",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Carroll": {
+      "display_name": "Carroll County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Carroll County",
+      "circuit_court_clerk_email": "clerk_carroll@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-386-2022",
+      "circuit_court_address": "55 North Court Street, Westminster, MD 21157",
+      "auditor_office_phone": "410-386-2022"
     },
-    {
-      "name": "Cecil",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Cecil": {
+      "display_name": "Cecil County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Cecil County",
+      "circuit_court_clerk_email": "clerk_cecil@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-996-5373",
+      "circuit_court_address": "129 East Main Street, Elkton, MD 21921",
+      "auditor_office_phone": "410-996-5373"
     },
-    {
-      "name": "Charles",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Charles": {
+      "display_name": "Charles County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Charles County",
+      "circuit_court_clerk_email": "clerk_charles@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "301-932-3202",
+      "circuit_court_address": "200 Charles Street, La Plata, MD 20646",
+      "auditor_office_phone": "301-932-3202"
     },
-    {
-      "name": "Dorchester",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Dorchester": {
+      "display_name": "Dorchester County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Dorchester County",
+      "circuit_court_clerk_email": "clerk_dorchester@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-228-0481",
+      "circuit_court_address": "206 High Street, Cambridge, MD 21613",
+      "auditor_office_phone": "410-228-0481"
     },
-    {
-      "name": "Frederick",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Frederick": {
+      "display_name": "Frederick County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Frederick County",
+      "circuit_court_clerk_email": "clerk_frederick@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "301-600-1976",
+      "circuit_court_address": "100 West Patrick Street, Frederick, MD 21701",
+      "auditor_office_phone": "301-600-1976"
     },
-    {
-      "name": "Garrett",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Garrett": {
+      "display_name": "Garrett County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Garrett County",
+      "circuit_court_clerk_email": "clerk_garrett@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "301-334-1937",
+      "circuit_court_address": "203 South Fourth Street, Oakland, MD 21550",
+      "auditor_office_phone": "301-334-1937"
     },
-    {
-      "name": "Harford",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Harford": {
+      "display_name": "Harford County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Harford County",
+      "circuit_court_clerk_email": "clerk_harford@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-638-3426",
+      "circuit_court_address": "20 West Courtland Street, Bel Air, MD 21014",
+      "auditor_office_phone": "410-638-3426"
     },
-    {
-      "name": "Howard",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Howard": {
+      "display_name": "Howard County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Howard County",
+      "circuit_court_clerk_email": "clerk_howard@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-313-2111",
+      "circuit_court_address": "8360 Court Avenue, Ellicott City, MD 21043",
+      "auditor_office_phone": "410-313-2111"
     },
-    {
-      "name": "Kent",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Kent": {
+      "display_name": "Kent County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Kent County",
+      "circuit_court_clerk_email": "clerk_kent@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-778-7460",
+      "circuit_court_address": "103 North Cross Street, Chestertown, MD 21620",
+      "auditor_office_phone": "410-778-7460"
     },
-    {
-      "name": "Montgomery",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Montgomery": {
+      "display_name": "Montgomery County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Montgomery County",
+      "circuit_court_clerk_email": "clerk_montgomery@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "240-777-9400",
+      "circuit_court_address": "50 Maryland Avenue, Rockville, MD 20850",
+      "auditor_office_phone": "240-777-9400"
     },
-    {
-      "name": "Prince George's",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "PrinceGeorges": {
+      "display_name": "Prince George's County",
+      "circuit_court_clerk_name": "Mahasin El Amin",
+      "circuit_court_clerk_email": "clerk_princegeorges@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY — use MDEC eFiling portal for official submissions",
+      "circuit_court_clerk_phone": "301-952-3318",
+      "circuit_court_address": "14735 Main Street, Upper Marlboro, MD 20772",
+      "auditor_office_phone": "301-952-3293"
     },
-    {
-      "name": "Queen Anne's",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "QueenAnnes": {
+      "display_name": "Queen Anne's County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Queen Anne's County",
+      "circuit_court_clerk_email": "clerk_queenannes@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-758-1773",
+      "circuit_court_address": "100 Old Court House Square, Centreville, MD 21617",
+      "auditor_office_phone": "410-758-1773"
     },
-    {
-      "name": "Somerset",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "SaintMarys": {
+      "display_name": "Saint Mary's County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Saint Mary's County",
+      "circuit_court_clerk_email": "clerk_saintmarys@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "301-475-4567",
+      "circuit_court_address": "41605 Courthouse Drive, Leonardtown, MD 20650",
+      "auditor_office_phone": "301-475-4567"
     },
-    {
-      "name": "St. Mary's",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Somerset": {
+      "display_name": "Somerset County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Somerset County",
+      "circuit_court_clerk_email": "clerk_somerset@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-651-1555",
+      "circuit_court_address": "30512 Prince William Street, Princess Anne, MD 21853",
+      "auditor_office_phone": "410-651-1555"
     },
-    {
-      "name": "Talbot",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Talbot": {
+      "display_name": "Talbot County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Talbot County",
+      "circuit_court_clerk_email": "clerk_talbot@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-822-2611",
+      "circuit_court_address": "11 North Washington Street, Easton, MD 21601",
+      "auditor_office_phone": "410-822-2611"
     },
-    {
-      "name": "Washington",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Washington": {
+      "display_name": "Washington County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Washington County",
+      "circuit_court_clerk_email": "clerk_washington@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "301-733-8660",
+      "circuit_court_address": "95 West Washington Street, Hagerstown, MD 21740",
+      "auditor_office_phone": "301-733-8660"
     },
-    {
-      "name": "Wicomico",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Wicomico": {
+      "display_name": "Wicomico County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Wicomico County",
+      "circuit_court_clerk_email": "clerk_wicomico@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-543-6551",
+      "circuit_court_address": "101 North Division Street, Salisbury, MD 21801",
+      "auditor_office_phone": "410-543-6551"
     },
-    {
-      "name": "Worcester",
-      "circuit_court": {
-        "clerk": "",
-        "phone": "",
-        "email": "",
-        "address": "",
-        "surplus_claim_url": ""
-      },
-      "land_records_url": ""
+    "Worcester": {
+      "display_name": "Worcester County",
+      "circuit_court_clerk_name": "Clerk of the Circuit Court for Worcester County",
+      "circuit_court_clerk_email": "clerk_worcester@courts.state.md.us",
+      "circuit_court_clerk_email_note": "VERIFY",
+      "circuit_court_clerk_phone": "410-632-5500",
+      "circuit_court_address": "One West Market Street, Snow Hill, MD 21863",
+      "auditor_office_phone": "410-632-5500"
     }
-  ]
+  }
 }
