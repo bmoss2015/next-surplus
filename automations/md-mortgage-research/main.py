@@ -22,8 +22,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -137,45 +137,59 @@ async def oauth_google_start():
     """
     Start the Google OAuth 2.0 flow.
 
-    Returns an authorization URL the user opens in their own browser.
-    After authorizing, Google shows a code to copy. Pass that code to
-    POST /oauth/google/callback to exchange it for a refresh token.
+    Returns an authorization URL the user opens in their browser. Google will
+    redirect back to GET /oauth/google/callback with the authorization code.
     """
     try:
         from storage.google_drive import get_oauth_authorization_url
-        auth_url = get_oauth_authorization_url()
+        auth_url, state = get_oauth_authorization_url()
         return {
             "authorization_url": auth_url,
-            "instructions": (
-                "Open the authorization_url in your browser, authorize access, "
-                "then copy the code Google shows and POST it to /oauth/google/callback "
-                "as JSON: {\"code\": \"<paste-code-here>\"}"
-            ),
+            "instructions": "Open authorization_url in your browser and authorize access.",
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-class OAuthCallbackRequest(BaseModel):
-    code: str
-
-
-@app.post("/oauth/google/callback")
-async def oauth_google_callback(body: OAuthCallbackRequest):
+@app.get("/oauth/google/callback")
+async def oauth_google_callback(
+    code: str = Query(..., description="Authorization code from Google"),
+    state: str = Query(..., description="State token for CSRF verification"),
+    error: Optional[str] = Query(None),
+):
     """
-    Exchange the Google authorization code for a refresh token.
+    Google redirects here after the user authorizes (or denies) access.
 
-    Accepts the code the user copied from Google's consent screen.
-    Returns the refresh token — store it as GOOGLE_REFRESH_TOKEN in Railway.
+    Exchanges the code for a refresh token and displays it on a simple page.
+    Copy the refresh token and add it as GOOGLE_REFRESH_TOKEN in Railway.
     """
+    if error:
+        return HTMLResponse(
+            f"<h2>Authorization denied</h2><p>Google returned error: <code>{error}</code></p>",
+            status_code=400,
+        )
     try:
         from storage.google_drive import complete_oauth_flow
-        refresh_token = complete_oauth_flow(body.code)
-        return {
-            "refresh_token": refresh_token,
-            "message": "Store this value as GOOGLE_REFRESH_TOKEN in your Railway environment variables.",
-        }
+        refresh_token = complete_oauth_flow(code=code, state=state)
+        return HTMLResponse(f"""<!DOCTYPE html>
+<html>
+<head><title>OAuth Complete</title>
+<style>body{{font-family:sans-serif;max-width:600px;margin:60px auto;padding:0 20px}}
+code{{background:#f4f4f4;padding:12px;display:block;word-break:break-all;border-radius:4px}}
+</style></head>
+<body>
+<h2>Authorization successful</h2>
+<p>Copy the refresh token below and add it to Railway as <strong>GOOGLE_REFRESH_TOKEN</strong>:</p>
+<code>{refresh_token}</code>
+<p>Once added, Google Drive and Gmail features will be active.</p>
+</body></html>""")
+    except ValueError as exc:
+        return HTMLResponse(
+            f"<h2>Invalid state</h2><p>{exc}</p><p>Please restart the OAuth flow.</p>",
+            status_code=400,
+        )
     except Exception as exc:
+        logger.error("OAuth callback error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

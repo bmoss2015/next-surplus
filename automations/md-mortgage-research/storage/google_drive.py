@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import secrets
+import threading
 from typing import Optional
 
 from googleapiclient.discovery import build
@@ -38,62 +39,74 @@ _SCOPES = [
 _DRIVE_ROOT_FOLDER = "Moss Equity Partners"
 _RESEARCH_SUBFOLDER = "Lead Research"
 
+_DEFAULT_REDIRECT_URI = "https://md-mortgage-research-production.up.railway.app/oauth/google/callback"
+
 # In-memory folder ID cache to avoid repeated Drive API lookups
 _folder_cache: dict[str, str] = {}
+
+# Pending OAuth state tokens: state_value → True (TTL not needed; single-use flow)
+_pending_states: dict[str, bool] = {}
+_states_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
 # OAuth helpers
 # ---------------------------------------------------------------------------
 
-def get_oauth_authorization_url() -> str:
-    """
-    Generate the Google OAuth 2.0 authorization URL for the user to open.
+def _get_redirect_uri() -> str:
+    return os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", _DEFAULT_REDIRECT_URI)
 
-    Uses the OOB (out-of-band) redirect URI so the user receives an auth code
-    to copy/paste rather than being redirected to a server callback.
+
+def get_oauth_authorization_url() -> tuple[str, str]:
+    """
+    Generate the Google OAuth 2.0 authorization URL and a state token.
 
     Returns:
-        Authorization URL string.
+        Tuple of (authorization_url, state). The state is stored in-process
+        and verified by complete_oauth_flow().
     """
     creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS_JSON", "")
     if not creds_json:
         raise RuntimeError("GOOGLE_OAUTH_CREDENTIALS_JSON environment variable not set")
 
+    redirect_uri = _get_redirect_uri()
     creds_info = json.loads(creds_json)
-    flow = Flow.from_client_config(
-        creds_info,
-        scopes=_SCOPES,
-        redirect_uri="urn:ietf:wg:oauth:2.0:oob",
-    )
+    flow = Flow.from_client_config(creds_info, scopes=_SCOPES, redirect_uri=redirect_uri)
+
     state = secrets.token_urlsafe(32)
     auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent", state=state)
-    return auth_url
+
+    with _states_lock:
+        _pending_states[state] = True
+
+    return auth_url, state
 
 
-def complete_oauth_flow(code: str) -> str:
+def complete_oauth_flow(code: str, state: str) -> str:
     """
-    Exchange an authorization code for tokens and return the refresh token.
+    Verify state, exchange authorization code for tokens, return refresh token.
 
     Args:
-        code: The authorization code the user copied from Google's consent page.
+        code:  Authorization code from Google's redirect.
+        state: State parameter from Google's redirect; must match a pending state.
 
     Returns:
         Refresh token string. Store in GOOGLE_REFRESH_TOKEN environment variable.
     """
+    with _states_lock:
+        if state not in _pending_states:
+            raise ValueError("Invalid or expired OAuth state token")
+        del _pending_states[state]
+
     creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS_JSON", "")
     if not creds_json:
         raise RuntimeError("GOOGLE_OAUTH_CREDENTIALS_JSON environment variable not set")
 
+    redirect_uri = _get_redirect_uri()
     creds_info = json.loads(creds_json)
-    flow = Flow.from_client_config(
-        creds_info,
-        scopes=_SCOPES,
-        redirect_uri="urn:ietf:wg:oauth:2.0:oob",
-    )
+    flow = Flow.from_client_config(creds_info, scopes=_SCOPES, redirect_uri=redirect_uri)
     flow.fetch_token(code=code)
-    refresh_token = flow.credentials.refresh_token
-    return refresh_token
+    return flow.credentials.refresh_token
 
 
 def get_drive_service():
