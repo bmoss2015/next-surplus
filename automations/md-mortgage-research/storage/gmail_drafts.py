@@ -1,18 +1,21 @@
 """
-Gmail draft creator for the Maryland mortgage research pipeline.
+Gmail integration for the Maryland mortgage research pipeline.
 
 Shares OAuth credentials with google_drive.py:
   GOOGLE_OAUTH_CREDENTIALS_JSON  – OAuth 2.0 client credentials JSON string
   GOOGLE_REFRESH_TOKEN           – Long-lived refresh token
 
-Call ``google_drive.authorize_oauth_flow()`` once to generate the refresh
-token; it requests both Drive and Gmail scopes together.
+Provides:
+  - Draft creation for clerk records requests
+  - Inbox polling for MDLandRec access-code emails
 """
 
 import base64
 import json
 import logging
 import os
+import re
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -26,6 +29,7 @@ logger = logging.getLogger(__name__)
 _SCOPES = [
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.readonly",
 ]
 
 _SENDER = "bree@mossequitypartners.com"
@@ -36,6 +40,15 @@ _COMPANY = "Moss Equity Partners"
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
+
+def _parse_creds_info(creds_json: str) -> dict:
+    """Extract the credential fields from either a 'web' or 'installed' credentials blob."""
+    data = json.loads(creds_json)
+    app = data.get("web") or data.get("installed")
+    if not app:
+        raise RuntimeError("GOOGLE_OAUTH_CREDENTIALS_JSON must have a 'web' or 'installed' key")
+    return app
+
 
 def get_gmail_service():
     """
@@ -50,24 +63,132 @@ def get_gmail_service():
     if not creds_json or not refresh_token:
         raise RuntimeError(
             "GOOGLE_OAUTH_CREDENTIALS_JSON and GOOGLE_REFRESH_TOKEN must be set. "
-            "Run google_drive.authorize_oauth_flow() once to generate the refresh token."
+            "Call POST /oauth/google/start to begin the authorization flow."
         )
 
-    creds_info = json.loads(creds_json)
-    client_id = creds_info["installed"]["client_id"]
-    client_secret = creds_info["installed"]["client_secret"]
-    token_uri = creds_info["installed"]["token_uri"]
-
+    app = _parse_creds_info(creds_json)
     creds = Credentials(
         token=None,
         refresh_token=refresh_token,
-        token_uri=token_uri,
-        client_id=client_id,
-        client_secret=client_secret,
+        token_uri=app["token_uri"],
+        client_id=app["client_id"],
+        client_secret=app["client_secret"],
         scopes=_SCOPES,
     )
     creds.refresh(Request())
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+
+# ---------------------------------------------------------------------------
+# Inbox polling for MDLandRec access codes
+# ---------------------------------------------------------------------------
+
+def poll_for_mdlandrec_code(max_wait: int = 60, poll_interval: int = 10) -> str:
+    """
+    Poll Gmail inbox for an MDLandRec access-code email and return the code.
+
+    Searches for recent messages from msa.maryland.gov / maryland.gov that
+    contain "access code" in the subject or body.  Retries every
+    ``poll_interval`` seconds up to ``max_wait`` seconds.
+
+    Args:
+        max_wait:      Maximum seconds to wait before raising TimeoutError.
+        poll_interval: Seconds between Gmail poll attempts.
+
+    Returns:
+        The extracted numeric access code string (4–8 digits).
+
+    Raises:
+        TimeoutError: If no code email arrives within max_wait seconds.
+        RuntimeError: If Gmail credentials are not configured.
+    """
+    service = get_gmail_service()
+
+    # Gmail search query — broad enough to survive minor subject-line variation
+    query = (
+        "(from:msa.maryland.gov OR from:maryland.gov) "
+        "(subject:\"access code\" OR subject:\"verification code\" OR subject:\"MDLandRec\") "
+        "newer_than:5m"
+    )
+
+    deadline = time.time() + max_wait
+    attempt = 0
+
+    while True:
+        attempt += 1
+        logger.info("Gmail poll attempt %d for MDLandRec access code...", attempt)
+
+        result = service.users().messages().list(
+            userId="me",
+            q=query,
+            maxResults=5,
+        ).execute()
+
+        for msg_ref in result.get("messages", []):
+            msg = service.users().messages().get(
+                userId="me",
+                id=msg_ref["id"],
+                format="full",
+            ).execute()
+
+            body = _extract_body(msg)
+            code = _extract_code(body)
+            if code:
+                logger.info("Found MDLandRec access code in email %s", msg_ref["id"])
+                return code
+
+        if time.time() >= deadline:
+            break
+
+        remaining = deadline - time.time()
+        sleep_for = min(poll_interval, remaining)
+        if sleep_for > 0:
+            logger.debug("Access code not found yet; sleeping %.0fs", sleep_for)
+            time.sleep(sleep_for)
+
+    raise TimeoutError(
+        f"No MDLandRec access code email found within {max_wait} seconds. "
+        "Check that GOOGLE_REFRESH_TOKEN has gmail.readonly scope and the email "
+        "address matches the MDLandRec account."
+    )
+
+
+def _extract_body(msg: dict) -> str:
+    """Recursively extract plain-text body from a Gmail message payload."""
+    def _walk(part: dict) -> str:
+        mime = part.get("mimeType", "")
+        if mime == "text/plain":
+            data = part.get("body", {}).get("data", "")
+            if data:
+                return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
+        for sub in part.get("parts", []):
+            result = _walk(sub)
+            if result:
+                return result
+        return ""
+
+    return _walk(msg.get("payload", {}))
+
+
+def _extract_code(text: str) -> str:
+    """
+    Pull a 4–8 digit access / verification code from email body text.
+
+    Tries labelled patterns first (e.g. "access code: 123456"), then falls
+    back to any isolated 6–8 digit number.
+    """
+    patterns = [
+        r"access\s+code[:\s]+([0-9]{4,8})",
+        r"verification\s+code[:\s]+([0-9]{4,8})",
+        r"one.?time\s+(?:pass)?code[:\s]+([0-9]{4,8})",
+        r"\bcode[:\s]+([0-9]{4,8})",
+        r"\b([0-9]{6,8})\b",  # bare 6-8 digit number as last resort
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            return m.group(1)
+    return ""
 
 
 # ---------------------------------------------------------------------------

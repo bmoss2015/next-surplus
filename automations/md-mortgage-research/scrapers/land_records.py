@@ -39,7 +39,7 @@ MDLANDREC_URL = "https://mdlandrec.net"
 LOGIN_URL = "https://mdlandrec.net/main/dsp_login.cfm"
 SEARCH_URL = "https://mdlandrec.net/main/dsp_search.cfm"
 
-_COOKIE_PATH = Path.home() / ".md-research" / "session-cookies.json"
+_COOKIE_PATH = Path.home() / ".md-research" / "mdlandrec-session.json"
 
 _CHROME_PATHS = [
     "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
@@ -129,30 +129,42 @@ async def _screenshot(page: Page, label: str) -> None:
 # Public API
 # ---------------------------------------------------------------------------
 
-async def login(email: str, password: str) -> list[dict]:
+async def login(
+    email: Optional[str] = None,
+    password: Optional[str] = None,
+) -> list[dict]:
     """
-    Authenticate with MDLandRec.
+    Authenticate with MDLandRec, handling the email access-code step automatically.
 
-    Handles the optional email verification code prompt that appears on first
-    login from a new device.  Returns the session cookies so callers can
-    persist them.
+    Credentials default to the ``MDLANDREC_EMAIL`` / ``MDLANDREC_PASSWORD``
+    environment variables.  After submitting credentials, if MDLandRec sends
+    an access-code email, Gmail is polled (via the Google API) to retrieve and
+    submit the code automatically.
 
-    If the verification code prompt appears, this function will block waiting
-    for the code to be entered via stdin (intended for initial one-time setup).
+    On success the session cookies are saved to
+    ``~/.md-research/mdlandrec-session.json`` and returned.
 
     Args:
-        email:    MDLandRec account email.
-        password: MDLandRec account password.
+        email:    MDLandRec account email (defaults to MDLANDREC_EMAIL env var).
+        password: MDLandRec account password (defaults to MDLANDREC_PASSWORD env var).
 
     Returns:
-        List of cookie dicts (Playwright format) saved to ~/.md-research/session-cookies.json.
+        List of cookie dicts (Playwright format).
     """
-    async with _browser_session() as (browser, page):
+    email = email or os.environ.get("MDLANDREC_EMAIL", "")
+    password = password or os.environ.get("MDLANDREC_PASSWORD", "")
+
+    if not email or not password:
+        raise RuntimeError(
+            "MDLandRec credentials not configured. "
+            "Set MDLANDREC_EMAIL and MDLANDREC_PASSWORD environment variables."
+        )
+
+    async with _browser_session() as (_, page):
         try:
             await page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30_000)
             await _screenshot(page, "login_page")
 
-            # Fill credentials
             await _fill(page, email, [
                 "input[name='emailAddress']", "input[name='email']",
                 "input[type='email']", "input[id*='email']", "input[id*='Email']",
@@ -162,37 +174,76 @@ async def login(email: str, password: str) -> list[dict]:
                 "input[id*='password']", "input[id*='Password']",
             ])
 
-            # Submit
-            await _click_submit(page, ["input[type='submit']", "button[type='submit']",
-                                       "button:has-text('Login')", "input[value='Login']"])
+            await _click_submit(page, [
+                "input[type='submit']", "button[type='submit']",
+                "button:has-text('Login')", "input[value='Login']",
+            ])
             await page.wait_for_load_state("domcontentloaded", timeout=20_000)
             await _screenshot(page, "after_login")
 
             content = await page.content()
 
-            # Verification code prompt
-            if "verification" in content.lower() or "verify" in content.lower():
-                logger.info("Email verification code required — check your inbox")
-                code = input("Enter verification code from email: ").strip()
+            if _needs_access_code(content):
+                logger.info("MDLandRec access-code prompt detected — polling Gmail...")
+                code = await _fetch_access_code_from_gmail()
+                logger.info("Access code retrieved: %s", code)
+
                 await _fill(page, code, [
-                    "input[name='verificationCode']", "input[name='code']",
-                    "input[id*='code']", "input[id*='Code']", "input[type='text']",
+                    "input[name='verificationCode']", "input[name='accessCode']",
+                    "input[name='code']", "input[id*='code']",
+                    "input[id*='Code']", "input[id*='verify']",
+                    "input[type='text']",
                 ])
-                await _click_submit(page, ["input[type='submit']", "button[type='submit']",
-                                           "button:has-text('Verify')", "input[value='Verify']"])
+                await _click_submit(page, [
+                    "input[type='submit']", "button[type='submit']",
+                    "button:has-text('Verify')", "button:has-text('Submit')",
+                    "input[value='Verify']", "input[value='Submit']",
+                ])
                 await page.wait_for_load_state("domcontentloaded", timeout=20_000)
+                await _screenshot(page, "after_code")
 
             cookies = await page.context.cookies()
             _save_cookies(cookies)
-            logger.info("Login successful; %d cookies saved", len(cookies))
+            logger.info("MDLandRec login successful; %d cookies saved", len(cookies))
             return cookies
 
         except PlaywrightTimeoutError as exc:
-            logger.error("Login timeout: %s", exc)
+            logger.error("MDLandRec login timeout: %s", exc)
             return []
         except Exception as exc:
-            logger.exception("Login error")
+            logger.exception("MDLandRec login error")
             return []
+
+
+def _needs_access_code(page_content: str) -> bool:
+    """Return True if the page is showing an access / verification code prompt."""
+    lower = page_content.lower()
+    triggers = ["access code", "verification code", "verify your", "enter the code",
+                "email verification", "one-time"]
+    return any(t in lower for t in triggers)
+
+
+async def _fetch_access_code_from_gmail(max_wait: int = 60, poll_interval: int = 10) -> str:
+    """
+    Poll Gmail via the Google API for the MDLandRec access-code email.
+
+    Runs the synchronous Gmail calls in a thread executor so the async event
+    loop is not blocked.
+
+    Returns:
+        Numeric access code string.
+
+    Raises:
+        TimeoutError: If no code arrives within max_wait seconds.
+        RuntimeError: If Google credentials are not configured.
+    """
+    from storage.gmail_drafts import poll_for_mdlandrec_code
+    loop = asyncio.get_event_loop()
+    code = await loop.run_in_executor(
+        None,
+        lambda: poll_for_mdlandrec_code(max_wait=max_wait, poll_interval=poll_interval),
+    )
+    return code
 
 
 async def search_grantor_index(
@@ -323,10 +374,15 @@ async def _run_grantor_search(
     await _screenshot(page, "search_landing")
 
     content = await page.content()
-    # Redirect to login if session expired
+    # Session expired — re-authenticate automatically, then retry
     if "login" in content.lower() and "password" in content.lower():
-        return [{"error": "not_authenticated",
-                 "message": "Session expired. Call login() to refresh credentials."}]
+        logger.info("MDLandRec session expired; re-authenticating...")
+        await login()
+        await page.goto(SEARCH_URL, wait_until="domcontentloaded", timeout=30_000)
+        content = await page.content()
+        if "login" in content.lower() and "password" in content.lower():
+            return [{"error": "not_authenticated",
+                     "message": "Re-authentication failed. Check MDLANDREC_EMAIL/PASSWORD."}]
 
     # County selection
     await _select_option(page, county, [

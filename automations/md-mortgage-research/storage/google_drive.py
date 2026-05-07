@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 _SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.readonly",
 ]
 _DRIVE_ROOT_FOLDER = "Moss Equity Partners"
 _RESEARCH_SUBFOLDER = "Lead Research"
@@ -126,9 +127,12 @@ def get_drive_service():
         )
 
     creds_info = json.loads(creds_json)
-    client_id = creds_info["installed"]["client_id"]
-    client_secret = creds_info["installed"]["client_secret"]
-    token_uri = creds_info["installed"]["token_uri"]
+    app = creds_info.get("web") or creds_info.get("installed")
+    if not app:
+        raise RuntimeError("GOOGLE_OAUTH_CREDENTIALS_JSON must have a 'web' or 'installed' key")
+    client_id = app["client_id"]
+    client_secret = app["client_secret"]
+    token_uri = app["token_uri"]
 
     creds = Credentials(
         token=None,
