@@ -23,6 +23,78 @@ jobs:
           ref: claude/setup-md-mortgage-automation-VQ7KG
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Ensure MDLANDREC credentials exist in Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          python3 - <<'PYEOF'
+import json, urllib.request, os, sys
+
+token = os.environ.get("RAILWAY_TOKEN", "")
+if not token:
+    print("No RAILWAY_TOKEN — skipping env var bootstrap")
+    sys.exit(0)
+
+# Check if vars already exist
+query = {
+    "query": """query($serviceId: String!, $environmentId: String!) {
+        variables(serviceId: $serviceId, environmentId: $environmentId)
+    }""",
+    "variables": {
+        "serviceId": "73341e75-b9ea-412c-b0ff-2aa623b26c7b",
+        "environmentId": "b5f83c4b-0081-460a-8038-c63e9caa3f78"
+    }
+}
+req = urllib.request.Request(
+    "https://backboard.railway.app/graphql/v2",
+    data=json.dumps(query).encode(),
+    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    method="POST"
+)
+with urllib.request.urlopen(req) as r:
+    data = json.loads(r.read())
+
+variables = data.get("data", {}).get("variables", {})
+existing_keys = list(variables.keys()) if isinstance(variables, dict) else []
+mdlandrec_present = all(k in existing_keys for k in ["MDLANDREC_EMAIL", "MDLANDREC_PASSWORD"])
+
+if mdlandrec_present:
+    print("MDLANDREC credentials already present in Railway — skipping upsert")
+    sys.exit(0)
+
+print("MDLANDREC credentials not found — upserting now...")
+mutation = {
+    "query": """mutation($input: VariableCollectionUpsertInput!) {
+        variableCollectionUpsert(input: $input)
+    }""",
+    "variables": {
+        "input": {
+            "projectId": "c6b32bb9-cb3c-454e-aab3-1b8ecefa320a",
+            "environmentId": "b5f83c4b-0081-460a-8038-c63e9caa3f78",
+            "serviceId": "73341e75-b9ea-412c-b0ff-2aa623b26c7b",
+            "variables": {
+                "MDLANDREC_EMAIL": "bree@mossequitypartners.com",
+                "MDLANDREC_PASSWORD": "Tretre16!$"
+            }
+        }
+    }
+}
+req2 = urllib.request.Request(
+    "https://backboard.railway.app/graphql/v2",
+    data=json.dumps(mutation).encode(),
+    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    method="POST"
+)
+with urllib.request.urlopen(req2) as r:
+    result = json.loads(r.read())
+
+errors = result.get("errors", [])
+if errors:
+    print(f"Warning: Railway upsert returned errors: {errors}")
+else:
+    print("MDLANDREC credentials successfully added to Railway.")
+PYEOF
+
       - name: Resolve Railway service URL
         id: url
         run: |
