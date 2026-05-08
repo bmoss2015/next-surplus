@@ -21,6 +21,13 @@ automations/*/debug/
 debug/
 *.png
 
+# Persisted browser cookies (per-site stealth state)
+automations/*/.cache/
+.cache/
+
+# Discovery / one-off inspection scripts
+**/tests/_inspect_*.py
+
 # OS
 .DS_Store
 Thumbs.db

@@ -56,7 +56,14 @@ def build_drive_service():
         token_uri="https://oauth2.googleapis.com/token",
         client_id=client_info["client_id"],
         client_secret=client_info["client_secret"],
-        scopes=["https://www.googleapis.com/auth/drive"],
+        # Match the scopes the refresh token was originally issued with.
+        # Per project handoff: Drive file + Gmail compose + Gmail readonly.
+        # Asking for a superset (e.g. auth/drive) yields invalid_scope: Bad Request.
+        scopes=[
+            "https://www.googleapis.com/auth/drive.file",
+            "https://www.googleapis.com/auth/gmail.compose",
+            "https://www.googleapis.com/auth/gmail.readonly",
+        ],
     )
 
     service = build("drive", "v3", credentials=creds)

@@ -49,11 +49,16 @@ def test_supabase_connection():
     test_id = str(uuid.uuid4())
     test_record = {
         "id": test_id,
-        "created_at": datetime.utcnow().isoformat(),
-        "owner_name": "Test Lead - Local Dev",
-        "property_address": "123 Test Street, Prince George's County, MD 20748",
-        "status": "test",
         "source": "local_test_runner",
+        "owner_full_name": "Test Lead - Local Dev",
+        "owner_first_name": "Test",
+        "owner_last_name": "Lead",
+        "property_address": "123 Test Street",
+        "property_city": "Hyattsville",
+        "property_state": "MD",
+        "property_zip": "20748",
+        "county": "Prince George's",
+        "status": "test",
     }
 
     supabase: Client = None
@@ -99,8 +104,8 @@ def test_supabase_connection():
         )
         if read_response.data:
             record = read_response.data[0]
-            print(f"    Read back: {record}")
-            assert record.get("owner_name") == test_record["owner_name"], "Data mismatch!"
+            print(f"    Read back: id={record.get('id')} owner_full_name={record.get('owner_full_name')!r} status={record.get('status')!r}")
+            assert record.get("owner_full_name") == test_record["owner_full_name"], "Data mismatch!"
             print("    Data integrity check passed")
         else:
             print(f"    WARNING: Could not read back the inserted record")

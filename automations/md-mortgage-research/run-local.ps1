@@ -98,7 +98,7 @@ function Run-Setup {
             exit 1
         }
     } else {
-        Write-Warn "requirements.txt not found — installing base packages..."
+        Write-Warn "requirements.txt not found -- installing base packages..."
         pip install --upgrade pip -q
         pip install playwright python-dotenv supabase anthropic google-auth google-auth-oauthlib google-api-python-client
     }
@@ -124,7 +124,7 @@ function Run-Setup {
             Copy-Item "$ProjectRoot\.env.template" $EnvFile
             Write-Warn "Fill in your credentials in: $EnvFile"
         } else {
-            Write-Err ".env.template also missing — check your git pull"
+            Write-Err ".env.template also missing -- check your git pull"
         }
     }
 

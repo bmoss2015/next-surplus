@@ -1,6 +1,15 @@
 """
-test_land_records.py - Test the Maryland Land Records (mdlandrec.net) scraper.
-Test subject: Sarah Moore, Prince George's County
+test_land_records.py - Smoke-test MDLandRec login (with stealth).
+
+MDLandRec migrated from mdlandrec.net (ColdFusion) to landrec.msa.maryland.gov
+(ASP.NET) with a 2FA flow: username+password POST triggers a 6-char code emailed
+from msa.helpdesk@maryland.gov. The full automated login requires Gmail API
+integration to retrieve the code; this test only validates step 1 (creds accepted,
+access-code prompt appears).
+
+Now uses playwright-stealth defensively (login page is the easiest place for a
+state to bot-block credential-stuffing attempts).
+
 Requires: MDLANDREC_EMAIL and MDLANDREC_PASSWORD in .env
 """
 
@@ -15,12 +24,22 @@ load_dotenv(dotenv_path=env_path)
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
+sys.path.insert(0, str(Path(__file__).parent))
+from _stealth_setup import (
+    make_stealth_context, save_cookies,
+    human_pause, field_pause, human_click, human_type,
+    maryland_initial_wait,
+)
+
 DEBUG_DIR = Path(__file__).parent.parent / "debug"
 DEBUG_DIR.mkdir(exist_ok=True)
 
-TEST_FIRST_NAME = "Sarah"
-TEST_LAST_NAME = "Moore"
-TEST_COUNTY = "Prince George's"
+LOGIN_URL = "https://landrec.msa.maryland.gov/Pages/Login.aspx"
+
+SEL_USERNAME = "input#body_tbUsername"
+SEL_PASSWORD = "input#body_tbPassword"
+SEL_SUBMIT = "input#body_btnSubmit"
+SEL_USERCODE = "input#body_tbUsercode"
 
 MDLANDREC_EMAIL = os.environ.get("MDLANDREC_EMAIL", "")
 MDLANDREC_PASSWORD = os.environ.get("MDLANDREC_PASSWORD", "")
@@ -37,127 +56,88 @@ def save_screenshot(page, name: str):
 
 def check_credentials():
     missing = []
-    if not MDLANDREC_EMAIL:
+    if not MDLANDREC_EMAIL or "your-email" in MDLANDREC_EMAIL:
         missing.append("MDLANDREC_EMAIL")
-    if not MDLANDREC_PASSWORD:
+    if not MDLANDREC_PASSWORD or "your-mdlandrec" in MDLANDREC_PASSWORD:
         missing.append("MDLANDREC_PASSWORD")
     if missing:
         print(f"[SKIP] Missing credentials: {', '.join(missing)}")
-        print("       Set them in .env and re-run.")
         return False
     return True
 
 
 def test_land_records():
-    print("\n=== Maryland Land Records Test ===")
-    print(f"Name   : {TEST_LAST_NAME}, {TEST_FIRST_NAME}")
-    print(f"County : {TEST_COUNTY}")
-    print(f"Email  : {MDLANDREC_EMAIL or '(not set)'}")
+    print("\n=== MDLandRec Login Smoke Test (with stealth) ===")
+    print(f"Email : {MDLANDREC_EMAIL or '(not set)'}")
+    print(f"URL   : {LOGIN_URL}")
     print()
 
     if not check_credentials():
-        sys.exit(0)  # Skip gracefully, not a failure
+        sys.exit(0)  # Skip gracefully
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            )
-        )
+        context = make_stealth_context(browser, "land_records")
         page = context.new_page()
 
         try:
-            print("[1] Navigating to mdlandrec.net...")
-            page.goto("https://mdlandrec.net/main/dsp_login.cfm", wait_until="networkidle", timeout=30000)
+            print("[1] Loading login page...")
+            page.goto(LOGIN_URL, wait_until="networkidle", timeout=30000)
+            maryland_initial_wait()
             save_screenshot(page, "land_01_login_page")
+            print(f"    Final URL: {page.url}")
             print("    Login page loaded")
 
-            print("[2] Logging in...")
-            page.fill("input[name='cEmailAddress']", MDLANDREC_EMAIL)
-            page.fill("input[name='cPassword']", MDLANDREC_PASSWORD)
+            print("[2] Filling credentials (human-like) and submitting...")
+            human_type(page, SEL_USERNAME, MDLANDREC_EMAIL)
+            field_pause()
+            human_type(page, SEL_PASSWORD, MDLANDREC_PASSWORD)
             save_screenshot(page, "land_02_credentials_filled")
-
-            page.click("input[type='submit']")
+            field_pause()
+            human_click(page, SEL_SUBMIT)
             page.wait_for_load_state("networkidle", timeout=20000)
-            save_screenshot(page, "land_03_post_login")
+            page.wait_for_timeout(3000)
+            save_screenshot(page, "land_03_post_submit")
 
-            body_text = page.inner_text("body")
-            if "invalid" in body_text.lower() or "incorrect" in body_text.lower():
-                print("[FAIL] Login failed — check MDLANDREC_EMAIL and MDLANDREC_PASSWORD")
-                return False
-            print("    Login successful")
+            print("[3] Checking response...")
+            body = page.inner_text("body")
 
-            print("[3] Navigating to search page...")
-            # Try direct search URL
-            page.goto(
-                "https://mdlandrec.net/main/dsp_search.cfm",
-                wait_until="networkidle",
-                timeout=20000,
-            )
-            save_screenshot(page, "land_04_search_form")
-            print("    Search form loaded")
-
-            print(f"[4] Searching for: {TEST_LAST_NAME}, {TEST_FIRST_NAME} in {TEST_COUNTY}...")
-            # Select county
-            try:
-                page.select_option("select[name='cCountyCode']", label=TEST_COUNTY)
-                print(f"    County: {TEST_COUNTY}")
-            except Exception:
-                print(f"    WARNING: Could not select county '{TEST_COUNTY}'")
-
-            # Fill grantor/grantee name
-            try:
-                page.fill("input[name='cGrantorLastName']", TEST_LAST_NAME)
-                page.fill("input[name='cGrantorFirstName']", TEST_FIRST_NAME)
-                print(f"    Name: {TEST_LAST_NAME}, {TEST_FIRST_NAME}")
-            except Exception:
-                print("    WARNING: Could not fill grantor name fields — trying alternative selectors")
-                try:
-                    page.fill("input[name='LastName']", TEST_LAST_NAME)
-                    page.fill("input[name='FirstName']", TEST_FIRST_NAME)
-                except Exception as e:
-                    print(f"    Alternative selectors also failed: {e}")
-
-            page.wait_for_timeout(500)
-            save_screenshot(page, "land_05_form_filled")
-
-            print("[5] Submitting search...")
-            page.click("input[type='submit']")
-            page.wait_for_load_state("networkidle", timeout=25000)
-            save_screenshot(page, "land_06_results")
-
-            result_text = page.inner_text("body")
-            print("[6] Checking results...")
-
-            if "no records" in result_text.lower():
-                print("    No records found for this name/county")
-            else:
-                rows = page.locator("table tr").count()
-                print(f"    Found approximately {max(0, rows - 1)} result rows")
-                print("\n--- Results Snippet (first 600 chars) ---")
-                print(result_text[:600])
+            # Bad credentials path
+            if "invalid" in body.lower() or "incorrect" in body.lower() or "not found" in body.lower():
+                print("[FAIL] Login rejected -- check MDLANDREC_EMAIL / MDLANDREC_PASSWORD")
+                print("\n--- Body (first 600 chars) ---")
+                print(body[:600])
                 print("---")
+                return False
 
-                # Try clicking first result
-                try:
-                    first_link = page.locator("table a").first
-                    link_text = first_link.inner_text()
-                    print(f"\n    First result: {link_text}")
-                    first_link.click()
-                    page.wait_for_load_state("networkidle", timeout=15000)
-                    save_screenshot(page, "land_07_record_detail")
-                    detail = page.inner_text("body")
-                    print("\n--- Record Detail Snippet (first 600 chars) ---")
-                    print(detail[:600])
-                    print("---")
-                except Exception as e:
-                    print(f"    Could not open first result: {e}")
+            # Success path: usercode prompt appears (good -- creds accepted, 2FA initiated)
+            usercode_visible = False
+            try:
+                usercode_visible = page.locator(SEL_USERCODE).is_visible()
+            except Exception:
+                pass
 
-            print("\n[PASS] Land Records test completed successfully")
-            return True
+            if usercode_visible:
+                print("    [PASS] Credentials accepted -- access-code prompt appeared")
+                print("    Site sent a 6-char code to your email (from msa.helpdesk@maryland.gov)")
+                print("    To complete login, retrieve via Gmail API + submit to body_btnSubUsercode")
+                print("    (Skipping 2FA completion in this smoke test.)")
+                save_cookies(context, "land_records")
+                return True
+
+            # Fully logged in (already had session?) -- also a pass
+            if "logout" in body.lower() or "log out" in body.lower() or ("search" in body.lower() and "indices" in body.lower()):
+                print("    [PASS] Logged in directly (session already active or 2FA bypassed)")
+                save_cookies(context, "land_records")
+                return True
+
+            # Unexpected state
+            print("[WARN] Unexpected post-submit page")
+            print("\n--- Body (first 1200 chars) ---")
+            print(body[:1200])
+            print("---")
+            save_cookies(context, "land_records")
+            return False
 
         except PlaywrightTimeoutError as e:
             save_screenshot(page, "land_error_timeout")
