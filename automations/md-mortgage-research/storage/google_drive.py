@@ -9,7 +9,7 @@ variable.  Subsequent calls use the refresh token automatically.
 Environment variables:
   GOOGLE_OAUTH_CREDENTIALS_JSON  – JSON string of the OAuth client credentials
                                    (downloaded from Google Cloud Console as
-                                   "OAuth 2.0 Client ID → Desktop app").
+                                   "OAuth 2.0 Client ID → Web application").
   GOOGLE_REFRESH_TOKEN           – Long-lived refresh token obtained via
                                    ``authorize_oauth_flow()``.
 

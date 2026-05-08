@@ -8,7 +8,7 @@ import sys
 import traceback
 import uuid
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / ".env"
@@ -49,10 +49,12 @@ def test_supabase_connection():
     test_id = str(uuid.uuid4())
     test_record = {
         "id": test_id,
-        "created_at": datetime.utcnow().isoformat(),
-        "owner_name": "Test Lead - Local Dev",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "owner_first_name": "Test",
+        "owner_last_name": "LocalDev",
+        "owner_full_name": "Test LocalDev",
         "property_address": "123 Test Street, Prince George's County, MD 20748",
-        "status": "test",
+        "status": "new",
         "source": "local_test_runner",
     }
 
@@ -100,7 +102,7 @@ def test_supabase_connection():
         if read_response.data:
             record = read_response.data[0]
             print(f"    Read back: {record}")
-            assert record.get("owner_name") == test_record["owner_name"], "Data mismatch!"
+            assert record.get("owner_last_name") == test_record["owner_last_name"], "Data mismatch!"
             print("    Data integrity check passed")
         else:
             print(f"    WARNING: Could not read back the inserted record")
