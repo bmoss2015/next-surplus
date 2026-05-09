@@ -33,6 +33,12 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
 
+from ._stealth import (
+    make_stealth_context,
+    maryland_initial_wait,
+    is_md_judiciary_blocked,
+)
+
 logger = logging.getLogger(__name__)
 
 CASE_SEARCH_URL = "https://casesearch.courts.state.md.us/casesearch/"
@@ -220,15 +226,10 @@ class _browser_session:
             args=["--no-sandbox", "--disable-dev-shm-usage"],
             **({"executable_path": exec_} if exec_ else {}),
         )
-        ctx: BrowserContext = await self._browser.new_context(
-            ignore_https_errors=True,
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1280, "height": 900},
-        )
+        # Stealth: MD Judiciary uses an explicit IP-reputation WAF block page.
+        # Stealth alone won't bypass an IP block but it does bypass the silent
+        # bot detection that triggers on raw Playwright fingerprints.
+        ctx: BrowserContext = await make_stealth_context(self._browser)
         self._page = await ctx.new_page()
         return self._browser, self._page
 
@@ -292,6 +293,19 @@ async def _name_search(
     """Navigate the name-search form, collect all result rows, and filter."""
     # Go to the landing page; accept disclaimer; land on inquirySearch.jis
     await page.goto(CASE_SEARCH_URL, wait_until="domcontentloaded", timeout=30_000)
+    await maryland_initial_wait()
+
+    # Detect WAF block before doing anything else (saves 30s+ of timeouts).
+    if is_md_judiciary_blocked(await page.content()):
+        logger.warning("MD Case Search: WAF blocked our IP at landing page")
+        return [{
+            "error": "ip_blocked",
+            "message": (
+                "MD Judiciary WAF blocked this IP. Verify Railway egress IP "
+                "is not on the block list, or try again in 1-72 hours."
+            ),
+        }]
+
     await _accept_disclaimer(page)
 
     # If we're still on the disclaimer/landing page, try navigating directly
@@ -747,6 +761,15 @@ def _parse_date(date_str: str) -> datetime:
 async def _case_number_search(page: Page, case_number: str) -> dict:
     """Navigate to a specific case's docket via case-number search."""
     await page.goto(CASE_SEARCH_URL, wait_until="domcontentloaded", timeout=30_000)
+    await maryland_initial_wait()
+
+    if is_md_judiciary_blocked(await page.content()):
+        logger.warning("MD Case Search: WAF blocked our IP at landing page (docket lookup)")
+        return {
+            "error": "ip_blocked",
+            "message": "MD Judiciary WAF blocked this IP.",
+        }
+
     await _accept_disclaimer(page)
     await _screenshot(page, "docket_after_disclaimer")
 

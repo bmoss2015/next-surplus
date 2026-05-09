@@ -18,6 +18,15 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
 
+from ._stealth import (
+    make_stealth_context,
+    maryland_initial_wait,
+    human_pause,
+    field_pause,
+    human_click,
+    human_type,
+)
+
 logger = logging.getLogger(__name__)
 
 SDAT_URL = "https://sdat.dat.maryland.gov/RealProperty/Pages/default.aspx"
@@ -122,15 +131,9 @@ async def search_sdat(property_address: str, county: str) -> dict:
             args=["--no-sandbox", "--disable-dev-shm-usage"],
             **( {"executable_path": _exec} if _exec else {} ),
         )
-        context = await browser.new_context(
-            ignore_https_errors=True,
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1280, "height": 900},
-        )
+        # Stealth context: SDAT silently bot-detects raw Playwright and refuses
+        # to advance the wizard past the address-entry step (verified locally).
+        context = await make_stealth_context(browser)
         page = await context.new_page()
         try:
             result = await _run_search(page, county, street_number, street_name)
@@ -154,6 +157,8 @@ async def _run_search(
     page: Page, county: str, street_number: str, street_name: str
 ) -> dict:
     await page.goto(SDAT_URL, wait_until="domcontentloaded", timeout=30_000)
+    # MD state sites are slow + WAF triggers on instant interaction
+    await maryland_initial_wait()
 
     await _accept_disclaimer(page)
     await _fill_page1(page, county)
@@ -219,14 +224,25 @@ async def _fill_page1(page: Page, county: str) -> None:
     county_candidates = _normalize_county(county)
     logger.info("SDAT county candidates: %s", county_candidates)
 
-    # County dropdown — try a few ID patterns used by SDAT's ASP.NET controls
+    # County dropdown — try a few ID patterns used by SDAT's ASP.NET controls.
+    # The 2026 wizard redesign uses the long cphMainContentArea_... ID; keep the
+    # short fallbacks for older deployments / cached pages.
     county_selectors = [
+        "select#cphMainContentArea_ucSearchType_wzrdRealPropertySearch_ucSearchType_ddlCounty",
+        "[id$='ddlCounty']",
         "#County",
         "#ddlCounty",
-        "[id$='ddlCounty']",
         "select[name*='County']",
         "select[id*='County']",
     ]
+    # Wizard's PRINCE GEORGE'S option is "PRINCE GEORGE'S COUNTY" (with " COUNTY")
+    if "prince george" in county.lower():
+        county_candidates = [
+            "PRINCE GEORGE'S COUNTY",
+            "PRINCE GEORGE'S",
+            "PRINCE GEORGES COUNTY",
+            "PRINCE GEORGES",
+        ] + county_candidates
     county_selected = False
     for sel in county_selectors:
         try:
@@ -251,9 +267,10 @@ async def _fill_page1(page: Page, county: str) -> None:
 
     # Search type dropdown — SDAT uses "STREET ADDRESS" (all caps)
     search_type_selectors = [
+        "select#cphMainContentArea_ucSearchType_wzrdRealPropertySearch_ucSearchType_ddlSearchType",
+        "[id$='ddlSearchType']",
         "#SearchType",
         "#ddlSearchType",
-        "[id$='ddlSearchType']",
         "select[name*='SearchType']",
         "select[id*='SearchType']",
         "select[name*='Type']",
@@ -290,7 +307,11 @@ async def _fill_page1(page: Page, county: str) -> None:
 
 async def _fill_page2(page: Page, street_number: str, street_name: str) -> None:
     """Enter street number and street name, then advance to results."""
+    # 2026 wizard uses long ASP.NET IDs with a typo: txtStreenNumber (not Street).
     number_selectors = [
+        "input#cphMainContentArea_ucSearchType_wzrdRealPropertySearch_ucEnterData_txtStreenNumber",
+        "[id$='txtStreenNumber']",
+        "input[id*='txtStreen']",
         "#StreetNumberID",
         "#txtStNo",
         "[id$='txtStNo']",
@@ -311,6 +332,8 @@ async def _fill_page2(page: Page, street_number: str, street_name: str) -> None:
             continue
 
     name_selectors = [
+        "input#cphMainContentArea_ucSearchType_wzrdRealPropertySearch_ucEnterData_txtStreetName",
+        "[id$='txtStreetName']",
         "#StreetNameID",
         "#txtStName",
         "[id$='txtStName']",
@@ -344,15 +367,24 @@ async def _fill_page2(page: Page, street_number: str, street_name: str) -> None:
 
 
 async def _click_submit(page: Page) -> None:
-    """Click the Next / Submit button using multiple fallback selectors."""
+    """Click the Next / Submit / Continue button using multiple fallback selectors."""
+    # Brief human-like pause before clicking; SDAT's bot detection trips on instant clicks.
+    await field_pause()
     submit_selectors = [
+        # 2026 wizard: page 1 -> Continue, page 2 -> Next
+        "input#cphMainContentArea_ucSearchType_wzrdRealPropertySearch_StartNavigationTemplateContainerID_btnContinue",
+        "input#cphMainContentArea_ucSearchType_wzrdRealPropertySearch_StepNavigationTemplateContainerID_btnStepNextButton",
+        "[id$='btnContinue']",
+        "[id$='btnStepNextButton']",
+        "input[type='submit'][value='Continue']",
+        "input[type='submit'][value='Next']",
+        # Older / generic
         "#btnNext",
         "#btnSubmit",
         "#btnSearch",
         "[id$='btnNext']",
         "[id$='btnSubmit']",
         "[id$='btnSearch']",
-        "input[type='submit'][value='Next']",
         "input[type='submit'][value='Search']",
         "input[type='submit'][value='Submit']",
         "input[type='submit']",
@@ -362,7 +394,8 @@ async def _click_submit(page: Page) -> None:
         try:
             loc = page.locator(sel)
             if await loc.count() > 0:
-                await loc.first.click()
+                # human_click does mouse-move + offset, defeating instant-click bot heuristics.
+                await human_click(page, sel)
                 logger.debug("Clicked submit via: %s", sel)
                 return
         except Exception:
