@@ -2,23 +2,25 @@
 Scraper for the Maryland Judiciary Case Search portal
 (https://casesearch.courts.state.md.us/casesearch/).
 
-This site is protected by **DataDome**. The reliable production path is
-**Bright Data Web Unlocker via the Direct API**: we POST the target URL to
-``https://api.brightdata.com/request`` with our zone + Bearer key, and Bright
-Data returns the fully-rendered HTML (DataDome bypass handled internally).
+This site is protected by **DataDome**. The reliable production path is to
+route requests through a scraping API that handles DataDome internally.
+We support two providers in priority order:
 
-Public API (unchanged from earlier versions):
+  1. **Scrapfly** (preferred) - https://api.scrapfly.io/scrape with asp=true.
+     Permissive on .gov domains. Free tier = 1000 credits/mo.
+     Set SCRAPFLY_API_KEY.
+
+  2. **Bright Data Web Unlocker** (fallback) - https://api.brightdata.com/request
+     Refuses .gov by default; needs a domain allowlist request to support.
+     Set BRIGHTDATA_API_KEY + BRIGHTDATA_ZONE.
+
+If neither is configured, the public functions return ``error="not_configured"``
+so callers see the blocker without timing out.
+
+Public API (unchanged across providers):
   search_by_owner   - find foreclosure cases where the homeowner is the defendant
   search_by_trustee - find foreclosure cases where a named trustee is the plaintiff
   get_case_docket   - return full docket entries for a known case number
-
-Required environment variables:
-  BRIGHTDATA_API_KEY    Bright Data Web Unlocker API key
-  BRIGHTDATA_ZONE       Bright Data zone name (e.g. "web_unlocker_md")
-
-When BRIGHTDATA_API_KEY is missing, the public functions return a single-item
-list/dict with ``error="not_configured"`` so callers see the blocker without
-timing out.
 """
 
 import asyncio
@@ -43,6 +45,7 @@ SEARCH_URL = urljoin(CASE_SEARCH_BASE, "inquirySearch.jis")
 CASE_NUM_URL = urljoin(CASE_SEARCH_BASE, "inquiryByCaseNum.jis")
 
 BRIGHTDATA_API_URL = "https://api.brightdata.com/request"
+SCRAPFLY_API_URL = "https://api.scrapfly.io/scrape"
 
 # Patterns that identify a foreclosure / mortgage case type
 _FORECLOSURE_RE = re.compile(
@@ -86,69 +89,109 @@ _TOO_MANY = 50
 
 
 # ---------------------------------------------------------------------------
-# Bright Data Direct API helper
+# Scraping-API helpers (Scrapfly preferred; Bright Data fallback)
 # ---------------------------------------------------------------------------
 
-def _api_key() -> Optional[str]:
+def _scrapfly_key() -> Optional[str]:
+    return os.environ.get("SCRAPFLY_API_KEY", "").strip() or None
+
+
+def _brightdata_key() -> Optional[str]:
     return os.environ.get("BRIGHTDATA_API_KEY", "").strip() or None
 
 
-def _zone() -> str:
+def _brightdata_zone() -> str:
     return os.environ.get("BRIGHTDATA_ZONE", "web_unlocker_md").strip() or "web_unlocker_md"
+
+
+def _provider() -> str:
+    """Which scraping API will be used. Scrapfly preferred when both set."""
+    if _scrapfly_key():
+        return "scrapfly"
+    if _brightdata_key():
+        return "brightdata"
+    return "none"
 
 
 def _not_configured() -> dict:
     return {
         "error": "not_configured",
         "message": (
-            "BRIGHTDATA_API_KEY is not set. Maryland Case Search is protected "
-            "by DataDome and requires routing through Bright Data Web Unlocker. "
-            "Set BRIGHTDATA_API_KEY and BRIGHTDATA_ZONE environment variables."
+            "Neither SCRAPFLY_API_KEY nor BRIGHTDATA_API_KEY is set. "
+            "Maryland Case Search is protected by DataDome and requires a "
+            "scraping API. Recommended: set SCRAPFLY_API_KEY (free tier "
+            "available; permissive on .gov domains)."
         ),
     }
 
 
-class BrightDataPolicyBlock(RuntimeError):
-    """Raised when Bright Data refuses to scrape the target due to its
-    usage-policy classification (e.g. .gov domains)."""
-    def __init__(self, target_url: str, brd_error: str):
+class ScrapingPolicyBlock(RuntimeError):
+    """Raised when the scraping provider refuses the target URL by policy
+    (e.g. Bright Data refusing .gov domains)."""
+    def __init__(self, target_url: str, provider: str, error: str):
         self.target_url = target_url
-        self.brd_error = brd_error
-        super().__init__(f"Bright Data policy block on {target_url}: {brd_error}")
+        self.provider = provider
+        self.error = error
+        super().__init__(f"{provider} refused {target_url}: {error}")
+
+
+async def _scrapfly_get(target_url: str) -> str:
+    """Fetch via Scrapfly with Anti-Scraping Protection (DataDome bypass)."""
+    api_key = _scrapfly_key()
+    if not api_key:
+        raise RuntimeError("SCRAPFLY_API_KEY not set")
+
+    params = {
+        "key": api_key,
+        "url": target_url,
+        "asp": "true",                  # Anti Scraping Protection -- handles DataDome
+        "country": "us",
+        "format": "raw",                # return raw HTML in response body
+        "render_js": "true",            # real headless browser -- needed for JS challenges
+        "auto_scroll": "true",          # mimic human scroll for behavioural shields
+        "browser_brand": "chrome",
+        "rendering_wait": "3000",       # wait 3s after load for DataDome JS to settle
+    }
+    logger.debug("Scrapfly GET %s", target_url)
+    async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=30.0)) as client:
+        response = await client.get(SCRAPFLY_API_URL, params=params)
+
+    # Scrapfly returns 4xx/5xx on quota/auth/policy issues with a JSON body
+    # describing the problem. format=raw returns HTML on success.
+    if response.status_code >= 400:
+        try:
+            payload = response.json()
+        except Exception:
+            payload = {"raw": response.text[:500]}
+        logger.error("Scrapfly HTTP %s for %s: %s",
+                     response.status_code, target_url, payload)
+        # Try to surface a useful error code
+        err = payload.get("error", {}) if isinstance(payload, dict) else {}
+        code = err.get("code") if isinstance(err, dict) else None
+        msg = err.get("message") if isinstance(err, dict) else None
+        if code in ("ERR::SCRAPE::DOMAIN_BLOCKED", "ERR::SCRAPE::FORBIDDEN"):
+            raise ScrapingPolicyBlock(target_url, "Scrapfly", msg or code)
+        response.raise_for_status()
+
+    return response.text
 
 
 async def _bd_get(target_url: str) -> str:
     """
-    Fetch a URL through Bright Data Web Unlocker Direct API (GET only).
-
-    The Direct API spec accepts ``{zone, url, format}`` as the only fields;
-    POST/body/method are not supported. We build the target URL with query
-    parameters when a "form submit" is needed -- Maryland JIS forms accept
-    GET as readily as POST since they use ``request.getParameter()``.
+    Fetch via Bright Data Web Unlocker Direct API (GET only).
 
     Bright Data wraps the upstream response in their own HTTP 200, so a
     successful API call doesn't mean the scrape worked. Their actual outcome
     is signalled in response headers ``x-brd-error``, ``x-brd-error-code``,
-    and ``x-brd-status-code``. We inspect those and raise a typed error
+    and ``x-brd-status-code``. We inspect those and raise ScrapingPolicyBlock
     when they refuse the target (e.g. .gov domains).
-
-    Args:
-        target_url: The URL on the target site to fetch (with query string).
-
-    Returns:
-        The fully-rendered HTML body of the unblocked response.
-
-    Raises:
-        RuntimeError: If BRIGHTDATA_API_KEY is not set.
-        BrightDataPolicyBlock: If Bright Data refuses the URL by policy.
-        httpx.HTTPStatusError: On non-2xx response from Bright Data itself.
     """
-    api_key = _api_key()
+    api_key = _brightdata_key()
     if not api_key:
         raise RuntimeError("BRIGHTDATA_API_KEY not set")
 
     body = {
-        "zone": _zone(),
+        "zone": _brightdata_zone(),
         "url": target_url,
         "format": "raw",
     }
@@ -169,9 +212,20 @@ async def _bd_get(target_url: str) -> str:
             "Bright Data refused %s | x-brd-status=%s | x-brd-error=%s",
             target_url, brd_status or "?", brd_err or "(none)",
         )
-        raise BrightDataPolicyBlock(target_url, brd_err or f"upstream status {brd_status}")
+        raise ScrapingPolicyBlock(target_url, "Bright Data",
+                                  brd_err or f"upstream status {brd_status}")
 
     return response.text
+
+
+async def _fetch(target_url: str) -> str:
+    """Dispatch to the configured scraping provider (Scrapfly first)."""
+    provider = _provider()
+    if provider == "scrapfly":
+        return await _scrapfly_get(target_url)
+    if provider == "brightdata":
+        return await _bd_get(target_url)
+    raise RuntimeError("No scraping provider configured (set SCRAPFLY_API_KEY)")
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +246,7 @@ async def search_by_owner(
     Returns a list of case dicts. On failure, a single-element list with
     ``{"error": "<code>", "message": "<detail>"}``.
     """
-    if not _api_key():
+    if _provider() == "none":
         return [_not_configured()]
 
     logger.info(
@@ -207,21 +261,18 @@ async def search_by_owner(
             county=county,
             role_filter="defendant",
         )
-    except BrightDataPolicyBlock as exc:
+    except ScrapingPolicyBlock as exc:
         return [{
-            "error": "brightdata_policy_block",
-            "message": (
-                f"Bright Data refused the request: {exc.brd_error} "
-                "Email Bright Data support to allowlist this domain, or switch "
-                "to ScrapingBee / ScraperAPI / Zyte (they have different .gov policies)."
-            ),
+            "error": "scraping_policy_block",
+            "message": f"{exc.provider} refused the request: {exc.error}",
         }]
     except httpx.HTTPStatusError as exc:
-        logger.error("CaseSearch owner Bright Data HTTP %s: %s",
-                     exc.response.status_code, exc.response.text[:300])
+        provider = _provider()
+        logger.error("CaseSearch owner %s HTTP %s: %s",
+                     provider, exc.response.status_code, exc.response.text[:300])
         return [{
-            "error": "brightdata_error",
-            "message": f"Bright Data API returned HTTP {exc.response.status_code}: {exc.response.text[:200]}",
+            "error": f"{provider}_error",
+            "message": f"{provider} API returned HTTP {exc.response.status_code}: {exc.response.text[:200]}",
         }]
     except Exception as exc:
         logger.exception("CaseSearch owner unexpected error")
@@ -234,7 +285,7 @@ async def search_by_trustee(
     county: str,
 ) -> list[dict]:
     """Same shape as ``search_by_owner`` but filters for plaintiff role."""
-    if not _api_key():
+    if _provider() == "none":
         return [_not_configured()]
 
     logger.info(
@@ -249,17 +300,18 @@ async def search_by_trustee(
             county=county,
             role_filter="plaintiff",
         )
-    except BrightDataPolicyBlock as exc:
+    except ScrapingPolicyBlock as exc:
         return [{
-            "error": "brightdata_policy_block",
-            "message": f"Bright Data refused the request: {exc.brd_error}",
+            "error": "scraping_policy_block",
+            "message": f"{exc.provider} refused the request: {exc.error}",
         }]
     except httpx.HTTPStatusError as exc:
-        logger.error("CaseSearch trustee Bright Data HTTP %s: %s",
-                     exc.response.status_code, exc.response.text[:300])
+        provider = _provider()
+        logger.error("CaseSearch trustee %s HTTP %s: %s",
+                     provider, exc.response.status_code, exc.response.text[:300])
         return [{
-            "error": "brightdata_error",
-            "message": f"Bright Data API returned HTTP {exc.response.status_code}",
+            "error": f"{provider}_error",
+            "message": f"{provider} API returned HTTP {exc.response.status_code}",
         }]
     except Exception as exc:
         logger.exception("CaseSearch trustee unexpected error")
@@ -274,23 +326,24 @@ async def get_case_docket(case_number: str, county: str) -> dict:
     "court", "parties", "docket_entries", "source_url"}`` or
     ``{"error", "message"}``.
     """
-    if not _api_key():
+    if _provider() == "none":
         return _not_configured()
 
     logger.info("CaseSearch docket | case=%r county=%r", case_number, county)
     try:
         return await _docket_search(case_number, county)
-    except BrightDataPolicyBlock as exc:
+    except ScrapingPolicyBlock as exc:
         return {
-            "error": "brightdata_policy_block",
-            "message": f"Bright Data refused the request: {exc.brd_error}",
+            "error": "scraping_policy_block",
+            "message": f"{exc.provider} refused the request: {exc.error}",
         }
     except httpx.HTTPStatusError as exc:
-        logger.error("CaseSearch docket Bright Data HTTP %s: %s",
-                     exc.response.status_code, exc.response.text[:300])
+        provider = _provider()
+        logger.error("CaseSearch docket %s HTTP %s: %s",
+                     provider, exc.response.status_code, exc.response.text[:300])
         return {
-            "error": "brightdata_error",
-            "message": f"Bright Data API returned HTTP {exc.response.status_code}",
+            "error": f"{provider}_error",
+            "message": f"{provider} API returned HTTP {exc.response.status_code}",
         }
     except Exception as exc:
         logger.exception("CaseSearch docket unexpected error")
@@ -330,7 +383,7 @@ async def _name_search(
         "action": "Search",
     }
     search_url = f"{SEARCH_URL}?{urlencode(params)}"
-    html = await _bd_get(search_url)
+    html = await _fetch(search_url)
 
     if _looks_blocked(html):
         return [{
@@ -350,7 +403,7 @@ async def _name_search(
         if not next_url:
             break
         page_num += 1
-        last_html = await _bd_get(next_url)
+        last_html = await _fetch(next_url)
         more = _parse_results_table(last_html)
         if not more:
             break
@@ -395,7 +448,7 @@ async def _docket_search(case_number: str, county: str) -> dict:
         "action": "Search",
     }
     case_num_url = f"{CASE_NUM_URL}?{urlencode(params)}"
-    html = await _bd_get(case_num_url)
+    html = await _fetch(case_num_url)
 
     if _looks_blocked(html):
         return {"error": "datadome_block",
@@ -411,7 +464,7 @@ async def _docket_search(case_number: str, county: str) -> dict:
 
     if detail_link:
         detail_url = urljoin(CASE_SEARCH_BASE, detail_link)
-        html = await _bd_get(detail_url)
+        html = await _fetch(detail_url)
         soup = BeautifulSoup(html, "html.parser")
         source_url = detail_url
     else:
