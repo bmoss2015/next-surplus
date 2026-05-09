@@ -33,11 +33,18 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
 
+from ._stealth import make_stealth_context, maryland_initial_wait
+
 logger = logging.getLogger(__name__)
 
-MDLANDREC_URL = "https://mdlandrec.net"
-LOGIN_URL = "https://mdlandrec.net/main/dsp_login.cfm"
-SEARCH_URL = "https://mdlandrec.net/main/dsp_search.cfm"
+# As of 2025/2026 mdlandrec.net redirects to the ASP.NET app at
+# landrec.msa.maryland.gov. Old .cfm URLs no longer resolve. Login form fields
+# changed from cEmailAddress / cPassword to body_tbUsername / body_tbPassword,
+# and a 6-char access-code email step (from msa.helpdesk@maryland.gov) gates
+# the post-login session.
+MDLANDREC_URL = "https://landrec.msa.maryland.gov"
+LOGIN_URL = "https://landrec.msa.maryland.gov/Pages/Login.aspx"
+SEARCH_URL = "https://landrec.msa.maryland.gov/Pages/Search.aspx"
 
 _COOKIE_PATH = Path.home() / ".md-research" / "mdlandrec-session.json"
 
@@ -73,15 +80,8 @@ class _browser_session:
             args=["--no-sandbox", "--disable-dev-shm-usage"],
             **({"executable_path": exec_} if exec_ else {}),
         )
-        ctx: BrowserContext = await self._browser.new_context(
-            ignore_https_errors=True,
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1280, "height": 900},
-        )
+        # Stealth context — login forms get aggressive bot detection.
+        ctx: BrowserContext = await make_stealth_context(self._browser)
         # Restore saved cookies if available
         cookies = _load_cookies()
         if cookies:
@@ -163,18 +163,29 @@ async def login(
     async with _browser_session() as (_, page):
         try:
             await page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30_000)
+            await maryland_initial_wait()
             await _screenshot(page, "login_page")
 
+            # New ASP.NET site (landrec.msa.maryland.gov) uses tbUsername / tbPassword.
+            # Old CFM site fallbacks kept in case of rollback / cached redirect.
             await _fill(page, email, [
+                "input#body_tbUsername",
+                "input[name='ctl00$body$tbUsername']",
+                "input[id*='tbUsername']",
                 "input[name='emailAddress']", "input[name='email']",
                 "input[type='email']", "input[id*='email']", "input[id*='Email']",
             ])
             await _fill(page, password, [
+                "input#body_tbPassword",
+                "input[name='ctl00$body$tbPassword']",
+                "input[id*='tbPassword']",
                 "input[name='password']", "input[type='password']",
                 "input[id*='password']", "input[id*='Password']",
             ])
 
             await _click_submit(page, [
+                "input#body_btnSubmit",
+                "input[name='ctl00$body$btnSubmit']",
                 "input[type='submit']", "button[type='submit']",
                 "button:has-text('Login')", "input[value='Login']",
             ])
@@ -189,12 +200,17 @@ async def login(
                 logger.info("Access code retrieved: %s", code)
 
                 await _fill(page, code, [
+                    "input#body_tbUsercode",
+                    "input[name='ctl00$body$tbUsercode']",
+                    "input[id*='tbUsercode']",
                     "input[name='verificationCode']", "input[name='accessCode']",
                     "input[name='code']", "input[id*='code']",
                     "input[id*='Code']", "input[id*='verify']",
                     "input[type='text']",
                 ])
                 await _click_submit(page, [
+                    "input#body_btnSubUsercode",
+                    "input[name='ctl00$body$btnSubUsercode']",
                     "input[type='submit']", "button[type='submit']",
                     "button:has-text('Verify')", "button:has-text('Submit')",
                     "input[value='Verify']", "input[value='Submit']",
