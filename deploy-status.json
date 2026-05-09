@@ -1,8 +1,8 @@
 {
-  "status": "BUILDING",
-  "deploy_id": "e584431f-5544-4136-b713-6795673fa01c",
+  "status": "SUCCESS",
+  "deploy_id": "f98c2913-d118-4155-bef6-529c4eeab39d",
   "project_id": "c6b32bb9-cb3c-454e-aab3-1b8ecefa320a",
   "service_id": "73341e75-b9ea-412c-b0ff-2aa623b26c7b",
-  "checked_at": "2026-05-09T00:37:02Z",
-  "trigger_sha": "4048d074caefbe5f3ac67be424936cd56ca3d112"
+  "checked_at": "2026-05-09T00:54:37Z",
+  "trigger_sha": "f76f8d07141ff4ab73913c2c8c252bc1062a03cf"
 }
