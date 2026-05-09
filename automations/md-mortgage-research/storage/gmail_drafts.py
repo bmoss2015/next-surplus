@@ -26,9 +26,12 @@ from google.auth.transport.requests import Request
 
 logger = logging.getLogger(__name__)
 
+# Match exactly the scopes the existing refresh token was issued with;
+# asking for a superset (e.g. gmail.modify) returns invalid_scope: Bad Request.
+# poll_for_mdlandrec_code() only reads — it does NOT mark messages as read,
+# so gmail.readonly is sufficient. create_draft uses gmail.compose.
 _SCOPES = [
     "https://www.googleapis.com/auth/gmail.compose",
-    "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/gmail.readonly",
 ]
 
