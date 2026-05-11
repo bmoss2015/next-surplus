@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { IconX } from "@tabler/icons-react";
 import { Drawer } from "@/components/Drawer";
 import { updateTask } from "../_actions";
 import type { TaskRow } from "@/lib/tasks/fetch";
@@ -38,7 +39,8 @@ function formatTimeForInput(time: string | null): string {
 function normalizeTimeInput(value: string): string | null {
   const match = value.trim().match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
   if (!match) return null;
-  let [, hour, minute, suffix] = match;
+  const [, rawHour, minute, suffix] = match;
+  let hour = rawHour;
   const h = Number(hour);
   const m = Number(minute);
   if (h < 1 || h > 12 || m < 0 || m > 59) return null;
@@ -92,7 +94,7 @@ export function EditTaskDrawer({
   }, [task]);
 
   useEffect(() => {
-    if (!leadQuery.trim()) {
+    if (!leadQuery.trim() || leadQuery === selectedLeadLabel) {
       setLeadSearchResults([]);
       return;
     }
@@ -113,7 +115,7 @@ export function EditTaskDrawer({
       }
     }, 300);
     return () => window.clearTimeout(handle);
-  }, [leadQuery]);
+  }, [leadQuery, selectedLeadLabel]);
 
   function handleSave() {
     if (!task) return;
@@ -197,9 +199,9 @@ export function EditTaskDrawer({
           />
         </div>
 
-        <div className="grid grid-cols-[1fr_150px_150px] gap-2">
+        <div className="relative">
+          <label className={labelClass}>Linked Lead</label>
           <div className="relative">
-            <label className={labelClass}>Linked Lead</label>
             <input
               type="text"
               value={leadQuery}
@@ -211,40 +213,63 @@ export function EditTaskDrawer({
                   setSelectedLeadLabel("");
                 }
               }}
-              placeholder="Search lead by ID or address"
-              className={inputClass}
+              placeholder="Search Lead By ID Or Address"
+              className={`${inputClass}${leadId ? " pr-8" : ""}`}
             />
-            {leadSearchResults.length > 0 && (
-              <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-b-md border border-gray-200 bg-white shadow-lg">
-                {leadSearchResults.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => {
-                      const label = `${opt.lead_id} — ${opt.address}`;
-                      setLeadId(opt.id);
-                      setLeadQuery(label);
-                      setSelectedLeadLabel(label);
-                      setLeadSearchResults([]);
-                    }}
-                    className="w-full cursor-pointer border-b border-gray-100 px-3 py-2 text-left text-[12px] text-ink hover:bg-gray-50"
-                  >
-                    <div className="font-medium">{opt.lead_id}</div>
-                    <div className="truncate text-[11px] text-gray-500">{opt.address}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-            {isSearching && (
-              <div className="mt-1 text-[11px] text-gray-500">Searching leads…</div>
+            {leadId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLeadId("");
+                  setLeadQuery("");
+                  setSelectedLeadLabel("");
+                  setLeadSearchResults([]);
+                }}
+                aria-label="Clear linked lead"
+                title="Clear Linked Lead"
+                className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400 hover:text-ink"
+              >
+                <IconX size={14} stroke={1.75} />
+              </button>
             )}
           </div>
+          {leadSearchResults.length > 0 && (
+            <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-b-md border border-gray-200 bg-white shadow-lg">
+              {leadSearchResults.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    const label = `${opt.lead_id} — ${opt.address}`;
+                    setLeadId(opt.id);
+                    setLeadQuery(label);
+                    setSelectedLeadLabel(label);
+                    setLeadSearchResults([]);
+                  }}
+                  className="w-full cursor-pointer border-b border-gray-100 px-3 py-2 text-left text-[12px] text-ink hover:bg-gray-50"
+                >
+                  <div className="font-medium">{opt.lead_id}</div>
+                  <div className="truncate text-[11px] text-gray-500">{opt.address}</div>
+                </button>
+              ))}
+            </div>
+          )}
+          {isSearching && (
+            <div className="mt-1 text-[11px] text-gray-500">Searching Leads…</div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
           <div>
             <label className={labelClass}>Due Date</label>
             <input
               type="text"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              onBlur={(e) => {
+                const normalized = normalizeDateInput(e.target.value);
+                if (normalized) setDueDate(formatDateForInput(normalized));
+              }}
               placeholder="mm/dd/yyyy"
               className={inputClass}
             />
@@ -255,6 +280,10 @@ export function EditTaskDrawer({
               type="text"
               value={dueTime}
               onChange={(e) => setDueTime(e.target.value)}
+              onBlur={(e) => {
+                const normalized = normalizeTimeInput(e.target.value);
+                if (normalized) setDueTime(formatTimeForInput(normalized));
+              }}
               placeholder="HH:MM AM/PM"
               className={inputClass}
             />
