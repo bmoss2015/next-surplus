@@ -55,6 +55,24 @@ type Step =
 
 const DISMISS_VALUE = "__dismiss__";
 
+// Fix E / Fix H: column-mapping lists are chunked so the user never faces a
+// wall of 100+ rows. Pure helper so page math stays consistent everywhere.
+const MAPPING_PAGE_SIZE = 10;
+function paginate<T>(items: T[], page: number): {
+  pageItems: T[];
+  pageCount: number;
+  currentPage: number;
+} {
+  const pageCount = Math.max(1, Math.ceil(items.length / MAPPING_PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), pageCount);
+  const start = (currentPage - 1) * MAPPING_PAGE_SIZE;
+  return {
+    pageItems: items.slice(start, start + MAPPING_PAGE_SIZE),
+    pageCount,
+    currentPage,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
@@ -398,6 +416,44 @@ function MappingTable({
   );
 }
 
+// Previous / Next pager shown under a paginated mapping table.
+function Pager({
+  currentPage,
+  pageCount,
+  onPrev,
+  onNext,
+}: {
+  currentPage: number;
+  pageCount: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  if (pageCount <= 1) return null;
+  return (
+    <div className="mx-auto mt-3 flex max-w-[900px] items-center justify-center gap-3 text-xs text-gray-500">
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={currentPage <= 1}
+        className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-1 hover:border-petrol-500 disabled:opacity-40"
+      >
+        Previous
+      </button>
+      <span>
+        Page {currentPage} Of {pageCount}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={currentPage >= pageCount}
+        className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-1 hover:border-petrol-500 disabled:opacity-40"
+      >
+        Next
+      </button>
+    </div>
+  );
+}
+
 // ===========================================================================
 // Main wizard
 // ===========================================================================
@@ -429,7 +485,9 @@ export function ImportWizard() {
   // mapping: portalFieldKey -> csvHeader
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [dismissed, setDismissed] = useState<string[]>([]);
-  // Fix E: paginate the unrecognized-columns review at 10 per page.
+  // Fix E / Fix H: both mapping lists (recognized on step 1, unrecognized on
+  // step 2) paginate at MAPPING_PAGE_SIZE rows per page.
+  const [recPage, setRecPage] = useState(1);
   const [unrecPage, setUnrecPage] = useState(1);
   const [savedMapping, setSavedMapping] = useState<
     { mapping: Record<string, string>; dismissedColumns: string[] } | null
@@ -458,6 +516,8 @@ export function ImportWizard() {
     setHeaders([]);
     setMapping({});
     setDismissed([]);
+    setRecPage(1);
+    setUnrecPage(1);
     setSavedMapping(null);
     setPersistMode("save");
     setError(null);
@@ -486,6 +546,9 @@ export function ImportWizard() {
         const hdrs = (results.meta.fields ?? []).filter((h) => h && h.trim());
         setRawRows(results.data);
         setHeaders(hdrs);
+        // Fix H: a fresh CSV always starts both mapping lists on page 1.
+        setRecPage(1);
+        setUnrecPage(1);
       },
       error: (err) => setError(`Parse Error: ${err.message}`),
     });
@@ -959,6 +1022,11 @@ export function ImportWizard() {
 
   // ===================== PAGE 1: MAP COLUMNS =====================
   if (step === "map") {
+    const {
+      pageItems: recPageCols,
+      pageCount: recPageCount,
+      currentPage: recCurrentPage,
+    } = paginate(recognizedCols, recPage);
     return (
       <Shell step={step}>
         <h2 className="m-0 text-[14px] font-medium text-ink">Confirm Column Mapping</h2>
@@ -1002,15 +1070,28 @@ export function ImportWizard() {
 
         <div className="mt-4">
           {recognizedCols.length > 0 ? (
-            <MappingTable
-              columns={recognizedCols}
-              rawSampleRow={sampleRow}
-              mapping={mapping}
-              onMapColumn={mapColumn}
-              missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
-                (k) => !mapping[k]
-              )}
-            />
+            <>
+              <div className="mx-auto mb-2 max-w-[900px] text-[11.5px] font-medium text-gray-600">
+                Recognized Columns — Page {recCurrentPage} Of {recPageCount} ·{" "}
+                {recognizedCols.length}{" "}
+                {recognizedCols.length === 1 ? "Column" : "Columns"} Auto Matched
+              </div>
+              <MappingTable
+                columns={recPageCols}
+                rawSampleRow={sampleRow}
+                mapping={mapping}
+                onMapColumn={mapColumn}
+                missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
+                  (k) => !mapping[k]
+                )}
+              />
+              <Pager
+                currentPage={recCurrentPage}
+                pageCount={recPageCount}
+                onPrev={() => setRecPage((p) => Math.max(1, p - 1))}
+                onNext={() => setRecPage((p) => Math.min(recPageCount, p + 1))}
+              />
+            </>
           ) : (
             <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-[12px] text-gray-500">
               No Columns Were Auto Matched. You Will Map Every Column On The Next Page.
@@ -1056,19 +1137,23 @@ export function ImportWizard() {
 
   // ===================== PAGE 2: UNRECOGNIZED COLUMNS =====================
   if (step === "unrecognized") {
-    const UNREC_PAGE_SIZE = 10;
-    const unrecPageCount = Math.max(
-      1,
-      Math.ceil(unrecognizedCols.length / UNREC_PAGE_SIZE)
-    );
-    const unrecCurrentPage = Math.min(Math.max(1, unrecPage), unrecPageCount);
-    const unrecPageCols = unrecognizedCols.slice(
-      (unrecCurrentPage - 1) * UNREC_PAGE_SIZE,
-      unrecCurrentPage * UNREC_PAGE_SIZE
-    );
+    const {
+      pageItems: unrecPageCols,
+      pageCount: unrecPageCount,
+      currentPage: unrecCurrentPage,
+    } = paginate(unrecognizedCols, unrecPage);
     const allReviewed = unrecognizedCols.length === 0;
+    // Fix H: "Dismiss All Remaining" dismisses the current page and every page
+    // after it — columns the user already paged past are left alone.
     const dismissAllRemaining = () =>
-      setDismissed((prev) => Array.from(new Set([...prev, ...unrecognizedCols])));
+      setDismissed((prev) =>
+        Array.from(
+          new Set([
+            ...prev,
+            ...unrecognizedCols.slice((unrecCurrentPage - 1) * MAPPING_PAGE_SIZE),
+          ])
+        )
+      );
     const continueToPreview = () => {
       if (unrecognizedCols.length > 0) {
         setError("Map Or Dismiss The Remaining Columns First.");
@@ -1137,29 +1222,12 @@ export function ImportWizard() {
                   (k) => !mapping[k]
                 )}
               />
-              {unrecPageCount > 1 && (
-                <div className="mx-auto mt-3 flex max-w-[900px] items-center justify-center gap-3 text-xs text-gray-500">
-                  <button
-                    type="button"
-                    onClick={() => setUnrecPage((p) => Math.max(1, p - 1))}
-                    disabled={unrecCurrentPage <= 1}
-                    className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-1 hover:border-petrol-500 disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-                  <span>
-                    Page {unrecCurrentPage} Of {unrecPageCount}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setUnrecPage((p) => Math.min(unrecPageCount, p + 1))}
-                    disabled={unrecCurrentPage >= unrecPageCount}
-                    className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-1 hover:border-petrol-500 disabled:opacity-40"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
+              <Pager
+                currentPage={unrecCurrentPage}
+                pageCount={unrecPageCount}
+                onPrev={() => setUnrecPage((p) => Math.max(1, p - 1))}
+                onNext={() => setUnrecPage((p) => Math.min(unrecPageCount, p + 1))}
+              />
             </>
           )}
         </div>
