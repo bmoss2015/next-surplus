@@ -55,3 +55,42 @@ export function formatAddress(value: string): string {
     })
     .join(" ");
 }
+
+// Fix 94: address abbreviation expansions used for duplicate-detection only.
+// Whole-word matches are expanded so "123 Main St" and "123 main street" hash
+// to the same normalized form. These are NOT applied to the stored address.
+const MATCH_EXPANSIONS: Record<string, string> = {
+  rd: "road",
+  st: "street",
+  ln: "lane",
+  blvd: "boulevard",
+  ave: "avenue",
+  dr: "drive",
+  ct: "court",
+  pl: "place",
+  n: "north",
+  s: "south",
+  e: "east",
+  w: "west",
+};
+
+/**
+ * Normalize an address for fuzzy duplicate matching:
+ *  1. lowercase the whole address;
+ *  2. expand common abbreviations as whole words (rd -> road, st -> street, ...);
+ *  3. strip punctuation and collapse extra whitespace.
+ * Pure helper — never used to format a value that gets persisted.
+ */
+export function normalizeAddressForMatch(value: string): string {
+  if (!value) return "";
+  return value
+    .toLowerCase()
+    // Strip punctuation -> spaces so abbreviations followed by a comma/period
+    // are still treated as whole words.
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => MATCH_EXPANSIONS[word] ?? word)
+    .join(" ")
+    .trim();
+}
