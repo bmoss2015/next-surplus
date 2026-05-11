@@ -68,28 +68,6 @@ export async function fetchAttorneys(): Promise<AttorneyRow[]> {
   return (data ?? []) as AttorneyRow[];
 }
 
-export type StateRuleRow = {
-  state: string;
-  state_name: string;
-  redemption_period_months: number | null;
-  filing_window_years: number | null;
-  funds_custodian: string | null;
-  default_recovery_type: string | null;
-  notes: string | null;
-};
-
-export async function fetchStateRules(): Promise<StateRuleRow[]> {
-  const sb = await createClient();
-  const { data, error } = await sb
-    .from("state_rules")
-    .select(
-      "state, state_name, redemption_period_months, filing_window_years, funds_custodian, default_recovery_type, notes"
-    )
-    .order("state", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as StateRuleRow[];
-}
-
 export type TemplateRow = {
   id: string;
   name: string;

@@ -6,16 +6,14 @@ import { upsertTemplate, deleteTemplate } from "../_actions";
 import { US_STATE_NAMES } from "@/lib/leads/types";
 import type { TemplateRow } from "@/lib/settings/fetch";
 
-// Fix 63 — SMS Templates removed (no SMS integration). Only Email Templates
-// remain; the underlying `templates` table/CRUD is unchanged (channel always
-// "email" here).
+// Fix 99 — SMS Templates mirror Email Templates. They live in the same
+// `templates` table with channel = "sms"; the parent passes every template row
+// and this section filters to the SMS ones.
 
 const STATE_CODES = Object.keys(US_STATE_NAMES).sort();
 
-export function TemplatesSection({ initial }: { initial: TemplateRow[] }) {
-  const [rows, setRows] = useState(
-    initial.filter((r) => r.channel === "email")
-  );
+export function SmsTemplatesSection({ initial }: { initial: TemplateRow[] }) {
+  const [rows, setRows] = useState(initial.filter((r) => r.channel === "sms"));
   const [editing, setEditing] = useState<TemplateRow | "new" | null>(null);
   const [, startTransition] = useTransition();
 
@@ -23,16 +21,15 @@ export function TemplatesSection({ initial }: { initial: TemplateRow[] }) {
     id: string | null;
     name: string;
     state: string;
-    subject: string;
     body: string;
   }) {
     startTransition(async () => {
       const result = await upsertTemplate({
         id: form.id,
         name: form.name,
-        channel: "email",
+        channel: "sms",
         state: form.state || null,
-        subject: form.subject || null,
+        subject: null,
         body: form.body,
       });
       if (result.ok) {
@@ -44,7 +41,6 @@ export function TemplatesSection({ initial }: { initial: TemplateRow[] }) {
                     ...r,
                     name: form.name,
                     state: form.state || null,
-                    subject: form.subject || null,
                     body: form.body,
                   }
                 : r
@@ -56,9 +52,9 @@ export function TemplatesSection({ initial }: { initial: TemplateRow[] }) {
             {
               id: result.id,
               name: form.name,
-              channel: "email",
+              channel: "sms",
               state: form.state || null,
-              subject: form.subject || null,
+              subject: null,
               body: form.body,
               variables: [],
             },
@@ -81,7 +77,7 @@ export function TemplatesSection({ initial }: { initial: TemplateRow[] }) {
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h2 className="m-0 text-[14px] font-medium text-ink">
-            Email Templates
+            SMS Templates
           </h2>
         </div>
         {!editing && (
@@ -97,7 +93,7 @@ export function TemplatesSection({ initial }: { initial: TemplateRow[] }) {
       </div>
 
       {editing && (
-        <TemplateForm
+        <SmsTemplateForm
           initial={editing === "new" ? null : editing}
           onCancel={() => setEditing(null)}
           onSave={save}
@@ -120,9 +116,8 @@ export function TemplatesSection({ initial }: { initial: TemplateRow[] }) {
                   {row.name}
                 </div>
                 <div className="text-[11px] text-gray-500">
-                  Email
+                  SMS
                   {row.state ? ` · ${row.state}` : ""}
-                  {row.subject ? ` · ${row.subject}` : ""}
                 </div>
               </div>
               <button
@@ -149,7 +144,7 @@ export function TemplatesSection({ initial }: { initial: TemplateRow[] }) {
   );
 }
 
-function TemplateForm({
+function SmsTemplateForm({
   initial,
   onCancel,
   onSave,
@@ -160,13 +155,11 @@ function TemplateForm({
     id: string | null;
     name: string;
     state: string;
-    subject: string;
     body: string;
   }) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [state, setState] = useState(initial?.state ?? "");
-  const [subject, setSubject] = useState(initial?.subject ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
 
   const inputClass =
@@ -174,7 +167,7 @@ function TemplateForm({
 
   return (
     <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-      <div className="grid grid-cols-[1fr_140px] gap-2">
+      <div className="grid grid-cols-[1fr_120px_120px] gap-2">
         <input
           autoFocus
           type="text"
@@ -195,14 +188,10 @@ function TemplateForm({
             </option>
           ))}
         </select>
+        <div className="flex items-center rounded-md border border-gray-200 bg-gray-100 px-2 py-[6px] text-[12px] font-medium text-gray-600">
+          SMS
+        </div>
       </div>
-      <input
-        type="text"
-        value={subject}
-        onChange={(e) => setSubject(e.target.value)}
-        placeholder="Subject line"
-        className={`${inputClass} mt-2 w-full`}
-      />
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -225,7 +214,6 @@ function TemplateForm({
               id: initial?.id ?? null,
               name,
               state,
-              subject,
               body,
             })
           }
