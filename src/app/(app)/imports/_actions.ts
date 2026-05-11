@@ -2,40 +2,42 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { formatAddress, formatCity } from "@/lib/imports/format-address";
+import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/imports/format-address";
 import {
   DEFAULT_LEAD_SOURCE,
   type IncomingLead,
   type ImportHistoryRow,
   type SavedSourceMapping,
+  type ImportRowDecision,
 } from "./_shared";
 
+// Fix 94: build the fuzzy dedupe key for a row — normalized address + zip.
+function dedupeKey(address: string, zip: string): string {
+  return `${normalizeAddressForMatch(address)}|${(zip ?? "").trim()}`;
+}
+
+// Fix 94 / Fix 95: check every CSV row against existing leads using a fuzzy
+// (normalized) address + zip match. Returns, for each input row, the matching
+// existing lead id (or null). The caller keys back into this by row order.
 export async function checkDuplicates(
   rows: Array<{ address: string; zip: string }>
-): Promise<{ duplicates: Set<string> }> {
+): Promise<{ matches: Array<string | null> }> {
   const sb = await createClient();
-  const keys = rows.map((r) => `${r.address.toLowerCase()}|${r.zip}`);
 
-  // Pull all existing leads with the matching addresses for these ZIPs
-  const zips = Array.from(new Set(rows.map((r) => r.zip).filter(Boolean)));
-  if (zips.length === 0) return { duplicates: new Set() };
+  const zips = Array.from(new Set(rows.map((r) => (r.zip ?? "").trim()).filter(Boolean)));
+  if (zips.length === 0) return { matches: rows.map(() => null) };
 
-  const { data } = await sb
-    .from("leads")
-    .select("address, zip")
-    .in("zip", zips);
+  const { data } = await sb.from("leads").select("id, address, zip").in("zip", zips);
 
-  const existing = new Set(
-    (data ?? []).map(
-      (l) => `${(l.address as string).toLowerCase()}|${l.zip as string}`
-    )
-  );
-
-  const dupes = new Set<string>();
-  for (const k of keys) {
-    if (existing.has(k)) dupes.add(k);
+  // normalizedKey -> existing lead id (first wins on the rare collision).
+  const existing = new Map<string, string>();
+  for (const l of data ?? []) {
+    const key = dedupeKey(l.address as string, l.zip as string);
+    if (!existing.has(key)) existing.set(key, l.id as string);
   }
-  return { duplicates: dupes };
+
+  const matches = rows.map((r) => existing.get(dedupeKey(r.address, r.zip)) ?? null);
+  return { matches };
 }
 
 // ---------------------------------------------------------------------------
@@ -111,16 +113,89 @@ export async function saveSourceMapping(
 }
 
 // ---------------------------------------------------------------------------
+// Fix 90: recovery type prefill lookup (state + sale_type -> recovery_type).
+// ---------------------------------------------------------------------------
+
+async function loadRecoveryTypeLookup(
+  sb: Awaited<ReturnType<typeof createClient>>
+): Promise<Map<string, string>> {
+  const { data } = await sb
+    .from("recovery_type_lookup")
+    .select("state, sale_type, recovery_type");
+  const map = new Map<string, string>();
+  for (const r of data ?? []) {
+    map.set(`${r.state as string}|${r.sale_type as string}`, r.recovery_type as string);
+  }
+  return map;
+}
+
+function resolveRecoveryType(
+  lookup: Map<string, string>,
+  state: string,
+  saleType: string
+): string {
+  return lookup.get(`${state}|${saleType}`) ?? "unknown";
+}
+
+// ---------------------------------------------------------------------------
 // Import execution
 // ---------------------------------------------------------------------------
+
+// Fields on `leads` we are willing to (re)write from a CSV row.
+const LEAD_WRITABLE_FIELDS = [
+  "address",
+  "city",
+  "state",
+  "zip",
+  "county",
+  "sale_type",
+  "sale_date",
+  "closing_bid",
+  "opening_bid",
+  "lead_source",
+  "recovery_type",
+] as const;
+
+function leadFieldsFromRow(
+  row: IncomingLead,
+  rowSource: string,
+  recoveryType: string
+): Record<string, unknown> {
+  return {
+    address: formatAddress(row.address),
+    city: formatCity(row.city),
+    state: row.state,
+    zip: row.zip,
+    county: row.county ?? null,
+    sale_type: row.sale_type,
+    sale_date: row.sale_date ?? null,
+    closing_bid: row.closing_bid ?? null,
+    opening_bid: row.opening_bid ?? null,
+    // Fix 101: confirmed_surplus is never auto-populated from imports —
+    // it is set only by manual entry on the lead detail page.
+    lead_source: rowSource,
+    recovery_type: recoveryType,
+  };
+}
+
+function isBlank(v: unknown): boolean {
+  return v == null || (typeof v === "string" && v.trim() === "");
+}
 
 export async function importLeads(
   filename: string,
   rows: IncomingLead[],
-  rowsToImport: number[], // indices into rows[]
+  decisions: ImportRowDecision[],
   leadSource: string
 ): Promise<
-  | { ok: true; importId: string; imported: number; skipped: number }
+  | {
+      ok: true;
+      importId: string;
+      imported: number;
+      skipped: number;
+      updatedBlank: number;
+      replaced: number;
+    }
   | { ok: false; error: string }
 > {
   const sb = await createClient();
@@ -131,6 +206,8 @@ export async function importLeads(
   await sb
     .from("lead_sources")
     .upsert({ name: batchSource }, { onConflict: "org_id,name", ignoreDuplicates: true });
+
+  const recoveryLookup = await loadRecoveryTypeLookup(sb);
 
   // Create the import row
   const { data: importRow, error: importErr } = await sb
@@ -150,118 +227,188 @@ export async function importLeads(
 
   let imported = 0;
   let skipped = 0;
+  let updatedBlank = 0;
+  let replaced = 0;
   let errors = 0;
   const importRowsLog: Array<Record<string, unknown>> = [];
 
-  const importToSet = new Set(rowsToImport);
+  const decisionByIndex = new Map<number, ImportRowDecision>();
+  for (const d of decisions) decisionByIndex.set(d.index, d);
+
+  // Helper: write the owner + contact rows for a freshly created/updated lead.
+  async function writeContactsForLead(leadId: string, row: IncomingLead) {
+    const ownerName = (row.owner_full_name ?? "").trim();
+    const phones = (row.phones ?? []).map((p) => p.trim()).filter(Boolean);
+    const emails = (row.emails ?? []).map((e) => e.trim()).filter(Boolean);
+    const mailingAddresses = (row.mailing_addresses ?? [])
+      .map((m) => m.trim())
+      .filter(Boolean);
+
+    if (!ownerName && phones.length === 0 && emails.length === 0 && mailingAddresses.length === 0) {
+      return;
+    }
+
+    const { data: ownerRow } = await sb
+      .from("owners")
+      .insert({
+        lead_id: leadId,
+        full_name: ownerName || "Unknown Owner",
+        is_primary: true,
+        status: "unknown",
+      })
+      .select("id")
+      .single();
+    if (!ownerRow) return;
+
+    // Fix 93: every mapped phone / email / mailing-address column becomes its
+    // own contacts row — nothing overwrites a single shared value.
+    const contactRows: Array<Record<string, unknown>> = [];
+    phones.forEach((value, idx) => {
+      contactRows.push({
+        owner_id: ownerRow.id,
+        lead_id: leadId,
+        channel: "phone",
+        value,
+        status: "untested",
+        is_primary: idx === 0,
+      });
+    });
+    emails.forEach((value, idx) => {
+      contactRows.push({
+        owner_id: ownerRow.id,
+        lead_id: leadId,
+        channel: "email",
+        value,
+        status: "untested",
+        is_primary: idx === 0 && phones.length === 0,
+      });
+    });
+    mailingAddresses.forEach((value) => {
+      contactRows.push({
+        owner_id: ownerRow.id,
+        lead_id: leadId,
+        channel: "mailing_address",
+        value,
+        status: "untested",
+        is_primary: false,
+      });
+    });
+    if (contactRows.length > 0) {
+      await sb.from("contacts").insert(contactRows);
+    }
+  }
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const isImporting = importToSet.has(i);
+    const decision = decisionByIndex.get(i);
 
-    if (!isImporting) {
+    // No decision, or an explicit "skip" decision -> skipped by the user.
+    if (!decision || decision.action === "skip") {
       skipped += 1;
       importRowsLog.push({
         import_id: importRow.id,
         raw_row: row,
-        action_taken: "skipped_user",
+        action_taken: decision?.action === "skip" ? "skipped_duplicate" : "skipped_user",
         lead_id: null,
-        dedupe_match_id: null,
+        dedupe_match_id:
+          decision && decision.action === "skip" ? decision.existingLeadId : null,
       });
       continue;
     }
 
-    // Fix 10: format address + city before writing.
-    const address = formatAddress(row.address);
-    const city = formatCity(row.city);
-
-    // A per-row mapped lead_source column overrides the batch source.
     const rowSource = (row.lead_source && row.lead_source.trim()) || batchSource;
+    const recoveryType = resolveRecoveryType(recoveryLookup, row.state, row.sale_type);
+    const fields = leadFieldsFromRow(row, rowSource, recoveryType);
 
-    // NOTE: deliberately do NOT touch the liens column (junior_liens /
-    // total_liens) — leave it to its default.
-    const { data: leadRow, error: leadErr } = await sb
-      .from("leads")
-      .insert({
-        address,
-        city,
-        state: row.state,
-        zip: row.zip,
-        county: row.county ?? null,
-        sale_type: row.sale_type,
-        sale_date: row.sale_date ?? null,
-        closing_bid: row.closing_bid ?? null,
-        opening_bid: row.opening_bid ?? null,
-        confirmed_surplus: row.confirmed_surplus ?? null,
-        lead_source: rowSource,
-        assigned_to: null,
-      })
-      .select("id")
-      .single();
+    if (decision.action === "insert") {
+      // NOTE: deliberately do NOT touch the liens column (junior_liens /
+      // total_liens) — leave it to its default.
+      const { data: leadRow, error: leadErr } = await sb
+        .from("leads")
+        .insert({ ...fields, assigned_to: null })
+        .select("id")
+        .single();
 
-    if (leadErr) {
+      if (leadErr) {
+        errors += 1;
+        importRowsLog.push({
+          import_id: importRow.id,
+          raw_row: row,
+          action_taken: "error",
+          error_message: leadErr.message,
+        });
+        continue;
+      }
+
+      imported += 1;
+      importRowsLog.push({
+        import_id: importRow.id,
+        raw_row: row,
+        action_taken: "imported",
+        lead_id: leadRow.id,
+      });
+      await writeContactsForLead(leadRow.id as string, row);
+      continue;
+    }
+
+    // Duplicate resolution against an existing lead.
+    const leadId = decision.existingLeadId;
+    let patch: Record<string, unknown>;
+
+    if (decision.action === "replace_all") {
+      patch = { ...fields };
+    } else {
+      // update_blank: only fill columns that are currently null/empty.
+      const { data: current } = await sb
+        .from("leads")
+        .select(LEAD_WRITABLE_FIELDS.join(", "))
+        .eq("id", leadId)
+        .maybeSingle();
+      patch = {};
+      const currentRow = current as unknown as Record<string, unknown> | null;
+      if (currentRow) {
+        for (const f of LEAD_WRITABLE_FIELDS) {
+          if (isBlank(currentRow[f]) && !isBlank(fields[f])) {
+            patch[f] = fields[f];
+          }
+        }
+      }
+    }
+
+    let updateErr: { message: string } | null = null;
+    if (Object.keys(patch).length > 0) {
+      const { error } = await sb.from("leads").update(patch).eq("id", leadId);
+      updateErr = error;
+    }
+
+    if (updateErr) {
       errors += 1;
       importRowsLog.push({
         import_id: importRow.id,
         raw_row: row,
         action_taken: "error",
-        error_message: leadErr.message,
+        error_message: updateErr.message,
+        lead_id: leadId,
+        dedupe_match_id: leadId,
       });
       continue;
     }
 
-    imported += 1;
+    if (decision.action === "replace_all") replaced += 1;
+    else updatedBlank += 1;
+
     importRowsLog.push({
       import_id: importRow.id,
       raw_row: row,
-      action_taken: "imported",
-      lead_id: leadRow.id,
+      action_taken:
+        decision.action === "replace_all" ? "updated_replace" : "updated_blank",
+      lead_id: leadId,
+      dedupe_match_id: leadId,
     });
 
-    // Owner: insert a primary owner if a name was mapped for this row.
-    const ownerName = (row.owner_full_name ?? "").trim();
-    const phones = (row.phones ?? []).map((p) => p.trim()).filter(Boolean);
-    const email = (row.email ?? "").trim();
-
-    if (ownerName || phones.length > 0 || email) {
-      const { data: ownerRow } = await sb
-        .from("owners")
-        .insert({
-          lead_id: leadRow.id,
-          full_name: ownerName || "Unknown Owner",
-          is_primary: true,
-          status: "unknown",
-        })
-        .select("id")
-        .single();
-
-      if (ownerRow) {
-        const contactRows: Array<Record<string, unknown>> = [];
-        phones.forEach((value, idx) => {
-          contactRows.push({
-            owner_id: ownerRow.id,
-            lead_id: leadRow.id,
-            channel: "phone",
-            value,
-            status: "untested",
-            is_primary: idx === 0,
-          });
-        });
-        if (email) {
-          contactRows.push({
-            owner_id: ownerRow.id,
-            lead_id: leadRow.id,
-            channel: "email",
-            value: email,
-            status: "untested",
-            is_primary: false,
-          });
-        }
-        if (contactRows.length > 0) {
-          await sb.from("contacts").insert(contactRows);
-        }
-      }
-    }
+    // Contacts are additive — append the row's contact rows to the existing
+    // lead rather than overwriting.
+    await writeContactsForLead(leadId, row);
   }
 
   if (importRowsLog.length > 0) {
@@ -285,6 +432,8 @@ export async function importLeads(
     importId: importRow.id as string,
     imported,
     skipped,
+    updatedBlank,
+    replaced,
   };
 }
 
