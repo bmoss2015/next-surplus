@@ -7,6 +7,33 @@
 // CSV doesn't carry a sale type (added to the sale_type enum in migration 0021).
 export type ImportSaleType = "TAX" | "MTG" | "unknown";
 
+// Fix 95: how a detected duplicate row should be resolved on import.
+//  - skip:          do not import the row at all
+//  - update_blank:  only write into fields that are null/empty on the lead
+//  - replace_all:   overwrite every importable field on the lead
+export type DuplicateResolution = "skip" | "update_blank" | "replace_all";
+
+export const DEFAULT_DUPLICATE_RESOLUTION: DuplicateResolution = "update_blank";
+
+export function duplicateResolutionLabel(r: DuplicateResolution): string {
+  switch (r) {
+    case "skip":
+      return "Skip";
+    case "update_blank":
+      return "Update Blank Fields Only";
+    case "replace_all":
+      return "Replace All";
+  }
+}
+
+// Fix 95: one decision per CSV row the user wants to act on. New rows get
+// "insert"; rows matched to an existing lead get one of the duplicate
+// resolutions plus the existing lead id. Lives here (not in the "use server"
+// _actions module) so it can be a plain type export.
+export type ImportRowDecision =
+  | { index: number; action: "insert" }
+  | { index: number; action: DuplicateResolution; existingLeadId: string };
+
 // The literal "Other" option appended to the lead-source dropdown — picking it
 // reveals a free-text input for a brand-new source name (Fix 6).
 export const OTHER_SOURCE_OPTION = "Other";
@@ -39,6 +66,9 @@ export type PortalFieldKey =
   | "phone_2"
   | "phone_3"
   | "email"
+  | "email_2"
+  | "mailing_address_1"
+  | "mailing_address_2"
   | "lead_source";
 
 export type PortalField = {
@@ -199,7 +229,39 @@ export const PORTAL_FIELDS: PortalField[] = [
     key: "email",
     label: "Email",
     required: false,
-    aliases: ["email", "emailaddress", "emailaddr", "owneremail"],
+    aliases: ["email", "email1", "emailaddress", "emailaddr", "owneremail"],
+  },
+  {
+    key: "email_2",
+    label: "Email 2",
+    required: false,
+    aliases: ["email2", "secondaryemail", "altemail", "alternateemail", "owneremail2"],
+  },
+  {
+    key: "mailing_address_1",
+    label: "Mailing Address",
+    required: false,
+    aliases: [
+      "mailingaddress",
+      "mailaddress",
+      "mailingaddress1",
+      "ownermailingaddress",
+      "owneraddress",
+      "forwardingaddress",
+      "lastknownaddress",
+    ],
+  },
+  {
+    key: "mailing_address_2",
+    label: "Mailing Address 2",
+    required: false,
+    aliases: [
+      "mailingaddress2",
+      "secondmailingaddress",
+      "altmailingaddress",
+      "alternatemailingaddress",
+      "mailingaddressb",
+    ],
   },
   {
     key: "lead_source",
@@ -263,8 +325,9 @@ export type IncomingLead = {
   confirmed_surplus: number | null;
   lead_source: string | null; // per-row override from a mapped column; usually null
   owner_full_name: string | null;
-  phones: string[]; // ordered: phone_1, phone_2, phone_3 (only the non-empty ones)
-  email: string | null;
+  phones: string[]; // each mapped phone column, in order (only the non-empty ones)
+  emails: string[]; // each mapped email column, in order (only the non-empty ones)
+  mailing_addresses: string[]; // each mapped mailing-address column (non-empty only)
 };
 
 export type ImportHistoryRow = {
