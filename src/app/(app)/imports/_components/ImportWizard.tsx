@@ -324,9 +324,10 @@ function MappingTable({
   );
 
   return (
-    <div className="overflow-hidden rounded-md border border-gray-200">
-      <div className="grid grid-cols-[1fr_360px] bg-gray-50 text-[11.5px] font-medium text-gray-500">
+    <div className="mx-auto w-full max-w-[900px] overflow-hidden rounded-md border border-gray-200">
+      <div className="grid grid-cols-[2fr_1fr_2fr] bg-gray-50 text-[11.5px] font-medium text-gray-500">
         <div className="px-3 py-2">Your CSV Column</div>
+        <div className="px-3 py-2" aria-hidden />
         <div className="px-3 py-2">Maps To Portal Field</div>
       </div>
       <div>
@@ -339,7 +340,7 @@ function MappingTable({
           return (
             <div
               key={header}
-              className="grid grid-cols-[1fr_360px] items-center gap-3 border-t border-gray-150 px-3 py-2"
+              className="grid grid-cols-[2fr_1fr_2fr] items-center gap-2 border-t border-gray-150 px-3 py-2"
             >
               <div className="min-w-0">
                 <div className="truncate text-[12.5px] font-medium text-ink">{header}</div>
@@ -347,12 +348,17 @@ function MappingTable({
                   <div className="truncate text-[11px] text-gray-400">e.g. {sample}</div>
                 )}
               </div>
-              <FieldPicker
-                value={current}
-                onChange={(v) => onMapColumn(header, v)}
-                disabledKeys={takenKeys}
-                allowDismiss={allowDismiss}
-              />
+              <div className="flex items-center justify-center text-gray-300" aria-hidden>
+                <IconArrowRight size={16} stroke={1.75} />
+              </div>
+              <div className="min-w-0">
+                <FieldPicker
+                  value={current}
+                  onChange={(v) => onMapColumn(header, v)}
+                  disabledKeys={takenKeys}
+                  allowDismiss={allowDismiss}
+                />
+              </div>
             </div>
           );
         })}
