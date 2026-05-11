@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTransition } from "react";
-import { IconX } from "@tabler/icons-react";
+import { IconX, IconFilter } from "@tabler/icons-react";
 import {
   STAGES,
   STAGE_LABELS,
@@ -102,18 +102,22 @@ export function LeadsFilters({ states }: { states: string[] }) {
   const hasFilters = pills.length > 0 || params.has("q");
 
   const selectClass =
-    "rounded-md border border-petrol-100 bg-surface px-2 py-[6px] text-xs text-ink outline-none focus:border-petrol-500 cursor-pointer";
+    "rounded-md border border-white/20 bg-white/10 px-2.5 py-[6px] text-xs text-white outline-none transition-colors hover:bg-white/15 focus:border-petrol-300 focus:bg-white/15 cursor-pointer [&>option]:bg-petrol-700 [&>option]:text-white";
   const numberClass =
-    "w-20 rounded-md border border-petrol-100 bg-surface px-2 py-[6px] text-xs text-ink outline-none focus:border-petrol-500";
+    "w-20 rounded-md border border-white/20 bg-white/10 px-2.5 py-[6px] text-xs text-white outline-none transition-colors placeholder:text-white/40 hover:bg-white/15 focus:border-petrol-300 focus:bg-white/15";
 
   return (
     <div
       className={cn(
-        "mb-4 rounded-lg border border-petrol-100 bg-petrol-50/60 px-3 py-[10px]",
+        "mb-4 rounded-lg bg-petrol-700 px-4 py-3 shadow-card",
         isPending && "opacity-70"
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-1 inline-flex items-center gap-1.5 text-[11px] font-medium tracking-[0.4px] text-white/70">
+          <IconFilter size={13} stroke={1.75} />
+          Filters
+        </span>
         <select
           className={selectClass}
           value={params.get("state") ?? "all"}
@@ -166,8 +170,10 @@ export function LeadsFilters({ states }: { states: string[] }) {
           ))}
         </select>
 
-        <div className="ml-1 flex items-center gap-1 border-l border-petrol-100 pl-2">
-          <span className="text-[11px] text-gray-500">Surplus</span>
+        <div className="ml-1 flex items-center gap-1 border-l border-white/20 pl-3">
+          <span className="text-[11px] font-medium tracking-[0.4px] text-white/70">
+            Surplus
+          </span>
           <input
             type="number"
             placeholder="Min"
@@ -175,7 +181,7 @@ export function LeadsFilters({ states }: { states: string[] }) {
             defaultValue={params.get("surplus_min") ?? ""}
             onBlur={(e) => update({ surplus_min: e.target.value })}
           />
-          <span className="text-gray-400">–</span>
+          <span className="text-white/40">–</span>
           <input
             type="number"
             placeholder="Max"
@@ -189,7 +195,7 @@ export function LeadsFilters({ states }: { states: string[] }) {
           <button
             type="button"
             onClick={clearAll}
-            className="ml-auto cursor-pointer rounded-md border border-petrol-100 bg-surface px-3 py-[6px] text-xs text-gray-500 hover:border-petrol-500 hover:text-petrol-500"
+            className="ml-auto cursor-pointer rounded-md border border-white/30 bg-white/5 px-3 py-[6px] text-xs text-white/80 hover:border-white/60 hover:text-white"
           >
             Clear All
           </button>
@@ -197,8 +203,8 @@ export function LeadsFilters({ states }: { states: string[] }) {
       </div>
 
       {pills.length > 0 && (
-        <div className="mt-[10px] flex flex-wrap items-center gap-[6px]">
-          <span className="text-[11px] tracking-[0.4px] text-gray-500">
+        <div className="mt-[10px] flex flex-wrap items-center gap-[6px] border-t border-white/15 pt-[10px]">
+          <span className="text-[11px] font-medium tracking-[0.4px] text-white/70">
             Active Filters
           </span>
           {pills.map((pill) => (
