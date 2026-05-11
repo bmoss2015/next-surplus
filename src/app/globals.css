@@ -34,11 +34,12 @@
   --color-danger-bg: #fef2f2;
   --color-danger-border: #fecaca;
 
-  --color-warn: #c9a84c;
-  --color-warn-strong: #854f0b;
-  --color-warn-bg: #fef3c7;
-  --color-warn-border: #fcd34d;
-  --color-warn-deep: #78350f;
+  /* Fix K — "warn"/attention states use a teal variant, no amber/yellow. */
+  --color-warn: #0d6c7d;
+  --color-warn-strong: #0a3d4a;
+  --color-warn-bg: #e0f2f7;
+  --color-warn-border: #0d6c7d;
+  --color-warn-deep: #0a3d4a;
 
   --color-success: #15803d;
   --color-success-strong: #065f46;

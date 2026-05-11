@@ -407,7 +407,7 @@ function MappingTable({
   return (
     <div className="mx-auto w-full max-w-[900px] overflow-hidden rounded-md border border-gray-200">
       {missingRequiredKeys.length > 0 && (
-        <div className="flex items-center gap-1.5 border-b border-[#f59e0b] bg-[#fff8ed] px-3 py-2 text-[12px] text-[#92400e]">
+        <div className="flex items-center gap-1.5 border-b border-[#0d6c7d] bg-[#e0f2f7] px-3 py-2 text-[12px] text-[#0a3d4a]">
           <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
           <span>
             Still Needed:{" "}
@@ -436,7 +436,7 @@ function MappingTable({
               key={header}
               className={cn(
                 "grid grid-cols-[2fr_1fr_2fr] items-center gap-2 border-t border-gray-150 px-3 py-2",
-                needsMapping && "border-l-2 border-l-[#f59e0b] bg-[#fffaf0]"
+                needsMapping && "border-l-2 border-l-[#0d6c7d] bg-[#f0f9ff]"
               )}
             >
               <div className="min-w-0">
@@ -467,7 +467,7 @@ function MappingTable({
                     Dismissed
                   </span>
                 ) : (
-                  <span className="inline-flex shrink-0 items-center rounded-full bg-[#fff8ed] px-1.5 py-[2px] text-[9px] font-medium text-[#92400e]">
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-[#e0f2f7] px-1.5 py-[2px] text-[9px] font-medium text-[#0a3d4a]">
                     Needs Mapping
                   </span>
                 )}
@@ -539,7 +539,7 @@ function MappingStatusBanner({
       <span
         className={cn(
           "inline-flex items-center gap-1 rounded-full px-2 py-[2px]",
-          unrecCount > 0 ? "bg-[#fff8ed] text-[#92400e]" : "bg-gray-100 text-gray-500"
+          unrecCount > 0 ? "bg-[#e0f2f7] text-[#0a3d4a]" : "bg-gray-100 text-gray-500"
         )}
       >
         {unrecCount > 0 && <IconAlertTriangle size={10} stroke={2.5} />}
@@ -1213,7 +1213,7 @@ export function ImportWizard() {
         </div>
 
         {unrecognizedCols.length > 0 && (
-          <div className="mx-auto mt-4 flex max-w-[900px] flex-wrap items-center justify-between gap-2 rounded-md border border-[#f59e0b] bg-[#fff8ed] px-3 py-2 text-[11.5px] font-medium text-[#92400e]">
+          <div className="mx-auto mt-4 flex max-w-[900px] flex-wrap items-center justify-between gap-2 rounded-md border border-[#0d6c7d] bg-[#e0f2f7] px-3 py-2 text-[11.5px] font-medium text-[#0a3d4a]">
             <span>
               {unrecognizedCols.length}{" "}
               {unrecognizedCols.length === 1 ? "Column Is" : "Columns Are"} Not Yet Recognized.
@@ -1224,7 +1224,7 @@ export function ImportWizard() {
                 setUnrecPage(1);
                 setStep("unrecognized");
               }}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#f59e0b] bg-surface px-2.5 py-1 text-xs font-medium text-[#92400e] hover:bg-[#fffaf0]"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#0d6c7d] bg-surface px-2.5 py-1 text-xs font-medium text-[#0a3d4a] hover:bg-[#f0f9ff]"
             >
               Jump To Unrecognized
               <IconArrowRight size={12} stroke={2} />

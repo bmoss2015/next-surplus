@@ -233,14 +233,14 @@ export function TasksList({
       </div>
 
       {showOverdueOnly && (
-        <div className="mb-3 flex items-center justify-between rounded-md border-l-4 border-l-[#f59e0b] border border-[#f59e0b] bg-[#fff8ed] px-3 py-2 text-[#92400e]">
+        <div className="mb-3 flex items-center justify-between rounded-md border-l-4 border-l-[#0d6c7d] border border-[#0d6c7d] bg-[#e0f2f7] px-3 py-2 text-[#0a3d4a]">
           <div className="text-[12px] font-medium">
             Showing Overdue Tasks Only
           </div>
           <button
             type="button"
             onClick={() => setShowOverdueOnly(false)}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#f59e0b] bg-surface px-2 py-[3px] text-[11px] text-[#92400e] hover:bg-[#fff8ed]"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#0d6c7d] bg-surface px-2 py-[3px] text-[11px] text-[#0a3d4a] hover:bg-[#e0f2f7]"
           >
             <IconX size={11} stroke={2} />
             Show All Tasks
@@ -288,14 +288,14 @@ export function TasksList({
               className={cn(
                 "mb-2 flex items-baseline justify-between rounded-md",
                 section.warn
-                  ? "border-l-4 border-l-[#f59e0b] bg-[#fff8ed] px-3 py-2"
+                  ? "border-l-4 border-l-[#0d6c7d] bg-[#e0f2f7] px-3 py-2"
                   : ""
               )}
             >
               <h2
                 className={cn(
                   "m-0 text-[13px] font-medium",
-                  section.warn ? "text-[#92400e]" : "text-ink"
+                  section.warn ? "text-[#0a3d4a]" : "text-ink"
                 )}
               >
                 {section.label}
@@ -303,7 +303,7 @@ export function TasksList({
               <span
                 className={cn(
                   "text-[11px]",
-                  section.warn ? "text-[#92400e]" : "text-gray-500"
+                  section.warn ? "text-[#0a3d4a]" : "text-gray-500"
                 )}
               >
                 {section.tasks.length}
@@ -313,7 +313,7 @@ export function TasksList({
               className={cn(
                 "overflow-hidden rounded-lg border bg-surface shadow-card",
                 section.warn
-                  ? "border-[#f59e0b] border-l-4 border-l-[#f59e0b]"
+                  ? "border-[#0d6c7d] border-l-4 border-l-[#0d6c7d]"
                   : "border-gray-200"
               )}
             >
@@ -322,7 +322,7 @@ export function TasksList({
                   className={cn(
                     "px-4 py-3 text-center text-[12px]",
                     section.warn
-                      ? "bg-[#fff8ed] text-[#92400e]"
+                      ? "bg-[#e0f2f7] text-[#0a3d4a]"
                       : "text-gray-500"
                   )}
                 >
@@ -418,7 +418,7 @@ function TaskRowDisplay({
       }}
       className={cn(
         "group flex cursor-pointer items-center gap-3 border-b border-gray-150 px-4 py-3 last:border-b-0",
-        selected && (warn ? "bg-[#fff8ed]" : "bg-petrol-50")
+        selected && (warn ? "bg-[#e0f2f7]" : "bg-petrol-50")
       )}
     >
       <button
@@ -460,7 +460,7 @@ function TaskRowDisplay({
           <div
             className={cn(
               "mt-[2px] text-[11px]",
-              warn && !task.completed ? "text-[#92400e]" : "text-gray-500"
+              warn && !task.completed ? "text-[#0a3d4a]" : "text-gray-500"
             )}
           >
             {task.due_date && (
