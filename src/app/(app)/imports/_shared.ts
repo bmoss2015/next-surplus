@@ -61,6 +61,7 @@ export type PortalFieldKey =
   | "opening_bid"
   | "sale_date"
   | "sale_type"
+  | "case_number"
   | "surplus_amount"
   | "phone_1"
   | "phone_2"
@@ -191,13 +192,36 @@ export const PORTAL_FIELDS: PortalField[] = [
     key: "sale_date",
     label: "Sale Date",
     required: false,
-    aliases: ["saledate", "dateofsale", "auctiondate", "soldon", "salesdate"],
+    aliases: [
+      "saledate",
+      "dateofsale",
+      "datesold",
+      "solddate",
+      "auctiondate",
+      "foreclosuredate",
+      "soldon",
+      "salesdate",
+    ],
   },
   {
     key: "sale_type",
     label: "Sale Type",
     required: false,
     aliases: ["saletype", "type", "saletypecode", "auctiontype", "category"],
+  },
+  {
+    key: "case_number",
+    label: "Case Number",
+    required: false,
+    aliases: [
+      "casenumber",
+      "caseno",
+      "casenum",
+      "docketnumber",
+      "filenumber",
+      "cause",
+      "causenumber",
+    ],
   },
   {
     key: "surplus_amount",
@@ -362,6 +386,7 @@ export type IncomingLead = {
   county: string | null;
   sale_type: ImportSaleType;
   sale_date: string | null;
+  case_number: string | null;
   closing_bid: number | null;
   opening_bid: number | null;
   confirmed_surplus: number | null;

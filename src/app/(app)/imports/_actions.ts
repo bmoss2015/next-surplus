@@ -150,6 +150,7 @@ const LEAD_WRITABLE_FIELDS = [
   "county",
   "sale_type",
   "sale_date",
+  "case_number",
   "closing_bid",
   "opening_bid",
   "lead_source",
@@ -169,6 +170,7 @@ function leadFieldsFromRow(
     county: row.county ?? null,
     sale_type: row.sale_type,
     sale_date: row.sale_date ?? null,
+    case_number: row.case_number ?? null,
     closing_bid: row.closing_bid ?? null,
     opening_bid: row.opening_bid ?? null,
     // Fix 101: confirmed_surplus is never auto-populated from imports —
