@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Papa from "papaparse";
 import {
   IconUpload,
@@ -216,18 +217,48 @@ function FieldPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const wrapRef = useRef<HTMLDivElement>(null);
+  // Fix J: the menu is portaled to <body> so card/section `overflow-hidden`
+  // can't clip it. Track the trigger's viewport rect to anchor it.
+  const [rect, setRect] = useState<{ left: number; top: number; width: number } | null>(
+    null
+  );
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  function measure() {
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (r) setRect({ left: r.left, top: r.bottom + 4, width: r.width });
+  }
+  function close() {
+    setOpen(false);
+    setQuery("");
+  }
+  function openMenu() {
+    measure();
+    setOpen(true);
+    setQuery("");
+  }
 
   useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
+    if (!open) return;
+    measure();
+    function onDocPointer(e: MouseEvent) {
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      close();
     }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+    function onReposition() {
+      measure();
+    }
+    document.addEventListener("mousedown", onDocPointer);
+    window.addEventListener("scroll", onReposition, true);
+    window.addEventListener("resize", onReposition);
+    return () => {
+      document.removeEventListener("mousedown", onDocPointer);
+      window.removeEventListener("scroll", onReposition, true);
+      window.removeEventListener("resize", onReposition);
+    };
+  }, [open]);
 
   const currentLabel =
     value === DISMISS_VALUE
@@ -241,9 +272,15 @@ function FieldPicker({
     q === "" ? true : f.label.toLowerCase().includes(q)
   );
 
+  function pick(v: string) {
+    onChange(v);
+    close();
+  }
+
   return (
-    <div ref={wrapRef} className="relative">
+    <>
       <div
+        ref={triggerRef}
         className={cn(
           "flex items-center gap-1.5 rounded-md border bg-surface px-2 py-[6px] text-[12px] outline-none",
           open ? "border-petrol-500" : "border-gray-200"
@@ -254,12 +291,9 @@ function FieldPicker({
           type="text"
           value={open ? query : currentLabel}
           placeholder="Type To Search Fields"
-          onFocus={() => {
-            setOpen(true);
-            setQuery("");
-          }}
+          onFocus={openMenu}
           onChange={(e) => {
-            setOpen(true);
+            if (!open) openMenu();
             setQuery(e.target.value);
           }}
           className="w-full cursor-pointer bg-transparent text-ink outline-none placeholder:text-gray-400"
@@ -275,68 +309,73 @@ function FieldPicker({
           </button>
         )}
       </div>
-      {open && (
-        <div className="absolute left-0 right-0 z-20 mt-1 max-h-[220px] overflow-auto rounded-md border border-gray-200 bg-surface shadow-card">
-          <button
-            type="button"
-            onClick={() => {
-              onChange("");
-              setOpen(false);
-              setQuery("");
+      {open &&
+        rect &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              zIndex: 9999,
             }}
-            className="block w-full cursor-pointer px-3 py-1.5 text-left text-[12px] text-gray-500 hover:bg-gray-50"
+            className="max-h-[260px] overflow-auto rounded-md border border-gray-200 bg-surface shadow-elevated"
           >
-            Not Mapped
-          </button>
-          {allowDismiss && (
             <button
               type="button"
-              onClick={() => {
-                onChange(DISMISS_VALUE);
-                setOpen(false);
-                setQuery("");
-              }}
+              onClick={() => pick("")}
               className="block w-full cursor-pointer px-3 py-1.5 text-left text-[12px] text-gray-500 hover:bg-gray-50"
             >
-              Dismiss (Do Not Import)
+              Not Mapped
             </button>
-          )}
-          {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-[12px] text-gray-400">No Matching Fields</div>
-          ) : (
-            filtered.map((f) => {
-              const taken = disabledKeys.has(f.key) && f.key !== value;
-              return (
-                <button
-                  key={f.key}
-                  type="button"
-                  disabled={taken}
-                  onClick={() => {
-                    onChange(f.key);
-                    setOpen(false);
-                    setQuery("");
-                  }}
-                  className={cn(
-                    "flex w-full items-center justify-between px-3 py-1.5 text-left text-[12px]",
-                    taken
-                      ? "cursor-not-allowed text-gray-300"
-                      : "cursor-pointer text-ink hover:bg-gray-50",
-                    f.key === value && "bg-petrol-300/10 font-medium"
-                  )}
-                >
-                  <span>
-                    {f.label}
-                    {f.required && <span className="ml-1 text-danger">*</span>}
-                  </span>
-                  {taken && <span className="text-[10px] text-gray-300">In Use</span>}
-                  {f.key === value && <IconCheck size={12} className="text-petrol-500" />}
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
+            {allowDismiss && (
+              <button
+                type="button"
+                onClick={() => pick(DISMISS_VALUE)}
+                className="block w-full cursor-pointer px-3 py-1.5 text-left text-[12px] text-gray-500 hover:bg-gray-50"
+              >
+                Dismiss (Do Not Import)
+              </button>
+            )}
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-[12px] text-gray-400">No Matching Fields</div>
+            ) : (
+              filtered.map((f) => {
+                const taken = disabledKeys.has(f.key) && f.key !== value;
+                return (
+                  <button
+                    key={f.key}
+                    type="button"
+                    disabled={taken}
+                    onClick={() => pick(f.key)}
+                    className={cn(
+                      "flex w-full items-center justify-between px-3 py-1.5 text-left text-[12px]",
+                      taken
+                        ? "cursor-not-allowed text-gray-300"
+                        : "cursor-pointer text-ink hover:bg-gray-50",
+                      f.key === value && "bg-petrol-300/10 font-medium"
+                    )}
+                  >
+                    <span>
+                      {f.label}
+                      {f.required && <span className="ml-1 text-danger">*</span>}
+                    </span>
+                    {taken && (
+                      <span className="text-[10px] font-medium text-petrol-500">In Use</span>
+                    )}
+                    {f.key === value && (
+                      <IconCheck size={12} className="text-petrol-500" />
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
