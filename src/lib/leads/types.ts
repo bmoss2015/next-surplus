@@ -96,6 +96,9 @@ export type LeadRow = {
     is_primary: boolean;
     status: OwnerStatus;
   }>;
+  // Fix G: true when any contact or relative on this lead carries a
+  // litigator-risk phone. Populated by the list / kanban / daily-work fetchers.
+  has_litigator?: boolean;
 };
 
 export type SortColumn =

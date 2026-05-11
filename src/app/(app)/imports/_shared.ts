@@ -64,10 +64,20 @@ export type PortalFieldKey =
   | "case_number"
   | "surplus_amount"
   | "phone_1"
+  | "phone_1_type"
+  | "phone_1_dnc"
   | "phone_2"
+  | "phone_2_type"
+  | "phone_2_dnc"
   | "phone_3"
+  | "phone_3_type"
+  | "phone_3_dnc"
   | "phone_4"
+  | "phone_4_type"
+  | "phone_4_dnc"
   | "phone_5"
+  | "phone_5_type"
+  | "phone_5_dnc"
   | "email"
   | "email_2"
   | "email_3"
@@ -102,6 +112,31 @@ export const RELATIVE_EMAIL_COUNT = 5;
 // all collapse to "propertyaddress".
 export function normalizeHeader(header: string): string {
   return header.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Excess Elite carries a "Phone N: Type" column with values like "Mobile",
+// "Wireless", "Residential", "LandLine", "VOIP", etc. Collapse to the three
+// values the portal stores (or null when blank / unrecognized as a class).
+export function parsePhoneType(raw: string): string | null {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (!v) return null;
+  if (v.startsWith("m") || v.includes("cell") || v.includes("wireless") || v.includes("mobile"))
+    return "Mobile";
+  if (v.startsWith("r") || v.includes("land") || v.includes("home") || v.includes("residential"))
+    return "Residential";
+  return "Other";
+}
+
+// Excess Elite carries a "Phone N: DNC/Litigator" column. A "Y" (or "DNC")
+// marks the number do-not-call; anything mentioning "litigator" additionally
+// marks it litigation risk (which also implies DNC).
+export function parseDncLitigator(raw: string): { is_dnc: boolean; is_litigator: boolean } {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (!v) return { is_dnc: false, is_litigator: false };
+  const is_litigator = v.includes("litig");
+  const yes = ["y", "yes", "t", "true", "1", "x"].includes(v);
+  const is_dnc = is_litigator || yes || v.includes("dnc") || v.includes("do not call");
+  return { is_dnc, is_litigator };
 }
 
 export const PORTAL_FIELDS: PortalField[] = [
@@ -269,10 +304,34 @@ export const PORTAL_FIELDS: PortalField[] = [
     aliases: ["phone", "phone1", "primaryphone", "phonenumber", "phoneone", "tel"],
   },
   {
+    key: "phone_1_type",
+    label: "Phone 1 Type",
+    required: false,
+    aliases: ["phone1type", "phonetype", "phone1linetype"],
+  },
+  {
+    key: "phone_1_dnc",
+    label: "Phone 1 DNC/Litigator",
+    required: false,
+    aliases: ["phone1dnclitigator", "phone1dnc", "phone1litigator", "phonednclitigator"],
+  },
+  {
     key: "phone_2",
     label: "Phone 2",
     required: false,
     aliases: ["phone2", "secondaryphone", "phonetwo", "altphone", "alternatephone"],
+  },
+  {
+    key: "phone_2_type",
+    label: "Phone 2 Type",
+    required: false,
+    aliases: ["phone2type", "phone2linetype"],
+  },
+  {
+    key: "phone_2_dnc",
+    label: "Phone 2 DNC/Litigator",
+    required: false,
+    aliases: ["phone2dnclitigator", "phone2dnc", "phone2litigator"],
   },
   {
     key: "phone_3",
@@ -281,16 +340,52 @@ export const PORTAL_FIELDS: PortalField[] = [
     aliases: ["phone3", "phonethree", "thirdphone", "otherphone"],
   },
   {
+    key: "phone_3_type",
+    label: "Phone 3 Type",
+    required: false,
+    aliases: ["phone3type", "phone3linetype"],
+  },
+  {
+    key: "phone_3_dnc",
+    label: "Phone 3 DNC/Litigator",
+    required: false,
+    aliases: ["phone3dnclitigator", "phone3dnc", "phone3litigator"],
+  },
+  {
     key: "phone_4",
     label: "Phone 4",
     required: false,
     aliases: ["phone4", "phonefour", "fourthphone", "ownerphone4"],
   },
   {
+    key: "phone_4_type",
+    label: "Phone 4 Type",
+    required: false,
+    aliases: ["phone4type", "phone4linetype"],
+  },
+  {
+    key: "phone_4_dnc",
+    label: "Phone 4 DNC/Litigator",
+    required: false,
+    aliases: ["phone4dnclitigator", "phone4dnc", "phone4litigator"],
+  },
+  {
     key: "phone_5",
     label: "Phone 5",
     required: false,
     aliases: ["phone5", "phonefive", "fifthphone", "ownerphone5"],
+  },
+  {
+    key: "phone_5_type",
+    label: "Phone 5 Type",
+    required: false,
+    aliases: ["phone5type", "phone5linetype"],
+  },
+  {
+    key: "phone_5_dnc",
+    label: "Phone 5 DNC/Litigator",
+    required: false,
+    aliases: ["phone5dnclitigator", "phone5dnc", "phone5litigator"],
   },
   {
     key: "email",
@@ -440,6 +535,12 @@ for (let n = 1; n <= RELATIVE_COUNT; n++) {
         aliases: [`relative${n}phone${m}`, `rel${n}phone${m}`],
       },
       {
+        key: relativeFieldKey(n, `phone_${m}_type`),
+        label: `Relative ${n} Phone ${m} Type`,
+        required: false,
+        aliases: [`relative${n}phone${m}type`, `rel${n}phone${m}type`],
+      },
+      {
         key: relativeFieldKey(n, `phone_${m}_dnc`),
         label: `Relative ${n} Phone ${m} DNC/Litigator`,
         required: false,
@@ -498,14 +599,22 @@ export function autoMapHeaders(headers: string[]): Record<string, string> {
 // Transport types between client wizard and server actions.
 // ---------------------------------------------------------------------------
 
+// One phone parsed off a CSV row — value plus its Excess Elite classification.
+// phone_type is one of "Mobile" | "Residential" | "Other" (or null).
+export type ImportPhone = {
+  value: string;
+  phone_type: string | null;
+  is_dnc: boolean;
+  is_litigator: boolean;
+};
+
 // A relative parsed off one CSV row. Phones/emails are already trimmed and
-// non-empty; a phone flagged DNC/Litigator carries a trailing " (DNC)" marker
-// (the relatives table stores phones as a single text column, not contact rows).
+// non-empty; phones carry their type / DNC / litigator classification.
 export type ImportRelative = {
   full_name: string | null;
   relationship: string | null;
   age: number | null;
-  phones: string[];
+  phones: ImportPhone[];
   emails: string[];
 };
 
@@ -527,7 +636,7 @@ export type IncomingLead = {
   owner_full_name: string | null;
   owner_age: number | null;
   owner_deceased: boolean;
-  phones: string[]; // each mapped phone column, in order (only the non-empty ones)
+  phones: ImportPhone[]; // each mapped phone column, in order (only the non-empty ones)
   emails: string[]; // each mapped email column, in order (only the non-empty ones)
   mailing_addresses: string[]; // each mapped mailing-address column (non-empty only)
   relatives: ImportRelative[]; // up to RELATIVE_COUNT, only the non-empty ones

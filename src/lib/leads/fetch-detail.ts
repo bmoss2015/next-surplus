@@ -21,6 +21,9 @@ export type ContactRow = {
   source: string | null;
   last_attempted: string | null;
   is_primary: boolean;
+  phone_type: string | null;
+  is_dnc: boolean;
+  is_litigator: boolean;
   mailed: boolean;
   mailed_at: string | null;
   notes: string | null;
@@ -33,6 +36,8 @@ export type OwnerRowFull = {
   status: OwnerStatus;
   date_of_death: string | null;
   is_primary: boolean;
+  is_deceased: boolean;
+  age: number | null;
   relationship: string | null;
   notes: string | null;
 };
@@ -160,7 +165,7 @@ export async function fetchOwnersWithContacts(leadId: string): Promise<{
     sb
       .from("owners")
       .select(
-        "id, lead_id, full_name, status, date_of_death, is_primary, relationship, notes"
+        "id, lead_id, full_name, status, date_of_death, is_primary, is_deceased, age, relationship, notes"
       )
       .eq("lead_id", leadId)
       .order("is_primary", { ascending: false })
@@ -168,7 +173,7 @@ export async function fetchOwnersWithContacts(leadId: string): Promise<{
     sb
       .from("contacts")
       .select(
-        "id, owner_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, mailed, mailed_at, notes"
+        "id, owner_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, notes"
       )
       .eq("lead_id", leadId)
       .order("channel", { ascending: true })
@@ -187,8 +192,32 @@ export type RelativeRow = {
   lead_id: string;
   full_name: string;
   relationship: string | null;
+  age: number | null;
   phone: string | null;
+  phone_type: string | null;
+  phone_is_dnc: boolean;
+  phone_is_litigator: boolean;
+  phone_2: string | null;
+  phone_2_type: string | null;
+  phone_2_is_dnc: boolean;
+  phone_2_is_litigator: boolean;
+  phone_3: string | null;
+  phone_3_type: string | null;
+  phone_3_is_dnc: boolean;
+  phone_3_is_litigator: boolean;
+  phone_4: string | null;
+  phone_4_type: string | null;
+  phone_4_is_dnc: boolean;
+  phone_4_is_litigator: boolean;
+  phone_5: string | null;
+  phone_5_type: string | null;
+  phone_5_is_dnc: boolean;
+  phone_5_is_litigator: boolean;
   email: string | null;
+  email_2: string | null;
+  email_3: string | null;
+  email_4: string | null;
+  email_5: string | null;
   notes: string | null;
   street: string | null;
   city: string | null;
@@ -196,15 +225,23 @@ export type RelativeRow = {
   zip: string | null;
 };
 
+const RELATIVE_COLUMNS =
+  "id, lead_id, full_name, relationship, age, " +
+  "phone, phone_type, phone_is_dnc, phone_is_litigator, " +
+  "phone_2, phone_2_type, phone_2_is_dnc, phone_2_is_litigator, " +
+  "phone_3, phone_3_type, phone_3_is_dnc, phone_3_is_litigator, " +
+  "phone_4, phone_4_type, phone_4_is_dnc, phone_4_is_litigator, " +
+  "phone_5, phone_5_type, phone_5_is_dnc, phone_5_is_litigator, " +
+  "email, email_2, email_3, email_4, email_5, " +
+  "notes, street, city, state, zip";
+
 export async function fetchRelatives(leadId: string): Promise<RelativeRow[]> {
   const sb = await createClient();
   const { data, error } = await sb
     .from("relatives")
-    .select(
-      "id, lead_id, full_name, relationship, phone, email, notes, street, city, state, zip"
-    )
+    .select(RELATIVE_COLUMNS)
     .eq("lead_id", leadId)
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as RelativeRow[];
+  return (data ?? []) as unknown as RelativeRow[];
 }

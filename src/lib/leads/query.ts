@@ -11,6 +11,37 @@ export async function currentAssignmentFilterId(): Promise<string | null> {
   return null;
 }
 
+const RELATIVE_LITIGATOR_OR =
+  "phone_is_litigator.eq.true,phone_2_is_litigator.eq.true," +
+  "phone_3_is_litigator.eq.true,phone_4_is_litigator.eq.true,phone_5_is_litigator.eq.true";
+
+// Fix G: which of these leads has at least one contact or relative phone marked
+// as a litigation risk. Used to surface the maroon "Litigator" badge on lead
+// rows / cards without opening the lead.
+export async function litigatorLeadIdSet(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  leadIds: string[]
+): Promise<Set<string>> {
+  const set = new Set<string>();
+  if (leadIds.length === 0) return set;
+  const [contactsRes, relativesRes] = await Promise.all([
+    sb.from("contacts").select("lead_id").in("lead_id", leadIds).eq("is_litigator", true),
+    sb.from("relatives").select("lead_id").in("lead_id", leadIds).or(RELATIVE_LITIGATOR_OR),
+  ]);
+  for (const r of contactsRes.data ?? []) set.add(r.lead_id as string);
+  for (const r of relativesRes.data ?? []) set.add(r.lead_id as string);
+  return set;
+}
+
+// Set `has_litigator` on each lead in the list (one extra round trip).
+export async function withLitigatorFlags<T extends LeadRow>(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  leads: T[]
+): Promise<T[]> {
+  const set = await litigatorLeadIdSet(sb, leads.map((l) => l.id));
+  return leads.map((l) => ({ ...l, has_litigator: set.has(l.id) }));
+}
+
 export type LeadsFilter = {
   q?: string;
   state?: string;
@@ -123,6 +154,8 @@ export async function fetchLeads(query: LeadsQuery): Promise<{
       return primary?.status === query.owner_status;
     });
   }
+
+  leads = await withLitigatorFlags(sb, leads);
 
   return { leads, total: count ?? 0 };
 }

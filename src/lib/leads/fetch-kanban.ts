@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { currentAssignmentFilterId } from "./query";
+import { currentAssignmentFilterId, withLitigatorFlags } from "./query";
 import { STAGES, type LeadRow, type Stage } from "./types";
 
 export async function fetchKanbanLeads(): Promise<Record<Stage, LeadRow[]>> {
@@ -22,7 +22,7 @@ export async function fetchKanbanLeads(): Promise<Record<Stage, LeadRow[]>> {
   const { data, error } = await req.order("imported_at", { ascending: false });
 
   if (error) throw error;
-  const leads = (data ?? []) as LeadRow[];
+  const leads = await withLitigatorFlags(sb, (data ?? []) as LeadRow[]);
 
   const grouped: Record<Stage, LeadRow[]> = {} as Record<Stage, LeadRow[]>;
   for (const stage of STAGES) grouped[stage] = [];

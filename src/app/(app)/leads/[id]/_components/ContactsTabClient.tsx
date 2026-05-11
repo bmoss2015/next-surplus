@@ -6,6 +6,7 @@ import {
   IconTrash,
   IconStar,
   IconStarFilled,
+  IconTag,
 } from "@tabler/icons-react";
 import {
   upsertContact,
@@ -19,7 +20,26 @@ import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_PER_CHANNEL = 3;
+const MAX_PER_CHANNEL = 5;
+
+// Phone-line classification — a type pill (M / R / O) plus DNC and Litigator
+// flags, all stored on the contacts row.
+type PhoneMetaPatch = {
+  phone_type?: string | null;
+  is_dnc?: boolean;
+  is_litigator?: boolean;
+};
+const PHONE_TYPE_CYCLE: (string | null)[] = [null, "Mobile", "Residential", "Other"];
+function phoneTypeShort(t: string | null): string {
+  if (t === "Mobile") return "M";
+  if (t === "Residential") return "R";
+  if (t === "Other") return "O";
+  return "Type";
+}
+function nextPhoneType(t: string | null): string | null {
+  const i = PHONE_TYPE_CYCLE.indexOf(t ?? null);
+  return PHONE_TYPE_CYCLE[(i + 1) % PHONE_TYPE_CYCLE.length] ?? null;
+}
 
 type ContactStatus = "untested" | "valid" | "invalid" | "dnc";
 
@@ -81,6 +101,8 @@ export function ContactsTabClient({
             status: newOwnerStatus,
             date_of_death: null,
             is_primary: willBePrimary,
+            is_deceased: false,
+            age: null,
             relationship: null,
             notes: null,
           },
@@ -137,6 +159,9 @@ export function ContactsTabClient({
             source: null,
             last_attempted: null,
             is_primary: false,
+            phone_type: null,
+            is_dnc: false,
+            is_litigator: false,
             mailed: false,
             mailed_at: null,
             notes: null,
@@ -160,6 +185,16 @@ export function ContactsTabClient({
     );
     startTransition(async () => {
       await upsertContact(leadId, target?.owner_id ?? "", contactId, { status });
+    });
+  }
+
+  function setPhoneMeta(contactId: string, patch: PhoneMetaPatch) {
+    const target = contacts.find((c) => c.id === contactId);
+    setContacts((prev) =>
+      prev.map((c) => (c.id === contactId ? { ...c, ...patch } : c))
+    );
+    startTransition(async () => {
+      await upsertContact(leadId, target?.owner_id ?? "", contactId, patch);
     });
   }
 
@@ -254,6 +289,7 @@ export function ContactsTabClient({
               }
               onRemoveContact={removeContact}
               onSetContactStatus={setContactStatus}
+              onSetPhoneMeta={setPhoneMeta}
             />
           ))}
         </div>
@@ -271,6 +307,7 @@ function OwnerCard({
   onAddContact,
   onRemoveContact,
   onSetContactStatus,
+  onSetPhoneMeta,
 }: {
   owner: OwnerRowFull;
   phones: ContactRow[];
@@ -280,6 +317,7 @@ function OwnerCard({
   onAddContact: (channel: "phone" | "email", value: string) => void;
   onRemoveContact: (id: string) => void;
   onSetContactStatus: (id: string, s: ContactStatus) => void;
+  onSetPhoneMeta: (id: string, patch: PhoneMetaPatch) => void;
 }) {
   const { isAdmin } = useRole();
   const [addingPhone, setAddingPhone] = useState(false);
@@ -321,8 +359,11 @@ function OwnerCard({
         ) : (
           <IconStar size={13} className="mt-[2px] shrink-0 text-gray-300" />
         )}
-        <div className="min-w-0 flex-1 text-[13px] font-medium leading-tight text-ink">
-          {owner.full_name}
+        <div className="min-w-0 flex-1 leading-tight">
+          <span className="text-[13px] font-medium text-ink">{owner.full_name}</span>
+          {owner.age != null && (
+            <span className="ml-1.5 text-[10px] font-normal text-gray-400">Age {owner.age}</span>
+          )}
         </div>
         {isAdmin && (
           <button
@@ -356,11 +397,16 @@ function OwnerCard({
         {phones.map((c) => (
           <ContactLine
             key={c.id}
+            kind="phone"
             value={formatPhone(c.value)}
             status={c.status}
+            phoneType={c.phone_type}
+            isDnc={c.is_dnc}
+            isLitigator={c.is_litigator}
             canRemove={isAdmin}
             onRemove={() => onRemoveContact(c.id)}
             onSetStatus={(s) => onSetContactStatus(c.id, s)}
+            onSetPhoneMeta={(patch) => onSetPhoneMeta(c.id, patch)}
           />
         ))}
         {addingPhone ? (
@@ -414,6 +460,7 @@ function OwnerCard({
         {emails.map((c) => (
           <ContactLine
             key={c.id}
+            kind="email"
             value={c.value}
             status={c.status}
             breakAll
@@ -488,42 +535,139 @@ function OwnerCard({
 }
 
 function ContactLine({
+  kind,
   value,
   status,
+  phoneType,
+  isDnc,
+  isLitigator,
   onRemove,
   onSetStatus,
+  onSetPhoneMeta,
   canRemove,
   breakAll,
 }: {
+  kind: "phone" | "email";
   value: string;
   status: ContactStatus;
+  phoneType?: string | null;
+  isDnc?: boolean;
+  isLitigator?: boolean;
   onRemove: () => void;
   onSetStatus: (s: ContactStatus) => void;
+  onSetPhoneMeta?: (patch: PhoneMetaPatch) => void;
   canRemove: boolean;
   breakAll?: boolean;
 }) {
+  const isPhone = kind === "phone";
+  const [editingTags, setEditingTags] = useState(false);
+  const ptype = phoneType ?? null;
+
+  const tagToggle = (active: boolean, activeClass: string) =>
+    cn(
+      "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
+      active ? activeClass : "bg-gray-100 text-gray-500 hover:bg-gray-150"
+    );
+
   return (
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">
       <div className="flex items-start gap-1">
         <span
           className={cn(
-            "min-w-0 flex-1 text-[11.5px] font-medium text-ink",
+            "min-w-0 text-[11.5px] font-medium text-ink",
             breakAll ? "break-all" : "whitespace-nowrap"
           )}
         >
           {value}
         </span>
+        {/* Active classification pills, inline with the number — only when set. */}
+        {isPhone && ptype && (
+          <button
+            type="button"
+            title={ptype}
+            aria-label={`Phone Type ${ptype}`}
+            onClick={() => onSetPhoneMeta?.({ phone_type: nextPhoneType(ptype) })}
+            className="shrink-0 cursor-pointer rounded-full bg-gray-150 px-1.5 py-[1px] text-[9px] font-medium leading-none text-gray-500 hover:bg-gray-200"
+          >
+            {phoneTypeShort(ptype)}
+          </button>
+        )}
+        {isPhone && isDnc && (
+          <button
+            type="button"
+            aria-label="Do Not Call"
+            onClick={() => onSetPhoneMeta?.({ is_dnc: false })}
+            className="shrink-0 cursor-pointer rounded-full bg-danger-bg px-1.5 py-[1px] text-[9px] font-medium leading-none text-danger"
+          >
+            DNC
+          </button>
+        )}
+        {isPhone && isLitigator && (
+          <button
+            type="button"
+            aria-label="Litigator"
+            onClick={() => onSetPhoneMeta?.({ is_litigator: false })}
+            className="shrink-0 cursor-pointer rounded-full bg-[#7f1d1d] px-1.5 py-[1px] text-[9px] font-medium leading-none text-white"
+          >
+            Litigator
+          </button>
+        )}
+        <span className="flex-1" />
+        {isPhone && (
+          <button
+            type="button"
+            aria-label="Edit Phone Tags"
+            onClick={() => setEditingTags((v) => !v)}
+            className={cn(
+              "shrink-0 cursor-pointer text-gray-300 hover:text-petrol-500",
+              editingTags && "text-petrol-500"
+            )}
+          >
+            <IconTag size={11} stroke={1.75} />
+          </button>
+        )}
         {canRemove && (
           <button
             type="button"
             onClick={onRemove}
-            className="cursor-pointer text-gray-300 hover:text-danger"
+            className="shrink-0 cursor-pointer text-gray-300 hover:text-danger"
             aria-label="Remove"
           >
             <IconTrash size={11} stroke={1.75} />
           </button>
         )}
       </div>
+
+      {isPhone && editingTags && (
+        <div className="mt-1 flex flex-wrap items-center gap-1 border-t border-gray-150 pt-1">
+          <span className="text-[9px] uppercase tracking-[0.3px] text-gray-400">Type</span>
+          {(["Mobile", "Residential", "Other"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => onSetPhoneMeta?.({ phone_type: ptype === t ? null : t })}
+              className={tagToggle(ptype === t, "bg-gray-200 text-ink")}
+            >
+              {phoneTypeShort(t)}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => onSetPhoneMeta?.({ is_dnc: !isDnc })}
+            className={tagToggle(!!isDnc, "bg-danger-bg text-danger")}
+          >
+            DNC
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetPhoneMeta?.({ is_litigator: !isLitigator })}
+            className={tagToggle(!!isLitigator, "bg-[#7f1d1d] text-white")}
+          >
+            Litigator
+          </button>
+        </div>
+      )}
+
       <div className="mt-1 flex flex-wrap gap-1">
         {CONTACT_STATUS_ORDER.map((s) => {
           const active = status === s;

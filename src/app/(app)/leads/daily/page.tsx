@@ -2,6 +2,7 @@ import Link from "next/link";
 import { fetchDailyWork, type DailyWorkLead } from "@/lib/leads/fetch-daily-work";
 import { ViewToggle } from "../_components/ViewToggle";
 import { StagePill } from "@/components/StagePill";
+import { LitigatorBadge } from "@/components/LitigatorBadge";
 import { formatCurrency, primaryOwner } from "@/lib/leads/format";
 
 export const dynamic = "force-dynamic";
@@ -92,8 +93,11 @@ function Section({
                   {lead.lead_id}
                 </span>
                 <div className="min-w-0">
-                  <div className="truncate text-[13px] font-medium text-ink">
-                    {lead.address}
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium text-ink">
+                      {lead.address}
+                    </span>
+                    {lead.has_litigator && <LitigatorBadge className="shrink-0" />}
                   </div>
                   <div className="truncate text-[11px] text-gray-500">
                     {primaryOwner(lead)} · {lead.city}, {lead.state}

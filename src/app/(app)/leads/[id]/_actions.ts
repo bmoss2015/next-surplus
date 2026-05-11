@@ -350,6 +350,9 @@ export async function upsertContact(
     value?: string;
     status?: "untested" | "valid" | "invalid" | "dnc";
     is_primary?: boolean;
+    phone_type?: string | null;
+    is_dnc?: boolean;
+    is_litigator?: boolean;
     notes?: string | null;
   }
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -372,6 +375,9 @@ export async function upsertContact(
         value: patch.value,
         status: patch.status ?? "untested",
         is_primary: patch.is_primary ?? false,
+        phone_type: patch.phone_type ?? null,
+        is_dnc: patch.is_dnc ?? false,
+        is_litigator: patch.is_litigator ?? false,
         notes: patch.notes ?? null,
         mailed: false,
         mailed_at: null,
@@ -386,6 +392,20 @@ export async function upsertContact(
 
 // -- Owners ------------------------------------------------------------------
 
+// Keep owners.is_deceased and owners.status consistent in both directions:
+// picking "Deceased" sets the flag; picking any other status clears it; setting
+// the flag forces status = 'deceased'. (A DB trigger also forces status when the
+// flag is true, so we must clear the flag whenever the status moves away.)
+function reconcileOwnerDeceased<T extends { status?: string; is_deceased?: boolean }>(
+  patch: T
+): T {
+  if (patch.is_deceased === true) return { ...patch, status: "deceased", is_deceased: true };
+  if (patch.status !== undefined) {
+    return { ...patch, is_deceased: patch.status === "deceased" };
+  }
+  return patch;
+}
+
 export async function upsertOwner(
   leadId: string,
   ownerId: string | null,
@@ -395,27 +415,32 @@ export async function upsertOwner(
     date_of_death?: string | null;
     relationship?: string | null;
     is_primary?: boolean;
+    is_deceased?: boolean;
+    age?: number | null;
     notes?: string | null;
   }
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const sb = await createClient();
+  const reconciled = reconcileOwnerDeceased(patch);
   if (ownerId) {
-    const { error } = await sb.from("owners").update(patch).eq("id", ownerId);
+    const { error } = await sb.from("owners").update(reconciled).eq("id", ownerId);
     if (error) return { ok: false, error: error.message };
     revalidatePath(`/leads/${leadId}`);
     return { ok: true, id: ownerId };
   } else {
-    if (!patch.full_name) return { ok: false, error: "Owner name is required" };
+    if (!reconciled.full_name) return { ok: false, error: "Owner name is required" };
     const { data, error } = await sb
       .from("owners")
       .insert({
         lead_id: leadId,
-        full_name: patch.full_name,
-        status: patch.status ?? "unknown",
-        date_of_death: patch.date_of_death ?? null,
-        relationship: patch.relationship ?? null,
-        is_primary: patch.is_primary ?? false,
-        notes: patch.notes ?? null,
+        full_name: reconciled.full_name,
+        status: reconciled.status ?? "unknown",
+        date_of_death: reconciled.date_of_death ?? null,
+        relationship: reconciled.relationship ?? null,
+        is_primary: reconciled.is_primary ?? false,
+        is_deceased: reconciled.is_deceased ?? false,
+        age: reconciled.age ?? null,
+        notes: reconciled.notes ?? null,
       })
       .select("id")
       .single();
@@ -440,20 +465,46 @@ export async function deleteOwner(
 
 // -- Relatives (heirs, spouses, family who aren't on the deed) ----------------
 
+export type RelativePatch = {
+  full_name?: string;
+  relationship?: string | null;
+  age?: number | null;
+  phone?: string | null;
+  phone_type?: string | null;
+  phone_is_dnc?: boolean;
+  phone_is_litigator?: boolean;
+  phone_2?: string | null;
+  phone_2_type?: string | null;
+  phone_2_is_dnc?: boolean;
+  phone_2_is_litigator?: boolean;
+  phone_3?: string | null;
+  phone_3_type?: string | null;
+  phone_3_is_dnc?: boolean;
+  phone_3_is_litigator?: boolean;
+  phone_4?: string | null;
+  phone_4_type?: string | null;
+  phone_4_is_dnc?: boolean;
+  phone_4_is_litigator?: boolean;
+  phone_5?: string | null;
+  phone_5_type?: string | null;
+  phone_5_is_dnc?: boolean;
+  phone_5_is_litigator?: boolean;
+  email?: string | null;
+  email_2?: string | null;
+  email_3?: string | null;
+  email_4?: string | null;
+  email_5?: string | null;
+  notes?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+};
+
 export async function upsertRelative(
   leadId: string,
   relativeId: string | null,
-  patch: {
-    full_name?: string;
-    relationship?: string | null;
-    phone?: string | null;
-    email?: string | null;
-    notes?: string | null;
-    street?: string | null;
-    city?: string | null;
-    state?: string | null;
-    zip?: string | null;
-  }
+  patch: RelativePatch
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const sb = await createClient();
   if (relativeId) {
@@ -469,18 +520,7 @@ export async function upsertRelative(
   if (!fullName) return { ok: false, error: "Name is required" };
   const { data, error } = await sb
     .from("relatives")
-    .insert({
-      lead_id: leadId,
-      full_name: fullName,
-      relationship: patch.relationship ?? null,
-      phone: patch.phone ?? null,
-      email: patch.email ?? null,
-      notes: patch.notes ?? null,
-      street: patch.street ?? null,
-      city: patch.city ?? null,
-      state: patch.state ?? null,
-      zip: patch.zip ?? null,
-    })
+    .insert({ ...patch, lead_id: leadId, full_name: fullName })
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };

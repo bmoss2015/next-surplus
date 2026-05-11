@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { currentAssignmentFilterId } from "./query";
+import { currentAssignmentFilterId, litigatorLeadIdSet } from "./query";
 import type { LeadRow } from "./types";
 
 export type DailyWorkLead = LeadRow & {
@@ -84,9 +84,12 @@ export async function fetchDailyWork(): Promise<{
     }
   }
 
+  const litigatorIds = await litigatorLeadIdSet(sb, leadIds);
+
   const now = Date.now();
   const enriched: DailyWorkLead[] = leads.map((l) => ({
     ...l,
+    has_litigator: litigatorIds.has(l.id),
     days_in_stage: Math.max(0, Math.floor((now - new Date(l.stage_changed_at).getTime()) / DAY_MS)),
     unchecked_verifications: uncheckedByLead.get(l.id) ?? 0,
     reason: "",

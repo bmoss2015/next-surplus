@@ -11,6 +11,7 @@ import {
 import { advanceStage } from "@/app/(app)/leads/[id]/_actions";
 import { formatCurrency, primaryOwner } from "@/lib/leads/format";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
+import { LitigatorBadge } from "@/components/LitigatorBadge";
 import { cn } from "@/lib/cn";
 
 const STAGE_DOT: Record<Stage, string> = {
@@ -183,6 +184,11 @@ function KanbanCard({
           <div className="mt-[2px] truncate text-[11px] text-gray-500">
             {primaryOwner(lead)}
           </div>
+          {lead.has_litigator && (
+            <div className="mt-[5px]">
+              <LitigatorBadge />
+            </div>
+          )}
           <div className="mt-[7px] whitespace-nowrap text-[12px] font-medium text-ink">
             Est. Surplus {formatCurrency(lead.estimated_surplus)}
           </div>

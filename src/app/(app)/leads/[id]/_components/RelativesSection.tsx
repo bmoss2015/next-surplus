@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { IconPlus, IconTrash, IconUsersGroup } from "@tabler/icons-react";
-import { upsertRelative, deleteRelative } from "../_actions";
+import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
 import { formatPhone } from "./ContactsTabClient";
@@ -20,23 +20,74 @@ const RELATIONSHIP_OPTIONS = [
   "Other",
 ] as const;
 
-const PHONE_SEP = " | ";
+// Phone slot column names. Phone 1 lives in the bare `phone` / `phone_type` /
+// `phone_is_dnc` / `phone_is_litigator` columns; phones 2..5 are numbered.
+const PHONE_SLOTS = [
+  { value: "phone", type: "phone_type", dnc: "phone_is_dnc", lit: "phone_is_litigator" },
+  { value: "phone_2", type: "phone_2_type", dnc: "phone_2_is_dnc", lit: "phone_2_is_litigator" },
+  { value: "phone_3", type: "phone_3_type", dnc: "phone_3_is_dnc", lit: "phone_3_is_litigator" },
+  { value: "phone_4", type: "phone_4_type", dnc: "phone_4_is_dnc", lit: "phone_4_is_litigator" },
+  { value: "phone_5", type: "phone_5_type", dnc: "phone_5_is_dnc", lit: "phone_5_is_litigator" },
+] as const;
 
-type RelativePatch = {
-  relationship?: string | null;
-  phone?: string | null;
-  street?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zip?: string | null;
-};
+const EMAIL_SLOTS = ["email", "email_2", "email_3", "email_4", "email_5"] as const;
 
-function splitPhones(value: string | null): string[] {
-  if (!value) return [];
-  return value
-    .split(/[|\n]/)
-    .map((p) => p.trim())
-    .filter(Boolean);
+const PHONE_TYPE_CYCLE: (string | null)[] = [null, "Mobile", "Residential", "Other"];
+function phoneTypeShort(t: string | null): string {
+  if (t === "Mobile") return "M";
+  if (t === "Residential") return "R";
+  if (t === "Other") return "O";
+  return "Type";
+}
+function nextPhoneType(t: string | null): string | null {
+  const i = PHONE_TYPE_CYCLE.indexOf(t ?? null);
+  return PHONE_TYPE_CYCLE[(i + 1) % PHONE_TYPE_CYCLE.length] ?? null;
+}
+
+function makeRelativeRow(
+  id: string,
+  leadId: string,
+  full_name: string,
+  relationship: string | null,
+  phone: string | null
+): RelativeRow {
+  return {
+    id,
+    lead_id: leadId,
+    full_name,
+    relationship,
+    age: null,
+    phone,
+    phone_type: null,
+    phone_is_dnc: false,
+    phone_is_litigator: false,
+    phone_2: null,
+    phone_2_type: null,
+    phone_2_is_dnc: false,
+    phone_2_is_litigator: false,
+    phone_3: null,
+    phone_3_type: null,
+    phone_3_is_dnc: false,
+    phone_3_is_litigator: false,
+    phone_4: null,
+    phone_4_type: null,
+    phone_4_is_dnc: false,
+    phone_4_is_litigator: false,
+    phone_5: null,
+    phone_5_type: null,
+    phone_5_is_dnc: false,
+    phone_5_is_litigator: false,
+    email: null,
+    email_2: null,
+    email_3: null,
+    email_4: null,
+    email_5: null,
+    notes: null,
+    street: null,
+    city: null,
+    state: null,
+    zip: null,
+  };
 }
 
 export function RelativesSection({
@@ -69,25 +120,11 @@ export function RelativesSection({
         full_name: name,
         relationship,
         phone,
-        email: null,
-        notes: null,
       });
       if (res.ok) {
         setRelatives((prev) => [
           ...prev,
-          {
-            id: res.id,
-            lead_id: leadId,
-            full_name: name,
-            relationship,
-            phone,
-            email: null,
-            notes: null,
-            street: null,
-            city: null,
-            state: null,
-            zip: null,
-          },
+          makeRelativeRow(res.id, leadId, name, relationship, phone),
         ]);
         setDraftName("");
         setDraftRelationship("");
@@ -101,7 +138,7 @@ export function RelativesSection({
 
   function patch(id: string, fields: RelativePatch) {
     setRelatives((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...fields } : r))
+      prev.map((r) => (r.id === id ? ({ ...r, ...fields } as RelativeRow) : r))
     );
     startTransition(async () => {
       await upsertRelative(leadId, id, fields);
@@ -225,23 +262,32 @@ function RelativeCard({
   onPatch: (fields: RelativePatch) => void;
   onRemove: () => void;
 }) {
-  const [phones, setPhones] = useState<string[]>(() => {
-    const list = splitPhones(relative.phone);
-    return list.length > 0 ? list : [""];
-  });
   const [street, setStreet] = useState(relative.street ?? "");
   const [city, setCity] = useState(relative.city ?? "");
   const [stateCode, setStateCode] = useState(relative.state ?? "");
   const [zip, setZip] = useState(relative.zip ?? "");
 
-  function commitPhones(next: string[]) {
-    setPhones(next);
-    const joined = next.map((p) => p.trim()).filter(Boolean).join(PHONE_SEP);
-    onPatch({ phone: joined || null });
-  }
-
   const addrInputClass =
     "w-full rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
+
+  // Show every filled phone slot plus the first empty one (so a new phone can
+  // be added in order — up to 5).
+  const firstEmptyIndex = PHONE_SLOTS.findIndex(
+    (s) => !((relative[s.value] as string | null) ?? "").trim()
+  );
+  const visibleSlotIndices = PHONE_SLOTS.map((_, i) => i).filter((i) => {
+    const has = !!((relative[PHONE_SLOTS[i].value] as string | null) ?? "").trim();
+    return has || i === firstEmptyIndex;
+  });
+
+  // Same idea for emails: every filled slot plus the first empty one.
+  const firstEmptyEmailIndex = EMAIL_SLOTS.findIndex(
+    (k) => !((relative[k] as string | null) ?? "").trim()
+  );
+  const visibleEmailIndices = EMAIL_SLOTS.map((_, i) => i).filter((i) => {
+    const has = !!((relative[EMAIL_SLOTS[i]] as string | null) ?? "").trim();
+    return has || i === firstEmptyEmailIndex;
+  });
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3">
@@ -267,39 +313,28 @@ function RelativeCard({
         <div className="text-[10px] font-medium uppercase tracking-[0.4px] text-gray-400">
           Phone
         </div>
-        {phones.map((p, idx) => (
-          <div key={idx} className="flex items-center gap-1">
-            <input
-              value={p}
-              onChange={(e) => {
-                const next = [...phones];
-                next[idx] = formatPhone(e.target.value);
-                setPhones(next);
-              }}
-              onBlur={() => commitPhones(phones)}
-              placeholder="(555) 555-5555"
-              className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
-            />
-            {phones.length > 1 && (
-              <button
-                type="button"
-                onClick={() => commitPhones(phones.filter((_, i) => i !== idx))}
-                className="cursor-pointer text-gray-300 hover:text-danger"
-                aria-label="Remove Phone"
-              >
-                <IconTrash size={11} stroke={1.75} />
-              </button>
-            )}
-          </div>
+        {visibleSlotIndices.map((i) => (
+          <PhoneSlot
+            key={PHONE_SLOTS[i].value}
+            slot={PHONE_SLOTS[i]}
+            relative={relative}
+            onPatch={onPatch}
+          />
         ))}
-        <button
-          type="button"
-          onClick={() => setPhones([...phones, ""])}
-          className="inline-flex w-fit cursor-pointer items-center gap-0.5 text-[11px] text-petrol-500 hover:text-petrol-700"
-        >
-          <IconPlus size={11} stroke={2} />
-          Add Phone {phones.length + 1}
-        </button>
+      </div>
+
+      <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
+        <div className="text-[10px] font-medium uppercase tracking-[0.4px] text-gray-400">
+          Email
+        </div>
+        {visibleEmailIndices.map((i) => (
+          <EmailSlot
+            key={EMAIL_SLOTS[i]}
+            field={EMAIL_SLOTS[i]}
+            relative={relative}
+            onPatch={onPatch}
+          />
+        ))}
       </div>
 
       <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
@@ -348,6 +383,132 @@ function RelativeCard({
         >
           <IconTrash size={12} stroke={1.75} />
           Remove
+        </button>
+      )}
+    </div>
+  );
+}
+
+function PhoneSlot({
+  slot,
+  relative,
+  onPatch,
+}: {
+  slot: (typeof PHONE_SLOTS)[number];
+  relative: RelativeRow;
+  onPatch: (fields: RelativePatch) => void;
+}) {
+  const stored = ((relative[slot.value] as string | null) ?? "").trim();
+  const [val, setVal] = useState(stored);
+  useEffect(() => {
+    setVal(((relative[slot.value] as string | null) ?? "").trim());
+  }, [relative, slot.value]);
+
+  const type = relative[slot.type] as string | null;
+  const isDnc = relative[slot.dnc] as boolean;
+  const isLit = relative[slot.lit] as boolean;
+
+  const pill = (active: boolean, activeClass: string) =>
+    cn(
+      "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium transition-colors",
+      active ? activeClass : "border border-gray-200 text-gray-400 hover:border-gray-300"
+    );
+
+  return (
+    <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">
+      <div className="flex items-center gap-1">
+        <input
+          value={val}
+          onChange={(e) => setVal(formatPhone(e.target.value))}
+          onBlur={() => {
+            const t = val.trim();
+            if (t !== stored) onPatch({ [slot.value]: t || null } as RelativePatch);
+          }}
+          placeholder="(555) 555-5555"
+          className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+        />
+        {stored && (
+          <button
+            type="button"
+            onClick={() => onPatch({ [slot.value]: null } as RelativePatch)}
+            className="cursor-pointer text-gray-300 hover:text-danger"
+            aria-label="Clear Phone"
+          >
+            <IconTrash size={11} stroke={1.75} />
+          </button>
+        )}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onPatch({ [slot.type]: nextPhoneType(type) } as RelativePatch)}
+          className={cn(
+            "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium",
+            type
+              ? "bg-petrol-100 text-petrol-700"
+              : "border border-dashed border-gray-300 text-gray-400"
+          )}
+          aria-label="Phone Type"
+        >
+          {phoneTypeShort(type)}
+        </button>
+        <button
+          type="button"
+          onClick={() => onPatch({ [slot.dnc]: !isDnc } as RelativePatch)}
+          className={pill(isDnc, "bg-danger-bg text-danger")}
+          aria-label="Do Not Call"
+        >
+          DNC
+        </button>
+        <button
+          type="button"
+          onClick={() => onPatch({ [slot.lit]: !isLit } as RelativePatch)}
+          className={pill(isLit, "bg-[#7f1d1d] text-white")}
+          aria-label="Litigator"
+        >
+          Litigator
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EmailSlot({
+  field,
+  relative,
+  onPatch,
+}: {
+  field: (typeof EMAIL_SLOTS)[number];
+  relative: RelativeRow;
+  onPatch: (fields: RelativePatch) => void;
+}) {
+  const stored = ((relative[field] as string | null) ?? "").trim();
+  const [val, setVal] = useState(stored);
+  useEffect(() => {
+    setVal(((relative[field] as string | null) ?? "").trim());
+  }, [relative, field]);
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="email"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={() => {
+          const t = val.trim();
+          if (t !== stored) onPatch({ [field]: t || null } as RelativePatch);
+        }}
+        placeholder="name@example.com"
+        className="min-w-0 flex-1 break-all rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+      />
+      {stored && (
+        <button
+          type="button"
+          onClick={() => onPatch({ [field]: null } as RelativePatch)}
+          className="cursor-pointer text-gray-300 hover:text-danger"
+          aria-label="Clear Email"
+        >
+          <IconTrash size={11} stroke={1.75} />
         </button>
       )}
     </div>

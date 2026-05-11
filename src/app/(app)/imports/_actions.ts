@@ -6,6 +6,7 @@ import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/impor
 import {
   DEFAULT_LEAD_SOURCE,
   type IncomingLead,
+  type ImportRelative,
   type ImportHistoryRow,
   type SavedSourceMapping,
   type ImportRowDecision,
@@ -184,6 +185,36 @@ function isBlank(v: unknown): boolean {
   return v == null || (typeof v === "string" && v.trim() === "");
 }
 
+// Map a parsed relative onto a `relatives` table row. Phone 1 lives in `phone`
+// / `phone_type` / `phone_is_dnc` / `phone_is_litigator`; phones 2..5 in
+// `phone_2` … `phone_5` with the parallel `_type` / `_is_dnc` / `_is_litigator`
+// columns. Emails 1..5 in `email` / `email_2` … `email_5`.
+const RELATIVE_PHONE_COLUMNS = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const;
+const RELATIVE_EMAIL_COLUMNS = ["email", "email_2", "email_3", "email_4", "email_5"] as const;
+
+function relativeRowFromImport(
+  leadId: string,
+  r: ImportRelative
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    lead_id: leadId,
+    full_name: r.full_name || "Unknown Relative",
+    relationship: r.relationship ?? null,
+    age: r.age ?? null,
+  };
+  RELATIVE_PHONE_COLUMNS.forEach((base, i) => {
+    const p = r.phones[i];
+    out[base] = p ? p.value.trim() : null;
+    out[`${base}_type`] = p ? (p.phone_type ?? null) : null;
+    out[`${base}_is_dnc`] = p ? p.is_dnc : false;
+    out[`${base}_is_litigator`] = p ? p.is_litigator : false;
+  });
+  RELATIVE_EMAIL_COLUMNS.forEach((base, i) => {
+    out[base] = r.emails[i] ?? null;
+  });
+  return out;
+}
+
 export async function importLeads(
   filename: string,
   rows: IncomingLead[],
@@ -240,13 +271,20 @@ export async function importLeads(
   // Helper: write the owner + contact rows for a freshly created/updated lead.
   async function writeContactsForLead(leadId: string, row: IncomingLead) {
     const ownerName = (row.owner_full_name ?? "").trim();
-    const phones = (row.phones ?? []).map((p) => p.trim()).filter(Boolean);
+    const phones = (row.phones ?? []).filter((p) => p.value.trim());
     const emails = (row.emails ?? []).map((e) => e.trim()).filter(Boolean);
     const mailingAddresses = (row.mailing_addresses ?? [])
       .map((m) => m.trim())
       .filter(Boolean);
 
-    if (!ownerName && phones.length === 0 && emails.length === 0 && mailingAddresses.length === 0) {
+    if (
+      !ownerName &&
+      phones.length === 0 &&
+      emails.length === 0 &&
+      mailingAddresses.length === 0 &&
+      !row.owner_deceased &&
+      row.owner_age == null
+    ) {
       return;
     }
 
@@ -256,7 +294,10 @@ export async function importLeads(
         lead_id: leadId,
         full_name: ownerName || "Unknown Owner",
         is_primary: true,
+        // The DB trigger forces status='deceased' when is_deceased is true, but
+        // set it here too so the value is right regardless of trigger state.
         status: row.owner_deceased ? "deceased" : "unknown",
+        is_deceased: row.owner_deceased,
         age: row.owner_age ?? null,
       })
       .select("id")
@@ -264,16 +305,20 @@ export async function importLeads(
     if (!ownerRow) return;
 
     // Fix 93: every mapped phone / email / mailing-address column becomes its
-    // own contacts row — nothing overwrites a single shared value.
+    // own contacts row — nothing overwrites a single shared value. Each phone
+    // carries its Excess Elite line type + DNC / litigator classification.
     const contactRows: Array<Record<string, unknown>> = [];
-    phones.forEach((value, idx) => {
+    phones.forEach((p, idx) => {
       contactRows.push({
         owner_id: ownerRow.id,
         lead_id: leadId,
         channel: "phone",
-        value,
+        value: p.value.trim(),
         status: "untested",
         is_primary: idx === 0,
+        phone_type: p.phone_type ?? null,
+        is_dnc: p.is_dnc,
+        is_litigator: p.is_litigator,
       });
     });
     emails.forEach((value, idx) => {
@@ -301,22 +346,15 @@ export async function importLeads(
     }
   }
 
-  // Helper: write the relatives parsed off a CSV row (Fix E expanded). The
-  // relatives table stores phones / emails as single text columns, so multiple
-  // mapped values are joined ("Phone 1 | Phone 2" / "a@x.com, b@y.com").
+  // Helper: write the relatives parsed off a CSV row. The relatives table now
+  // carries up to 5 discrete phones (each with type / DNC / litigator) and 5
+  // emails, so the parsed values map straight onto those columns.
   async function writeRelativesForLead(leadId: string, row: IncomingLead) {
     const relatives = (row.relatives ?? []).filter(
       (r) => r.full_name || r.phones.length > 0 || r.emails.length > 0
     );
     if (relatives.length === 0) return;
-    const relativeRows = relatives.map((r) => ({
-      lead_id: leadId,
-      full_name: r.full_name || "Unknown Relative",
-      relationship: r.relationship ?? null,
-      age: r.age ?? null,
-      phone: r.phones.length > 0 ? r.phones.join(" | ") : null,
-      email: r.emails.length > 0 ? r.emails.join(", ") : null,
-    }));
+    const relativeRows = relatives.map((r) => relativeRowFromImport(leadId, r));
     await sb.from("relatives").insert(relativeRows);
   }
 

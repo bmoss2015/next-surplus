@@ -32,8 +32,11 @@ import {
   RELATIVE_COUNT,
   RELATIVE_PHONE_COUNT,
   RELATIVE_EMAIL_COUNT,
+  parsePhoneType,
+  parseDncLitigator,
   type IncomingLead,
   type ImportRelative,
+  type ImportPhone,
   type ImportSaleType,
   type ImportHistoryRow,
   type DuplicateResolution,
@@ -674,15 +677,18 @@ export function ImportWizard() {
         ? splitFullName(ownerFull)
         : combineName(ownerFirst, ownerLast);
 
-      const phones = [
-        get(raw, "phone_1"),
-        get(raw, "phone_2"),
-        get(raw, "phone_3"),
-        get(raw, "phone_4"),
-        get(raw, "phone_5"),
-      ]
-        .map((p) => p.trim())
-        .filter(Boolean);
+      const phones: ImportPhone[] = [];
+      for (let pm = 1; pm <= 5; pm++) {
+        const pv = get(raw, `phone_${pm}`).trim();
+        if (!pv) continue;
+        const { is_dnc, is_litigator } = parseDncLitigator(get(raw, `phone_${pm}_dnc`));
+        phones.push({
+          value: pv,
+          phone_type: parsePhoneType(get(raw, `phone_${pm}_type`)),
+          is_dnc,
+          is_litigator,
+        });
+      }
       const emails = [
         get(raw, "email"),
         get(raw, "email_2"),
@@ -721,12 +727,17 @@ export function ImportWizard() {
         const rName = combineName(get(raw, rk("first_name")), get(raw, rk("last_name"))) || null;
         const rRelationship = get(raw, rk("possible_type")) || null;
         const rAge = parseAge(get(raw, rk("age")));
-        const rPhones: string[] = [];
+        const rPhones: ImportPhone[] = [];
         for (let pm = 1; pm <= RELATIVE_PHONE_COUNT; pm++) {
           const pv = get(raw, rk(`phone_${pm}`)).trim();
           if (!pv) continue;
-          const dnc = isYes(get(raw, rk(`phone_${pm}_dnc`)));
-          rPhones.push(dnc ? `${pv} (DNC)` : pv);
+          const { is_dnc, is_litigator } = parseDncLitigator(get(raw, rk(`phone_${pm}_dnc`)));
+          rPhones.push({
+            value: pv,
+            phone_type: parsePhoneType(get(raw, rk(`phone_${pm}_type`))),
+            is_dnc,
+            is_litigator,
+          });
         }
         const rEmails: string[] = [];
         for (let em = 1; em <= RELATIVE_EMAIL_COUNT; em++) {

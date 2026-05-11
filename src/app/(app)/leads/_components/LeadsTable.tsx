@@ -9,6 +9,7 @@ import {
 } from "@/lib/leads/format";
 import { OWNER_STATUS_LABELS, SALE_TYPE_LABELS } from "@/lib/leads/types";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
+import { LitigatorBadge } from "@/components/LitigatorBadge";
 import { SortHeader } from "./SortHeader";
 
 export function LeadsTable({
@@ -125,17 +126,20 @@ export function LeadsTable({
                   {days != null ? days : "—"}
                 </td>
                 <td className="px-4 py-[10px]">
-                  {lead.archived ? (
-                    <span className="inline-block rounded bg-gray-150 px-2 py-[2px] text-[11px] font-medium text-gray-500">
-                      Archived
-                    </span>
-                  ) : lead.needs_action_flag ? (
-                    <span className="inline-block rounded bg-danger-bg px-2 py-[2px] text-[11px] font-medium text-danger">
-                      Needs Action
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-gray-400">—</span>
-                  )}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {lead.archived ? (
+                      <span className="inline-block rounded bg-gray-150 px-2 py-[2px] text-[11px] font-medium text-gray-500">
+                        Archived
+                      </span>
+                    ) : lead.needs_action_flag ? (
+                      <span className="inline-block rounded bg-danger-bg px-2 py-[2px] text-[11px] font-medium text-danger">
+                        Needs Action
+                      </span>
+                    ) : !lead.has_litigator ? (
+                      <span className="text-[11px] text-gray-400">—</span>
+                    ) : null}
+                    {lead.has_litigator && <LitigatorBadge />}
+                  </div>
                 </td>
               </tr>
             );
