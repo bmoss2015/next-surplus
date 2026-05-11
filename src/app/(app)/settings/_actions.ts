@@ -133,38 +133,6 @@ export async function deleteAttorney(
   return { ok: true };
 }
 
-// -- State rules -------------------------------------------------------------
-
-export async function updateStateRule(input: {
-  state: string;
-  state_name: string;
-  redemption_period_months: number | null;
-  filing_window_years: number | null;
-  funds_custodian: string | null;
-  default_recovery_type: string | null;
-  notes: string | null;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard;
-  const sb = await createClient();
-  const { error } = await sb
-    .from("state_rules")
-    .update({
-      state_name: input.state_name,
-      redemption_period_months: input.redemption_period_months,
-      filing_window_years: input.filing_window_years,
-      funds_custodian: input.funds_custodian,
-      default_recovery_type: input.default_recovery_type,
-      notes: input.notes,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("state", input.state);
-  if (error) return { ok: false, error: error.message };
-  revalidatePath("/settings");
-  revalidatePath("/leads");
-  return { ok: true };
-}
-
 // -- Lost reasons admin ------------------------------------------------------
 
 export async function setLostReasonArchived(
@@ -209,21 +177,39 @@ export async function deleteLostReason(
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
   const sb = await createClient();
-  // Only allow deleting non-defaults; default reasons should be archived not removed.
-  const { data: existing } = await sb
+  // Look up the reason first so we can report its name and check usage. Leads
+  // store the lost reason as plain text (leads.lost_reason), so we match on the
+  // label rather than a foreign key.
+  const { data: existing, error: lookupError } = await sb
     .from("lost_reasons")
-    .select("is_default")
+    .select("label, is_default")
     .eq("id", id)
     .single();
-  if (existing?.is_default) {
+  if (lookupError || !existing) {
+    return { ok: false, error: lookupError?.message ?? "Reason not found" };
+  }
+  if (existing.is_default) {
     return {
       ok: false,
       error: "Default reasons can only be archived, not deleted.",
     };
   }
+  const { count, error: countError } = await sb
+    .from("leads")
+    .select("id", { count: "exact", head: true })
+    .eq("lost_reason", existing.label as string);
+  if (countError) return { ok: false, error: countError.message };
+  const used = count ?? 0;
+  if (used > 0) {
+    return {
+      ok: false,
+      error: `This reason is used by ${used} leads. Reassign those leads before deleting.`,
+    };
+  }
   const { error } = await sb.from("lost_reasons").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
+  revalidatePath("/leads");
   return { ok: true };
 }
 

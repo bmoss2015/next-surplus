@@ -2,13 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
-import { addLostReason, setLostReasonArchived } from "../_actions";
+import { addLostReason, deleteLostReason } from "../_actions";
 import type { LostReasonAdminRow } from "@/lib/settings/fetch";
 
-// Fix 61 — no "Show Archived" control, no archive toggle. An "Add Reason"
-// button reveals an inline text input. Non-default reasons get a "Remove"
-// button (soft-delete via setLostReasonArchived under the hood). Default
-// reasons stay non-removable.
+// Fix 98 — each non-default lost reason gets a trash icon. Deleting asks for
+// confirmation and is blocked when leads still reference the reason (leads
+// store the reason as plain text, so the server matches on the label).
 
 export function LostReasonsSection({
   initial,
@@ -43,9 +42,19 @@ export function LostReasonsSection({
   }
 
   function remove(row: LostReasonAdminRow) {
-    setRows((prev) => prev.filter((r) => r.id !== row.id));
+    if (
+      !window.confirm(`Delete the lost reason "${row.label}"? This cannot be undone.`)
+    ) {
+      return;
+    }
+    setError(null);
     startTransition(async () => {
-      await setLostReasonArchived(row.id, true);
+      const res = await deleteLostReason(row.id);
+      if (res.ok) {
+        setRows((prev) => prev.filter((r) => r.id !== row.id));
+      } else {
+        setError(res.error);
+      }
     });
   }
 
@@ -133,12 +142,11 @@ export function LostReasonsSection({
               <button
                 type="button"
                 onClick={() => remove(row)}
-                className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-danger"
-                title="Remove"
-                aria-label="Remove"
+                className="cursor-pointer text-gray-400 hover:text-danger"
+                title="Delete"
+                aria-label="Delete"
               >
                 <IconTrash size={14} stroke={1.75} />
-                Remove
               </button>
             )}
           </div>
