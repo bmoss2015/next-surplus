@@ -8,6 +8,7 @@ import {
   IconExternalLink,
   IconPlus,
   IconPencil,
+  IconX,
 } from "@tabler/icons-react";
 import {
   toggleTaskCompleted,
@@ -16,7 +17,6 @@ import {
   bulkDeleteTasks,
 } from "../_actions";
 import type { TaskRow } from "@/lib/tasks/fetch";
-import type { LeadOption } from "@/lib/leads/lead-options";
 import { AddTaskDrawer } from "./AddTaskDrawer";
 import { EditTaskDrawer } from "./EditTaskDrawer";
 import { useRole } from "@/components/RoleProvider";
@@ -125,17 +125,23 @@ function fmtDue(date: string | null, time: string | null): string {
 
 export function TasksList({
   initialTasks,
+  overdueOnly = false,
 }: {
   initialTasks: TaskRow[];
+  overdueOnly?: boolean;
 }) {
   const { isAdmin } = useRole();
   const [tasks, setTasks] = useState(initialTasks);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<TaskRow | null>(null);
+  const [showOverdueOnly, setShowOverdueOnly] = useState(overdueOnly);
   const [, startTransition] = useTransition();
 
-  const sections = buildSections(tasks);
+  const allSections = buildSections(tasks);
+  const sections = showOverdueOnly
+    ? allSections.filter((s) => s.key === "overdue")
+    : allSections;
   const completedCount = tasks.filter((t) => t.completed).length;
   const completed = tasks.filter((t) => t.completed).slice(0, 20); // cap completed list
 
@@ -226,6 +232,22 @@ export function TasksList({
         </button>
       </div>
 
+      {showOverdueOnly && (
+        <div className="mb-3 flex items-center justify-between rounded-md border-l-4 border-l-[#f59e0b] border border-[#f59e0b] bg-[#fff8ed] px-3 py-2 text-[#92400e]">
+          <div className="text-[12px] font-medium">
+            Showing Overdue Tasks Only
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowOverdueOnly(false)}
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#f59e0b] bg-surface px-2 py-[3px] text-[11px] text-[#92400e] hover:bg-[#fff8ed]"
+          >
+            <IconX size={11} stroke={2} />
+            Show All Tasks
+          </button>
+        </div>
+      )}
+
       {selected.size > 0 && (
         <div className="mb-3 flex items-center justify-between rounded-md border border-petrol-200 bg-petrol-50 px-3 py-2">
           <div className="text-[12px] text-petrol-700">
@@ -262,7 +284,14 @@ export function TasksList({
       <div className="space-y-5">
         {sections.map((section) => (
           <div key={section.key}>
-            <div className="mb-2 flex items-baseline justify-between">
+            <div
+              className={cn(
+                "mb-2 flex items-baseline justify-between rounded-md",
+                section.warn
+                  ? "border-l-4 border-l-[#f59e0b] bg-[#fff8ed] px-3 py-2"
+                  : ""
+              )}
+            >
               <h2
                 className={cn(
                   "m-0 text-[13px] font-medium",
@@ -284,7 +313,7 @@ export function TasksList({
               className={cn(
                 "overflow-hidden rounded-lg border bg-surface shadow-card",
                 section.warn
-                  ? "border-[#f59e0b] border-l-[3px] border-l-[#f59e0b]"
+                  ? "border-[#f59e0b] border-l-4 border-l-[#f59e0b]"
                   : "border-gray-200"
               )}
             >
@@ -317,7 +346,7 @@ export function TasksList({
           </div>
         ))}
 
-        {completed.length > 0 && (
+        {!showOverdueOnly && completed.length > 0 && (
           <div>
             <div className="mb-2 flex items-baseline justify-between">
               <h2 className="m-0 text-[13px] font-medium text-gray-500">
@@ -389,7 +418,7 @@ function TaskRowDisplay({
       }}
       className={cn(
         "group flex cursor-pointer items-center gap-3 border-b border-gray-150 px-4 py-3 last:border-b-0",
-        selected && (warn ? "bg-warn-bg" : "bg-petrol-50")
+        selected && (warn ? "bg-[#fff8ed]" : "bg-petrol-50")
       )}
     >
       <button
@@ -427,11 +456,11 @@ function TaskRowDisplay({
             {task.description}
           </div>
         )}
-        {(task.lead || task.notes || task.due_date) && (
+        {(task.lead || task.due_date) && (
           <div
             className={cn(
               "mt-[2px] text-[11px]",
-              warn && !task.completed ? "text-warn-strong" : "text-gray-500"
+              warn && !task.completed ? "text-[#92400e]" : "text-gray-500"
             )}
           >
             {task.due_date && (
@@ -447,7 +476,6 @@ function TaskRowDisplay({
                 {task.lead.lead_id}
               </Link>
             )}
-            {task.notes && <span> · {task.notes}</span>}
           </div>
         )}
       </div>
