@@ -38,21 +38,21 @@ export default async function DashboardPage() {
           context="Estimated Surplus, Active Leads"
           trend={
             data.newThisWeekCount > 0
-              ? { kind: "success", text: `+${data.newThisWeekCount} leads this week` }
-              : { kind: "muted", text: "No new leads this week" }
+              ? { kind: "success", text: `+${data.newThisWeekCount} New This Week` }
+              : { kind: "muted", text: "No New Leads This Week" }
           }
         />
         <Metric
           label="Active Claims"
           value={String(data.activeClaimsCount)}
-          context={`${formatCurrency(data.activeClaimsAmount)} filed at counties`}
-          trend={{ kind: "muted", text: "All on track" }}
+          context={`${formatCurrency(data.activeClaimsAmount)} Filed At Counties`}
+          trend={{ kind: "muted", text: "All On Track" }}
           divider
         />
         <Metric
           label="Active Conversations"
           value={String(data.activeConversationsCount)}
-          context="Leads in conversation"
+          context="Leads In Conversation"
           trend={{ kind: "info", text: "Live" }}
           divider
         />
@@ -117,7 +117,7 @@ export default async function DashboardPage() {
                   Leads Needing Action
                 </h2>
                 <div className="mt-[1px] text-[11px] text-gray-500">
-                  Sorted by surplus value
+                  Sorted By Surplus Value
                 </div>
               </div>
               <Link
@@ -193,8 +193,8 @@ export default async function DashboardPage() {
                     />
                   </div>
                   <div className="mt-1 text-[11px] text-gray-500">
-                    {formatCurrency(m.pipeline)} pipeline · {m.inConversation} in
-                    conversation
+                    {formatCurrency(m.pipeline)} Pipeline · {m.inConversation} In
+                    Conversation
                   </div>
                 </div>
               ))
