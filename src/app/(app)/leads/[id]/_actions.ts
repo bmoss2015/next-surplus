@@ -449,6 +449,10 @@ export async function upsertRelative(
     phone?: string | null;
     email?: string | null;
     notes?: string | null;
+    street?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
   }
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const sb = await createClient();
@@ -472,6 +476,10 @@ export async function upsertRelative(
       phone: patch.phone ?? null,
       email: patch.email ?? null,
       notes: patch.notes ?? null,
+      street: patch.street ?? null,
+      city: patch.city ?? null,
+      state: patch.state ?? null,
+      zip: patch.zip ?? null,
     })
     .select("id")
     .single();

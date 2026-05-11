@@ -6,6 +6,7 @@ import { upsertRelative, deleteRelative } from "../_actions";
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
 import { formatPhone } from "./ContactsTabClient";
+import { cn } from "@/lib/cn";
 
 const RELATIONSHIP_OPTIONS = [
   "Spouse",
@@ -20,6 +21,15 @@ const RELATIONSHIP_OPTIONS = [
 ] as const;
 
 const PHONE_SEP = " | ";
+
+type RelativePatch = {
+  relationship?: string | null;
+  phone?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+};
 
 function splitPhones(value: string | null): string[] {
   if (!value) return [];
@@ -73,6 +83,10 @@ export function RelativesSection({
             phone,
             email: null,
             notes: null,
+            street: null,
+            city: null,
+            state: null,
+            zip: null,
           },
         ]);
         setDraftName("");
@@ -85,10 +99,7 @@ export function RelativesSection({
     });
   }
 
-  function patch(
-    id: string,
-    fields: { relationship?: string | null; phone?: string | null }
-  ) {
+  function patch(id: string, fields: RelativePatch) {
     setRelatives((prev) =>
       prev.map((r) => (r.id === id ? { ...r, ...fields } : r))
     );
@@ -211,19 +222,26 @@ function RelativeCard({
 }: {
   relative: RelativeRow;
   canRemove: boolean;
-  onPatch: (fields: { relationship?: string | null; phone?: string | null }) => void;
+  onPatch: (fields: RelativePatch) => void;
   onRemove: () => void;
 }) {
   const [phones, setPhones] = useState<string[]>(() => {
     const list = splitPhones(relative.phone);
     return list.length > 0 ? list : [""];
   });
+  const [street, setStreet] = useState(relative.street ?? "");
+  const [city, setCity] = useState(relative.city ?? "");
+  const [stateCode, setStateCode] = useState(relative.state ?? "");
+  const [zip, setZip] = useState(relative.zip ?? "");
 
   function commitPhones(next: string[]) {
     setPhones(next);
     const joined = next.map((p) => p.trim()).filter(Boolean).join(PHONE_SEP);
     onPatch({ phone: joined || null });
   }
+
+  const addrInputClass =
+    "w-full rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3">
@@ -282,6 +300,43 @@ function RelativeCard({
           <IconPlus size={11} stroke={2} />
           Add Phone {phones.length + 1}
         </button>
+      </div>
+
+      <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
+        <div className="text-[10px] font-medium uppercase tracking-[0.4px] text-gray-400">
+          Address
+        </div>
+        <input
+          value={street}
+          onChange={(e) => setStreet(e.target.value)}
+          onBlur={() => onPatch({ street: street.trim() || null })}
+          placeholder="Street"
+          className={addrInputClass}
+        />
+        <input
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          onBlur={() => onPatch({ city: city.trim() || null })}
+          placeholder="City"
+          className={addrInputClass}
+        />
+        <div className="flex gap-1">
+          <input
+            value={stateCode}
+            onChange={(e) => setStateCode(e.target.value.toUpperCase().slice(0, 2))}
+            onBlur={() => onPatch({ state: stateCode.trim() || null })}
+            placeholder="ST"
+            maxLength={2}
+            className={cn(addrInputClass, "w-12 shrink-0 uppercase")}
+          />
+          <input
+            value={zip}
+            onChange={(e) => setZip(e.target.value)}
+            onBlur={() => onPatch({ zip: zip.trim() || null })}
+            placeholder="Zip"
+            className={cn(addrInputClass, "min-w-0 flex-1")}
+          />
+        </div>
       </div>
 
       {canRemove && (

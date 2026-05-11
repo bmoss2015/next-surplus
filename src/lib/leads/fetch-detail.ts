@@ -190,13 +190,19 @@ export type RelativeRow = {
   phone: string | null;
   email: string | null;
   notes: string | null;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
 };
 
 export async function fetchRelatives(leadId: string): Promise<RelativeRow[]> {
   const sb = await createClient();
   const { data, error } = await sb
     .from("relatives")
-    .select("id, lead_id, full_name, relationship, phone, email, notes")
+    .select(
+      "id, lead_id, full_name, relationship, phone, email, notes, street, city, state, zip"
+    )
     .eq("lead_id", leadId)
     .order("created_at", { ascending: true });
   if (error) throw error;
