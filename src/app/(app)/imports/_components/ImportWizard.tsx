@@ -934,6 +934,7 @@ export function ImportWizard() {
         sale_type: useMapping["sale_type"] ? parseSaleType(get(raw, "sale_type")) : "unknown",
         sale_date: get(raw, "sale_date") || null,
         case_number: get(raw, "case_number") || null,
+        parcel_number: get(raw, "parcel_number") || null,
         closing_bid: parseMoney(get(raw, "closing_bid")),
         opening_bid: parseMoney(get(raw, "opening_bid")),
         confirmed_surplus: parseMoney(get(raw, "surplus_amount")),

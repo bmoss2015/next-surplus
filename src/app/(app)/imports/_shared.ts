@@ -91,6 +91,7 @@ export type PortalFieldKey =
   | "owner_mailing_zip"
   | "owner_age"
   | "owner_deceased_flag"
+  | "parcel_number"
   | "lead_source";
 
 // Relative fields (Relative 1..5) use generated string keys, e.g.
@@ -267,7 +268,26 @@ export const PORTAL_FIELDS: PortalField[] = [
     key: "sale_type",
     label: "Sale Type",
     required: false,
-    aliases: ["saletype", "type", "saletypecode", "auctiontype", "category"],
+    aliases: [
+      "saletype",
+      "type",
+      "saletypecode",
+      "auctiontype",
+      "category",
+      "typeofforeclosure",
+      "foreclosuretype",
+      "deedtype",
+      "taxdeed",
+      "mortgage",
+      "mtg",
+      "tax",
+    ],
+  },
+  {
+    key: "parcel_number",
+    label: "Parcel Number",
+    required: false,
+    aliases: ["parcelnumber", "parcelno", "apn", "taxid", "parcelid", "parcel"],
   },
   {
     key: "case_number",
@@ -629,6 +649,7 @@ export type IncomingLead = {
   sale_type: ImportSaleType;
   sale_date: string | null;
   case_number: string | null;
+  parcel_number: string | null;
   closing_bid: number | null;
   opening_bid: number | null;
   confirmed_surplus: number | null;
