@@ -69,6 +69,10 @@ export type PortalFieldKey =
   | "email_2"
   | "mailing_address_1"
   | "mailing_address_2"
+  | "owner_mailing_street"
+  | "owner_mailing_city"
+  | "owner_mailing_state"
+  | "owner_mailing_zip"
   | "lead_source";
 
 export type PortalField = {
@@ -89,7 +93,7 @@ export function normalizeHeader(header: string): string {
 export const PORTAL_FIELDS: PortalField[] = [
   {
     key: "address",
-    label: "Address",
+    label: "Property Street Address",
     required: true,
     aliases: [
       "address",
@@ -98,25 +102,26 @@ export const PORTAL_FIELDS: PortalField[] = [
       "streetaddress",
       "propertyaddress",
       "propertystreet",
+      "propertystreetaddress",
       "situsaddress",
       "siteaddress",
     ],
   },
   {
     key: "city",
-    label: "City",
+    label: "Property City",
     required: true,
     aliases: ["city", "propertycity", "situscity", "town"],
   },
   {
     key: "state",
-    label: "State",
+    label: "Property State",
     required: true,
     aliases: ["state", "st", "propertystate", "situsstate"],
   },
   {
     key: "zip",
-    label: "Zip",
+    label: "Property Zip",
     required: true,
     aliases: [
       "zip",
@@ -262,6 +267,42 @@ export const PORTAL_FIELDS: PortalField[] = [
       "altmailingaddress",
       "alternatemailingaddress",
       "mailingaddressb",
+    ],
+  },
+  {
+    key: "owner_mailing_street",
+    label: "Owner Mailing Street",
+    required: false,
+    aliases: [
+      "mailingstreet",
+      "mailingstreetaddress",
+      "ownermailingstreet",
+      "mailingaddressline1",
+      "mailingline1",
+    ],
+  },
+  {
+    key: "owner_mailing_city",
+    label: "Owner Mailing City",
+    required: false,
+    aliases: ["mailingcity", "ownermailingcity", "mailcity"],
+  },
+  {
+    key: "owner_mailing_state",
+    label: "Owner Mailing State",
+    required: false,
+    aliases: ["mailingstate", "ownermailingstate", "mailstate"],
+  },
+  {
+    key: "owner_mailing_zip",
+    label: "Owner Mailing Zip",
+    required: false,
+    aliases: [
+      "mailingzip",
+      "mailingzipcode",
+      "ownermailingzip",
+      "mailingpostalcode",
+      "mailzip",
     ],
   },
   {

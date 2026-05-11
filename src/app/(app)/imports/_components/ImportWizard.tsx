@@ -664,6 +664,24 @@ export function ImportWizard() {
       const mailingAddresses = [get(raw, "mailing_address_1"), get(raw, "mailing_address_2")]
         .map((m) => m.trim())
         .filter(Boolean);
+      // Owner mailing address mapped as separate street/city/state/zip columns
+      // (Fix C) — compose into a single address line and treat it like any other
+      // mapped mailing address (becomes a contacts row, channel = mailing_address).
+      const ownerMailingStreet = get(raw, "owner_mailing_street");
+      const ownerMailingCity = get(raw, "owner_mailing_city");
+      const ownerMailingState = get(raw, "owner_mailing_state").toUpperCase();
+      const ownerMailingZip = get(raw, "owner_mailing_zip");
+      const ownerMailingTail = [
+        ownerMailingCity,
+        [ownerMailingState, ownerMailingZip].filter(Boolean).join(" "),
+      ]
+        .filter(Boolean)
+        .join(", ");
+      const ownerMailing = [ownerMailingStreet, ownerMailingTail]
+        .filter(Boolean)
+        .join(", ")
+        .trim();
+      if (ownerMailing) mailingAddresses.push(ownerMailing);
 
       rows.push({
         address: formatAddress(address),
