@@ -28,7 +28,12 @@ import {
   OTHER_SOURCE_OPTION,
   DEFAULT_DUPLICATE_RESOLUTION,
   duplicateResolutionLabel,
+  relativeFieldKey,
+  RELATIVE_COUNT,
+  RELATIVE_PHONE_COUNT,
+  RELATIVE_EMAIL_COUNT,
   type IncomingLead,
+  type ImportRelative,
   type ImportSaleType,
   type ImportHistoryRow,
   type DuplicateResolution,
@@ -73,6 +78,17 @@ function splitFullName(name: string): string {
 }
 function combineName(first: string, last: string): string {
   return [first.trim(), last.trim()].filter(Boolean).join(" ");
+}
+function parseAge(raw: string): number | null {
+  if (!raw) return null;
+  const n = parseInt(raw.replace(/[^\d]/g, ""), 10);
+  return Number.isFinite(n) && n > 0 && n < 130 ? n : null;
+}
+function isYes(raw: string): boolean {
+  const v = raw.trim().toLowerCase();
+  return (
+    v === "y" || v === "yes" || v === "true" || v === "t" || v === "1" || v === "x"
+  );
 }
 
 function sameMapping(a: Record<string, string>, b: Record<string, string>): boolean {
@@ -410,6 +426,8 @@ export function ImportWizard() {
   // mapping: portalFieldKey -> csvHeader
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [dismissed, setDismissed] = useState<string[]>([]);
+  // Fix E: paginate the unrecognized-columns review at 10 per page.
+  const [unrecPage, setUnrecPage] = useState(1);
   const [savedMapping, setSavedMapping] = useState<
     { mapping: Record<string, string>; dismissedColumns: string[] } | null
   >(null);
@@ -585,6 +603,7 @@ export function ImportWizard() {
     const recognized = mappedHeaders(mapping);
     const unrec = headers.filter((h) => !recognized.has(h) && !dismissed.includes(h));
     if (unrec.length > 0) {
+      setUnrecPage(1);
       setStep("unrecognized");
       return;
     }
@@ -655,10 +674,22 @@ export function ImportWizard() {
         ? splitFullName(ownerFull)
         : combineName(ownerFirst, ownerLast);
 
-      const phones = [get(raw, "phone_1"), get(raw, "phone_2"), get(raw, "phone_3")]
+      const phones = [
+        get(raw, "phone_1"),
+        get(raw, "phone_2"),
+        get(raw, "phone_3"),
+        get(raw, "phone_4"),
+        get(raw, "phone_5"),
+      ]
         .map((p) => p.trim())
         .filter(Boolean);
-      const emails = [get(raw, "email"), get(raw, "email_2")]
+      const emails = [
+        get(raw, "email"),
+        get(raw, "email_2"),
+        get(raw, "email_3"),
+        get(raw, "email_4"),
+        get(raw, "email_5"),
+      ]
         .map((e) => e.trim())
         .filter(Boolean);
       const mailingAddresses = [get(raw, "mailing_address_1"), get(raw, "mailing_address_2")]
@@ -683,6 +714,36 @@ export function ImportWizard() {
         .trim();
       if (ownerMailing) mailingAddresses.push(ownerMailing);
 
+      // Relatives 1..RELATIVE_COUNT (Excess Elite "RELATIVE N: ..." columns).
+      const relatives: ImportRelative[] = [];
+      for (let rn = 1; rn <= RELATIVE_COUNT; rn++) {
+        const rk = (s: string) => relativeFieldKey(rn, s);
+        const rName = combineName(get(raw, rk("first_name")), get(raw, rk("last_name"))) || null;
+        const rRelationship = get(raw, rk("possible_type")) || null;
+        const rAge = parseAge(get(raw, rk("age")));
+        const rPhones: string[] = [];
+        for (let pm = 1; pm <= RELATIVE_PHONE_COUNT; pm++) {
+          const pv = get(raw, rk(`phone_${pm}`)).trim();
+          if (!pv) continue;
+          const dnc = isYes(get(raw, rk(`phone_${pm}_dnc`)));
+          rPhones.push(dnc ? `${pv} (DNC)` : pv);
+        }
+        const rEmails: string[] = [];
+        for (let em = 1; em <= RELATIVE_EMAIL_COUNT; em++) {
+          const ev = get(raw, rk(`email_${em}`)).trim();
+          if (ev) rEmails.push(ev);
+        }
+        if (rName || rPhones.length > 0 || rEmails.length > 0) {
+          relatives.push({
+            full_name: rName,
+            relationship: rRelationship,
+            age: rAge,
+            phones: rPhones,
+            emails: rEmails,
+          });
+        }
+      }
+
       rows.push({
         address: formatAddress(address),
         city: formatCity(city),
@@ -697,9 +758,12 @@ export function ImportWizard() {
         confirmed_surplus: parseMoney(get(raw, "surplus_amount")),
         lead_source: get(raw, "lead_source") || null,
         owner_full_name: ownerName || null,
+        owner_age: parseAge(get(raw, "owner_age")),
+        owner_deceased: isYes(get(raw, "owner_deceased_flag")),
         phones,
         emails,
         mailing_addresses: mailingAddresses,
+        relatives,
       });
     }
 
@@ -896,6 +960,35 @@ export function ImportWizard() {
           Are Marked With An Asterisk.
         </div>
 
+        {/* Fix E: sticky top action bar — always reachable on long lists. */}
+        <div className="sticky top-0 z-20 -mx-5 mt-3 border-b border-gray-150 bg-surface px-5 pb-3 pt-3">
+          <div className="mx-auto flex max-w-[900px] items-center justify-between gap-2">
+            <span className="text-[11.5px] text-gray-500">
+              {recognizedCols.length} Recognized · {unrecognizedCols.length} To Review
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={resetAll}
+                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-xs text-ink hover:border-petrol-500"
+              >
+                Start Over
+              </button>
+              <button
+                type="button"
+                onClick={continueFromMap}
+                disabled={pending}
+                className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              >
+                {unrecognizedCols.length > 0
+                  ? "Review Unrecognized Columns"
+                  : "Continue To Preview"}
+                <IconArrowRight size={13} stroke={2} />
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-4">
           {recognizedCols.length > 0 ? (
             <MappingTable
@@ -952,40 +1045,116 @@ export function ImportWizard() {
 
   // ===================== PAGE 2: UNRECOGNIZED COLUMNS =====================
   if (step === "unrecognized") {
+    const UNREC_PAGE_SIZE = 10;
+    const unrecPageCount = Math.max(
+      1,
+      Math.ceil(unrecognizedCols.length / UNREC_PAGE_SIZE)
+    );
+    const unrecCurrentPage = Math.min(Math.max(1, unrecPage), unrecPageCount);
+    const unrecPageCols = unrecognizedCols.slice(
+      (unrecCurrentPage - 1) * UNREC_PAGE_SIZE,
+      unrecCurrentPage * UNREC_PAGE_SIZE
+    );
+    const allReviewed = unrecognizedCols.length === 0;
+    const dismissAllRemaining = () =>
+      setDismissed((prev) => Array.from(new Set([...prev, ...unrecognizedCols])));
+    const continueToPreview = () => {
+      if (unrecognizedCols.length > 0) {
+        setError("Map Or Dismiss The Remaining Columns First.");
+        return;
+      }
+      afterMappingComplete();
+    };
+
     return (
       <Shell step={step}>
         <h2 className="m-0 text-[14px] font-medium text-ink">Review Unrecognized Columns</h2>
         <div className="mt-[2px] text-[11.5px] text-gray-500">
-          {file?.name} · {unrecognizedCols.length}{" "}
-          {unrecognizedCols.length === 1 ? "Column" : "Columns"} Left To Review · Lead Source:{" "}
-          {leadSource}
+          {file?.name} · Lead Source: {leadSource}
         </div>
-        <div className="mt-1 text-[11.5px] text-gray-500">
-          For Each Column, Search For The Portal Field It Maps To Or Dismiss It. Dismissed
-          Columns Are Remembered For This Lead Source.
+
+        {/* Fix E: sticky top bar — progress, Dismiss All, Back, Continue. */}
+        <div className="sticky top-0 z-20 -mx-5 mt-3 border-b border-gray-150 bg-surface px-5 pb-3 pt-3">
+          <div className="mx-auto flex max-w-[900px] flex-wrap items-center justify-between gap-2">
+            <span className="text-[11.5px] font-medium text-gray-600">
+              Page {unrecCurrentPage} Of {unrecPageCount} — {unrecognizedCols.length}{" "}
+              {unrecognizedCols.length === 1 ? "Column" : "Columns"} Remaining
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={dismissAllRemaining}
+                disabled={allReviewed}
+                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-xs text-ink hover:border-petrol-500 disabled:opacity-50"
+              >
+                Dismiss All Remaining
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep("map")}
+                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-xs text-ink hover:border-petrol-500"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={continueToPreview}
+                disabled={pending}
+                className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              >
+                Continue To Preview
+                <IconArrowRight size={13} stroke={2} />
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="mt-4">
-          {unrecognizedCols.length === 0 ? (
-            <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-[12px] text-gray-500">
-              All Columns Reviewed.
+          {allReviewed ? (
+            <div className="mx-auto max-w-[900px] rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-[12px] text-gray-500">
+              All Columns Reviewed. You Can Continue To Preview.
             </div>
           ) : (
-            <MappingTable
-              columns={unrecognizedCols}
-              rawSampleRow={sampleRow}
-              mapping={mapping}
-              onMapColumn={mapColumn}
-              allowDismiss
-              missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
-                (k) => !mapping[k]
+            <>
+              <MappingTable
+                columns={unrecPageCols}
+                rawSampleRow={sampleRow}
+                mapping={mapping}
+                onMapColumn={mapColumn}
+                allowDismiss
+                missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
+                  (k) => !mapping[k]
+                )}
+              />
+              {unrecPageCount > 1 && (
+                <div className="mx-auto mt-3 flex max-w-[900px] items-center justify-center gap-3 text-xs text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => setUnrecPage((p) => Math.max(1, p - 1))}
+                    disabled={unrecCurrentPage <= 1}
+                    className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-1 hover:border-petrol-500 disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <span>
+                    Page {unrecCurrentPage} Of {unrecPageCount}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setUnrecPage((p) => Math.min(unrecPageCount, p + 1))}
+                    disabled={unrecCurrentPage >= unrecPageCount}
+                    className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-1 hover:border-petrol-500 disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
               )}
-            />
+            </>
           )}
         </div>
 
         {dismissed.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
+          <div className="mx-auto mt-3 flex max-w-[900px] flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
             <span>Dismissed:</span>
             {dismissed.map((h) => (
               <span
@@ -1007,16 +1176,16 @@ export function ImportWizard() {
         )}
 
         {error && (
-          <div className="mt-3 rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
+          <div className="mx-auto mt-3 max-w-[900px] rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
             {error}
           </div>
         )}
 
-        <div className="mt-4 flex justify-between gap-2">
+        <div className="mx-auto mt-4 flex max-w-[900px] flex-wrap justify-between gap-2">
           <button
             type="button"
-            onClick={() => setDismissed((prev) => Array.from(new Set([...prev, ...unrecognizedCols])))}
-            disabled={unrecognizedCols.length === 0}
+            onClick={dismissAllRemaining}
+            disabled={allReviewed}
             className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-2 text-xs text-ink hover:border-petrol-500 disabled:opacity-50"
           >
             Dismiss All Remaining
@@ -1031,13 +1200,7 @@ export function ImportWizard() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (unrecognizedCols.length > 0) {
-                  setError("Map Or Dismiss The Remaining Columns First.");
-                  return;
-                }
-                afterMappingComplete();
-              }}
+              onClick={continueToPreview}
               disabled={pending}
               className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-2 text-xs font-medium disabled:opacity-50"
             >

@@ -66,23 +66,36 @@ export type PortalFieldKey =
   | "phone_1"
   | "phone_2"
   | "phone_3"
+  | "phone_4"
+  | "phone_5"
   | "email"
   | "email_2"
+  | "email_3"
+  | "email_4"
+  | "email_5"
   | "mailing_address_1"
   | "mailing_address_2"
   | "owner_mailing_street"
   | "owner_mailing_city"
   | "owner_mailing_state"
   | "owner_mailing_zip"
+  | "owner_age"
+  | "owner_deceased_flag"
   | "lead_source";
 
+// Relative fields (Relative 1..5) use generated string keys, e.g.
+// "relative_1_first_name", "relative_2_phone_3_dnc" — see RELATIVE_COUNT below.
 export type PortalField = {
-  key: PortalFieldKey;
+  key: string;
   label: string;
   required: boolean;
   // Header aliases (already normalized — see normalizeHeader) used for auto-map.
   aliases: string[];
 };
+
+export const RELATIVE_COUNT = 5;
+export const RELATIVE_PHONE_COUNT = 5;
+export const RELATIVE_EMAIL_COUNT = 5;
 
 // Normalize a header for matching: lowercase, strip everything that isn't a
 // letter or digit. "Property Address" / "property_address" / "PROPERTYADDRESS"
@@ -166,6 +179,18 @@ export const PORTAL_FIELDS: PortalField[] = [
       "ownerofrecord",
       "defendant",
     ],
+  },
+  {
+    key: "owner_age",
+    label: "Owner Age",
+    required: false,
+    aliases: ["age", "ownerage", "primaryownerage"],
+  },
+  {
+    key: "owner_deceased_flag",
+    label: "Owner Deceased Flag",
+    required: false,
+    aliases: ["deceased", "deceasedflag", "isdeceased", "ownerdeceased", "deceasedindicator"],
   },
   {
     key: "closing_bid",
@@ -256,6 +281,18 @@ export const PORTAL_FIELDS: PortalField[] = [
     aliases: ["phone3", "phonethree", "thirdphone", "otherphone"],
   },
   {
+    key: "phone_4",
+    label: "Phone 4",
+    required: false,
+    aliases: ["phone4", "phonefour", "fourthphone", "ownerphone4"],
+  },
+  {
+    key: "phone_5",
+    label: "Phone 5",
+    required: false,
+    aliases: ["phone5", "phonefive", "fifthphone", "ownerphone5"],
+  },
+  {
     key: "email",
     label: "Email",
     required: false,
@@ -266,6 +303,24 @@ export const PORTAL_FIELDS: PortalField[] = [
     label: "Email 2",
     required: false,
     aliases: ["email2", "secondaryemail", "altemail", "alternateemail", "owneremail2"],
+  },
+  {
+    key: "email_3",
+    label: "Email 3",
+    required: false,
+    aliases: ["email3", "thirdemail", "owneremail3"],
+  },
+  {
+    key: "email_4",
+    label: "Email 4",
+    required: false,
+    aliases: ["email4", "fourthemail", "owneremail4"],
+  },
+  {
+    key: "email_5",
+    label: "Email 5",
+    required: false,
+    aliases: ["email5", "fifthemail", "owneremail5"],
   },
   {
     key: "mailing_address_1",
@@ -337,11 +392,78 @@ export const PORTAL_FIELDS: PortalField[] = [
   },
 ];
 
-export const PORTAL_FIELD_KEYS: PortalFieldKey[] = PORTAL_FIELDS.map(
-  (f) => f.key
-);
+// --- Relative 1..5 mappable fields (Excess Elite "RELATIVE N: ..." columns) --
+// Header normalization strips ":" and spaces, so "RELATIVE 1: Phone 1: Type"
+// and "RELATIVE 1 Phone 1 Type" both collapse to "relative1phone1type".
+export function relativeFieldKey(n: number, suffix: string): string {
+  return `relative_${n}_${suffix}`;
+}
 
-export const REQUIRED_PORTAL_FIELD_KEYS: PortalFieldKey[] = PORTAL_FIELDS.filter(
+for (let n = 1; n <= RELATIVE_COUNT; n++) {
+  PORTAL_FIELDS.push(
+    {
+      key: relativeFieldKey(n, "first_name"),
+      label: `Relative ${n} First Name`,
+      required: false,
+      aliases: [`relative${n}firstname`, `rel${n}firstname`],
+    },
+    {
+      key: relativeFieldKey(n, "last_name"),
+      label: `Relative ${n} Last Name`,
+      required: false,
+      aliases: [`relative${n}lastname`, `rel${n}lastname`],
+    },
+    {
+      key: relativeFieldKey(n, "possible_type"),
+      label: `Relative ${n} Possible Type`,
+      required: false,
+      aliases: [
+        `relative${n}possibletype`,
+        `relative${n}type`,
+        `relative${n}relationship`,
+        `rel${n}type`,
+      ],
+    },
+    {
+      key: relativeFieldKey(n, "age"),
+      label: `Relative ${n} Age`,
+      required: false,
+      aliases: [`relative${n}age`, `rel${n}age`],
+    }
+  );
+  for (let m = 1; m <= RELATIVE_PHONE_COUNT; m++) {
+    PORTAL_FIELDS.push(
+      {
+        key: relativeFieldKey(n, `phone_${m}`),
+        label: `Relative ${n} Phone ${m}`,
+        required: false,
+        aliases: [`relative${n}phone${m}`, `rel${n}phone${m}`],
+      },
+      {
+        key: relativeFieldKey(n, `phone_${m}_dnc`),
+        label: `Relative ${n} Phone ${m} DNC/Litigator`,
+        required: false,
+        aliases: [
+          `relative${n}phone${m}dnclitigator`,
+          `relative${n}phone${m}dnc`,
+          `relative${n}phone${m}litigator`,
+        ],
+      }
+    );
+  }
+  for (let m = 1; m <= RELATIVE_EMAIL_COUNT; m++) {
+    PORTAL_FIELDS.push({
+      key: relativeFieldKey(n, `email_${m}`),
+      label: `Relative ${n} Email ${m}`,
+      required: false,
+      aliases: [`relative${n}email${m}`, `rel${n}email${m}`],
+    });
+  }
+}
+
+export const PORTAL_FIELD_KEYS: string[] = PORTAL_FIELDS.map((f) => f.key);
+
+export const REQUIRED_PORTAL_FIELD_KEYS: string[] = PORTAL_FIELDS.filter(
   (f) => f.required
 ).map((f) => f.key);
 
@@ -376,6 +498,17 @@ export function autoMapHeaders(headers: string[]): Record<string, string> {
 // Transport types between client wizard and server actions.
 // ---------------------------------------------------------------------------
 
+// A relative parsed off one CSV row. Phones/emails are already trimmed and
+// non-empty; a phone flagged DNC/Litigator carries a trailing " (DNC)" marker
+// (the relatives table stores phones as a single text column, not contact rows).
+export type ImportRelative = {
+  full_name: string | null;
+  relationship: string | null;
+  age: number | null;
+  phones: string[];
+  emails: string[];
+};
+
 // One parsed CSV row reduced to the portal fields the user mapped. All values
 // are post-transform (address/city already formatted, numerics parsed, etc.).
 export type IncomingLead = {
@@ -392,9 +525,12 @@ export type IncomingLead = {
   confirmed_surplus: number | null;
   lead_source: string | null; // per-row override from a mapped column; usually null
   owner_full_name: string | null;
+  owner_age: number | null;
+  owner_deceased: boolean;
   phones: string[]; // each mapped phone column, in order (only the non-empty ones)
   emails: string[]; // each mapped email column, in order (only the non-empty ones)
   mailing_addresses: string[]; // each mapped mailing-address column (non-empty only)
+  relatives: ImportRelative[]; // up to RELATIVE_COUNT, only the non-empty ones
 };
 
 export type ImportHistoryRow = {

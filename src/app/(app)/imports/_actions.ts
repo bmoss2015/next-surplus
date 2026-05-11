@@ -256,7 +256,8 @@ export async function importLeads(
         lead_id: leadId,
         full_name: ownerName || "Unknown Owner",
         is_primary: true,
-        status: "unknown",
+        status: row.owner_deceased ? "deceased" : "unknown",
+        age: row.owner_age ?? null,
       })
       .select("id")
       .single();
@@ -298,6 +299,25 @@ export async function importLeads(
     if (contactRows.length > 0) {
       await sb.from("contacts").insert(contactRows);
     }
+  }
+
+  // Helper: write the relatives parsed off a CSV row (Fix E expanded). The
+  // relatives table stores phones / emails as single text columns, so multiple
+  // mapped values are joined ("Phone 1 | Phone 2" / "a@x.com, b@y.com").
+  async function writeRelativesForLead(leadId: string, row: IncomingLead) {
+    const relatives = (row.relatives ?? []).filter(
+      (r) => r.full_name || r.phones.length > 0 || r.emails.length > 0
+    );
+    if (relatives.length === 0) return;
+    const relativeRows = relatives.map((r) => ({
+      lead_id: leadId,
+      full_name: r.full_name || "Unknown Relative",
+      relationship: r.relationship ?? null,
+      age: r.age ?? null,
+      phone: r.phones.length > 0 ? r.phones.join(" | ") : null,
+      email: r.emails.length > 0 ? r.emails.join(", ") : null,
+    }));
+    await sb.from("relatives").insert(relativeRows);
   }
 
   for (let i = 0; i < rows.length; i++) {
@@ -350,6 +370,7 @@ export async function importLeads(
         lead_id: leadRow.id,
       });
       await writeContactsForLead(leadRow.id as string, row);
+      await writeRelativesForLead(leadRow.id as string, row);
       continue;
     }
 
@@ -411,6 +432,7 @@ export async function importLeads(
     // Contacts are additive — append the row's contact rows to the existing
     // lead rather than overwriting.
     await writeContactsForLead(leadId, row);
+    await writeRelativesForLead(leadId, row);
   }
 
   if (importRowsLog.length > 0) {
