@@ -311,12 +311,14 @@ function MappingTable({
   mapping,
   onMapColumn,
   allowDismiss,
+  missingRequiredKeys = [],
 }: {
   columns: string[];
   rawSampleRow: Record<string, string> | undefined;
   mapping: Record<string, string>;
   onMapColumn: (header: string, value: string) => void;
   allowDismiss?: boolean;
+  missingRequiredKeys?: string[];
 }) {
   const takenKeys = useMemo(
     () => new Set(Object.keys(mapping).filter((k) => mapping[k])),
@@ -325,6 +327,16 @@ function MappingTable({
 
   return (
     <div className="mx-auto w-full max-w-[900px] overflow-hidden rounded-md border border-gray-200">
+      {missingRequiredKeys.length > 0 && (
+        <div className="flex items-center gap-1.5 border-b border-[#f59e0b] bg-[#fff8ed] px-3 py-2 text-[12px] text-[#92400e]">
+          <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
+          <span>
+            Still Needed:{" "}
+            {missingRequiredKeys.map((k) => portalFieldLabel(k)).join(", ")}. Map A
+            Column To Each Below.
+          </span>
+        </div>
+      )}
       <div className="grid grid-cols-[2fr_1fr_2fr] bg-gray-50 text-[11.5px] font-medium text-gray-500">
         <div className="px-3 py-2">Your CSV Column</div>
         <div className="px-3 py-2" aria-hidden />
@@ -376,6 +388,12 @@ export function ImportWizard() {
   const [step, setStep] = useState<Step>("upload");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Fix B: an error banner is useless if it scrolls off the top of a long
+  // mapping list. Whenever an error appears, bring it back into view.
+  useEffect(() => {
+    if (error) window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [error]);
 
   // ---- upload state ----
   const [file, setFile] = useState<File | null>(null);
@@ -866,6 +884,9 @@ export function ImportWizard() {
               rawSampleRow={sampleRow}
               mapping={mapping}
               onMapColumn={mapColumn}
+              missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
+                (k) => !mapping[k]
+              )}
             />
           ) : (
             <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-[12px] text-gray-500">
@@ -937,6 +958,9 @@ export function ImportWizard() {
               mapping={mapping}
               onMapColumn={mapColumn}
               allowDismiss
+              missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
+                (k) => !mapping[k]
+              )}
             />
           )}
         </div>
