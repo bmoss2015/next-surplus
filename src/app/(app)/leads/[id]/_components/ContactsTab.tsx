@@ -1,0 +1,48 @@
+import {
+  fetchOwnersWithContacts,
+  fetchRelatives,
+  fetchAttorneyOptions,
+} from "@/lib/leads/fetch-detail";
+import { createClient } from "@/lib/supabase/server";
+import { ContactsTabClient } from "./ContactsTabClient";
+import { RelativesSection } from "./RelativesSection";
+import { AttorneyAssignment } from "./AttorneyAssignment";
+
+export async function ContactsTab({ leadId }: { leadId: string }) {
+  const sb = await createClient();
+  const [{ owners, contacts }, relatives, attorneys, leadRow] =
+    await Promise.all([
+      fetchOwnersWithContacts(leadId),
+      fetchRelatives(leadId),
+      fetchAttorneyOptions(),
+      sb.from("leads").select("attorney_id").eq("id", leadId).maybeSingle(),
+    ]);
+
+  const currentAttorneyId =
+    (leadRow.data?.attorney_id as string | null | undefined) ?? null;
+
+  return (
+    <>
+      <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="m-0 text-[14px] font-medium tracking-tight text-ink">
+            Assign Attorney
+          </h3>
+          <AttorneyAssignment
+            leadId={leadId}
+            attorneys={attorneys}
+            currentAttorneyId={currentAttorneyId}
+          />
+        </div>
+      </div>
+      <div className="mt-4">
+        <ContactsTabClient
+          leadId={leadId}
+          initialOwners={owners}
+          initialContacts={contacts}
+        />
+      </div>
+      <RelativesSection leadId={leadId} initial={relatives} />
+    </>
+  );
+}

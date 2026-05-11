@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Test-Path *)",
+      "PowerShell(Copy-Item *)",
+      "PowerShell(Out-File *)",
+      "Bash(npx --yes create-next-app@latest /c/Users/info/moss-equity-portal --typescript --tailwind --app --eslint --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Skill(update-config)",
+      "PowerShell",
+      "Bash",
+      "Write",
+      "mcp__claude_ai_Supabase__list_organizations",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__get_cost",
+      "mcp__claude_ai_Supabase__confirm_cost"
+    ]
+  }
+}

@@ -1,0 +1,232 @@
+import "server-only";
+import { createClient } from "@/lib/supabase/server";
+
+export type OrgMemberRow = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  role: "admin" | "member";
+};
+
+export async function fetchOrgMembers(): Promise<OrgMemberRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("profiles")
+    .select("id, full_name, email, role")
+    .order("full_name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    full_name: (r.full_name as string | null) ?? "",
+    email: (r.email as string | null) ?? null,
+    role: r.role === "admin" ? "admin" : "member",
+  }));
+}
+
+export type AppSettings = {
+  default_recovery_fee_percent: number;
+  default_attorney_cost: number;
+  surplus_floor: number;
+};
+
+export async function fetchAppSettings(): Promise<AppSettings> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("app_settings")
+    .select("key, value")
+    .in("key", [
+      "default_recovery_fee_percent",
+      "default_attorney_cost",
+      "surplus_floor",
+    ]);
+  if (error) throw error;
+  const map = new Map((data ?? []).map((r) => [r.key as string, r.value]));
+  return {
+    default_recovery_fee_percent:
+      Number(map.get("default_recovery_fee_percent")) || 30,
+    default_attorney_cost: Number(map.get("default_attorney_cost")) || 2500,
+    surplus_floor: Number(map.get("surplus_floor")) || 35000,
+  };
+}
+
+export type AttorneyRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  states_covered: string[];
+  default_cost: number | null;
+  notes: string | null;
+};
+
+export async function fetchAttorneys(): Promise<AttorneyRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("attorneys")
+    .select("id, name, email, states_covered, default_cost, notes")
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as AttorneyRow[];
+}
+
+export type StateRuleRow = {
+  state: string;
+  state_name: string;
+  redemption_period_months: number | null;
+  filing_window_years: number | null;
+  funds_custodian: string | null;
+  default_recovery_type: string | null;
+  notes: string | null;
+};
+
+export async function fetchStateRules(): Promise<StateRuleRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("state_rules")
+    .select(
+      "state, state_name, redemption_period_months, filing_window_years, funds_custodian, default_recovery_type, notes"
+    )
+    .order("state", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as StateRuleRow[];
+}
+
+export type TemplateRow = {
+  id: string;
+  name: string;
+  channel: string;
+  state: string | null;
+  subject: string | null;
+  body: string;
+  variables: string[];
+};
+
+export async function fetchTemplates(): Promise<TemplateRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("templates")
+    .select("id, name, channel, state, subject, body, variables")
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as TemplateRow[];
+}
+
+export type LostReasonAdminRow = {
+  id: string;
+  label: string;
+  is_default: boolean;
+  archived: boolean;
+  created_at: string;
+};
+
+export async function fetchLostReasonsAdmin(): Promise<LostReasonAdminRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("lost_reasons")
+    .select("id, label, is_default, archived, created_at")
+    .order("label", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as LostReasonAdminRow[];
+}
+
+// -- Scripts (Fix 64) --------------------------------------------------------
+
+export type ScriptChannel = "Call" | "SMS" | "Email";
+
+export type ScriptRow = {
+  id: string;
+  name: string;
+  state: string | null;
+  channel: ScriptChannel;
+  body: string;
+};
+
+export async function fetchScripts(): Promise<ScriptRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("scripts")
+    .select("id, name, state, channel, body")
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    name: (r.name as string | null) ?? "",
+    state: (r.state as string | null) || null,
+    channel: ((r.channel as string) === "SMS"
+      ? "SMS"
+      : (r.channel as string) === "Email"
+        ? "Email"
+        : "Call") as ScriptChannel,
+    body: (r.body as string | null) ?? "",
+  }));
+}
+
+// -- State phone numbers (Fix 66) --------------------------------------------
+
+export type StatePhoneRow = {
+  state: string;
+  phone: string | null;
+};
+
+export async function fetchStatePhoneNumbers(): Promise<StatePhoneRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("state_phone_numbers")
+    .select("state, phone");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    state: r.state as string,
+    phone: (r.phone as string | null) || null,
+  }));
+}
+
+// -- Research templates (Fix 36) ---------------------------------------------
+
+export type ResearchStep = {
+  name: string;
+  url: string | null;
+  instructions: string | null;
+};
+
+export type ResearchTemplateRow = {
+  id: string;
+  name: string;
+  state: string | null;
+  sale_type: "TAX" | "MTG" | null;
+  steps: ResearchStep[];
+};
+
+function normalizeSteps(raw: unknown): ResearchStep[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((s) => {
+    const obj = (s ?? {}) as Record<string, unknown>;
+    return {
+      name: typeof obj.name === "string" ? obj.name : "",
+      url: typeof obj.url === "string" && obj.url ? obj.url : null,
+      instructions:
+        typeof obj.instructions === "string" && obj.instructions
+          ? obj.instructions
+          : null,
+    };
+  });
+}
+
+export async function fetchResearchTemplates(): Promise<ResearchTemplateRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("research_templates")
+    .select("id, name, state, sale_type, steps")
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    name: (r.name as string | null) ?? "",
+    state: (r.state as string | null) || null,
+    sale_type:
+      (r.sale_type as string) === "TAX"
+        ? "TAX"
+        : (r.sale_type as string) === "MTG"
+          ? "MTG"
+          : null,
+    steps: normalizeSteps(r.steps),
+  }));
+}

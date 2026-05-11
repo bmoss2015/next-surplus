@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moss Equity Portal — Design Tour</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f0f3f7;
+  color: #0f1729;
+  margin: 0;
+  padding: 40px 20px;
+  -webkit-font-smoothing: antialiased;
+}
+.tour-wrapper { max-width: 1300px; margin: 0 auto; }
+
+.tour-header {
+  background: linear-gradient(135deg, #0a3d4a 0%, #0d6c7d 70%, #1a8a9c 100%);
+  color: #ffffff;
+  padding: 40px 44px;
+  border-radius: 14px;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 24px rgba(10,61,74,0.18);
+}
+.tour-eyebrow { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; opacity: 0.75; margin-bottom: 10px; }
+.tour-title { font-size: 32px; font-weight: 500; letter-spacing: -0.7px; margin: 0 0 8px; }
+.tour-lede { font-size: 15px; opacity: 0.9; max-width: 720px; line-height: 1.55; margin: 0; }
+.tour-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.18); }
+.tour-stat-cell { padding-right: 24px; }
+.tour-stat-cell + .tour-stat-cell { border-left: 1px solid rgba(255,255,255,0.15); padding-left: 24px; }
+.tour-stat-num { font-size: 24px; font-weight: 500; }
+.tour-stat-label { font-size: 11px; opacity: 0.75; letter-spacing: 0.4px; text-transform: uppercase; margin-top: 2px; }
+
+.tour-section { margin-bottom: 36px; }
+.tour-label { padding: 16px 22px; background: #ffffff; border: 1px solid #e5e7eb; border-bottom: none; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center; }
+.tour-label-left { display: flex; align-items: baseline; gap: 14px; }
+.tour-num { font-size: 11px; color: #0d6c7d; font-weight: 500; letter-spacing: 0.5px; padding: 3px 9px; background: #f0fafb; border: 1px solid #cfe9ed; border-radius: 4px; }
+.tour-section-title { font-size: 17px; font-weight: 500; color: #0f1729; letter-spacing: -0.3px; margin: 0; }
+.tour-section-desc { font-size: 12px; color: #6b7280; }
+
+.shell { background: #ffffff; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px; overflow: hidden; }
+.layout { display: grid; grid-template-columns: 200px 1fr; min-height: 660px; }
+
+.sidebar { background: linear-gradient(180deg, #0a3d4a 0%, #0d6c7d 100%); padding: 22px 0 80px; color: #ffffff; position: relative; }
+.brand { padding: 0 22px 20px; margin-bottom: 18px; }
+.brand-name { font-size: 14px; font-weight: 500; color: #ffffff; letter-spacing: -0.2px; }
+.brand-sub { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 3px; letter-spacing: 0.2px; }
+.nav-pad { padding: 0 14px; }
+.nav-item { display: block; padding: 8px 12px; border-radius: 6px; margin-bottom: 2px; color: rgba(255,255,255,0.8); font-size: 13px; cursor: pointer; }
+.nav-item:hover { background: rgba(255,255,255,0.06); }
+.nav-item.active { background: rgba(255,255,255,0.14); color: #ffffff; font-weight: 500; }
+.nav-item .nav-counter { float: right; font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 1px; }
+.nav-item .nav-counter.alert { color: #ffffff; font-weight: 500; }
+.nav-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 14px 6px; }
+.user-block { position: absolute; bottom: 0; left: 0; width: 200px; padding: 16px 18px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 11px; }
+.user-avatar { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; color: #ffffff; font-weight: 500; font-size: 11px; }
+
+.main { background: #fafbfc; }
+.top-bar { background: #ffffff; padding: 14px 24px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid #e5e7eb; }
+.top-bar.compact { padding: 12px 20px; }
+.search-wrap { flex: 1; max-width: 400px; position: relative; }
+.search-input { width: 100%; padding: 8px 12px 8px 34px; background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; color: #0f1729; outline: none; font-family: inherit; }
+.search-input:focus { border-color: #0d6c7d; background: #ffffff; }
+.search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; color: #9ca3af; }
+.search-shortcut { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 10px; color: #9ca3af; padding: 2px 6px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+.bell-wrap { position: relative; margin-left: auto; }
+.bell-dot { position: absolute; top: -1px; right: -3px; width: 6px; height: 6px; background: #0d6c7d; border-radius: 50%; }
+
+.btn { padding: 8px 12px; font-size: 12px; font-weight: 500; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: 1px solid #d1d5db; background: #ffffff; color: #0f1729; font-family: inherit; }
+.btn:hover { background: #f8f9fa; }
+.btn i { font-size: 13px; }
+.btn-primary { background: #0d6c7d; color: #ffffff; border-color: #0d6c7d; }
+.btn-primary:hover { background: #0a3d4a; }
+.btn-icon { padding: 8px 10px; }
+
+.content { padding: 24px 28px 32px; }
+.content-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; gap: 16px; }
+.h1 { margin: 0 0 4px; font-size: 22px; font-weight: 500; color: #0f1729; letter-spacing: -0.4px; }
+.h1-sub { font-size: 13px; color: #6b7280; }
+
+.view-toggle { display: inline-flex; gap: 0; background: #f1f3f5; padding: 3px; border-radius: 7px; }
+.view-tab { padding: 6px 12px; font-size: 12px; color: #6b7280; cursor: pointer; border-radius: 5px; }
+.view-tab.active { background: #ffffff; color: #0f1729; font-weight: 500; box-shadow: 0 1px 2px rgba(15,23,41,0.08); }
+
+.metric-row-dash { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 22px; background: #ffffff; }
+.metric-cell-dash { padding: 18px 22px; border-right: 1px solid #e5e7eb; }
+.metric-cell-dash:last-child { border-right: none; }
+.metric-label { font-size: 11px; color: #6b7280; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 8px; }
+.metric-value-dash { font-size: 24px; font-weight: 500; color: #0f1729; letter-spacing: -0.4px; }
+.metric-context { font-size: 12px; color: #6b7280; margin-top: 4px; }
+.metric-trend { margin-top: 10px; font-size: 11px; font-weight: 500; }
+.metric-trend.success { color: #15803d; }
+.metric-trend.alert { color: #0d6c7d; }
+.metric-trend.muted { color: #6b7280; }
+
+.section-title-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+.section-h3 { margin: 0; font-size: 14px; font-weight: 500; color: #0f1729; }
+.section-link { font-size: 12px; color: #0f1729; cursor: pointer; text-decoration: underline; text-decoration-color: #d1d5db; text-underline-offset: 3px; }
+
+.stages-strip { display: grid; grid-template-columns: repeat(9, 1fr); border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 22px; background: #ffffff; }
+.stage-cell { padding: 14px 6px; text-align: center; border-right: 1px solid #e5e7eb; cursor: pointer; }
+.stage-cell:last-child { border-right: none; }
+.stage-cell:hover { background: #fafbfc; }
+.stage-num { font-size: 20px; font-weight: 500; color: #0f1729; letter-spacing: -0.3px; }
+.stage-label { font-size: 9px; color: #6b7280; margin-top: 4px; letter-spacing: 0.4px; text-transform: uppercase; }
+
+.split-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: 22px; }
+.lead-card-list { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+.lead-card-list-head { padding: 14px 18px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+.lead-row-dash { padding: 13px 18px; border-bottom: 1px solid #f1f3f5; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.lead-row-dash:hover { background: #fafbfc; }
+.lead-row-dash:last-child { border-bottom: none; }
+.lead-id-dash { font-size: 11px; color: #6b7280; font-family: 'JetBrains Mono', monospace; width: 130px; flex-shrink: 0; }
+.lead-info-block { flex: 1; min-width: 0; }
+.lead-addr { font-size: 13px; font-weight: 500; color: #0f1729; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.lead-meta { font-size: 11px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lead-stage-text { font-size: 11px; color: #6b7280; width: 80px; flex-shrink: 0; }
+.lead-right { text-align: right; flex-shrink: 0; width: 100px; }
+.lead-value { font-size: 13px; font-weight: 500; color: #0f1729; }
+.lead-status-text { font-size: 11px; }
+.status-urgent { color: #b91c1c; font-weight: 500; }
+.status-attention { color: #c9a84c; font-weight: 500; }
+.status-info { color: #0d6c7d; }
+.status-neutral { color: #6b7280; }
+
+.market-card-dash { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px; margin-bottom: 18px; }
+.market-row-dash { margin-bottom: 14px; }
+.market-row-dash:last-child { margin-bottom: 0; }
+.market-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+.market-name { color: #0f1729; font-weight: 500; }
+.market-bar { height: 4px; background: #f1f3f5; border-radius: 2px; overflow: hidden; }
+.market-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #0a3d4a, #0d6c7d); }
+.market-foot-text { font-size: 11px; color: #6b7280; margin-top: 4px; }
+
+.deadline-card-dash { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; }
+.deadline-row { padding: 13px 18px; border-bottom: 1px solid #f1f3f5; display: flex; justify-content: space-between; align-items: center; }
+.deadline-row:last-child { border-bottom: none; }
+.deadline-title { font-size: 13px; font-weight: 500; color: #0f1729; margin-bottom: 2px; }
+.deadline-sub { font-size: 11px; color: #6b7280; }
+.deadline-time { font-size: 12px; font-weight: 500; }
+
+.section-block { margin-bottom: 22px; }
+.section-head-block { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 0 4px; }
+.section-title-group { display: flex; align-items: center; gap: 10px; }
+.section-marker { width: 4px; height: 16px; border-radius: 2px; }
+.marker-replies { background: #b91c1c; }
+.marker-action { background: #0d6c7d; }
+.marker-external { background: #9ca3af; }
+.section-title-text { font-size: 14px; font-weight: 500; color: #0f1729; letter-spacing: -0.2px; }
+.section-count-pill { font-size: 11px; color: #6b7280; padding: 2px 8px; background: #f1f3f5; border-radius: 10px; font-weight: 500; }
+.section-sub-text { font-size: 11.5px; color: #6b7280; }
+
+.lead-row-dw { display: grid; grid-template-columns: 130px 1fr 110px 100px 130px; gap: 14px; padding: 13px 18px; border-bottom: 1px solid #f1f3f5; align-items: center; cursor: pointer; }
+.lead-row-dw:hover { background: #fafbfc; }
+.lead-row-dw:last-child { border-bottom: none; }
+.lead-stage-pill { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; text-align: center; }
+.stage-qual { background: #cfe9ed; color: #0a3d4a; }
+.stage-out { background: #cfe9ed; color: #0a3d4a; }
+.stage-convo { background: #ddd6fe; color: #3c3489; }
+.stage-contract { background: #fef3c7; color: #854f0b; }
+.stage-attorney { background: #fef3c7; color: #854f0b; }
+.stage-filed { background: #d1fae5; color: #065f46; }
+.lead-value-right { text-align: right; font-size: 13px; font-weight: 500; color: #0f1729; }
+.lead-action-right { text-align: right; font-size: 11.5px; }
+
+.lead-header { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 22px 24px 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(15,23,41,0.04); }
+.header-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; gap: 20px; }
+.header-pills { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.id-pill { font-size: 11px; color: #0f1729; font-family: 'JetBrains Mono', monospace; padding: 4px 10px; background: #f1f3f5; border: 1px solid #e5e7eb; border-radius: 5px; font-weight: 500; }
+.alert-pill { font-size: 11px; color: #b91c1c; padding: 4px 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 5px; font-weight: 500; }
+.header-h1 { margin: 0 0 4px; font-size: 22px; font-weight: 500; color: #0f1729; letter-spacing: -0.4px; }
+.header-sub { font-size: 13px; color: #6b7280; }
+.header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.stage-strip { display: flex; align-items: center; gap: 0; margin-bottom: 18px; padding: 12px 0 4px; }
+.stage-step { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; cursor: pointer; }
+.stage-circle { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; position: relative; z-index: 2; background: #ffffff; }
+.stage-step.done .stage-circle { background: #0d6c7d; color: #ffffff; }
+.stage-step.current .stage-circle { color: #0d6c7d; border: 2px solid #0d6c7d; box-shadow: 0 0 0 4px rgba(13,108,125,0.12); }
+.stage-step.upcoming .stage-circle { color: #9ca3af; border: 1.5px solid #d1d5db; }
+.stage-line { position: absolute; top: 13px; left: 50%; right: -50%; height: 2px; z-index: 1; background: #e5e7eb; }
+.stage-step.done .stage-line { background: #0d6c7d; }
+.stage-step:last-child .stage-line { display: none; }
+.stage-name { font-size: 10px; color: #6b7280; margin-top: 7px; letter-spacing: 0.2px; text-align: center; line-height: 1.2; max-width: 70px; }
+.stage-step.done .stage-name { color: #0a3d4a; }
+.stage-step.current .stage-name { color: #0d6c7d; font-weight: 500; }
+
+.metric-strip-detail { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+.metric-cell-detail { padding: 14px 16px; border-right: 1px solid #e5e7eb; background: #ffffff; }
+.metric-cell-detail:last-child { border-right: none; }
+.metric-cell-detail.highlight { background: linear-gradient(135deg, #f0fafb 0%, #cfe9ed 100%); border-right-color: #9bd1d9; }
+.metric-cell-detail.payout { background: linear-gradient(135deg, #0a3d4a 0%, #0d6c7d 100%); color: #ffffff; border-right-color: #0a3d4a; }
+.metric-cell-detail.payout .metric-label { color: rgba(255,255,255,0.85); }
+.metric-cell-detail.payout .metric-value-detail { color: #ffffff; font-size: 20px; }
+.metric-cell-detail.payout .metric-sub-detail { color: rgba(255,255,255,0.85); }
+.metric-cell-detail.highlight .metric-label { color: #0a3d4a; }
+.metric-value-detail { font-size: 18px; font-weight: 500; color: #0f1729; letter-spacing: -0.2px; }
+.metric-value-detail.muted { color: #9ca3af; font-size: 13px; font-weight: 400; padding-top: 4px; }
+.metric-sub-detail { font-size: 11px; color: #6b7280; margin-top: 3px; }
+
+.body-grid { display: grid; grid-template-columns: 1fr 280px; gap: 18px; margin-top: 16px; }
+.tab-group { display: inline-flex; gap: 3px; background: #f1f3f5; padding: 4px; border-radius: 8px; margin-bottom: 16px; }
+.tab { padding: 7px 14px; font-size: 12px; color: #6b7280; cursor: pointer; border-radius: 6px; }
+.tab.active { background: #0d6c7d; color: #ffffff; font-weight: 500; }
+
+.card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px 22px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(15,23,41,0.03); }
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 12px; }
+.card-title { margin: 0; font-size: 14px; font-weight: 500; color: #0f1729; letter-spacing: -0.2px; }
+.card-sub { font-size: 11px; color: #6b7280; margin-top: 2px; }
+
+.btn-sm { padding: 6px 10px; font-size: 11px; font-weight: 500; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; border: 1px solid #cfe9ed; background: #ffffff; color: #0d6c7d; flex-shrink: 0; font-family: inherit; }
+
+.viability-strip { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: linear-gradient(90deg, #f0fafb 0%, #ffffff 100%); border: 1px solid #cfe9ed; border-radius: 8px; font-size: 12.5px; margin-bottom: 16px; }
+.viability-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; font-weight: 500; font-size: 11px; }
+.viability-pill.success { background: #d1fae5; color: #065f46; }
+.viability-pill.action { background: #cfe9ed; color: #0a3d4a; }
+.viability-reason { color: #0a3d4a; flex: 1; font-size: 12px; }
+
+.subsection-label { font-size: 10px; color: #6b7280; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px; font-weight: 500; }
+.facts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.facts-block { background: #fafbfc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; }
+.kv-list { font-size: 12.5px; line-height: 1.85; }
+.kv-row { display: grid; grid-template-columns: 150px 1fr; }
+.kv-key { color: #6b7280; }
+.kv-val { color: #0f1729; }
+.kv-val.empty { color: #9ca3af; font-style: italic; }
+.kv-val.strong { font-weight: 500; }
+.fact-line { display: flex; gap: 6px; margin-bottom: 5px; font-size: 12px; line-height: 1.5; color: #0f1729; }
+.fact-line:last-child { margin-bottom: 0; }
+.fact-line i { font-size: 13px; color: #15803d; flex-shrink: 0; margin-top: 2px; }
+
+.blocked-callout { background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%); border: 1px solid #fcd34d; border-radius: 8px; padding: 14px 16px; margin-top: 16px; }
+.blocked-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.blocked-head i { font-size: 15px; color: #92400e; }
+.blocked-title { font-size: 12px; font-weight: 500; color: #78350f; }
+.blocked-list { font-size: 12px; color: #78350f; line-height: 1.7; padding-left: 23px; }
+
+.right-rail { display: flex; flex-direction: column; gap: 14px; }
+.rail-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(15,23,41,0.03); }
+.rail-label { font-size: 10px; color: #6b7280; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 11px; font-weight: 500; }
+.decision-btn { padding: 10px 12px; border-radius: 6px; cursor: pointer; border: 1px solid #d1d5db; background: #ffffff; text-align: left; margin-bottom: 6px; font-family: inherit; width: 100%; }
+.decision-btn:last-child { margin-bottom: 0; }
+.decision-btn:hover { border-color: #0d6c7d; background: #fafbfc; }
+.decision-btn.primary { background: #0d6c7d; border-color: #0d6c7d; color: #ffffff; }
+.decision-btn.danger { color: #6b7280; }
+.decision-head { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; color: #0f1729; }
+.decision-btn.primary .decision-head { color: #ffffff; }
+.decision-btn.danger .decision-head { color: #6b7280; }
+.decision-head i { font-size: 14px; }
+.decision-sub { font-size: 11px; color: #6b7280; margin-top: 2px; padding-left: 21px; }
+.decision-btn.primary .decision-sub { color: rgba(255,255,255,0.85); }
+
+.rail-kv { font-size: 12px; line-height: 1.9; }
+.rail-row { display: flex; justify-content: space-between; }
+.rail-row .r-key { color: #6b7280; }
+.rail-row .r-val { color: #0f1729; }
+.rail-row .r-val.muted { color: #9ca3af; font-style: italic; }
+
+.kanban-scroll { overflow-x: auto; padding-bottom: 4px; }
+.kanban-row { display: grid; grid-template-columns: repeat(9, 240px); gap: 10px; }
+.kanban-col { background: #f4f6f8; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+.kanban-col-head { padding: 11px 12px; background: #ffffff; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+.kanban-col-title { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; color: #0f1729; }
+.col-dot { width: 7px; height: 7px; border-radius: 50%; }
+.dot-leads { background: #9ca3af; }
+.dot-qual { background: #2563b8; }
+.dot-out { background: #2563b8; }
+.dot-convo { background: #534ab7; }
+.dot-contract { background: #c9a84c; }
+.dot-attorney { background: #c9a84c; }
+.dot-filed { background: #1d9e75; }
+.dot-won { background: #15803d; }
+.dot-lost { background: #888780; }
+.kanban-count { font-size: 11px; color: #6b7280; font-weight: 500; }
+.kanban-col-body { padding: 8px; min-height: 460px; }
+.kanban-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 11px; margin-bottom: 7px; cursor: pointer; box-shadow: 0 1px 2px rgba(15,23,41,0.03); }
+.kanban-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+.kanban-id { font-size: 9.5px; color: #6b7280; font-family: 'JetBrains Mono', monospace; }
+.kanban-state { font-size: 9px; padding: 1px 5px; background: #f1f3f5; color: #6b7280; border-radius: 3px; font-weight: 500; }
+.kanban-addr { font-size: 12px; font-weight: 500; color: #0f1729; line-height: 1.35; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kanban-owner { font-size: 11px; color: #6b7280; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kanban-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f3f5; }
+.kanban-value { font-size: 12px; font-weight: 500; color: #0f1729; }
+.kanban-meta { font-size: 10px; color: #6b7280; }
+.kanban-flag { font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 500; }
+.flag-blocked { background: #fef3c7; color: #78350f; }
+.flag-reply { background: #cfe9ed; color: #0a3d4a; }
+.flag-due { background: #fef2f2; color: #b91c1c; }
+.flag-new { background: #f1f3f5; color: #6b7280; }
+.flag-success { background: #d1fae5; color: #065f46; }
+
+.content-grid-inbox { display: grid; grid-template-columns: 280px 1fr 280px; height: 700px; }
+.thread-list { background: #ffffff; border-right: 1px solid #e5e7eb; overflow-y: auto; }
+.thread-tabs { display: flex; gap: 0; padding: 8px 12px 0; border-bottom: 1px solid #e5e7eb; }
+.thread-tab-inbox { padding: 6px 10px; font-size: 11.5px; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.thread-tab-inbox.active { color: #0d6c7d; border-bottom-color: #0d6c7d; font-weight: 500; }
+.thread-list-head { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.thread-list-title { font-size: 13px; font-weight: 500; color: #0f1729; }
+.thread-list-actions { display: flex; gap: 6px; align-items: center; }
+.thread-list-filter { font-size: 11px; color: #6b7280; cursor: pointer; padding: 3px 8px; background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 4px; }
+.thread-row { padding: 14px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; }
+.thread-row:hover { background: #fafbfc; }
+.thread-row.active { background: #f0fafb; border-left: 3px solid #0d6c7d; padding-left: 13px; }
+.thread-row.unread .thread-name, .thread-row.unread .thread-preview { color: #0f1729; font-weight: 500; }
+.thread-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.thread-name-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+.unread-dot { width: 6px; height: 6px; background: #0d6c7d; border-radius: 50%; flex-shrink: 0; }
+.thread-name { font-size: 13px; color: #0f1729; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thread-time { font-size: 11px; color: #6b7280; flex-shrink: 0; margin-left: 8px; }
+.thread-time.new { color: #0d6c7d; font-weight: 500; }
+.thread-meta-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.thread-id { font-size: 10px; color: #6b7280; font-family: 'JetBrains Mono', monospace; }
+.thread-channel-icon { font-size: 11px; color: #6b7280; }
+.thread-stage { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 500; }
+.thread-preview { font-size: 11.5px; color: #6b7280; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.convo-pane { background: #fafbfc; display: flex; flex-direction: column; min-width: 0; }
+.convo-head { background: #ffffff; padding: 14px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.convo-id-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.convo-id { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6b7280; padding: 2px 7px; background: #f1f3f5; border-radius: 4px; }
+.convo-stage-pill { font-size: 11px; padding: 2px 8px; background: #ddd6fe; color: #3c3489; border-radius: 4px; font-weight: 500; }
+.convo-name { font-size: 16px; font-weight: 500; color: #0f1729; letter-spacing: -0.2px; margin-bottom: 2px; }
+.convo-sub { font-size: 12px; color: #6b7280; }
+.convo-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.convo-body { flex: 1; padding: 20px 24px; overflow-y: auto; }
+.day-divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
+.day-divider::before, .day-divider::after { content: ''; flex: 1; height: 1px; background: #e5e7eb; }
+.day-divider-text { font-size: 11px; color: #9ca3af; font-weight: 500; }
+.msg { max-width: 70%; margin-bottom: 14px; }
+.msg.inbound { margin-right: auto; }
+.msg.outbound { margin-left: auto; }
+.msg-meta { font-size: 10.5px; color: #6b7280; margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+.msg.outbound .msg-meta { justify-content: flex-end; }
+.msg-channel { font-size: 9.5px; padding: 1px 5px; border-radius: 3px; font-weight: 500; letter-spacing: 0.3px; text-transform: uppercase; }
+.channel-sms { background: #cfe9ed; color: #0a3d4a; }
+.msg-bubble { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+.msg.inbound .msg-bubble { background: #ffffff; border: 1px solid #e5e7eb; color: #0f1729; border-bottom-left-radius: 4px; }
+.msg.outbound .msg-bubble { background: #0d6c7d; color: #ffffff; border-bottom-right-radius: 4px; }
+.composer { background: #ffffff; border-top: 1px solid #e5e7eb; padding: 12px 16px; }
+.composer-tabs { display: flex; gap: 0; margin-bottom: 10px; border-bottom: 1px solid #f1f3f5; }
+.composer-tab { padding: 7px 12px; font-size: 11.5px; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; display: flex; align-items: center; gap: 5px; }
+.composer-tab.active { color: #0d6c7d; border-bottom-color: #0d6c7d; font-weight: 500; }
+.composer-input { width: 100%; min-height: 60px; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; color: #0f1729; outline: none; resize: none; font-family: inherit; line-height: 1.5; }
+.composer-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.composer-tools { display: flex; gap: 6px; align-items: center; }
+.composer-tool { padding: 5px 7px; border-radius: 4px; cursor: pointer; color: #6b7280; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
+.composer-send { background: #0d6c7d; color: #ffffff; border: none; padding: 6px 14px; font-size: 12px; font-weight: 500; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-family: inherit; }
+
+.context-panel { background: #ffffff; border-left: 1px solid #e5e7eb; overflow-y: auto; }
+.ctx-section { padding: 14px 16px; border-bottom: 1px solid #f1f3f5; }
+.ctx-summary-card { background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%); border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+.ctx-summary-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.ctx-summary-title { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; color: #0f1729; }
+.ctx-summary-title i { font-size: 13px; color: #0d6c7d; }
+.ctx-summary-refresh { font-size: 10.5px; color: #0d6c7d; cursor: pointer; padding: 3px 7px; background: #f0fafb; border: 1px solid #cfe9ed; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px; font-weight: 500; font-family: inherit; }
+.ctx-summary-text { font-size: 12px; color: #0f1729; line-height: 1.6; }
+.ctx-summary-foot { font-size: 10.5px; color: #6b7280; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f3f5; display: flex; justify-content: space-between; align-items: center; }
+.ctx-payout { background: linear-gradient(135deg, #f0fafb 0%, #cfe9ed 100%); padding: 12px 14px; border-radius: 6px; }
+.ctx-payout-label { font-size: 10px; color: #0a3d4a; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 4px; }
+.ctx-payout-val { font-size: 18px; font-weight: 500; color: #0d6c7d; letter-spacing: -0.3px; }
+.ctx-payout-sub { font-size: 11px; color: #0a3d4a; margin-top: 2px; }
+.ctx-label-text { font-size: 10px; color: #6b7280; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px; font-weight: 500; }
+.ctx-row { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.85; }
+.c-key { color: #6b7280; }
+.c-val { color: #0f1729; font-weight: 500; }
+.c-val.muted { color: #9ca3af; font-weight: 400; font-style: italic; }
+.ctx-actions { display: flex; flex-direction: column; gap: 6px; }
+.ctx-btn { padding: 7px 10px; border: 1px solid #d1d5db; background: #ffffff; border-radius: 5px; cursor: pointer; font-size: 12px; color: #0f1729; display: flex; align-items: center; gap: 6px; justify-content: center; font-family: inherit; }
+.ctx-btn.primary { background: #0d6c7d; color: #ffffff; border-color: #0d6c7d; }
+.activity-row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f1f3f5; font-size: 11.5px; }
+.activity-row:last-child { border-bottom: none; padding-bottom: 0; }
+.activity-row:first-child { padding-top: 0; }
+.activity-icon { width: 18px; height: 18px; border-radius: 50%; background: #f1f3f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.activity-icon i { font-size: 11px; color: #6b7280; }
+.activity-text { color: #0f1729; line-height: 1.4; }
+.activity-time { color: #6b7280; font-size: 10.5px; margin-top: 2px; }
+
+.toc { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 22px 28px; margin-bottom: 32px; }
+.toc-title { font-size: 13px; color: #6b7280; letter-spacing: 0.5px; text-transform: uppercase; font-weight: 500; margin: 0 0 14px; }
+.toc-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.toc-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px; text-decoration: none; color: #0f1729; font-size: 13px; }
+.toc-item-num { width: 22px; height: 22px; border-radius: 4px; background: #f0fafb; color: #0d6c7d; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; flex-shrink: 0; }
+.toc-item-name { font-weight: 500; }
+.toc-item-desc { font-size: 11px; color: #6b7280; margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="tour-wrapper">
+
+<div class="tour-header">
+<div class="tour-eyebrow">Design Tour · Built for Bree</div>
+<h1 class="tour-title">Moss Equity Operations Portal</h1>
+<p class="tour-lede">Five core screens designed end-to-end. Operations dashboard, full lead lifecycle management with daily prioritization, deep lead detail with research integration, and a CRM-style messaging inbox with conversation context. Petrol palette, no emojis, Proper Case throughout.</p>
+<div class="tour-stats">
+<div class="tour-stat-cell"><div class="tour-stat-num">5</div><div class="tour-stat-label">Screens Designed</div></div>
+<div class="tour-stat-cell"><div class="tour-stat-num">9</div><div class="tour-stat-label">Pipeline Stages</div></div>
+<div class="tour-stat-cell"><div class="tour-stat-num">10</div><div class="tour-stat-label">Sidebar Modules</div></div>
+<div class="tour-stat-cell"><div class="tour-stat-num">5</div><div class="tour-stat-label">More To Build</div></div>
+</div>
+</div>
+
+<div class="toc">
+<div class="toc-title">Tour Contents</div>
+<div class="toc-list">
+<a class="toc-item" href="#screen-1"><span class="toc-item-num">1</span><span class="toc-item-name">Dashboard</span><span class="toc-item-desc">Operations overview</span></a>
+<a class="toc-item" href="#screen-2"><span class="toc-item-num">2</span><span class="toc-item-name">Leads · Daily Work</span><span class="toc-item-desc">Prioritized work view</span></a>
+<a class="toc-item" href="#screen-3"><span class="toc-item-num">3</span><span class="toc-item-name">Leads · Kanban</span><span class="toc-item-desc">Pipeline visualization</span></a>
+<a class="toc-item" href="#screen-4"><span class="toc-item-num">4</span><span class="toc-item-name">Lead Detail</span><span class="toc-item-desc">Single lead workspace</span></a>
+<a class="toc-item" href="#screen-5"><span class="toc-item-num">5</span><span class="toc-item-name">Inbox</span><span class="toc-item-desc">Messaging with context</span></a>
+</div>
+</div>
+
+<div class="tour-section" id="screen-1">
+<div class="tour-label">
+<div class="tour-label-left"><span class="tour-num">Screen 01</span><h2 class="tour-section-title">Dashboard</h2></div>
+<span class="tour-section-desc">Daily morning view · operations overview</span>
+</div>
+<div class="shell">
+<div class="layout">
+<div class="sidebar">
+<div class="brand"><div class="brand-name">Moss Equity</div><div class="brand-sub">Operations</div></div>
+<div class="nav-pad">
+<div class="nav-item active">Dashboard</div>
+<div class="nav-divider"></div>
+<div class="nav-item">Leads<span class="nav-counter">247</span></div>
+<div class="nav-item">Tasks<span class="nav-counter alert">12</span></div>
+<div class="nav-item">Claims<span class="nav-counter">14</span></div>
+<div class="nav-item">Inbox<span class="nav-counter alert">7</span></div>
+<div class="nav-divider"></div>
+<div class="nav-item">Campaigns</div>
+<div class="nav-item">Automations</div>
+<div class="nav-item">Imports</div>
+<div class="nav-divider"></div>
+<div class="nav-item">Reports</div>
+<div class="nav-item">Settings</div>
+</div>
+<div class="user-block">
+<div class="user-avatar">BM</div>
+<div style="flex:1;"><div style="font-size:12px;color:#fff;">Bree Moss</div><div style="font-size:10px;color:rgba(255,255,255,0.55);">Owner</div></div>
+</div>
+</div>
+<div class="main">
+<div class="top-bar">
+<div class="search-wrap"><i class="ti ti-search search-icon"></i><input class="search-input" type="text" placeholder="Search leads, addresses, owners..."><span class="search-shortcut">⌘ K</span></div>
+<div class="bell-wrap"><i class="ti ti-bell" style="font-size:17px;color:#6b7280;"></i><span class="bell-dot"></span></div>
+<button class="btn btn-primary"><i class="ti ti-plus"></i>Import Leads</button>
+</div>
+<div class="content">
+<div class="content-head"><div><h2 class="h1">Dashboard</h2><div class="h1-sub">Thursday, May 7 2026 · 247 active leads across 3 states</div></div></div>
+<div class="metric-row-dash">
+<div class="metric-cell-dash"><div class="metric-label">Pipeline Value</div><div class="metric-value-dash">$8.4M</div><div class="metric-context">Net potential surplus</div><div class="metric-trend success">+18 leads this week</div></div>
+<div class="metric-cell-dash"><div class="metric-label">Active Claims</div><div class="metric-value-dash">14</div><div class="metric-context">$612K filed at counties</div><div class="metric-trend muted">All on track</div></div>
+<div class="metric-cell-dash"><div class="metric-label">Needs Attention</div><div class="metric-value-dash">9</div><div class="metric-context">Blocked items pending</div><div class="metric-trend alert">Action required</div></div>
+<div class="metric-cell-dash"><div class="metric-label">Conversations</div><div class="metric-value-dash">23</div><div class="metric-context">Live conversations</div><div class="metric-trend alert">7 unread</div></div>
+</div>
+<div class="section-title-row"><div><h3 class="section-h3">Lead Stages</h3><div class="h1-sub">247 active leads</div></div><span class="section-link">View all leads</span></div>
+<div class="stages-strip">
+<div class="stage-cell"><div class="stage-num">68</div><div class="stage-label">New Leads</div></div>
+<div class="stage-cell"><div class="stage-num">31</div><div class="stage-label">Qualifying</div></div>
+<div class="stage-cell"><div class="stage-num">86</div><div class="stage-label">Outreach</div></div>
+<div class="stage-cell"><div class="stage-num">23</div><div class="stage-label">In Conversation</div></div>
+<div class="stage-cell"><div class="stage-num">8</div><div class="stage-label">Contract</div></div>
+<div class="stage-cell"><div class="stage-num">6</div><div class="stage-label">With Attorney</div></div>
+<div class="stage-cell"><div class="stage-num">8</div><div class="stage-label">Claim Filed</div></div>
+<div class="stage-cell"><div class="stage-num">3</div><div class="stage-label">Won</div></div>
+<div class="stage-cell"><div class="stage-num">14</div><div class="stage-label">Lost</div></div>
+</div>
+<div class="split-row">
+<div>
+<div class="lead-card-list">
+<div class="lead-card-list-head"><div><h3 class="section-h3">Leads Needing Action</h3><div style="font-size:11px;color:#6b7280;margin-top:1px;">Sorted by surplus value</div></div><span class="section-link">View all</span></div>
+<div class="lead-row-dash"><div class="lead-id-dash">SC-TAX-2025-0247</div><div class="lead-info-block"><div class="lead-addr">2847 Magnolia Ave, Charleston SC</div><div class="lead-meta">Marcus Johnson · Tax sale · 18 days post sale</div></div><div class="lead-stage-text">Qualifying</div><div class="lead-right"><div class="lead-value">$84,200</div><span class="lead-status-text status-attention">3 blocked</span></div></div>
+<div class="lead-row-dash"><div class="lead-id-dash">TN-MTG-2026-0012</div><div class="lead-info-block"><div class="lead-addr">412 Oakwood Dr, Memphis TN</div><div class="lead-meta">Patricia Hayes · Mortgage · Reply 2h ago</div></div><div class="lead-stage-text">In Conversation</div><div class="lead-right"><div class="lead-value">$67,800</div><span class="lead-status-text status-urgent">Reply needed</span></div></div>
+<div class="lead-row-dash"><div class="lead-id-dash">SC-MTG-2026-0089</div><div class="lead-info-block"><div class="lead-addr">1156 Bent Creek Ln, Greenville SC</div><div class="lead-meta">Estate of R. Williams · Heirs noted</div></div><div class="lead-stage-text">New Leads</div><div class="lead-right"><div class="lead-value">$112,400</div><span class="lead-status-text status-neutral">New today</span></div></div>
+<div class="lead-row-dash"><div class="lead-id-dash">PA-TAX-2025-0034</div><div class="lead-info-block"><div class="lead-addr">3301 Chestnut St, Philadelphia PA</div><div class="lead-meta">Donald Reeves · Active litigation</div></div><div class="lead-stage-text">Qualifying</div><div class="lead-right"><div class="lead-value">$54,900</div><span class="lead-status-text status-urgent">Contested</span></div></div>
+<div class="lead-row-dash"><div class="lead-id-dash">SC-MTG-2025-0156</div><div class="lead-info-block"><div class="lead-addr">887 Riverside Dr, Columbia SC</div><div class="lead-meta">James Carter · Notary scheduled</div></div><div class="lead-stage-text">Contract</div><div class="lead-right"><div class="lead-value">$48,600</div><span class="lead-status-text status-attention">Notary May 9</span></div></div>
+</div>
+</div>
+<div>
+<div class="section-title-row"><h3 class="section-h3">Active Markets</h3></div>
+<div class="market-card-dash">
+<div class="market-row-dash"><div class="market-head"><span class="market-name">South Carolina</span><span style="color:#0f1729;">142</span></div><div class="market-bar"><div class="market-fill" style="width:78%;"></div></div><div class="market-foot-text">$4.2M pipeline · 8 in conversation</div></div>
+<div class="market-row-dash"><div class="market-head"><span class="market-name">Tennessee</span><span style="color:#0f1729;">68</span></div><div class="market-bar"><div class="market-fill" style="width:48%;"></div></div><div class="market-foot-text">$2.6M pipeline · 11 in conversation</div></div>
+<div class="market-row-dash"><div class="market-head"><span class="market-name">Pennsylvania</span><span style="color:#0f1729;">37</span></div><div class="market-bar"><div class="market-fill" style="width:28%;"></div></div><div class="market-foot-text">$1.6M pipeline · 4 in conversation</div></div>
+</div>
+<div class="section-title-row"><h3 class="section-h3">Upcoming Deadlines</h3><span class="section-link">All</span></div>
+<div class="deadline-card-dash">
+<div class="deadline-row"><div><div class="deadline-title">Notary Appointment</div><div class="deadline-sub">James Carter · Columbia SC</div></div><div style="text-align:right;"><div class="deadline-time" style="color:#b91c1c;">2 days</div><div class="deadline-sub">May 9</div></div></div>
+<div class="deadline-row"><div><div class="deadline-title">County Hearing</div><div class="deadline-sub">Hayes claim · Shelby TN</div></div><div style="text-align:right;"><div class="deadline-time" style="color:#c9a84c;">8 days</div><div class="deadline-sub">May 15</div></div></div>
+<div class="deadline-row"><div><div class="deadline-title">Redemption Period Ends</div><div class="deadline-sub">3 SC tax sale leads</div></div><div style="text-align:right;"><div class="deadline-time" style="color:#6b7280;">21 days</div><div class="deadline-sub">May 28</div></div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="tour-section" id="screen-2">
+<div class="tour-label"><div class="tour-label-left"><span class="tour-num">Screen 02</span><h2 class="tour-section-title">Leads · Daily Work</h2></div><span class="tour-section-desc">Three sections · 23 of 247 leads need you today</span></div>
+<div class="shell">
+<div class="layout">
+<div class="sidebar">
+<div class="brand"><div class="brand-name">Moss Equity</div><div class="brand-sub">Operations</div></div>
+<div class="nav-pad">
+<div class="nav-item">Dashboard</div>
+<div class="nav-divider"></div>
+<div class="nav-item active">Leads<span class="nav-counter alert">247</span></div>
+<div class="nav-item">Tasks<span class="nav-counter alert">12</span></div>
+<div class="nav-item">Claims<span class="nav-counter">14</span></div>
+<div class="nav-item">Inbox<span class="nav-counter alert">7</span></div>
+<div class="nav-divider"></div>
+<div class="nav-item">Campaigns</div>
+<div class="nav-item">Automations</div>
+<div class="nav-item">Imports</div>
+<div class="nav-divider"></div>
+<div class="nav-item">Reports</div>
+<div class="nav-item">Settings</div>
+</div>
+<div class="user-block"><div class="user-avatar">BM</div><div style="flex:1;"><div style="font-size:12px;color:#fff;">Bree Moss</div><div style="font-size:10px;color:rgba(255,255,255,0.55);">Owner</div></div></div>
+</div>
+<div class="main">
+<div class="top-bar">
+<div class="search-wrap"><i class="ti ti-search search-icon"></i><input class="search-input" type="text" placeholder="Search by lead ID, address, owner..."><span class="search-shortcut">⌘ K</span></div>
+<div class="bell-wrap"><i class="ti ti-bell" style="font-size:17px;color:#6b7280;"></i><span class="bell-dot"></span></div>
+<button class="btn btn-primary"><i class="ti ti-plus"></i>Import Leads</button>
+</div>
+<div class="content">
+<div class="content-head"><div><h2 class="h1">Leads</h2><div class="h1-sub">23 leads need you today · 247 total · 11 new awaiting triage</div></div><div class="view-toggle"><div class="view-tab active">Daily Work</div><div class="view-tab">Kanban</div><div class="view-tab">Table</div></div></div>
+
+<div class="section-block">
+<div class="section-head-block"><div class="section-title-group"><div class="section-marker marker-replies"></div><span class="section-title-text">Needs Reply</span><span class="section-count-pill">5</span></div><span class="section-sub-text">Someone replied or is expecting you · respond within hours</span></div>
+<div class="lead-card-list">
+<div class="lead-row-dw"><div class="lead-id-dash">TN-MTG-2026-0012</div><div class="lead-info-block"><div class="lead-addr">412 Oakwood Dr, Memphis TN</div><div class="lead-meta">Patricia Hayes · Mortgage foreclosure</div></div><div><span class="lead-stage-pill stage-convo">In Conversation</span></div><div class="lead-value-right">$67,800</div><div class="lead-action-right"><span class="status-urgent">Replied 2h ago</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">SC-TAX-2025-0218</div><div class="lead-info-block"><div class="lead-addr">5512 Long Point Rd, Mount Pleasant SC</div><div class="lead-meta">G. Sullivan · Tax sale</div></div><div><span class="lead-stage-pill stage-convo">In Conversation</span></div><div class="lead-value-right">$104,300</div><div class="lead-action-right"><span class="status-urgent">Replied yesterday</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">SC-MTG-2026-0055</div><div class="lead-info-block"><div class="lead-addr">2031 Daniel Island Dr, Charleston SC</div><div class="lead-meta">A. Whitney · Mortgage foreclosure</div></div><div><span class="lead-stage-pill stage-convo">In Conversation</span></div><div class="lead-value-right">$185,600</div><div class="lead-action-right"><span class="status-urgent">Call due today</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">SC-MTG-2025-0156</div><div class="lead-info-block"><div class="lead-addr">887 Riverside Dr, Columbia SC</div><div class="lead-meta">James Carter · Notary scheduled</div></div><div><span class="lead-stage-pill stage-contract">Contract</span></div><div class="lead-value-right">$48,600</div><div class="lead-action-right"><span class="status-urgent">Notary in 2 days</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">SC-TAX-2025-0211</div><div class="lead-info-block"><div class="lead-addr">915 Edgewater Dr, Charleston SC</div><div class="lead-meta">L. Robinson · Replied to mailer</div></div><div><span class="lead-stage-pill stage-out">Outreach</span></div><div class="lead-value-right">$58,200</div><div class="lead-action-right"><span class="status-urgent">Replied 4h ago</span></div></div>
+</div>
+</div>
+
+<div class="section-block">
+<div class="section-head-block"><div class="section-title-group"><div class="section-marker marker-action"></div><span class="section-title-text">Needs Your Action</span><span class="section-count-pill">11</span></div><span class="section-sub-text">You're the bottleneck · move these forward this week</span></div>
+<div class="lead-card-list">
+<div class="lead-row-dw"><div class="lead-id-dash">SC-TAX-2025-0247</div><div class="lead-info-block"><div class="lead-addr">2847 Magnolia Ave, Charleston SC</div><div class="lead-meta">Marcus Johnson · 3 verifications blocked</div></div><div><span class="lead-stage-pill stage-qual">Qualifying</span></div><div class="lead-value-right">$84,200</div><div class="lead-action-right"><span class="status-attention">Resolve verifications</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">SC-TAX-2025-0244</div><div class="lead-info-block"><div class="lead-addr">1701 Calhoun St, Charleston SC</div><div class="lead-meta">Jefferson Estate · Heirs identified</div></div><div><span class="lead-stage-pill stage-qual">Qualifying</span></div><div class="lead-value-right">$143,800</div><div class="lead-action-right"><span class="status-info">Run heir skip trace</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">TN-MTG-2025-0048</div><div class="lead-info-block"><div class="lead-addr">1204 Belmont Blvd, Nashville TN</div><div class="lead-meta">R. Greene · ID received</div></div><div><span class="lead-stage-pill stage-contract">Contract</span></div><div class="lead-value-right">$73,100</div><div class="lead-action-right"><span class="status-attention">Schedule notary</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">SC-MTG-2026-0072</div><div class="lead-info-block"><div class="lead-addr">3308 Sumter Hwy, Sumter SC</div><div class="lead-meta">P. Robinson · Agreement signed</div></div><div><span class="lead-stage-pill stage-contract">Contract</span></div><div class="lead-value-right">$58,900</div><div class="lead-action-right"><span class="status-attention">Send to attorney</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">SC-MTG-2025-0142</div><div class="lead-info-block"><div class="lead-addr">4720 Spring Hill Rd, Greenville SC</div><div class="lead-meta">D. Klein · Conversation cooling</div></div><div><span class="lead-stage-pill stage-convo">In Conversation</span></div><div class="lead-value-right">$92,400</div><div class="lead-action-right"><span class="status-info">Follow up call</span></div></div>
+</div>
+</div>
+
+<div class="section-block">
+<div class="section-head-block"><div class="section-title-group"><div class="section-marker marker-external"></div><span class="section-title-text">Awaiting External</span><span class="section-count-pill">7</span></div><span class="section-sub-text">Attorney, county, or redemption · monitor weekly</span></div>
+<div class="lead-card-list">
+<div class="lead-row-dw"><div class="lead-id-dash">SC-TAX-2024-0198</div><div class="lead-info-block"><div class="lead-addr">3712 Folly Beach Rd, Folly Beach SC</div><div class="lead-meta">N. Patterson · Blessed preparing filing</div></div><div><span class="lead-stage-pill stage-attorney">With Attorney</span></div><div class="lead-value-right">$94,200</div><div class="lead-action-right"><span class="status-neutral">Day 8 with attorney</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">PA-TAX-2024-0017</div><div class="lead-info-block"><div class="lead-addr">622 Locust St, Philadelphia PA</div><div class="lead-meta">M. Davies · Filing in progress</div></div><div><span class="lead-stage-pill stage-attorney">With Attorney</span></div><div class="lead-value-right">$118,500</div><div class="lead-action-right"><span class="status-neutral">Day 14 with attorney</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">SC-MTG-2024-0072</div><div class="lead-info-block"><div class="lead-addr">5104 Goose Creek Rd, Goose Creek SC</div><div class="lead-meta">B. Walker · Filed Mar 25</div></div><div><span class="lead-stage-pill stage-filed">Claim Filed</span></div><div class="lead-value-right">$78,400</div><div class="lead-action-right"><span class="status-neutral">Day 32 county wait</span></div></div>
+<div class="lead-row-dw"><div class="lead-id-dash">TN-MTG-2025-0021</div><div class="lead-info-block"><div class="lead-addr">2210 Elliston Pl, Nashville TN</div><div class="lead-meta">F. Holcomb · Filed Apr 19</div></div><div><span class="lead-stage-pill stage-filed">Claim Filed</span></div><div class="lead-value-right">$56,300</div><div class="lead-action-right"><span class="status-neutral">Day 18 county wait</span></div></div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="tour-section" id="screen-3">
+<div class="tour-label"><div class="tour-label-left"><span class="tour-num">Screen 03</span><h2 class="tour-section-title">Leads · Kanban</h2></div><span class="tour-section-desc">Pipeline visualization · scroll horizontally · drag between stages</span></div>
+<div class="shell">
+<div class="layout">
+<div class="sidebar">
+<div class="brand"><div class="brand-name">Moss Equity</div><div class="brand-sub">Operations</div></div>
+<div class="nav-pad">
+<div class="nav-item">Dashboard</div>
+<div class="nav-divider"></div>
+<div class="nav-item active">Leads<span class="nav-counter alert">247</span></div>
+<div class="nav-item">Tasks<span class="nav-counter alert">12</span></div>
+<div class="nav-item">Claims<span class="nav-counter">14</span></div>
+<div class="nav-item">Inbox<span class="nav-counter alert">7</span></div>
+<div class="nav-divider"></div>
+<div class="nav-item">Campaigns</div>
+<div class="nav-item">Automations</div>
+<div class="nav-item">Imports</div>
+<div class="nav-divider"></div>
+<div class="nav-item">Reports</div>
+<div class="nav-item">Settings</div>
+</div>
+<div class="user-block"><div class="user-avatar">BM</div><div style="flex:1;"><div style="font-size:12px;color:#fff;">Bree Moss</div><div style="font-size:10px;color:rgba(255,255,255,0.55);">Owner</div></div></div>
+</div>
+<div class="main">
+<div class="top-bar">
+<div class="search-wrap"><i class="ti ti-search search-icon"></i><input class="search-input" type="text" placeholder="Search by lead ID, address, owner..."><span class="search-shortcut">⌘ K</span></div>
+<div class="bell-wrap"><i class="ti ti-bell" style="font-size:17px;color:#6b7280;"></i><span class="bell-dot"></span></div>
+<button class="btn btn-primary"><i class="ti ti-plus"></i>Import Leads</button>
+</div>
+<div class="content">
+<div class="content-head"><div><h2 class="h1">Leads</h2><div class="h1-sub">247 active leads · $8.4M pipeline value</div></div><div class="view-toggle"><div class="view-tab">Daily Work</div><div class="view-tab active">Kanban</div><div class="view-tab">Table</div></div></div>
+
+<div class="kanban-scroll">
+<div class="kanban-row">
+<div class="kanban-col">
+<div class="kanban-col-head"><div class="kanban-col-title"><span class="col-dot dot-leads"></span>New Leads</div><span class="kanban-count">68</span></div>
+<div class="kanban-col-body">
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-MTG-2026-0089</span><span class="kanban-state">SC</span></div><div class="kanban-addr">1156 Bent Creek Ln</div><div class="kanban-owner">Estate of R. Williams</div><div class="kanban-foot"><span class="kanban-value">$112,400</span><span class="kanban-flag flag-new">New</span></div></div>
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-TAX-2025-0252</span><span class="kanban-state">SC</span></div><div class="kanban-addr">204 Ashley River Rd</div><div class="kanban-owner">Helen Brooks</div><div class="kanban-foot"><span class="kanban-value">$78,300</span><span class="kanban-flag flag-new">New</span></div></div>
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-MTG-2026-0090</span><span class="kanban-state">SC</span></div><div class="kanban-addr">442 Pine Tree Cir</div><div class="kanban-owner">D. Anderson</div><div class="kanban-foot"><span class="kanban-value">$96,200</span><span class="kanban-flag flag-new">New</span></div></div>
+</div>
+</div>
+<div class="kanban-col">
+<div class="kanban-col-head"><div class="kanban-col-title"><span class="col-dot dot-qual"></span>Qualifying</div><span class="kanban-count">31</span></div>
+<div class="kanban-col-body">
+<div class="kanban-card" style="border-color:#0d6c7d;box-shadow:0 0 0 2px rgba(13,108,125,0.12);"><div class="kanban-card-head"><span class="kanban-id">SC-TAX-2025-0247</span><span class="kanban-state">SC</span></div><div class="kanban-addr">2847 Magnolia Ave</div><div class="kanban-owner">Marcus Johnson</div><div class="kanban-foot"><span class="kanban-value">$84,200</span><span class="kanban-flag flag-blocked">3 Blocked</span></div></div>
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-TAX-2025-0244</span><span class="kanban-state">SC</span></div><div class="kanban-addr">1701 Calhoun St</div><div class="kanban-owner">Jefferson Estate</div><div class="kanban-foot"><span class="kanban-value">$143,800</span><span class="kanban-flag flag-due">Heirs needed</span></div></div>
+</div>
+</div>
+<div class="kanban-col">
+<div class="kanban-col-head"><div class="kanban-col-title"><span class="col-dot dot-out"></span>Outreach</div><span class="kanban-count">86</span></div>
+<div class="kanban-col-body">
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-MTG-2026-0072</span><span class="kanban-state">SC</span></div><div class="kanban-addr">3308 Sumter Hwy</div><div class="kanban-owner">P. Robinson</div><div class="kanban-foot"><span class="kanban-value">$58,900</span><span class="kanban-meta">SMS 3/5</span></div></div>
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-TAX-2025-0233</span><span class="kanban-state">SC</span></div><div class="kanban-addr">772 Beaufain St</div><div class="kanban-owner">M. Chen</div><div class="kanban-foot"><span class="kanban-value">$92,400</span><span class="kanban-meta">SMS 2/5</span></div></div>
+</div>
+</div>
+<div class="kanban-col">
+<div class="kanban-col-head"><div class="kanban-col-title"><span class="col-dot dot-convo"></span>In Conversation</div><span class="kanban-count">23</span></div>
+<div class="kanban-col-body">
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">TN-MTG-2026-0012</span><span class="kanban-state">TN</span></div><div class="kanban-addr">412 Oakwood Dr</div><div class="kanban-owner">Patricia Hayes</div><div class="kanban-foot"><span class="kanban-value">$67,800</span><span class="kanban-flag flag-reply">Reply 2h</span></div></div>
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-TAX-2025-0218</span><span class="kanban-state">SC</span></div><div class="kanban-addr">5512 Long Point Rd</div><div class="kanban-owner">G. Sullivan</div><div class="kanban-foot"><span class="kanban-value">$104,300</span><span class="kanban-flag flag-reply">Replied</span></div></div>
+</div>
+</div>
+<div class="kanban-col">
+<div class="kanban-col-head"><div class="kanban-col-title"><span class="col-dot dot-contract"></span>Contract</div><span class="kanban-count">8</span></div>
+<div class="kanban-col-body">
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-MTG-2025-0156</span><span class="kanban-state">SC</span></div><div class="kanban-addr">887 Riverside Dr</div><div class="kanban-owner">James Carter</div><div class="kanban-foot"><span class="kanban-value">$48,600</span><span class="kanban-flag flag-due">Notary 5/9</span></div></div>
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">TN-MTG-2025-0048</span><span class="kanban-state">TN</span></div><div class="kanban-addr">1204 Belmont Blvd</div><div class="kanban-owner">R. Greene</div><div class="kanban-foot"><span class="kanban-value">$73,100</span><span class="kanban-meta">ID received</span></div></div>
+</div>
+</div>
+<div class="kanban-col">
+<div class="kanban-col-head"><div class="kanban-col-title"><span class="col-dot dot-attorney"></span>With Attorney</div><span class="kanban-count">6</span></div>
+<div class="kanban-col-body">
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-TAX-2024-0198</span><span class="kanban-state">SC</span></div><div class="kanban-addr">3712 Folly Beach</div><div class="kanban-owner">N. Patterson</div><div class="kanban-foot"><span class="kanban-value">$94,200</span><span class="kanban-meta">Blessed</span></div></div>
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">PA-TAX-2024-0017</span><span class="kanban-state">PA</span></div><div class="kanban-addr">622 Locust St</div><div class="kanban-owner">M. Davies</div><div class="kanban-foot"><span class="kanban-value">$118,500</span><span class="kanban-meta">Prep filing</span></div></div>
+</div>
+</div>
+<div class="kanban-col">
+<div class="kanban-col-head"><div class="kanban-col-title"><span class="col-dot dot-filed"></span>Claim Filed</div><span class="kanban-count">8</span></div>
+<div class="kanban-col-body">
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-MTG-2024-0072</span><span class="kanban-state">SC</span></div><div class="kanban-addr">5104 Goose Creek Rd</div><div class="kanban-owner">B. Walker</div><div class="kanban-foot"><span class="kanban-value">$78,400</span><span class="kanban-meta">Day 32</span></div></div>
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">TN-MTG-2025-0021</span><span class="kanban-state">TN</span></div><div class="kanban-addr">2210 Elliston Pl</div><div class="kanban-owner">F. Holcomb</div><div class="kanban-foot"><span class="kanban-value">$56,300</span><span class="kanban-meta">Day 18</span></div></div>
+</div>
+</div>
+<div class="kanban-col">
+<div class="kanban-col-head"><div class="kanban-col-title"><span class="col-dot dot-won"></span>Won</div><span class="kanban-count">3</span></div>
+<div class="kanban-col-body">
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-MTG-2024-0008</span><span class="kanban-state">SC</span></div><div class="kanban-addr">1407 Savannah Hwy</div><div class="kanban-owner">C. Beaumont</div><div class="kanban-foot"><span class="kanban-value">$67,400</span><span class="kanban-flag flag-success">Paid Apr 28</span></div></div>
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">SC-TAX-2024-0032</span><span class="kanban-state">SC</span></div><div class="kanban-addr">88 Tradd St</div><div class="kanban-owner">L. Brennan</div><div class="kanban-foot"><span class="kanban-value">$112,800</span><span class="kanban-flag flag-success">Paid Apr 12</span></div></div>
+</div>
+</div>
+<div class="kanban-col">
+<div class="kanban-col-head"><div class="kanban-col-title"><span class="col-dot dot-lost"></span>Lost</div><span class="kanban-count">14</span></div>
+<div class="kanban-col-body">
+<div class="kanban-card"><div class="kanban-card-head"><span class="kanban-id">PA-TAX-2025-0034</span><span class="kanban-state">PA</span></div><div class="kanban-addr">3301 Chestnut St</div><div class="kanban-owner">Donald Reeves</div><div class="kanban-foot"><span class="kanban-value">$54,900</span><span class="kanban-meta">Contested</span></div></div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+
+<div class="tour-section" id="screen-4">
+<div class="tour-label"><div class="tour-label-left"><span class="tour-num">Screen 04</span><h2 class="tour-section-title">Lead Detail</h2></div><span class="tour-section-desc">Single-lead workspace · research, decisions, financials, mailers</span></div>
+<div class="shell">
+<div class="layout">
+<div class="sidebar">
+<div class="brand"><div class="brand-name">Moss Equity</div><div class="brand-sub">Operations</div></div>
+<div class="nav-pad">
+<div class="nav-item">Dashboard</div>
+<div class="nav-divider"></div>
+<div class="nav-item active">Leads<span class="nav-counter alert">247</span></div>
+<div class="nav-item">Tasks<span class="nav-counter alert">12</span></div>
+<div class="nav-item">Claims<span class="nav-counter">14</span></div>
+<div class="nav-item">Inbox<span class="nav-counter alert">7</span></div>
+<div class="nav-divider"></div>
+<div class="nav-item">Campaigns</div>
+<div class="nav-item">Automations</div>
+<div class="nav-item">Imports</div>
+<div class="nav-divider"></div>
+<div class="nav-item">Reports</div>
+<div class="nav-item">Settings</div>
+</div>
+<div class="user-block"><div class="user-avatar">BM</div><div style="flex:1;"><div style="font-size:12px;color:#fff;">Bree Moss</div><div style="font-size:10px;color:rgba(255,255,255,0.55);">Owner</div></div></div>
+</div>
+<div class="main">
+<div class="top-bar compact">
+<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;"><span style="cursor:pointer;">Leads</span><i class="ti ti-chevron-right" style="font-size:12px;"></i><span style="color:#0f1729;font-weight:500;">SC-TAX-2025-0247</span></div>
+<div class="bell-wrap"><i class="ti ti-bell" style="font-size:17px;color:#6b7280;"></i><span class="bell-dot"></span></div>
+</div>
+<div class="content">
+<div class="lead-header">
+<div class="header-top">
+<div style="flex:1;min-width:0;">
+<div class="header-pills"><span class="id-pill">SC-TAX-2025-0247</span><span class="alert-pill">3 Items Need Verification</span></div>
+<h1 class="header-h1">2847 Magnolia Ave, Charleston SC 29401</h1>
+<div class="header-sub">Marcus Johnson · Charleston County · Tax Sale · Sale Date Apr 19, 2026</div>
+</div>
+<div class="header-actions">
+<button class="btn"><i class="ti ti-search"></i>Refresh Research</button>
+<button class="btn"><i class="ti ti-message"></i>Send SMS</button>
+<button class="btn btn-primary"><i class="ti ti-file-signature"></i>Send Agreement</button>
+</div>
+</div>
+
+<div class="stage-strip">
+<div class="stage-step done"><div class="stage-circle"><i class="ti ti-check" style="font-size:13px;"></i></div><div class="stage-line"></div><div class="stage-name">New Leads</div></div>
+<div class="stage-step current"><div class="stage-circle">2</div><div class="stage-line"></div><div class="stage-name">Qualifying</div></div>
+<div class="stage-step upcoming"><div class="stage-circle">3</div><div class="stage-line"></div><div class="stage-name">Outreach</div></div>
+<div class="stage-step upcoming"><div class="stage-circle">4</div><div class="stage-line"></div><div class="stage-name">In Conversation</div></div>
+<div class="stage-step upcoming"><div class="stage-circle">5</div><div class="stage-line"></div><div class="stage-name">Contract</div></div>
+<div class="stage-step upcoming"><div class="stage-circle">6</div><div class="stage-line"></div><div class="stage-name">With Attorney</div></div>
+<div class="stage-step upcoming"><div class="stage-circle">7</div><div class="stage-line"></div><div class="stage-name">Claim Filed</div></div>
+<div class="stage-step upcoming"><div class="stage-circle">8</div><div class="stage-name">Won</div></div>
+</div>
+
+<div class="metric-strip-detail">
+<div class="metric-cell-detail"><div class="metric-label">Estimated Surplus</div><div class="metric-value-detail">$84,200</div><div class="metric-sub-detail">Closing bid less debt</div></div>
+<div class="metric-cell-detail highlight"><div class="metric-label">Confirmed Surplus</div><div class="metric-value-detail muted">Pending County</div><div class="metric-sub-detail" style="color:#0a3d4a;">Awaiting Treasurer</div></div>
+<div class="metric-cell-detail payout"><div class="metric-label">Estimated Net Payout</div><div class="metric-value-detail">$22,260</div><div class="metric-sub-detail">After Fee + Attorney</div></div>
+<div class="metric-cell-detail"><div class="metric-label">Owner Status</div><div class="metric-value-detail" style="font-size:14px;padding-top:3px;">Living · 1 Owner</div><div class="metric-sub-detail">Verified May 5</div></div>
+<div class="metric-cell-detail"><div class="metric-label">Sale Process</div><div class="metric-value-detail" style="font-size:14px;padding-top:3px;">Tax Sale · Non-Judicial</div><div class="metric-sub-detail">Charleston County</div></div>
+<div class="metric-cell-detail"><div class="metric-label">Days Since Sale</div><div class="metric-value-detail">18</div><div class="metric-sub-detail">Apr 19, 2026</div></div>
+</div>
+</div>
+
+<div class="body-grid">
+<div>
+<div class="tab-group">
+<div class="tab active">Overview</div>
+<div class="tab">Contacts</div>
+<div class="tab">Conversations</div>
+<div class="tab">Documents</div>
+<div class="tab">Notes</div>
+<div class="tab">Activity</div>
+</div>
+
+<div class="card">
+<div class="card-head"><div><h3 class="card-title">Research Report</h3><div class="card-sub">Generated by SC Tax Sale agent · May 5, 2026 · Manual edits preserved</div></div><button class="btn-sm"><i class="ti ti-refresh"></i>Refresh Research</button></div>
+
+<div class="viability-strip">
+<span class="viability-pill success"><i class="ti ti-check" style="font-size:11px;"></i>Clears $35K Floor</span>
+<span class="viability-pill action">Recommendation: PURSUE</span>
+<span class="viability-reason">Strong surplus, clean prelim, redemption window allows time</span>
+</div>
+
+<div class="facts-grid">
+<div class="facts-block">
+<div class="subsection-label">State Rules</div>
+<div class="kv-list">
+<div class="kv-row"><span class="kv-key">Sale Process</span><span class="kv-val">Non-Judicial Tax Sale</span></div>
+<div class="kv-row"><span class="kv-key">Redemption Period</span><span class="kv-val">12 Months · Ends Apr 18, 2027</span></div>
+<div class="kv-row"><span class="kv-key">Funds Custodian</span><span class="kv-val">County Treasurer</span></div>
+<div class="kv-row"><span class="kv-key">Filing Window</span><span class="kv-val">5 Years Post-Sale</span></div>
+</div>
+</div>
+<div class="facts-block">
+<div class="subsection-label">Researched Facts</div>
+<div>
+<div class="fact-line"><i class="ti ti-check"></i><span>Surplus on County Treasurer list ($84,200)</span></div>
+<div class="fact-line"><i class="ti ti-check"></i><span>No funds claimed yet (verified May 5, 2026)</span></div>
+<div class="fact-line"><i class="ti ti-check"></i><span>No SC unclaimed property match</span></div>
+<div class="fact-line"><i class="ti ti-check"></i><span>Owner not in SC obituaries (living)</span></div>
+</div>
+</div>
+</div>
+
+<div class="blocked-callout">
+<div class="blocked-head"><i class="ti ti-alert-triangle"></i><div class="blocked-title">3 Items Need Manual Verification</div></div>
+<div class="blocked-list">
+<div>· Charleston County Land Records — confirm current titleholder</div>
+<div>· SC Judicial Portal — pull docket for Case 2025-CP-10-3847</div>
+<div>· Federal Bankruptcy Records — confirm no active stay</div>
+</div>
+</div>
+</div>
+
+<div class="card">
+<h3 class="card-title" style="margin-bottom:14px;">Surplus Breakdown</h3>
+<div class="card-sub" style="margin-bottom:14px;">Recovery Fee % below is the single source — updates Estimated Net Payout everywhere</div>
+<div class="facts-grid" style="margin-bottom:14px;">
+<div>
+<div class="subsection-label">Sale Financials</div>
+<div class="kv-list">
+<div class="kv-row"><span class="kv-key">Closing Bid</span><span class="kv-val">$142,000</span></div>
+<div class="kv-row"><span class="kv-key">Opening Bid</span><span class="kv-val">$54,800</span></div>
+<div class="kv-row"><span class="kv-key">Outstanding Tax</span><span class="kv-val">$54,800</span></div>
+<div class="kv-row"><span class="kv-key">Junior Liens</span><span class="kv-val empty">$0 verified</span></div>
+<div class="kv-row"><span class="kv-key">Court Costs &amp; Fees</span><span class="kv-val">$3,000</span></div>
+</div>
+</div>
+<div>
+<div class="subsection-label">Surplus And Fees</div>
+<div class="kv-list">
+<div class="kv-row"><span class="kv-key">Estimated Surplus</span><span class="kv-val strong">$84,200</span></div>
+<div class="kv-row"><span class="kv-key">Confirmed Surplus</span><span class="kv-val empty">Pending county</span></div>
+<div class="kv-row" style="align-items:center;"><span class="kv-key">Recovery Fee</span><span class="kv-val"><span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #cfe9ed;border-radius:4px;padding:1px 6px;"><input type="text" value="30" style="background:transparent;border:none;outline:none;color:#0d6c7d;font-size:12px;font-weight:500;width:30px;text-align:right;padding:0;font-family:inherit;"><span style="color:#0d6c7d;font-size:12px;">%</span></span><span style="color:#6b7280;margin-left:8px;">$25,260</span></span></div>
+<div class="kv-row"><span class="kv-key">Attorney Cost</span><span class="kv-val">$2,500</span></div>
+</div>
+</div>
+</div>
+<div style="background:linear-gradient(90deg,#f0fafb 0%,#cfe9ed 100%);border-left:3px solid #0d6c7d;padding:8px 12px;margin:4px 0;border-radius:4px;display:grid;grid-template-columns:150px 1fr;align-items:center;">
+<span style="color:#0a3d4a;font-weight:500;font-size:13px;">Estimated Net Payout</span>
+<span style="color:#0d6c7d;font-weight:500;font-size:18px;letter-spacing:-0.3px;">$22,260</span>
+</div>
+</div>
+
+</div>
+
+<div class="right-rail">
+<div class="rail-card">
+<div class="rail-label">Decision</div>
+<button class="decision-btn primary"><div class="decision-head"><i class="ti ti-check"></i>Pursue</div><div class="decision-sub">Move to Outreach</div></button>
+<button class="decision-btn"><div class="decision-head"><i class="ti ti-clock"></i>Review</div><div class="decision-sub">Pause with reason</div></button>
+<button class="decision-btn danger"><div class="decision-head"><i class="ti ti-x"></i>Mark Lost</div><div class="decision-sub">Close out with reason</div></button>
+</div>
+
+<div class="rail-card">
+<div class="rail-label">Quick Facts</div>
+<div class="rail-kv">
+<div class="rail-row"><span class="r-key">Sale Date</span><span class="r-val">Apr 19, 2026</span></div>
+<div class="rail-row"><span class="r-key">Redemption Ends</span><span class="r-val">Apr 18, 2027</span></div>
+<div class="rail-row"><span class="r-key">Filing Deadline</span><span class="r-val">Apr 19, 2031</span></div>
+<div class="rail-row"><span class="r-key">Lead Source</span><span class="r-val">Excess Elite</span></div>
+<div class="rail-row"><span class="r-key">Imported</span><span class="r-val">May 4, 2026</span></div>
+<div class="rail-row"><span class="r-key">Attorney</span><span class="r-val muted">Not assigned</span></div>
+<div class="rail-row"><span class="r-key">Assigned To</span><span class="r-val">Bree Moss</span></div>
+</div>
+</div>
+
+<div class="rail-card">
+<div class="rail-label">Recent Activity</div>
+<div class="activity-row"><div class="activity-icon"><i class="ti ti-mail"></i></div><div><div class="activity-text">Mailer Delivered</div><div class="activity-time">May 2, 2026 · Mount Pleasant</div></div></div>
+<div class="activity-row"><div class="activity-icon"><i class="ti ti-refresh"></i></div><div><div class="activity-text">Research Refreshed</div><div class="activity-time">2h ago · Bree</div></div></div>
+<div class="activity-row"><div class="activity-icon"><i class="ti ti-message"></i></div><div><div class="activity-text">SMS #2 Sent</div><div class="activity-time">Yesterday · Automation</div></div></div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="tour-section" id="screen-5">
+<div class="tour-label"><div class="tour-label-left"><span class="tour-num">Screen 05</span><h2 class="tour-section-title">Inbox</h2></div><span class="tour-section-desc">CRM hybrid · thread list · conversation · lead context with AI summary</span></div>
+<div class="shell">
+<div class="layout">
+<div class="sidebar">
+<div class="brand"><div class="brand-name">Moss Equity</div><div class="brand-sub">Operations</div></div>
+<div class="nav-pad">
+<div class="nav-item">Dashboard</div>
+<div class="nav-divider"></div>
+<div class="nav-item">Leads<span class="nav-counter">247</span></div>
+<div class="nav-item">Tasks<span class="nav-counter alert">12</span></div>
+<div class="nav-item">Claims<span class="nav-counter">14</span></div>
+<div class="nav-item active">Inbox<span class="nav-counter alert">7</span></div>
+<div class="nav-divider"></div>
+<div class="nav-item">Campaigns</div>
+<div class="nav-item">Automations</div>
+<div class="nav-item">Imports</div>
+<div class="nav-divider"></div>
+<div class="nav-item">Reports</div>
+<div class="nav-item">Settings</div>
+</div>
+<div class="user-block"><div class="user-avatar">BM</div><div style="flex:1;"><div style="font-size:12px;color:#fff;">Bree Moss</div><div style="font-size:10px;color:rgba(255,255,255,0.55);">Owner</div></div></div>
+</div>
+<div class="main">
+<div class="top-bar compact">
+<div class="search-wrap"><i class="ti ti-search search-icon"></i><input class="search-input" type="text" placeholder="Search messages, contacts..."><span class="search-shortcut">⌘ K</span></div>
+<div class="bell-wrap"><i class="ti ti-bell" style="font-size:16px;color:#6b7280;"></i><span class="bell-dot"></span></div>
+<button class="btn btn-primary"><i class="ti ti-pencil"></i>Compose</button>
+</div>
+
+<div class="content-grid-inbox">
+<div class="thread-list">
+<div class="thread-tabs">
+<div class="thread-tab-inbox active">Inbox</div>
+<div class="thread-tab-inbox">Scheduled</div>
+<div class="thread-tab-inbox">Sent</div>
+<div class="thread-tab-inbox">Archived</div>
+</div>
+<div class="thread-list-head"><span class="thread-list-title">7 unread</span><div class="thread-list-actions"><span class="thread-list-filter">All channels ▾</span></div></div>
+
+<div class="thread-row active unread">
+<div class="thread-head"><div class="thread-name-wrap"><span class="unread-dot"></span><span class="thread-name">Patricia Hayes</span></div><span class="thread-time new">2h</span></div>
+<div class="thread-meta-row"><span class="thread-id">TN-MTG-2026-0012</span><i class="ti ti-message-circle thread-channel-icon"></i><span class="thread-stage stage-convo">In Conversation</span></div>
+<div class="thread-preview">Yes I want to know more. Can you call me this afternoon? I'll be available after 2pm CT.</div>
+</div>
+
+<div class="thread-row unread">
+<div class="thread-head"><div class="thread-name-wrap"><span class="unread-dot"></span><span class="thread-name">G. Sullivan</span></div><span class="thread-time new">5h</span></div>
+<div class="thread-meta-row"><span class="thread-id">SC-TAX-2025-0218</span><i class="ti ti-mail thread-channel-icon"></i><span class="thread-stage stage-convo">In Conversation</span></div>
+<div class="thread-preview">Thanks for the explanation. My attorney wants to review the agreement before I sign.</div>
+</div>
+
+<div class="thread-row unread">
+<div class="thread-head"><div class="thread-name-wrap"><span class="unread-dot"></span><span class="thread-name">A. Whitney</span></div><span class="thread-time">Yesterday</span></div>
+<div class="thread-meta-row"><span class="thread-id">SC-MTG-2026-0055</span><i class="ti ti-phone thread-channel-icon"></i><span class="thread-stage stage-convo">In Conversation</span></div>
+<div class="thread-preview">Voicemail · 47s · "Hi this is Aaron Whitney returning your call about the Daniel Island property..."</div>
+</div>
+
+<div class="thread-row unread">
+<div class="thread-head"><div class="thread-name-wrap"><span class="unread-dot"></span><span class="thread-name">L. Robinson</span></div><span class="thread-time">Yesterday</span></div>
+<div class="thread-meta-row"><span class="thread-id">SC-TAX-2025-0211</span><i class="ti ti-message-circle thread-channel-icon"></i><span class="thread-stage stage-out">Outreach</span></div>
+<div class="thread-preview">Who is this? How did you get my information?</div>
+</div>
+
+<div class="thread-row">
+<div class="thread-head"><div class="thread-name-wrap"><span class="thread-name">James Carter</span></div><span class="thread-time">2 days</span></div>
+<div class="thread-meta-row"><span class="thread-id">SC-MTG-2025-0156</span><i class="ti ti-mail thread-channel-icon"></i><span class="thread-stage stage-contract">Contract</span></div>
+<div class="thread-preview">Notary confirmed for Friday at 10am. I'll have my ID ready.</div>
+</div>
+</div>
+
+<div class="convo-pane">
+<div class="convo-head">
+<div style="min-width:0;flex:1;">
+<div class="convo-id-row"><span class="convo-id">TN-MTG-2026-0012</span><span class="convo-stage-pill">In Conversation</span></div>
+<div class="convo-name">Patricia Hayes</div>
+<div class="convo-sub">412 Oakwood Dr, Memphis TN · Mortgage foreclosure · 4 messages over 4 days</div>
+</div>
+<div class="convo-actions">
+<button class="btn btn-icon" title="Phone"><i class="ti ti-phone" style="font-size:14px;"></i></button>
+<button class="btn"><i class="ti ti-external-link" style="font-size:12px;"></i>Open Lead</button>
+</div>
+</div>
+
+<div class="convo-body">
+<div class="day-divider"><span class="day-divider-text">May 4, 2026</span></div>
+<div class="msg outbound">
+<div class="msg-meta"><span class="msg-channel channel-sms">SMS</span>· 5:47 PM · Auto · Delivered</div>
+<div class="msg-bubble">Hi Patricia, I'm reaching out about the property at 412 Oakwood Dr. There may be funds owed to you from the recent foreclosure sale. Would you like to discuss?</div>
+</div>
+<div class="day-divider"><span class="day-divider-text">May 5, 2026</span></div>
+<div class="msg inbound">
+<div class="msg-meta"><span class="msg-channel channel-sms">SMS</span>· 9:14 AM · From +1 (901) 555-2847</div>
+<div class="msg-bubble">What funds? I haven't heard anything about money.</div>
+</div>
+<div class="msg outbound">
+<div class="msg-meta"><span class="msg-channel channel-sms">SMS</span>· 11:22 AM · Bree · Delivered</div>
+<div class="msg-bubble">When the property sold at foreclosure auction, it sold for more than what was owed on the mortgage. The county is holding that surplus and you may be entitled to claim it. I help homeowners recover those funds. Can I send you more details by email?</div>
+</div>
+<div class="day-divider"><span class="day-divider-text">May 7, 2026 · Today</span></div>
+<div class="msg inbound">
+<div class="msg-meta"><span class="msg-channel channel-sms">SMS</span>· 2:08 PM · From +1 (901) 555-2847 · 2h ago</div>
+<div class="msg-bubble">Yes I want to know more. Can you call me this afternoon? I'll be available after 2pm CT.</div>
+</div>
+</div>
+
+<div class="composer">
+<div class="composer-tabs">
+<div class="composer-tab active"><i class="ti ti-message-circle"></i>SMS</div>
+<div class="composer-tab"><i class="ti ti-mail"></i>Email</div>
+<div class="composer-tab"><i class="ti ti-phone"></i>Log Call</div>
+<div class="composer-tab"><i class="ti ti-note"></i>Internal Note</div>
+</div>
+<textarea class="composer-input" placeholder="Type a message to Patricia..."></textarea>
+<div class="composer-foot">
+<div class="composer-tools">
+<span class="composer-tool"><i class="ti ti-template"></i>Templates</span>
+<span class="composer-tool"><i class="ti ti-clock"></i>Schedule</span>
+</div>
+<button class="composer-send"><i class="ti ti-send" style="font-size:13px;"></i>Send</button>
+</div>
+</div>
+</div>
+
+<div class="context-panel">
+<div class="ctx-section">
+<div class="ctx-summary-card">
+<div class="ctx-summary-head"><div class="ctx-summary-title"><i class="ti ti-sparkles"></i>Conversation Summary</div><button class="ctx-summary-refresh"><i class="ti ti-refresh"></i>Refresh</button></div>
+<div class="ctx-summary-text">Patricia received initial outreach SMS on May 4. She replied confused about the funds, you explained the surplus situation. As of today she's interested and asked for a call this afternoon after 2pm CT. No agreement sent yet.</div>
+<div class="ctx-summary-foot"><span>Generated 1h ago</span><span>4 of 4 messages</span></div>
+</div>
+</div>
+
+<div class="ctx-section">
+<div class="ctx-payout"><div class="ctx-payout-label">Estimated Net Payout</div><div class="ctx-payout-val">$17,840</div><div class="ctx-payout-sub">From $67,800 surplus · 30% fee</div></div>
+</div>
+
+<div class="ctx-section">
+<div class="ctx-label-text">Lead Snapshot</div>
+<div class="ctx-row"><span class="c-key">Stage</span><span class="c-val">In Conversation</span></div>
+<div class="ctx-row"><span class="c-key">Owner Status</span><span class="c-val">Living · Sole</span></div>
+<div class="ctx-row"><span class="c-key">Sale Date</span><span class="c-val">Apr 12, 2026</span></div>
+<div class="ctx-row"><span class="c-key">Surplus</span><span class="c-val">$67,800</span></div>
+<div class="ctx-row"><span class="c-key">Attorney</span><span class="c-val muted">Not assigned</span></div>
+</div>
+
+<div class="ctx-section">
+<div class="ctx-label-text">Quick Actions</div>
+<div class="ctx-actions">
+<button class="ctx-btn primary"><i class="ti ti-file-signature"></i>Send Agreement</button>
+<button class="ctx-btn"><i class="ti ti-phone"></i>Schedule Call</button>
+<button class="ctx-btn"><i class="ti ti-check"></i>Move To Contract</button>
+</div>
+</div>
+
+<div class="ctx-section" style="border-bottom:none;">
+<div class="ctx-label-text">Recent Activity</div>
+<div class="activity-row"><div class="activity-icon"><i class="ti ti-message"></i></div><div><div class="activity-text">Patricia replied via SMS</div><div class="activity-time">2 hours ago</div></div></div>
+<div class="activity-row"><div class="activity-icon"><i class="ti ti-message"></i></div><div><div class="activity-text">Sent SMS reply</div><div class="activity-time">May 5</div></div></div>
+<div class="activity-row"><div class="activity-icon"><i class="ti ti-bolt"></i></div><div><div class="activity-text">Outreach SMS auto-sent</div><div class="activity-time">May 4</div></div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

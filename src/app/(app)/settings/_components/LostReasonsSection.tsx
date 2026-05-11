@@ -1,0 +1,154 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { addLostReason, setLostReasonArchived } from "../_actions";
+import type { LostReasonAdminRow } from "@/lib/settings/fetch";
+
+// Fix 61 — no "Show Archived" control, no archive toggle. An "Add Reason"
+// button reveals an inline text input. Non-default reasons get a "Remove"
+// button (soft-delete via setLostReasonArchived under the hood). Default
+// reasons stay non-removable.
+
+export function LostReasonsSection({
+  initial,
+}: {
+  initial: LostReasonAdminRow[];
+}) {
+  const [rows, setRows] = useState(initial.filter((r) => !r.archived));
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  function add() {
+    const label = draft.trim();
+    if (!label) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await addLostReason(label);
+      if (res.ok) {
+        setRows((prev) =>
+          [
+            ...prev,
+            { id: res.id, label, is_default: false, archived: false, created_at: new Date().toISOString() },
+          ].sort((a, b) => a.label.localeCompare(b.label))
+        );
+        setDraft("");
+        setAdding(false);
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+
+  function remove(row: LostReasonAdminRow) {
+    setRows((prev) => prev.filter((r) => r.id !== row.id));
+    startTransition(async () => {
+      await setLostReasonArchived(row.id, true);
+    });
+  }
+
+  const inputClass =
+    "rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
+
+  return (
+    <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="m-0 text-[14px] font-medium text-ink">Lost Reasons</h2>
+          <div className="mt-[2px] text-[11px] text-gray-500">
+            Options that appear in the Mark Lost dropdown.
+          </div>
+        </div>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(true);
+              setError(null);
+            }}
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+          >
+            <IconPlus size={13} stroke={2} />
+            Add Reason
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="mb-3 flex items-center gap-2">
+          <input
+            autoFocus
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") add();
+              if (e.key === "Escape") {
+                setAdding(false);
+                setDraft("");
+                setError(null);
+              }
+            }}
+            placeholder="New reason"
+            className={`${inputClass} flex-1`}
+          />
+          <button
+            type="button"
+            onClick={add}
+            disabled={!draft.trim()}
+            className="cursor-pointer rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white disabled:opacity-50"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(false);
+              setDraft("");
+              setError(null);
+            }}
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      {error && <div className="mb-2 text-[12px] text-danger">{error}</div>}
+
+      <div className="divide-y divide-gray-150">
+        {rows.map((row) => (
+          <div
+            key={row.id}
+            className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
+          >
+            <div className="flex-1">
+              <div className="text-[13px] text-ink">{row.label}</div>
+              <div className="text-[10.5px] text-gray-500">
+                {row.is_default ? "Default" : "User Added"}
+              </div>
+            </div>
+            {!row.is_default && (
+              <button
+                type="button"
+                onClick={() => remove(row)}
+                className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-danger"
+                title="Remove"
+                aria-label="Remove"
+              >
+                <IconTrash size={14} stroke={1.75} />
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="py-4 text-center text-[12px] text-gray-500">
+            No reasons yet.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

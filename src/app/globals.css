@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@theme {
+  /* Petrol palette — primary brand colors */
+  --color-petrol-50: #f0fafb;
+  --color-petrol-100: #cfe9ed;
+  --color-petrol-200: #9bd1d9;
+  --color-petrol-300: #1a8a9c;
+  --color-petrol-500: #0d6c7d;
+  --color-petrol-700: #0a3d4a;
+  --color-petrol-900: #062831;
+
+  /* Charcoal — body text */
+  --color-ink: #0f1729;
+
+  /* Neutral grays — direct from portal_tour.html */
+  --color-gray-50: #fafbfc;
+  --color-gray-100: #f8f9fa;
+  --color-gray-150: #f1f3f5;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-700: #374151;
+  --color-gray-900: #0f1729;
+
+  /* Surface backgrounds */
+  --color-canvas: #f0f3f7;
+  --color-surface: #ffffff;
+  --color-surface-muted: #fafbfc;
+
+  /* Status accents */
+  --color-danger: #b91c1c;
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #fecaca;
+
+  --color-warn: #c9a84c;
+  --color-warn-strong: #854f0b;
+  --color-warn-bg: #fef3c7;
+  --color-warn-border: #fcd34d;
+  --color-warn-deep: #78350f;
+
+  --color-success: #15803d;
+  --color-success-strong: #065f46;
+  --color-success-bg: #d1fae5;
+
+  --color-info-violet: #534ab7;
+  --color-info-violet-deep: #3c3489;
+  --color-info-violet-bg: #ddd6fe;
+
+  /* Fonts */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "Courier New", monospace;
+
+  /* Border radius — portal uses 4-14px */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+
+  /* Shadows from portal */
+  --shadow-card: 0 1px 2px rgba(15, 23, 41, 0.03);
+  --shadow-card-hover: 0 1px 2px rgba(15, 23, 41, 0.08);
+  --shadow-elevated: 0 4px 24px rgba(10, 61, 74, 0.18);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.bg-sidebar-gradient {
+  background: linear-gradient(180deg, #0a3d4a 0%, #0d6c7d 100%);
+}
+
+.bg-hero-gradient {
+  background: linear-gradient(135deg, #0a3d4a 0%, #0d6c7d 70%, #1a8a9c 100%);
+}
+
+/* Fix 26 — universal action color. The petrol gradient from the Est. Net To You
+   bar is the one primary-action treatment. Use `btn-primary` on every primary
+   button, Next Stage, Add Relative / Add Mailing Address, and on the active
+   sidebar item / active stage step. */
+.btn-primary {
+  background: linear-gradient(135deg, #0a3d4a 0%, #0d6c7d 100%);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+}
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #093440 0%, #0b5d6c 100%);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Fix 25 — pointer cursor on everything interactive. */
+button:not(:disabled),
+summary,
+select:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"],
+[role="option"],
+label[for],
+a[href],
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="button"]:not(:disabled),
+.cursor-pointer {
+  cursor: pointer;
+}

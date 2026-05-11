@@ -1,0 +1,500 @@
+"use client";
+
+import Link from "next/link";
+import { useState, useTransition } from "react";
+import {
+  IconTrash,
+  IconCheck,
+  IconExternalLink,
+  IconPlus,
+  IconPencil,
+} from "@tabler/icons-react";
+import {
+  toggleTaskCompleted,
+  deleteTask,
+  bulkCompleteTasks,
+  bulkDeleteTasks,
+} from "../_actions";
+import type { TaskRow } from "@/lib/tasks/fetch";
+import type { LeadOption } from "@/lib/leads/lead-options";
+import { AddTaskDrawer } from "./AddTaskDrawer";
+import { EditTaskDrawer } from "./EditTaskDrawer";
+import { useRole } from "@/components/RoleProvider";
+import { cn } from "@/lib/cn";
+
+type BucketKey = "overdue" | "today" | "week" | "later" | "none";
+
+type Section = {
+  key: BucketKey;
+  label: string;
+  empty: string;
+  tasks: TaskRow[];
+  /** Amber-styled section (Overdue). */
+  warn?: boolean;
+};
+
+function dateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Buckets the open (incomplete) tasks for the page sections. Mirrors the
+// server-side `bucketTasks` in @/lib/tasks/fetch; kept here so this client
+// component can re-bucket after optimistic edits without importing the
+// server-only fetch module.
+function buildSections(tasks: TaskRow[]): Section[] {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const todayK = dateKey(now);
+  const sevenOut = new Date(now);
+  sevenOut.setDate(sevenOut.getDate() + 7);
+  const sevenOutK = dateKey(sevenOut);
+
+  const b: Record<BucketKey, TaskRow[]> = {
+    overdue: [],
+    today: [],
+    week: [],
+    later: [],
+    none: [],
+  };
+
+  for (const t of tasks) {
+    if (t.completed) continue;
+    if (!t.due_date) {
+      b.none.push(t);
+      continue;
+    }
+    if (t.due_date < todayK) b.overdue.push(t);
+    else if (t.due_date === todayK) b.today.push(t);
+    else if (t.due_date <= sevenOutK) b.week.push(t);
+    else b.later.push(t);
+  }
+
+  return [
+    {
+      key: "overdue",
+      label: "Overdue",
+      empty: "Nothing Overdue",
+      tasks: b.overdue,
+      warn: true,
+    },
+    { key: "today", label: "Today", empty: "Nothing Due Today", tasks: b.today },
+    {
+      key: "week",
+      label: "This Week",
+      empty: "Nothing Due This Week",
+      tasks: b.week,
+    },
+    {
+      key: "later",
+      label: "Later",
+      empty: "Nothing Scheduled Later",
+      tasks: b.later,
+    },
+    {
+      key: "none",
+      label: "No Due Date",
+      empty: "No Tasks Without A Due Date",
+      tasks: b.none,
+    },
+  ];
+}
+
+const PRIORITY_DOT = {
+  high: "bg-danger",
+  medium: "bg-warn",
+  low: "bg-gray-300",
+} as const;
+
+function fmtDue(date: string | null, time: string | null): string {
+  if (!date) return "";
+  const d = new Date(date + "T00:00:00");
+  const datePart = d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  if (!time) return datePart;
+  const [h, m] = time.split(":");
+  const hh = parseInt(h, 10);
+  const ampm = hh >= 12 ? "pm" : "am";
+  const displayH = hh % 12 || 12;
+  return `${datePart} · ${displayH}:${m}${ampm}`;
+}
+
+export function TasksList({
+  initialTasks,
+}: {
+  initialTasks: TaskRow[];
+}) {
+  const { isAdmin } = useRole();
+  const [tasks, setTasks] = useState(initialTasks);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editing, setEditing] = useState<TaskRow | null>(null);
+  const [, startTransition] = useTransition();
+
+  const sections = buildSections(tasks);
+  const completedCount = tasks.filter((t) => t.completed).length;
+  const completed = tasks.filter((t) => t.completed).slice(0, 20); // cap completed list
+
+  function toggle(task: TaskRow) {
+    const next = !task.completed;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === task.id
+          ? {
+              ...t,
+              completed: next,
+              completed_at: next ? new Date().toISOString() : null,
+            }
+          : t
+      )
+    );
+    startTransition(async () => {
+      await toggleTaskCompleted(task.id, next);
+    });
+  }
+
+  function remove(taskId: string) {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(taskId);
+      return next;
+    });
+    startTransition(async () => {
+      await deleteTask(taskId);
+    });
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function bulkComplete() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setTasks((prev) =>
+      prev.map((t) =>
+        ids.includes(t.id)
+          ? { ...t, completed: true, completed_at: new Date().toISOString() }
+          : t
+      )
+    );
+    setSelected(new Set());
+    startTransition(async () => {
+      await bulkCompleteTasks(ids);
+    });
+  }
+
+  function bulkDelete() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setTasks((prev) => prev.filter((t) => !ids.includes(t.id)));
+    setSelected(new Set());
+    startTransition(async () => {
+      await bulkDeleteTasks(ids);
+    });
+  }
+
+  return (
+    <>
+      <div className="mb-[22px] flex items-start justify-between">
+        <div>
+          <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
+            Tasks
+          </h1>
+          <div className="mt-1 text-[13px] text-gray-500">
+            {tasks.filter((t) => !t.completed).length} Open ·{" "}
+            {completedCount} Completed
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className="inline-flex cursor-pointer items-center gap-1 rounded-md btn-primary px-3 py-2 text-xs font-medium text-white"
+        >
+          <IconPlus size={13} stroke={2} />
+          Add Task
+        </button>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="mb-3 flex items-center justify-between rounded-md border border-petrol-200 bg-petrol-50 px-3 py-2">
+          <div className="text-[12px] text-petrol-700">
+            {selected.size} Selected
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={bulkComplete}
+              className="cursor-pointer rounded-md btn-primary px-3 py-[5px] text-xs font-medium text-white"
+            >
+              Complete
+            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={bulkDelete}
+                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-xs text-danger hover:border-danger"
+              >
+                Delete
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-xs text-ink hover:border-petrol-500"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-5">
+        {sections.map((section) => (
+          <div key={section.key}>
+            <div className="mb-2 flex items-baseline justify-between">
+              <h2
+                className={cn(
+                  "m-0 text-[13px] font-medium",
+                  section.warn ? "text-[#92400e]" : "text-ink"
+                )}
+              >
+                {section.label}
+              </h2>
+              <span
+                className={cn(
+                  "text-[11px]",
+                  section.warn ? "text-[#92400e]" : "text-gray-500"
+                )}
+              >
+                {section.tasks.length}
+              </span>
+            </div>
+            <div
+              className={cn(
+                "overflow-hidden rounded-lg border bg-surface shadow-card",
+                section.warn
+                  ? "border-[#f59e0b] border-l-[3px] border-l-[#f59e0b]"
+                  : "border-gray-200"
+              )}
+            >
+              {section.tasks.length === 0 ? (
+                <div
+                  className={cn(
+                    "px-4 py-3 text-center text-[12px]",
+                    section.warn
+                      ? "bg-[#fff8ed] text-[#92400e]"
+                      : "text-gray-500"
+                  )}
+                >
+                  {section.empty}
+                </div>
+              ) : (
+                section.tasks.map((task) => (
+                  <TaskRowDisplay
+                    key={task.id}
+                    task={task}
+                    selected={selected.has(task.id)}
+                    warn={section.warn}
+                    onToggleSelect={() => toggleSelect(task.id)}
+                    onToggleComplete={() => toggle(task)}
+                    onEdit={() => setEditing(task)}
+                    onRemove={() => remove(task.id)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        ))}
+
+        {completed.length > 0 && (
+          <div>
+            <div className="mb-2 flex items-baseline justify-between">
+              <h2 className="m-0 text-[13px] font-medium text-gray-500">
+                Recently Completed
+              </h2>
+              <span className="text-[11px] text-gray-500">
+                {completed.length}
+              </span>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50 opacity-80">
+              {completed.map((task) => (
+                <TaskRowDisplay
+                  key={task.id}
+                  task={task}
+                  selected={false}
+                  onToggleSelect={() => {}}
+                  onToggleComplete={() => toggle(task)}
+                  onEdit={() => setEditing(task)}
+                  onRemove={() => remove(task.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <AddTaskDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <EditTaskDrawer
+        task={editing}
+        onClose={() => setEditing(null)}
+        onSaved={(updated) =>
+          setTasks((prev) =>
+            prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t))
+          )
+        }
+      />
+    </>
+  );
+}
+
+function TaskRowDisplay({
+  task,
+  selected,
+  warn,
+  onToggleSelect,
+  onToggleComplete,
+  onEdit,
+  onRemove,
+}: {
+  task: TaskRow;
+  selected: boolean;
+  warn?: boolean;
+  onToggleSelect: () => void;
+  onToggleComplete: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const { isAdmin } = useRole();
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onToggleSelect}
+      onKeyDown={(e) => {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          onToggleSelect();
+        }
+      }}
+      className={cn(
+        "group flex cursor-pointer items-center gap-3 border-b border-gray-150 px-4 py-3 last:border-b-0",
+        selected && (warn ? "bg-warn-bg" : "bg-petrol-50")
+      )}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleComplete();
+        }}
+        aria-label={task.completed ? "Mark task incomplete" : "Mark task complete"}
+        className={cn(
+          "flex h-[18px] w-[18px] shrink-0 cursor-pointer items-center justify-center rounded border transition-colors",
+          task.completed
+            ? "border-petrol-500 bg-petrol-500 text-white"
+            : "border-gray-300 bg-surface hover:border-petrol-500"
+        )}
+      >
+        {task.completed && <IconCheck size={11} stroke={3} />}
+      </button>
+      <div className="min-w-0 flex-1">
+        <div
+          className={cn(
+            "text-[13px]",
+            task.completed ? "text-gray-400 line-through" : "text-ink"
+          )}
+        >
+          {task.title}
+        </div>
+        {task.description && (
+          <div
+            className={cn(
+              "mt-[2px] text-[12px]",
+              task.completed ? "text-gray-400" : "text-gray-600"
+            )}
+          >
+            {task.description}
+          </div>
+        )}
+        {(task.lead || task.notes || task.due_date) && (
+          <div
+            className={cn(
+              "mt-[2px] text-[11px]",
+              warn && !task.completed ? "text-warn-strong" : "text-gray-500"
+            )}
+          >
+            {task.due_date && (
+              <span>{fmtDue(task.due_date, task.due_time)}</span>
+            )}
+            {task.due_date && task.lead && <span> · </span>}
+            {task.lead && (
+              <Link
+                href={`/leads/${task.lead_id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="font-mono hover:text-petrol-500"
+              >
+                {task.lead.lead_id}
+              </Link>
+            )}
+            {task.notes && <span> · {task.notes}</span>}
+          </div>
+        )}
+      </div>
+      <span
+        className={cn(
+          "h-[6px] w-[6px] rounded-full",
+          PRIORITY_DOT[task.priority]
+        )}
+        title={`${task.priority} priority`}
+      />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit();
+        }}
+        className="cursor-pointer text-gray-400 hover:text-petrol-500"
+        aria-label="Edit task"
+        title="Edit Task"
+      >
+        <IconPencil size={13} stroke={1.75} />
+      </button>
+      {task.lead && (
+        <Link
+          href={`/leads/${task.lead_id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="cursor-pointer text-gray-400 hover:text-petrol-500"
+          aria-label="Open lead"
+          title="Open Lead"
+        >
+          <IconExternalLink size={13} stroke={1.75} />
+        </Link>
+      )}
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="cursor-pointer text-gray-400 hover:text-danger"
+          aria-label="Delete task"
+          title="Delete Task"
+        >
+          <IconTrash size={13} stroke={1.75} />
+        </button>
+      )}
+    </div>
+  );
+}
