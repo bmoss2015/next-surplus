@@ -175,35 +175,26 @@ function KanbanCard({
         isDragging && "opacity-40"
       )}
     >
-      <div className="mb-[5px] flex items-center justify-between">
-        <span className="font-mono text-[9.5px] text-gray-500">
-          {lead.lead_id}
-        </span>
-        <span className="rounded bg-gray-150 px-[5px] py-[1px] text-[9px] font-medium text-gray-500">
-          {lead.state}
-        </span>
-      </div>
-      <div className="mb-1 truncate text-[12px] font-medium text-ink">
-        {lead.address}
-      </div>
-      <div className="mb-[6px] truncate text-[11px] text-gray-500">
-        {primaryOwner(lead)}
-      </div>
-      <div className="flex items-start justify-between border-t border-gray-150 pt-[6px]">
-        <div className="min-w-0">
-          <div className="text-[12px] font-medium text-ink">
-            {formatCurrency(lead.estimated_surplus)}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12px] font-medium text-ink">
+            {lead.address}
           </div>
-          <div className="text-[9px] text-gray-500">Est. Surplus</div>
+          <div className="mt-[2px] truncate text-[11px] text-gray-500">
+            {primaryOwner(lead)}
+          </div>
+          <div className="mt-[7px] whitespace-nowrap text-[12px] font-medium text-ink">
+            Est. Surplus {formatCurrency(lead.estimated_surplus)}
+          </div>
+          <div className="whitespace-nowrap text-[10px] text-gray-400">
+            Net {formatCurrency(lead.estimated_net_payout)}
+          </div>
         </div>
-        <div className="flex items-center gap-[4px] pt-[1px]">
-          {lead.below_floor && <BelowFloorIcon size={13} />}
-          {lead.needs_action_flag && !lead.below_floor && (
-            <span className="rounded bg-danger-bg px-[5px] py-[1px] text-[9px] font-medium text-danger">
-              Needs Action
-            </span>
-          )}
-        </div>
+        {lead.below_floor && (
+          <div className="shrink-0 pt-[1px]">
+            <BelowFloorIcon size={13} />
+          </div>
+        )}
       </div>
     </a>
   );
