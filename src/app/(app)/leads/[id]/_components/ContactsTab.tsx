@@ -24,10 +24,10 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
   return (
     <>
       <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="m-0 text-[14px] font-medium tracking-tight text-ink">
-            Assign Attorney
-          </h3>
+        <h3 className="m-0 text-[14px] font-medium tracking-tight text-ink">
+          Assigned Attorney
+        </h3>
+        <div className="mt-2">
           <AttorneyAssignment
             leadId={leadId}
             attorneys={attorneys}

@@ -29,7 +29,7 @@ export function AttorneyAssignment({
       value={value}
       onChange={(e) => change(e.target.value)}
       disabled={pending}
-      className="max-w-[150px] cursor-pointer truncate rounded-md border border-gray-200 bg-surface px-1.5 py-[2px] text-[12px] text-ink outline-none focus:border-petrol-500 disabled:opacity-60"
+      className="w-[220px] cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[12.5px] text-ink outline-none focus:border-petrol-500 disabled:opacity-60"
     >
       <option value="">Not Assigned</option>
       {attorneys.map((a) => (
