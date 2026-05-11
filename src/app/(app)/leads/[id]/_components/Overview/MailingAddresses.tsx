@@ -122,20 +122,15 @@ export function MailingAddresses({
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="m-0 text-[14px] font-medium tracking-tight text-ink">
-            Mailing Addresses
-          </h3>
-          <div className="mt-[2px] text-[11px] text-gray-500">
-            Manual entry. Mark which addresses you&rsquo;ve mailed to.
-          </div>
-        </div>
+        <h3 className="m-0 text-[14px] font-medium tracking-tight text-ink">
+          Mailing Addresses
+        </h3>
         {!adding && owners.length > 0 && addButton}
       </div>
 
       {owners.length === 0 ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-7 text-center text-[12px] text-gray-500">
-          Add An Owner First To Attach A Mailing Address.
+          Add an owner first to attach a mailing address.
         </div>
       ) : rows.length === 0 && !adding ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-7 text-center text-[12px] text-gray-500">
@@ -143,37 +138,49 @@ export function MailingAddresses({
         </div>
       ) : (
         rows.length > 0 && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {rows.map((row) => (
-              <div key={row.id} className="group relative rounded-md border border-gray-200 bg-surface p-3">
+              <div
+                key={row.id}
+                className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3"
+              >
+                <div className="text-[12px] leading-snug text-ink">
+                  {row.value}
+                </div>
+                <div className="text-[11px] text-gray-500">
+                  {ownerName(row.owner_id)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleMailed(row)}
+                  className={cn(
+                    "inline-flex w-fit cursor-pointer items-center gap-1 rounded-full px-2 py-[2px] text-[10px] font-medium transition-colors",
+                    row.mailed
+                      ? "bg-success-bg text-success-strong"
+                      : "bg-gray-150 text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
+                  )}
+                  title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
+                >
+                  {row.mailed ? (
+                    <IconMail size={11} stroke={1.75} />
+                  ) : (
+                    <IconMailOff size={11} stroke={1.75} />
+                  )}
+                  {row.mailed && row.mailed_at
+                    ? `Mailed ${fmtMailedAt(row.mailed_at)}`
+                    : "Not Mailed"}
+                </button>
                 {isAdmin && (
                   <button
                     type="button"
                     onClick={() => remove(row)}
-                    className="absolute right-2 top-2 invisible cursor-pointer text-gray-400 hover:text-danger group-hover:visible"
+                    className="mt-auto inline-flex w-fit cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-danger"
                     aria-label="Remove Mailing Address"
                   >
-                    <IconTrash size={13} stroke={1.75} />
+                    <IconTrash size={12} stroke={1.75} />
+                    Remove
                   </button>
                 )}
-                <div className="pr-5 text-[12.5px] leading-snug text-ink">{row.value}</div>
-                <div className="mt-[6px] flex items-center justify-between gap-2">
-                  <span className="truncate text-[11px] text-gray-500">{ownerName(row.owner_id)}</span>
-                  <button
-                    type="button"
-                    onClick={() => toggleMailed(row)}
-                    className={cn(
-                      "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 py-[2px] text-[10.5px] font-medium transition-colors",
-                      row.mailed
-                        ? "bg-success-bg text-success-strong"
-                        : "bg-gray-150 text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
-                    )}
-                    title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
-                  >
-                    {row.mailed ? <IconMail size={11} stroke={1.75} /> : <IconMailOff size={11} stroke={1.75} />}
-                    {row.mailed && row.mailed_at ? `Mailed ${fmtMailedAt(row.mailed_at)}` : "Not Mailed"}
-                  </button>
-                </div>
               </div>
             ))}
           </div>
