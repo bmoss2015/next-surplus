@@ -1,43 +1,46 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback } from "react";
-import { IconCheck, IconPlus } from "@tabler/icons-react";
+import { useState, useTransition, useEffect } from "react";
+import {
+  IconCheck,
+  IconPlus,
+  IconArrowRight,
+  IconBan,
+  IconFlag,
+  IconFlagOff,
+} from "@tabler/icons-react";
 import { STAGES, STAGE_LABELS, type Stage } from "@/lib/leads/types";
-import { advanceStage, addNote, addLostReason, archiveLostReason } from "../_actions";
+import {
+  advanceStage,
+  pauseForReview,
+  clearReviewFlag,
+  addLostReason,
+  archiveLostReason,
+} from "../_actions";
 import type { LostReasonOption } from "@/lib/leads/lost-reasons";
 import { cn } from "@/lib/cn";
 
-// The 8-step strip excludes "lost" — that path is taken via Mark Lost (P / S / R
-// keyboard shortcuts also map to strip actions, see below).
+// The 8-step strip excludes "lost" — that path is taken via the Mark Lost
+// button below the strip. Stage advancement happens only here; there is no
+// separate keyboard-shortcut button row.
 const FORWARD_STAGES: Stage[] = STAGES.filter((s) => s !== "lost");
 const CUSTOM_REASON_KEY = "__custom__";
 
 type Dialog =
   | { kind: "stage"; toStage: Stage }
   | { kind: "lost" }
-  | { kind: "note" }
+  | { kind: "review" }
   | null;
-
-// True when the user is typing into a form field — keyboard shortcuts must not
-// fire then.
-function isTypingTarget(el: EventTarget | null): boolean {
-  if (!(el instanceof HTMLElement)) return false;
-  const tag = el.tagName;
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    tag === "SELECT" ||
-    el.isContentEditable
-  );
-}
 
 export function StageProgressStrip({
   leadId,
   currentStage,
+  needsReview,
   lostReasons,
 }: {
   leadId: string;
   currentStage: Stage;
+  needsReview: boolean;
   lostReasons: LostReasonOption[];
 }) {
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -46,6 +49,10 @@ export function StageProgressStrip({
 
   const currentIdx = FORWARD_STAGES.indexOf(currentStage);
   const isTerminal = currentStage === "won" || currentStage === "lost";
+  const nextStage =
+    currentIdx >= 0 && currentIdx < FORWARD_STAGES.length - 1
+      ? FORWARD_STAGES[currentIdx + 1]
+      : null;
 
   function openStage(stage: Stage) {
     if (stage === currentStage) return;
@@ -53,46 +60,16 @@ export function StageProgressStrip({
     setDialog({ kind: "stage", toStage: stage });
   }
 
-  const goQualifying = useCallback(() => {
-    if (currentStage === "qualifying" || isTerminal) return;
-    setError(null);
-    setDialog({ kind: "stage", toStage: "qualifying" });
-  }, [currentStage, isTerminal]);
-
-  const openLost = useCallback(() => {
+  function openLost() {
     if (isTerminal) return;
     setError(null);
     setDialog({ kind: "lost" });
-  }, [isTerminal]);
+  }
 
-  const openNote = useCallback(() => {
+  function openReview() {
     setError(null);
-    setDialog({ kind: "note" });
-  }, []);
-
-  // PRS keyboard shortcuts: P -> advance to Qualifying, S -> Mark Lost drawer,
-  // R -> add a note with no stage change. Suppressed while typing or when a
-  // dialog is already open.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (isTypingTarget(e.target)) return;
-      if (dialog) return;
-      const k = e.key.toLowerCase();
-      if (k === "p") {
-        e.preventDefault();
-        goQualifying();
-      } else if (k === "s") {
-        e.preventDefault();
-        openLost();
-      } else if (k === "r") {
-        e.preventDefault();
-        openNote();
-      }
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [dialog, goQualifying, openLost, openNote]);
+    setDialog({ kind: "review" });
+  }
 
   function close() {
     setDialog(null);
@@ -115,17 +92,23 @@ export function StageProgressStrip({
     });
   }
 
-  function confirmNote(body: string) {
+  function confirmReview(reason: string) {
     startTransition(async () => {
-      const result = await addNote(leadId, body);
+      const result = await pauseForReview(leadId, reason);
       if (result.ok) close();
       else setError(result.error);
     });
   }
 
+  function doClearReview() {
+    startTransition(async () => {
+      await clearReviewFlag(leadId);
+    });
+  }
+
   return (
     <>
-      <div className="mb-[18px] flex items-center gap-0 px-0 pt-3 pb-1">
+      <div className="mb-[14px] flex items-center gap-0 px-0 pt-3 pb-1">
         {FORWARD_STAGES.map((stage, idx) => {
           const isDone = idx < currentIdx;
           const isCurrent = idx === currentIdx;
@@ -173,6 +156,49 @@ export function StageProgressStrip({
         })}
       </div>
 
+      {/* Stage actions — the only place a lead's stage advances from. */}
+      <div className="mb-[18px] flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => nextStage && openStage(nextStage)}
+          disabled={!nextStage || isTerminal || pending}
+          className="btn-primary inline-flex items-center gap-1.5 rounded-md px-3 py-[7px] text-[12.5px] font-medium disabled:opacity-50"
+        >
+          <IconArrowRight size={14} stroke={2} />
+          {nextStage ? `Next Stage: ${STAGE_LABELS[nextStage]}` : "No Next Stage"}
+        </button>
+        <button
+          type="button"
+          onClick={openLost}
+          disabled={isTerminal || pending}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-danger-border bg-danger-bg px-3 py-[7px] text-[12.5px] font-medium text-danger hover:opacity-90 disabled:opacity-50"
+        >
+          <IconBan size={14} stroke={2} />
+          Mark Lost
+        </button>
+        {needsReview ? (
+          <button
+            type="button"
+            onClick={doClearReview}
+            disabled={pending}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-warn-border bg-warn-bg px-3 py-[7px] text-[12.5px] font-medium text-warn-deep hover:opacity-90 disabled:opacity-50"
+          >
+            <IconFlagOff size={14} stroke={2} />
+            Clear Needs Review
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={openReview}
+            disabled={pending}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[12.5px] font-medium text-ink hover:border-petrol-500 disabled:opacity-50"
+          >
+            <IconFlag size={14} stroke={2} />
+            Needs Review
+          </button>
+        )}
+      </div>
+
       {dialog?.kind === "stage" && (
         <StageTransitionDialog
           fromStage={currentStage}
@@ -192,11 +218,11 @@ export function StageProgressStrip({
           onCancel={close}
         />
       )}
-      {dialog?.kind === "note" && (
-        <AddNoteDialog
+      {dialog?.kind === "review" && (
+        <NeedsReviewDialog
           pending={pending}
           error={error}
-          onConfirm={confirmNote}
+          onConfirm={confirmReview}
           onCancel={close}
         />
       )}
@@ -247,7 +273,7 @@ function StageTransitionDialog({
   );
 }
 
-function AddNoteDialog({
+function NeedsReviewDialog({
   pending,
   error,
   onConfirm,
@@ -255,37 +281,39 @@ function AddNoteDialog({
 }: {
   pending: boolean;
   error: string | null;
-  onConfirm: (body: string) => void;
+  onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {
-  const [body, setBody] = useState("");
+  const [reason, setReason] = useState("");
   return (
     <Overlay onCancel={onCancel}>
-      <div className="text-[11px] tracking-[0.4px] text-gray-500">Add Note</div>
-      <div className="mt-2 text-[15px] font-medium text-ink">Add A Note</div>
+      <div className="text-[11px] tracking-[0.4px] text-gray-500">Needs Review</div>
+      <div className="mt-2 text-[15px] font-medium text-ink">
+        Flag This Lead For Review
+      </div>
       <div className="mt-1 text-[12px] text-gray-500">
-        Records a timestamped note. The stage stays the same.
+        Marks the lead as needing review. The stage stays the same.
       </div>
       <textarea
         autoFocus
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
             e.preventDefault();
-            if (body.trim()) onConfirm(body.trim());
+            if (reason.trim()) onConfirm(reason.trim());
           }
         }}
         rows={3}
-        placeholder="Type your note. Cmd+Enter to save."
+        placeholder="Why does this lead need review?"
         className="mt-4 w-full resize-none rounded-md border border-gray-200 bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-petrol-500"
       />
       {error && <ErrorBox text={error} />}
       <DialogButtons
         onCancel={onCancel}
-        onConfirm={() => onConfirm(body.trim())}
-        disabled={pending || body.trim().length === 0}
-        confirmLabel={pending ? "Saving" : "Save Note"}
+        onConfirm={() => onConfirm(reason.trim())}
+        disabled={pending || reason.trim().length === 0}
+        confirmLabel={pending ? "Saving" : "Flag For Review"}
       />
     </Overlay>
   );

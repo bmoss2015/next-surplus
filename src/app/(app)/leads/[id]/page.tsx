@@ -85,6 +85,7 @@ export default async function LeadDetailPage({
         <StageProgressStrip
           leadId={lead.id}
           currentStage={lead.stage}
+          needsReview={lead.needs_action_flag}
           lostReasons={lostReasons}
         />
         <MetricStripDetail lead={lead} />
