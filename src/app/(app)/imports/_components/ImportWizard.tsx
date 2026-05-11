@@ -477,6 +477,51 @@ function Pager({
   );
 }
 
+// Fix I: live mapping-status banner, pinned at the top of the mapping step so
+// the user always sees how many columns are mapped, how many are still
+// unrecognized, and — in red — any required portal field that isn't mapped yet.
+function MappingStatusBanner({
+  mappedCount,
+  unrecCount,
+  dismissedCount,
+  missingRequiredKeys,
+}: {
+  mappedCount: number;
+  unrecCount: number;
+  dismissedCount: number;
+  missingRequiredKeys: string[];
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium">
+      <span className="inline-flex items-center gap-1 rounded-full bg-petrol-100 px-2 py-[2px] text-petrol-700">
+        <IconCheck size={10} stroke={3} />
+        {mappedCount} {mappedCount === 1 ? "Column" : "Columns"} Mapped
+      </span>
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full px-2 py-[2px]",
+          unrecCount > 0 ? "bg-[#fff8ed] text-[#92400e]" : "bg-gray-100 text-gray-500"
+        )}
+      >
+        {unrecCount > 0 && <IconAlertTriangle size={10} stroke={2.5} />}
+        {unrecCount} Unrecognized
+      </span>
+      {dismissedCount > 0 && (
+        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-[2px] text-gray-500">
+          {dismissedCount} Dismissed
+        </span>
+      )}
+      {missingRequiredKeys.length > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-danger-bg px-2 py-[2px] text-danger">
+          <IconAlertTriangle size={10} stroke={2.5} />
+          Required: {missingRequiredKeys.map((k) => portalFieldLabel(k)).join(", ")}{" "}
+          {missingRequiredKeys.length === 1 ? "is" : "are"} unrecognized
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ===========================================================================
 // Main wizard
 // ===========================================================================
@@ -1063,40 +1108,49 @@ export function ImportWizard() {
           Are Marked With An Asterisk.
         </div>
 
-        {/* Sticky top bar — progress + pager + actions, always reachable. */}
+        {/* Sticky top bar — status banner (Fix I) + progress + pager + actions. */}
         <div className="sticky top-0 z-20 -mx-5 mt-3 border-b border-gray-150 bg-surface px-5 pb-3 pt-3">
-          <div className="mx-auto flex max-w-[900px] flex-wrap items-center justify-between gap-2">
-            <span className="text-[11.5px] font-medium text-gray-600">
-              {recognizedCols.length > 0
-                ? `Showing ${recStart + 1}-${recStart + recPageCols.length} Of ${recognizedCols.length} Recognized Columns`
-                : "0 Recognized Columns"}
-              {unrecognizedCols.length > 0 ? ` · ${unrecognizedCols.length} To Review` : ""}
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <Pager
-                currentPage={recCurrentPage}
-                pageCount={recPageCount}
-                onPrev={() => setRecPage((p) => Math.max(1, p - 1))}
-                onNext={() => setRecPage((p) => Math.min(recPageCount, p + 1))}
-              />
-              <button
-                type="button"
-                onClick={resetAll}
-                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-xs text-ink hover:border-petrol-500"
-              >
-                Start Over
-              </button>
-              <button
-                type="button"
-                onClick={continueFromMap}
-                disabled={pending}
-                className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-              >
-                {unrecognizedCols.length > 0
-                  ? "Review Unrecognized Columns"
-                  : "Continue To Preview"}
-                <IconArrowRight size={13} stroke={2} />
-              </button>
+          <div className="mx-auto max-w-[900px]">
+            <MappingStatusBanner
+              mappedCount={recognizedCols.length}
+              unrecCount={unrecognizedCols.length}
+              dismissedCount={dismissed.length}
+              missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
+                (k) => !mapping[k]
+              )}
+            />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11.5px] font-medium text-gray-600">
+                {recognizedCols.length > 0
+                  ? `Showing ${recStart + 1}-${recStart + recPageCols.length} Of ${recognizedCols.length} Recognized Columns`
+                  : "0 Recognized Columns"}
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Pager
+                  currentPage={recCurrentPage}
+                  pageCount={recPageCount}
+                  onPrev={() => setRecPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setRecPage((p) => Math.min(recPageCount, p + 1))}
+                />
+                <button
+                  type="button"
+                  onClick={resetAll}
+                  className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-xs text-ink hover:border-petrol-500"
+                >
+                  Start Over
+                </button>
+                <button
+                  type="button"
+                  onClick={continueFromMap}
+                  disabled={pending}
+                  className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                >
+                  {unrecognizedCols.length > 0
+                    ? "Review Unrecognized Columns"
+                    : "Continue To Preview"}
+                  <IconArrowRight size={13} stroke={2} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1120,10 +1174,22 @@ export function ImportWizard() {
         </div>
 
         {unrecognizedCols.length > 0 && (
-          <div className="mx-auto mt-4 max-w-[900px] rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[11.5px] text-gray-500">
-            {unrecognizedCols.length}{" "}
-            {unrecognizedCols.length === 1 ? "Column Is" : "Columns Are"} Not Yet Recognized.
-            You Will Review Them Next.
+          <div className="mx-auto mt-4 flex max-w-[900px] flex-wrap items-center justify-between gap-2 rounded-md border border-[#f59e0b] bg-[#fff8ed] px-3 py-2 text-[11.5px] font-medium text-[#92400e]">
+            <span>
+              {unrecognizedCols.length}{" "}
+              {unrecognizedCols.length === 1 ? "Column Is" : "Columns Are"} Not Yet Recognized.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setUnrecPage(1);
+                setStep("unrecognized");
+              }}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#f59e0b] bg-surface px-2.5 py-1 text-xs font-medium text-[#92400e] hover:bg-[#fffaf0]"
+            >
+              Jump To Unrecognized
+              <IconArrowRight size={12} stroke={2} />
+            </button>
           </div>
         )}
 
@@ -1168,45 +1234,55 @@ export function ImportWizard() {
           {file?.name} · Lead Source: {leadSource}
         </div>
 
-        {/* Sticky top bar — progress, pager, Dismiss All, Back, Continue. */}
+        {/* Sticky top bar — status banner (Fix I) + progress, pager, actions. */}
         <div className="sticky top-0 z-20 -mx-5 mt-3 border-b border-gray-150 bg-surface px-5 pb-3 pt-3">
-          <div className="mx-auto flex max-w-[900px] flex-wrap items-center justify-between gap-2">
-            <span className="text-[11.5px] font-medium text-gray-600">
-              {allReviewed
-                ? "0 Columns Remaining"
-                : `Showing ${unrecStart + 1}-${unrecStart + unrecPageCols.length} Of ${unrecognizedCols.length} · Page ${unrecCurrentPage} Of ${unrecPageCount} — ${unrecognizedCols.length} Columns Remaining`}
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <Pager
-                currentPage={unrecCurrentPage}
-                pageCount={unrecPageCount}
-                onPrev={() => setUnrecPage((p) => Math.max(1, p - 1))}
-                onNext={() => setUnrecPage((p) => Math.min(unrecPageCount, p + 1))}
-              />
-              <button
-                type="button"
-                onClick={dismissAllRemaining}
-                disabled={allReviewed}
-                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-xs text-ink hover:border-petrol-500 disabled:opacity-50"
-              >
-                Dismiss All Remaining
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep("map")}
-                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-xs text-ink hover:border-petrol-500"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={continueToPreview}
-                disabled={pending}
-                className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-              >
-                Continue To Preview
-                <IconArrowRight size={13} stroke={2} />
-              </button>
+          <div className="mx-auto max-w-[900px]">
+            <MappingStatusBanner
+              mappedCount={recognizedCols.length}
+              unrecCount={unrecognizedCols.length}
+              dismissedCount={dismissed.length}
+              missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
+                (k) => !mapping[k]
+              )}
+            />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11.5px] font-medium text-gray-600">
+                {allReviewed
+                  ? "0 Columns Remaining"
+                  : `Showing ${unrecStart + 1}-${unrecStart + unrecPageCols.length} Of ${unrecognizedCols.length} · Page ${unrecCurrentPage} Of ${unrecPageCount} — ${unrecognizedCols.length} Columns Remaining`}
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Pager
+                  currentPage={unrecCurrentPage}
+                  pageCount={unrecPageCount}
+                  onPrev={() => setUnrecPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setUnrecPage((p) => Math.min(unrecPageCount, p + 1))}
+                />
+                <button
+                  type="button"
+                  onClick={dismissAllRemaining}
+                  disabled={allReviewed}
+                  className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-xs text-ink hover:border-petrol-500 disabled:opacity-50"
+                >
+                  Dismiss All Remaining
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep("map")}
+                  className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-xs text-ink hover:border-petrol-500"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={continueToPreview}
+                  disabled={pending}
+                  className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                >
+                  Continue To Preview
+                  <IconArrowRight size={13} stroke={2} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
