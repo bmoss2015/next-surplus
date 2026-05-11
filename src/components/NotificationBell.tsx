@@ -26,7 +26,49 @@ function relativeTime(iso: string): string {
   return `${Math.floor(diffMo / 12)}y Ago`;
 }
 
-const POLL_MS = 60_000;
+const POLL_MS = 30_000;
+
+// Plays a soft two-tone chime (Web Audio, synthesized — no asset needed).
+// Safe to call from browsers without AudioContext (it just no-ops).
+function playChime() {
+  if (typeof window === "undefined") return;
+  const Ctx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!Ctx) return;
+  try {
+    const ctx = new Ctx();
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.12, now);
+    master.connect(ctx.destination);
+
+    const tone = (freq: number, start: number, dur: number) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + start);
+      g.gain.setValueAtTime(0.0001, now + start);
+      g.gain.exponentialRampToValueAtTime(1, now + start + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(now + start);
+      osc.stop(now + start + dur + 0.02);
+    };
+
+    // E5 then A5 — short and bright, total well under 1 second.
+    tone(659.25, 0, 0.18);
+    tone(880.0, 0.13, 0.32);
+
+    window.setTimeout(() => {
+      ctx.close().catch(() => {});
+    }, 800);
+  } catch {
+    // ignore — audio is non-essential
+  }
+}
 
 export function NotificationBell() {
   const router = useRouter();
@@ -35,12 +77,20 @@ export function NotificationBell() {
   const [unread, setUnread] = useState(0);
   const [, startTransition] = useTransition();
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  // Previous unread count, so we only chime when it actually goes up — never
+  // on first load (starts null until the baseline count is established).
+  const prevUnreadRef = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
     try {
       const res = await getNotifications();
       setItems(res.notifications);
       setUnread(res.unreadCount);
+      const prev = prevUnreadRef.current;
+      if (prev !== null && res.unreadCount > prev) {
+        playChime();
+      }
+      prevUnreadRef.current = res.unreadCount;
     } catch {
       // ignore — bell stays in its last state
     }
@@ -70,7 +120,11 @@ export function NotificationBell() {
       setItems((prev) =>
         prev.map((x) => (x.id === n.id ? { ...x, read: true } : x))
       );
-      setUnread((u) => Math.max(0, u - 1));
+      setUnread((u) => {
+        const next = Math.max(0, u - 1);
+        prevUnreadRef.current = next;
+        return next;
+      });
       startTransition(async () => {
         await markNotificationRead(n.id);
       });
@@ -84,6 +138,7 @@ export function NotificationBell() {
   function onMarkAll() {
     setItems((prev) => prev.map((x) => ({ ...x, read: true })));
     setUnread(0);
+    prevUnreadRef.current = 0;
     startTransition(async () => {
       await markAllNotificationsRead();
     });
