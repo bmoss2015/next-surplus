@@ -91,27 +91,29 @@ export default async function LeadDetailPage({
         <MetricStripDetail lead={lead} />
       </div>
 
-      <div className="mt-4 grid grid-cols-[1fr_280px] gap-[18px]">
-        <div className="min-w-0">
-          <TabBar active={activeTab} />
-          {activeTab === "overview" && <OverviewTab lead={lead} />}
-          {activeTab === "contacts" && <ContactsTab leadId={lead.id} />}
-          {activeTab === "research" && <ResearchTab lead={lead} />}
-          {activeTab === "documents" && <DocumentsTab leadId={lead.id} />}
-          {activeTab === "notes" && <NotesTab leadId={lead.id} />}
-          {activeTab === "discussion" && <DiscussionTab leadId={lead.id} />}
-          {activeTab === "activity" && <ActivityTab leadId={lead.id} />}
-        </div>
+      <div className="mt-4">
+        <TabBar active={activeTab} />
+        <div className="grid grid-cols-[1fr_280px] gap-[18px]">
+          <div className="min-w-0">
+            {activeTab === "overview" && <OverviewTab lead={lead} />}
+            {activeTab === "contacts" && <ContactsTab leadId={lead.id} />}
+            {activeTab === "research" && <ResearchTab lead={lead} />}
+            {activeTab === "documents" && <DocumentsTab leadId={lead.id} />}
+            {activeTab === "notes" && <NotesTab leadId={lead.id} />}
+            {activeTab === "discussion" && <DiscussionTab leadId={lead.id} />}
+            {activeTab === "activity" && <ActivityTab leadId={lead.id} />}
+          </div>
 
-        <div className="flex flex-col gap-[14px]">
-          <AssignToField
-            leadId={lead.id}
-            currentId={lead.assigned_to}
-            members={teamMembers.map((m) => ({ id: m.id, fullName: m.fullName }))}
-          />
-          <QuickFactsCard lead={lead} />
-          <AddTaskCard leadId={lead.id} />
-          <RecentActivityCard leadId={lead.id} leadSource={lead.lead_source} />
+          <div className="flex flex-col gap-[14px]">
+            <AssignToField
+              leadId={lead.id}
+              currentId={lead.assigned_to}
+              members={teamMembers.map((m) => ({ id: m.id, fullName: m.fullName }))}
+            />
+            <QuickFactsCard lead={lead} />
+            <AddTaskCard leadId={lead.id} />
+            <RecentActivityCard leadId={lead.id} leadSource={lead.lead_source} />
+          </div>
         </div>
       </div>
     </div>

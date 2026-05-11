@@ -245,7 +245,7 @@ export function SurplusBreakdown({
       {/* Hero Net Payout */}
       <div className="mt-4 grid grid-cols-[150px_1fr] items-center rounded border-l-[3px] border-petrol-500 bg-gradient-to-r from-petrol-50 to-petrol-100 px-3 py-2">
         <span className="text-[13px] font-medium text-petrol-700">
-          Est. Net To You
+          Est. Net Surplus
         </span>
         <span className="text-[18px] font-medium tracking-tight text-petrol-500">
           {fmt(liveNetPayout)}

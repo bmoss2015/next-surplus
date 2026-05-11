@@ -119,9 +119,9 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
 
       <div className="border-r border-petrol-700">
         <Cell
-          label="Est. Net To You"
+          label="Est. Net Surplus"
           variant="payout"
-          sub="Recovery Fee Less Attorney Cost"
+          sub="Recovery Fee Minus Attorney Cost"
         >
           {formatCurrency(lead.estimated_net_payout)}
         </Cell>

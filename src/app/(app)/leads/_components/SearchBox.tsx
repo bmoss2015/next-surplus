@@ -51,7 +51,7 @@ export function SearchBox() {
         value={value}
         onChange={onChange}
         placeholder="Search lead ID, address, owner..."
-        className="w-full rounded-md border border-gray-200 bg-surface py-[6px] pl-8 pr-8 text-xs text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+        className="w-full rounded-md border border-gray-200 bg-surface py-[6px] pl-8 pr-8 text-xs text-ink outline-none transition-colors placeholder:text-gray-400 focus:border-petrol-300 focus:ring-2 focus:ring-petrol-100"
       />
       {value && (
         <button

@@ -19,22 +19,30 @@ export function TeamSection({
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null
   );
 
+  const inviteReady =
+    email.trim().length > 0 && firstName.trim().length > 0 && lastName.trim().length > 0;
+
   function sendInvite(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
     const target = email.trim();
-    if (!target) return;
+    if (!inviteReady) return;
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
     startTransition(async () => {
-      const res = await inviteMember(target, role);
+      const res = await inviteMember(target, role, fullName);
       if (res.ok) {
         setMsg({ kind: "ok", text: `Invite Sent To ${target}.` });
         setEmail("");
+        setFirstName("");
+        setLastName("");
         setRole("member");
         setModalOpen(false);
         router.refresh();
@@ -196,6 +204,32 @@ export function TeamSection({
                   className="rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-gray-500">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Jane"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-gray-500">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                  />
+                </div>
+              </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[11px] font-medium text-gray-500">
                   Role
@@ -224,7 +258,7 @@ export function TeamSection({
                 </button>
                 <button
                   type="submit"
-                  disabled={pending || !email.trim()}
+                  disabled={pending || !inviteReady}
                   className="cursor-pointer rounded-md btn-primary px-3 py-[7px] text-[13px] font-medium text-white disabled:opacity-50"
                 >
                   {pending ? "Sending" : "Invite"}

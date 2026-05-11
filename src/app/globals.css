@@ -87,7 +87,7 @@ body {
   background: linear-gradient(135deg, #0a3d4a 0%, #0d6c7d 70%, #1a8a9c 100%);
 }
 
-/* Fix 26 — universal action color. The petrol gradient from the Est. Net To You
+/* Fix 26 — universal action color. The petrol gradient from the Est. Net Surplus
    bar is the one primary-action treatment. Use `btn-primary` on every primary
    button, Next Stage, Add Relative / Add Mailing Address, and on the active
    sidebar item / active stage step. */

@@ -189,11 +189,17 @@ function KanbanCard({
               <LitigatorBadge />
             </div>
           )}
-          <div className="mt-[7px] whitespace-nowrap text-[12px] font-medium text-ink">
-            Est. Surplus {formatCurrency(lead.estimated_surplus)}
+          <div className="mt-[7px] whitespace-nowrap text-[11px]">
+            <span className="text-gray-400">Total Surplus: </span>
+            <span className="font-medium text-ink">
+              {formatCurrency(lead.estimated_surplus)}
+            </span>
           </div>
-          <div className="whitespace-nowrap text-[10px] text-gray-400">
-            Net {formatCurrency(lead.estimated_net_payout)}
+          <div className="mt-[1px] whitespace-nowrap text-[10px]">
+            <span className="text-gray-400">Est. Net Surplus: </span>
+            <span className="text-gray-400">
+              {formatCurrency(lead.estimated_net_payout)}
+            </span>
           </div>
         </div>
         {lead.below_floor && (

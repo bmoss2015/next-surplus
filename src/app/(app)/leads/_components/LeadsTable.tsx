@@ -118,7 +118,7 @@ export function LeadsTable({
                     </div>
                   ) : (
                     <div className="text-[11px] text-gray-500">
-                      Est. Net To You {formatCurrency(lead.estimated_net_payout)}
+                      Est. Net Surplus {formatCurrency(lead.estimated_net_payout)}
                     </div>
                   )}
                 </td>

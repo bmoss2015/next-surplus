@@ -12,7 +12,8 @@ const SITE_URL =
 
 export async function inviteMember(
   email: string,
-  role: "admin" | "member"
+  role: "admin" | "member",
+  fullName: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const profile = await getCurrentProfile();
   if (!profile?.isAdmin) {
@@ -22,14 +23,19 @@ export async function inviteMember(
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
     return { ok: false, error: "Enter a valid email address" };
   }
+  const cleanName = (fullName ?? "").trim().replace(/\s+/g, " ");
+  if (cleanName.length === 0) {
+    return { ok: false, error: "First and last name are required" };
+  }
   const safeRole: "admin" | "member" = role === "admin" ? "admin" : "member";
 
-  // inviteUserByEmail sends the invite email and stamps the org + role into the
-  // new user's metadata; the on_auth_user_created trigger turns that into a
-  // profile row, so the invitee lands in the right org automatically.
+  // inviteUserByEmail sends the invite email and stamps the org + role + full
+  // name into the new user's metadata; the on_auth_user_created trigger turns
+  // that into a profile row, so the invitee lands in the right org with their
+  // name already set.
   const admin = createServiceClient();
   const { error } = await admin.auth.admin.inviteUserByEmail(cleanEmail, {
-    data: { org_id: profile.orgId, role: safeRole },
+    data: { org_id: profile.orgId, role: safeRole, full_name: cleanName },
     redirectTo: `${SITE_URL}/accept-invite`,
   });
   if (error) return { ok: false, error: error.message };
