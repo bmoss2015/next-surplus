@@ -124,6 +124,7 @@ export const PORTAL_FIELDS: PortalField[] = [
       "postal",
       "postalcode",
       "propertyzip",
+      "propertyzipcode",
       "situszip",
     ],
   },
