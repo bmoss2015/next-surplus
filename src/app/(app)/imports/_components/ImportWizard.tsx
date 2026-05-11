@@ -56,20 +56,23 @@ type Step =
 const DISMISS_VALUE = "__dismiss__";
 
 // Fix E / Fix H: column-mapping lists are chunked so the user never faces a
-// wall of 100+ rows. Pure helper so page math stays consistent everywhere.
-const MAPPING_PAGE_SIZE = 10;
-function paginate<T>(items: T[], page: number): {
-  pageItems: T[];
-  pageCount: number;
-  currentPage: number;
-} {
-  const pageCount = Math.max(1, Math.ceil(items.length / MAPPING_PAGE_SIZE));
+// wall of 100+ rows. Recognized columns (step 1) page at 15; unrecognized
+// columns still needing review (step 2) page at 10.
+const RECOGNIZED_PAGE_SIZE = 15;
+const UNRECOGNIZED_PAGE_SIZE = 10;
+function paginate<T>(
+  items: T[],
+  page: number,
+  pageSize: number
+): { pageItems: T[]; pageCount: number; currentPage: number; start: number } {
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
   const currentPage = Math.min(Math.max(1, page), pageCount);
-  const start = (currentPage - 1) * MAPPING_PAGE_SIZE;
+  const start = (currentPage - 1) * pageSize;
   return {
-    pageItems: items.slice(start, start + MAPPING_PAGE_SIZE),
+    pageItems: items.slice(start, start + pageSize),
     pageCount,
     currentPage,
+    start,
   };
 }
 
@@ -386,10 +389,16 @@ function MappingTable({
               ? String(rawSampleRow[header]).slice(0, 48)
               : "";
           const current = fieldForHeader(mapping, header);
+          const isDismissed = current === DISMISS_VALUE;
+          const isMapped = !!current && !isDismissed;
+          const needsMapping = !current;
           return (
             <div
               key={header}
-              className="grid grid-cols-[2fr_1fr_2fr] items-center gap-2 border-t border-gray-150 px-3 py-2"
+              className={cn(
+                "grid grid-cols-[2fr_1fr_2fr] items-center gap-2 border-t border-gray-150 px-3 py-2",
+                needsMapping && "border-l-2 border-l-[#f59e0b] bg-[#fffaf0]"
+              )}
             >
               <div className="min-w-0">
                 <div className="truncate text-[12.5px] font-medium text-ink">{header}</div>
@@ -400,13 +409,29 @@ function MappingTable({
               <div className="flex items-center justify-center text-gray-300" aria-hidden>
                 <IconArrowRight size={16} stroke={1.75} />
               </div>
-              <div className="min-w-0">
-                <FieldPicker
-                  value={current}
-                  onChange={(v) => onMapColumn(header, v)}
-                  disabledKeys={takenKeys}
-                  allowDismiss={allowDismiss}
-                />
+              <div className="flex min-w-0 items-center gap-1.5">
+                <div className="min-w-0 flex-1">
+                  <FieldPicker
+                    value={current}
+                    onChange={(v) => onMapColumn(header, v)}
+                    disabledKeys={takenKeys}
+                    allowDismiss={allowDismiss}
+                  />
+                </div>
+                {isMapped ? (
+                  <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-petrol-100 px-1.5 py-[2px] text-[9px] font-medium text-petrol-700">
+                    <IconCheck size={9} stroke={3} />
+                    Mapped
+                  </span>
+                ) : isDismissed ? (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-1.5 py-[2px] text-[9px] font-medium text-gray-500">
+                    Dismissed
+                  </span>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-[#fff8ed] px-1.5 py-[2px] text-[9px] font-medium text-[#92400e]">
+                    Needs Mapping
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -416,7 +441,8 @@ function MappingTable({
   );
 }
 
-// Previous / Next pager shown under a paginated mapping table.
+// Compact Previous / Next pager — sits in the sticky top bar of a paginated
+// mapping section. Renders nothing when there's only one page.
 function Pager({
   currentPage,
   pageCount,
@@ -430,23 +456,20 @@ function Pager({
 }) {
   if (pageCount <= 1) return null;
   return (
-    <div className="mx-auto mt-3 flex max-w-[900px] items-center justify-center gap-3 text-xs text-gray-500">
+    <div className="inline-flex items-center gap-1">
       <button
         type="button"
         onClick={onPrev}
         disabled={currentPage <= 1}
-        className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-1 hover:border-petrol-500 disabled:opacity-40"
+        className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-1 text-xs text-ink hover:border-petrol-500 disabled:opacity-40"
       >
         Previous
       </button>
-      <span>
-        Page {currentPage} Of {pageCount}
-      </span>
       <button
         type="button"
         onClick={onNext}
         disabled={currentPage >= pageCount}
-        className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-1 hover:border-petrol-500 disabled:opacity-40"
+        className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-1 text-xs text-ink hover:border-petrol-500 disabled:opacity-40"
       >
         Next
       </button>
@@ -1026,7 +1049,8 @@ export function ImportWizard() {
       pageItems: recPageCols,
       pageCount: recPageCount,
       currentPage: recCurrentPage,
-    } = paginate(recognizedCols, recPage);
+      start: recStart,
+    } = paginate(recognizedCols, recPage, RECOGNIZED_PAGE_SIZE);
     return (
       <Shell step={step}>
         <h2 className="m-0 text-[14px] font-medium text-ink">Confirm Column Mapping</h2>
@@ -1039,13 +1063,22 @@ export function ImportWizard() {
           Are Marked With An Asterisk.
         </div>
 
-        {/* Fix E: sticky top action bar — always reachable on long lists. */}
+        {/* Sticky top bar — progress + pager + actions, always reachable. */}
         <div className="sticky top-0 z-20 -mx-5 mt-3 border-b border-gray-150 bg-surface px-5 pb-3 pt-3">
-          <div className="mx-auto flex max-w-[900px] items-center justify-between gap-2">
-            <span className="text-[11.5px] text-gray-500">
-              {recognizedCols.length} Recognized · {unrecognizedCols.length} To Review
+          <div className="mx-auto flex max-w-[900px] flex-wrap items-center justify-between gap-2">
+            <span className="text-[11.5px] font-medium text-gray-600">
+              {recognizedCols.length > 0
+                ? `Showing ${recStart + 1}-${recStart + recPageCols.length} Of ${recognizedCols.length} Recognized Columns`
+                : "0 Recognized Columns"}
+              {unrecognizedCols.length > 0 ? ` · ${unrecognizedCols.length} To Review` : ""}
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Pager
+                currentPage={recCurrentPage}
+                pageCount={recPageCount}
+                onPrev={() => setRecPage((p) => Math.max(1, p - 1))}
+                onNext={() => setRecPage((p) => Math.min(recPageCount, p + 1))}
+              />
               <button
                 type="button"
                 onClick={resetAll}
@@ -1070,37 +1103,24 @@ export function ImportWizard() {
 
         <div className="mt-4">
           {recognizedCols.length > 0 ? (
-            <>
-              <div className="mx-auto mb-2 max-w-[900px] text-[11.5px] font-medium text-gray-600">
-                Recognized Columns — Page {recCurrentPage} Of {recPageCount} ·{" "}
-                {recognizedCols.length}{" "}
-                {recognizedCols.length === 1 ? "Column" : "Columns"} Auto Matched
-              </div>
-              <MappingTable
-                columns={recPageCols}
-                rawSampleRow={sampleRow}
-                mapping={mapping}
-                onMapColumn={mapColumn}
-                missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
-                  (k) => !mapping[k]
-                )}
-              />
-              <Pager
-                currentPage={recCurrentPage}
-                pageCount={recPageCount}
-                onPrev={() => setRecPage((p) => Math.max(1, p - 1))}
-                onNext={() => setRecPage((p) => Math.min(recPageCount, p + 1))}
-              />
-            </>
+            <MappingTable
+              columns={recPageCols}
+              rawSampleRow={sampleRow}
+              mapping={mapping}
+              onMapColumn={mapColumn}
+              missingRequiredKeys={REQUIRED_PORTAL_FIELD_KEYS.filter(
+                (k) => !mapping[k]
+              )}
+            />
           ) : (
-            <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-[12px] text-gray-500">
+            <div className="mx-auto max-w-[900px] rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-[12px] text-gray-500">
               No Columns Were Auto Matched. You Will Map Every Column On The Next Page.
             </div>
           )}
         </div>
 
         {unrecognizedCols.length > 0 && (
-          <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[11.5px] text-gray-500">
+          <div className="mx-auto mt-4 max-w-[900px] rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[11.5px] text-gray-500">
             {unrecognizedCols.length}{" "}
             {unrecognizedCols.length === 1 ? "Column Is" : "Columns Are"} Not Yet Recognized.
             You Will Review Them Next.
@@ -1108,29 +1128,10 @@ export function ImportWizard() {
         )}
 
         {error && (
-          <div className="mt-3 rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
+          <div className="mx-auto mt-3 max-w-[900px] rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
             {error}
           </div>
         )}
-
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={resetAll}
-            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-2 text-xs text-ink hover:border-petrol-500"
-          >
-            Start Over
-          </button>
-          <button
-            type="button"
-            onClick={continueFromMap}
-            disabled={pending}
-            className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-2 text-xs font-medium disabled:opacity-50"
-          >
-            {unrecognizedCols.length > 0 ? "Review Unrecognized Columns" : "Continue To Preview"}
-            <IconArrowRight size={13} stroke={2} />
-          </button>
-        </div>
       </Shell>
     );
   }
@@ -1141,17 +1142,15 @@ export function ImportWizard() {
       pageItems: unrecPageCols,
       pageCount: unrecPageCount,
       currentPage: unrecCurrentPage,
-    } = paginate(unrecognizedCols, unrecPage);
+      start: unrecStart,
+    } = paginate(unrecognizedCols, unrecPage, UNRECOGNIZED_PAGE_SIZE);
     const allReviewed = unrecognizedCols.length === 0;
-    // Fix H: "Dismiss All Remaining" dismisses the current page and every page
-    // after it — columns the user already paged past are left alone.
+    // "Dismiss All Remaining" dismisses the current page and every page after
+    // it — columns the user already paged past are left alone.
     const dismissAllRemaining = () =>
       setDismissed((prev) =>
         Array.from(
-          new Set([
-            ...prev,
-            ...unrecognizedCols.slice((unrecCurrentPage - 1) * MAPPING_PAGE_SIZE),
-          ])
+          new Set([...prev, ...unrecognizedCols.slice(unrecStart)])
         )
       );
     const continueToPreview = () => {
@@ -1169,14 +1168,21 @@ export function ImportWizard() {
           {file?.name} · Lead Source: {leadSource}
         </div>
 
-        {/* Fix E: sticky top bar — progress, Dismiss All, Back, Continue. */}
+        {/* Sticky top bar — progress, pager, Dismiss All, Back, Continue. */}
         <div className="sticky top-0 z-20 -mx-5 mt-3 border-b border-gray-150 bg-surface px-5 pb-3 pt-3">
           <div className="mx-auto flex max-w-[900px] flex-wrap items-center justify-between gap-2">
             <span className="text-[11.5px] font-medium text-gray-600">
-              Page {unrecCurrentPage} Of {unrecPageCount} — {unrecognizedCols.length}{" "}
-              {unrecognizedCols.length === 1 ? "Column" : "Columns"} Remaining
+              {allReviewed
+                ? "0 Columns Remaining"
+                : `Showing ${unrecStart + 1}-${unrecStart + unrecPageCols.length} Of ${unrecognizedCols.length} · Page ${unrecCurrentPage} Of ${unrecPageCount} — ${unrecognizedCols.length} Columns Remaining`}
             </span>
             <div className="flex flex-wrap items-center gap-2">
+              <Pager
+                currentPage={unrecCurrentPage}
+                pageCount={unrecPageCount}
+                onPrev={() => setUnrecPage((p) => Math.max(1, p - 1))}
+                onNext={() => setUnrecPage((p) => Math.min(unrecPageCount, p + 1))}
+              />
               <button
                 type="button"
                 onClick={dismissAllRemaining}
@@ -1222,12 +1228,6 @@ export function ImportWizard() {
                   (k) => !mapping[k]
                 )}
               />
-              <Pager
-                currentPage={unrecCurrentPage}
-                pageCount={unrecPageCount}
-                onPrev={() => setUnrecPage((p) => Math.max(1, p - 1))}
-                onNext={() => setUnrecPage((p) => Math.min(unrecPageCount, p + 1))}
-              />
             </>
           )}
         </div>
@@ -1259,35 +1259,6 @@ export function ImportWizard() {
             {error}
           </div>
         )}
-
-        <div className="mx-auto mt-4 flex max-w-[900px] flex-wrap justify-between gap-2">
-          <button
-            type="button"
-            onClick={dismissAllRemaining}
-            disabled={allReviewed}
-            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-2 text-xs text-ink hover:border-petrol-500 disabled:opacity-50"
-          >
-            Dismiss All Remaining
-          </button>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setStep("map")}
-              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-2 text-xs text-ink hover:border-petrol-500"
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={continueToPreview}
-              disabled={pending}
-              className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-2 text-xs font-medium disabled:opacity-50"
-            >
-              Continue To Preview
-              <IconArrowRight size={13} stroke={2} />
-            </button>
-          </div>
-        </div>
       </Shell>
     );
   }
