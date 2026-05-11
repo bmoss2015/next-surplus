@@ -1,5 +1,17 @@
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 
+// Fix 90: how a recovery type reads on screen. Proper Case, no dashes.
+function recoveryTypeLabel(value: string | null | undefined): string {
+  switch (value) {
+    case "non_judicial":
+      return "Non Judicial";
+    case "judicial":
+      return "Judicial";
+    default:
+      return "Unknown";
+  }
+}
+
 function fmtDate(d: string | null): string {
   if (!d) return "—";
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
@@ -43,6 +55,7 @@ export function QuickFactsCard({ lead }: { lead: LeadDetailWithCounts }) {
       </div>
       <div className="space-y-0">
         <Row label="Sale Date" value={fmtDate(lead.sale_date)} />
+        <Row label="Recovery Type" value={recoveryTypeLabel(lead.recovery_type)} />
         <Row
           label="Case Number"
           value={lead.case_number ?? "—"}
