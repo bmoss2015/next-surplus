@@ -180,6 +180,8 @@ function leadFieldsFromRow(
     sale_type: row.sale_type,
     sale_date: row.sale_date ?? null,
     case_number: row.case_number ?? null,
+    // parcel_number is always plain text — never parseInt'd or coerced — so any
+    // leading zeros survive the import.
     parcel_number: row.parcel_number ?? null,
     closing_bid: row.closing_bid ?? null,
     opening_bid: row.opening_bid ?? null,
@@ -212,7 +214,9 @@ function relativeRowFromImport(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {
     lead_id: leadId,
-    full_name: r.full_name || "Unknown Relative",
+    // A relative row with phones/emails but no name is still imported; it shows
+    // as "Unknown" in the UI (relatives.full_name is NOT NULL, so store it).
+    full_name: r.full_name || "Unknown",
     relationship: r.relationship ?? null,
     age: r.age ?? null,
   };

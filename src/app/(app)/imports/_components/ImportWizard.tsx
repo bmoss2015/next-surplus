@@ -24,6 +24,7 @@ import {
 } from "../_actions";
 import {
   autoMapHeaders,
+  normalizeHeader,
   PORTAL_FIELDS,
   REQUIRED_PORTAL_FIELD_KEYS,
   portalFieldLabel,
@@ -132,8 +133,12 @@ function mappedHeaders(mapping: Record<string, string>): Set<string> {
 
 function parseMoney(raw: string): number | null {
   if (!raw) return null;
-  const n = parseFloat(raw.replace(/[$,\s]/g, ""));
-  return Number.isFinite(n) ? n : null;
+  // Accounting-style "(75,000.00)" means a negative amount — flag it before
+  // stripping the parens so the downstream "<= 0" guard nulls + logs it.
+  const negative = /^\s*\(/.test(raw);
+  const n = parseFloat(raw.replace(/[$,\s()]/g, ""));
+  if (!Number.isFinite(n)) return null;
+  return negative ? -Math.abs(n) : n;
 }
 
 function parseSaleType(raw: string): ImportSaleType {
@@ -160,6 +165,24 @@ function splitFullName(name: string): string {
     return [first, last].filter(Boolean).join(" ");
   }
   return v;
+}
+
+// Generational / honorific suffixes that may trail a full-name column. The
+// normalized form is re-appended after Proper Case so "III" never becomes "Iii".
+const NAME_SUFFIXES: Record<string, string> = {
+  jr: "Jr",
+  sr: "Sr",
+  ii: "II",
+  iii: "III",
+  iv: "IV",
+  esq: "Esq",
+};
+// "JOHN SMITH JR" -> { name: "JOHN SMITH", suffix: "Jr" }. Returns an empty
+// suffix when there isn't one (or when stripping it would leave nothing).
+function splitNameSuffix(name: string): { name: string; suffix: string } {
+  const m = name.trim().match(/^(.*?)[\s,]+(jr|sr|ii|iii|iv|esq)\.?$/i);
+  if (!m || !m[1].trim()) return { name: name.trim(), suffix: "" };
+  return { name: m[1].trim(), suffix: NAME_SUFFIXES[m[2].toLowerCase()] ?? "" };
 }
 function combineName(first: string, last: string): string {
   return [first.trim(), last.trim()].filter(Boolean).join(" ");
@@ -783,7 +806,9 @@ export function ImportWizard() {
           setError(`Parse Error: ${results.errors[0].message}`);
           return;
         }
-        const hdrs = (results.meta.fields ?? []).filter((h) => h && h.trim());
+        // Drop blank columns entirely — anything whose normalized header is "" is
+        // not mappable and must not show up in the unrecognized-columns list.
+        const hdrs = (results.meta.fields ?? []).filter((h) => h && normalizeHeader(h) !== "");
         setRawRows(results.data);
         setHeaders(hdrs);
         // Fix H: a fresh CSV always starts both mapping lists on page 1.
@@ -994,9 +1019,17 @@ export function ImportWizard() {
       const ownerFull = get(raw, "owner_full_name");
       const ownerFirst = get(raw, "owner_first_name");
       const ownerLast = get(raw, "owner_last_name");
-      const ownerName = properCaseName(
-        ownerFull ? splitFullName(ownerFull) : combineName(ownerFirst, ownerLast)
-      );
+      let ownerName: string;
+      if (ownerFull) {
+        // Strip a trailing Jr/Sr/II–IV/Esq, reorder "Last, First", Proper Case,
+        // then re-attach the suffix.
+        const { name: ownerCore, suffix: ownerSuffix } = splitNameSuffix(ownerFull);
+        ownerName = [properCaseName(splitFullName(ownerCore)), ownerSuffix]
+          .filter(Boolean)
+          .join(" ");
+      } else {
+        ownerName = properCaseName(combineName(ownerFirst, ownerLast));
+      }
 
       const phones: ImportPhone[] = [];
       const seenPhones = new Set<string>();

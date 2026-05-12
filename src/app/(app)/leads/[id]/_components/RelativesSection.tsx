@@ -292,7 +292,7 @@ function RelativeCard({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3">
       <div className="text-[13px] font-medium leading-tight text-ink">
-        {properCaseName(relative.full_name)}
+        {properCaseName(relative.full_name) || "Unknown"}
         <AgeEditField value={relative.age} onCommit={(n) => onPatch({ age: n })} />
       </div>
 

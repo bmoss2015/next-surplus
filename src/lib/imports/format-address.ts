@@ -77,14 +77,19 @@ const MATCH_EXPANSIONS: Record<string, string> = {
 /**
  * Normalize an address for fuzzy duplicate matching:
  *  1. lowercase the whole address;
- *  2. expand common abbreviations as whole words (rd -> road, st -> street, ...);
- *  3. strip punctuation and collapse extra whitespace.
+ *  2. drop any unit/apartment designator and everything after it (Apt, Suite,
+ *     Unit, Ste, Fl, Floor, #) so "123 Main St Apt 4B" and "123 Main St #4B"
+ *     both compare as "123 main st";
+ *  3. expand common abbreviations as whole words (rd -> road, st -> street, ...);
+ *  4. strip punctuation and collapse extra whitespace.
  * Pure helper — never used to format a value that gets persisted.
  */
 export function normalizeAddressForMatch(value: string): string {
   if (!value) return "";
   return value
     .toLowerCase()
+    // Cut the address at the first unit/apartment marker (or "#"), inclusive.
+    .replace(/\s*(?:#|\b(?:apt|apartment|suite|ste|unit|fl|floor)\b).*$/i, "")
     // Strip punctuation -> spaces so abbreviations followed by a comma/period
     // are still treated as whole words.
     .replace(/[^a-z0-9\s]/g, " ")

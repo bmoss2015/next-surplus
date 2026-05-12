@@ -54,7 +54,7 @@ function buildRecipients(
     })),
     ...relatives.map((r) => ({
       key: `r:${r.id}`,
-      label: `${r.full_name} (Relative)`,
+      label: `${(r.full_name ?? "").trim() || "Unknown"} (Relative)`,
       ownerId: fallbackOwnerId,
     })),
   ];

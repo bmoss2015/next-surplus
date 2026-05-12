@@ -21,12 +21,18 @@ if (!/sghfmudgnddybsayfqbd/.test(url)) { console.error("Not staging — abort. U
 const sb = createClient(url, key, { auth: { persistSession: false } });
 
 // ---- transforms copied from src/app/(app)/imports/_shared.ts ---------------
-const normalizePhone = (raw) => (raw ?? "").replace(/\D/g, "");
+// Kept in sync with _shared.ts: a leading US "1" on an 11-digit number is
+// dropped; "Landline" is its own phone-type value (not "Residential").
+const normalizePhone = (raw) => {
+  const d = (raw ?? "").replace(/\D/g, "");
+  return d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
+};
 function parsePhoneType(raw) {
   const v = (raw ?? "").trim().toLowerCase();
   if (!v) return null;
   if (v.startsWith("m") || v.includes("cell") || v.includes("wireless") || v.includes("mobile")) return "Mobile";
-  if (v.startsWith("r") || v.includes("land") || v.includes("home") || v.includes("residential")) return "Residential";
+  if (v.includes("land")) return "Landline";
+  if (v.startsWith("r") || v.includes("home") || v.includes("residential")) return "Residential";
   return "Other";
 }
 function parseDncLitigator(raw) {
@@ -127,7 +133,7 @@ async function main() {
   check("owner status resolves 'deceased' (Deceased=Y)", (incoming.owner_deceased ? "deceased" : incoming.owner_living ? "living" : "unknown") === "deceased");
   check("all 5 owner phones normalized to digits", JSON.stringify(incoming.phones.map((p) => p.value)) === JSON.stringify(["2405551111","2405552222","2405067777","5552226666","6668889999"]), JSON.stringify(incoming.phones.map((p) => p.value)));
   check("owner phone1 type=Mobile dnc=true", incoming.phones[0].phone_type === "Mobile" && incoming.phones[0].is_dnc === true);
-  check("owner phone2 type=Residential dnc=false (LandLine, DNC N)", incoming.phones[1].phone_type === "Residential" && incoming.phones[1].is_dnc === false);
+  check("owner phone2 type=Landline dnc=false (LandLine, DNC N)", incoming.phones[1].phone_type === "Landline" && incoming.phones[1].is_dnc === false);
 
   // --- DB checks: attach owner/contacts/relatives to an owner-less staging lead ---
   const { data: leads } = await sb.from("leads").select("id, org_id, source_surplus, sale_date, case_number");
@@ -192,7 +198,7 @@ async function main() {
     const mailC = (cRows ?? []).filter((c) => c.channel === "mailing_address");
     check("5 owner phone contacts present", phoneC.length === 5, `got ${phoneC.length}`);
     check("phone 2405551111 -> type Mobile, DNC true", phoneC.some((c) => c.value === "2405551111" && c.phone_type === "Mobile" && c.is_dnc === true));
-    check("phone 2405552222 -> type Residential, DNC false", phoneC.some((c) => c.value === "2405552222" && c.phone_type === "Residential" && c.is_dnc === false));
+    check("phone 2405552222 -> type Landline, DNC false", phoneC.some((c) => c.value === "2405552222" && c.phone_type === "Landline" && c.is_dnc === false));
     check("phone (240) 506-7777 -> stored 2405067777", phoneC.some((c) => c.value === "2405067777"));
     check("phone 555-222-6666 -> stored 5552226666", phoneC.some((c) => c.value === "5552226666"));
     check("phone 6668889999 -> stored 6668889999", phoneC.some((c) => c.value === "6668889999"));
