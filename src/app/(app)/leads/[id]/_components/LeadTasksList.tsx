@@ -79,7 +79,7 @@ export function LeadTasksList({
           href={`/tasks?lead=${leadId}`}
           className="block pt-1 text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
         >
-          View All {totalCount} Tasks
+          View All {totalCount} Open Tasks
         </Link>
       )}
     </div>
