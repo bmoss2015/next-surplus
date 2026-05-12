@@ -6,8 +6,6 @@ import {
   IconClock,
   IconFile,
   IconCircleDot,
-  IconCircleCheck,
-  IconCircleDashed,
 } from "@tabler/icons-react";
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { fetchOwnersWithContacts } from "@/lib/leads/fetch-detail";
@@ -24,10 +22,10 @@ import { SurplusBreakdown } from "./Overview/SurplusBreakdown";
 import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
 
-// Fix TTTT2: Overview is a read-only deal snapshot — two columns plus a
+// Fix VVVV2: Overview is a read-only deal snapshot — two columns plus a
 // full-width Recent Activity strip. Every card links to the tab where the data
-// is actually edited; nothing here is editable except the Surplus Breakdown
-// (which keeps its own inline-edit behavior).
+// is actually edited; nothing here is editable except the Surplus Breakdown's
+// Confirmed Surplus and Attorney Cost inline actions.
 
 const ACTIVITY_ICONS = {
   create: IconSparkles,
@@ -38,20 +36,27 @@ const ACTIVITY_ICONS = {
   default: IconCircleDot,
 } as const;
 
-// User-facing labels for the document_category enum values that make up the
-// per-lead checklist (mirrors the Documents tab; "Other" is excluded).
-const DOC_CHECKLIST: Array<{ value: string; label: string }> = [
-  { value: "agreement", label: "Recovery Agreement" },
-  { value: "id_copy", label: "ID Copy" },
-  { value: "deed", label: "Deed" },
-  { value: "court_filing", label: "Court Filing" },
-  { value: "settlement_statement", label: "Settlement Statement" },
-];
+const DOC_CATEGORY_LABELS: Record<string, string> = {
+  agreement: "Recovery Agreement",
+  id_copy: "ID Copy",
+  deed: "Deed",
+  court_filing: "Court Filing",
+  settlement_statement: "Settlement Statement",
+  other: "Other",
+};
 
 function formatPhone(raw: string): string {
   const digits = (raw ?? "").replace(/\D/g, "").slice(0, 10);
   if (digits.length !== 10) return raw;
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+function formatDocDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function statusPillClass(status: OwnerStatus): string {
@@ -93,15 +98,12 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
   const primaryOwner = owners.find((o) => o.is_primary) ?? owners[0] ?? null;
   const phoneContacts = contacts.filter((c) => c.channel === "phone" && c.value.trim());
   const emailContacts = contacts.filter((c) => c.channel === "email" && c.value.trim());
-  const primaryPhone =
-    phoneContacts.find((c) => c.is_primary) ?? phoneContacts[0] ?? null;
-  const primaryEmail =
-    emailContacts.find((c) => c.is_primary) ?? emailContacts[0] ?? null;
+  const primaryPhone = phoneContacts.find((c) => c.is_primary) ?? phoneContacts[0] ?? null;
+  const primaryEmail = emailContacts.find((c) => c.is_primary) ?? emailContacts[0] ?? null;
   const hasAnyContacts = owners.length > 0 || contacts.length > 0;
 
   const findings = (lead.research_overall_findings ?? "").trim();
   const recentNotes = notes.slice(0, 2);
-  const docCategoriesPresent = new Set(documents.map((d) => d.category));
 
   return (
     <div className="space-y-4">
@@ -198,12 +200,11 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
 
         {/* RIGHT COLUMN */}
         <div className="flex flex-col gap-4">
-          {/* Surplus Breakdown — unchanged, moved here. */}
+          {/* Surplus Breakdown */}
           <SurplusBreakdown
             leadId={lead.id}
             closingBid={lead.closing_bid}
             outstandingDebt={lead.outstanding_debt}
-            courtCosts={lead.court_costs}
             liens={lead.liens}
             recoveryFeePercent={lead.recovery_fee_percent}
             attorneyCost={lead.attorney_cost}
@@ -212,32 +213,33 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
           {/* Documents Checklist */}
           <div className={CARD}>
             <SectionSubheader>Documents Checklist</SectionSubheader>
-            <ul className="space-y-1.5">
-              {DOC_CHECKLIST.map((cat) => {
-                const received = docCategoriesPresent.has(cat.value);
-                return (
-                  <li key={cat.value} className="flex items-center gap-2 text-[12.5px]">
-                    {received ? (
-                      <IconCircleCheck size={15} stroke={2} className="shrink-0 text-success" />
-                    ) : (
-                      <IconCircleDashed size={15} stroke={2} className="shrink-0 text-gray-300" />
-                    )}
-                    <span className={received ? "text-ink" : "text-gray-500"}>
-                      {cat.label}
-                    </span>
-                    <span
-                      className={cn(
-                        "ml-auto text-[10.5px] font-medium",
-                        received ? "text-success" : "text-gray-400"
-                      )}
-                    >
-                      {received ? "Received" : "Missing"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-            <CardLink href={`/leads/${leadId}?tab=documents`}>Open Documents</CardLink>
+            {documents.length === 0 ? (
+              <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center">
+                <div className="text-[12.5px] text-gray-500">No Documents Yet</div>
+                <CardLink href={`/leads/${leadId}?tab=documents`}>Go To Documents</CardLink>
+              </div>
+            ) : (
+              <>
+                <ul className="divide-y divide-gray-150">
+                  {documents.map((doc) => {
+                    const title =
+                      doc.custom_name?.trim() ||
+                      DOC_CATEGORY_LABELS[doc.category] ||
+                      doc.category;
+                    return (
+                      <li key={doc.id} className="flex items-center gap-2 py-2 text-[12.5px] first:pt-0 last:pb-0">
+                        <IconFile size={14} stroke={1.75} className="shrink-0 text-gray-400" />
+                        <span className="min-w-0 flex-1 truncate text-ink">{title}</span>
+                        <span className="shrink-0 text-[10.5px] text-gray-400">
+                          {DOC_CATEGORY_LABELS[doc.category] ?? doc.category} · {formatDocDate(doc.uploaded_at)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <CardLink href={`/leads/${leadId}?tab=documents`}>Open Documents</CardLink>
+              </>
+            )}
           </div>
         </div>
       </div>
