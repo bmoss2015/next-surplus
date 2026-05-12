@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
@@ -32,16 +33,46 @@ export async function inviteMember(
   // unless it was explicitly selected.
   const safeRole: "admin" | "member" = role === "admin" ? "admin" : "member";
 
-  // inviteUserByEmail sends the invite email and stamps the org + role + full
-  // name into the new user's metadata; the on_auth_user_created trigger turns
-  // that into a profile row, so the invitee lands in the right org with their
-  // name already set.
+  // Fix OOOOO: Supabase Auth's built-in SMTP isn't configured for this project,
+  // so we don't let it send the invite email. generateLink with type "invite"
+  // still creates the user record and stamps the org + role + full name into the
+  // metadata (the on_auth_user_created trigger turns that into a profile row, so
+  // the invitee lands in the right org with their name already set) — it just
+  // hands us the confirmation URL instead of mailing it. We then deliver that
+  // link ourselves via the Resend API.
   const admin = createServiceClient();
-  const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(cleanEmail, {
-    data: { org_id: profile.orgId, role: safeRole, full_name: cleanName },
-    redirectTo: `${SITE_URL}/accept-invite`,
+  const { data: invited, error } = await admin.auth.admin.generateLink({
+    type: "invite",
+    email: cleanEmail,
+    options: {
+      data: { org_id: profile.orgId, role: safeRole, full_name: cleanName },
+      redirectTo: `${SITE_URL}/accept-invite`,
+    },
   });
   if (error) return { ok: false, error: error.message };
+
+  const inviteUrl = invited?.properties?.action_link;
+  if (!inviteUrl) {
+    return { ok: false, error: "Could not generate the invite link" };
+  }
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const { error: emailError } = await resend.emails.send({
+    from: "bree@mossequitypartners.com",
+    to: cleanEmail,
+    subject: "You have been invited to Moss Equity Partners",
+    html:
+      `<p>Hello ${cleanName},</p>` +
+      `<p>You have been invited to join Moss Equity Partners. ` +
+      `Click the link below to set up your account:</p>` +
+      `<p><a href="${inviteUrl}">Accept Invite</a></p>`,
+  });
+  if (emailError) {
+    return {
+      ok: false,
+      error: `Invite created but the email failed to send: ${emailError.message}`,
+    };
+  }
 
   // Fix P / Fix 9: don't rely solely on the auth trigger — write the chosen
   // role straight onto the profile (service client, bypasses RLS) so the role
