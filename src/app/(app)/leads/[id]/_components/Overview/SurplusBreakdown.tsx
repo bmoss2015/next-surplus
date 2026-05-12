@@ -2,49 +2,39 @@
 
 import type { LienRow } from "@/lib/leads/fetch-detail";
 import { formatCurrency } from "@/lib/leads/format";
-import { cn } from "@/lib/cn";
 import { useConfirmedSurplus } from "../ConfirmedSurplusContext";
+import { SurplusConfirmControl } from "../SurplusConfirm";
 
-// Fix VVVV2 / WWWW2 / EEEEE / IIIII: the Surplus Breakdown card on the Overview
-// tab — read-only in full (the confirmed surplus is edited only from the hero
-// card; the attorney fee is edited on the Contacts tab). Court Costs and Opening
-// Bid do not appear or factor in. Calculated Surplus = Closing Bid − Tax /
-// Mortgage Payoff − Total Liens; when a Confirmed Surplus is set that row dims
-// and strikes through to show it has been superseded. Est. Net Payout =
-// (active surplus × recovery fee %) − attorney fee.
+// Fix VVVV2: the Surplus Breakdown card on the Overview tab. It ALWAYS shows
+// both numbers, clearly labelled — "Calculated Surplus (Unverified)" and either
+// the "Confirmed Surplus" amount or "Not Yet Confirmed" — and carries the
+// "Confirm Surplus" action as a secondary entry point (same inline behaviour as
+// the metric strip). The Est. Net Payout row uses the confirmed surplus when set
+// and the calculated figure otherwise, and labels which one it's based on.
+// Court Costs and Opening Bid do not appear or factor in. Calculated Surplus =
+// Closing Bid − Tax / Mortgage Payoff − Total Liens.
 
 const FIELD_LABEL = "text-[13px] font-normal text-[#64748b]";
 const FIELD_VALUE = "text-[14px] font-medium text-[#0f1729]";
 
-function Row({
-  label,
-  value,
-  superseded,
-}: {
-  label: string;
-  value: string;
-  superseded?: boolean;
-}) {
+function Row({ label, value }: { label: React.ReactNode; value: React.ReactNode }) {
   return (
-    <div
-      className={cn(
-        "grid grid-cols-[170px_1fr] items-center leading-[1.85]",
-        superseded && "opacity-50"
-      )}
-    >
-      <span className={cn(FIELD_LABEL, superseded && "line-through")}>{label}</span>
-      <span className={cn(FIELD_VALUE, superseded && "line-through")}>{value}</span>
+    <div className="grid grid-cols-[200px_1fr] items-center leading-[1.85]">
+      <span className={FIELD_LABEL}>{label}</span>
+      <span className={FIELD_VALUE}>{value}</span>
     </div>
   );
 }
 
 export function SurplusBreakdown({
+  leadId,
   closingBid,
   outstandingDebt,
   liens,
   recoveryFeePercent,
   attorneyCost,
 }: {
+  leadId: string;
   closingBid: number | null;
   outstandingDebt: number | null;
   liens: LienRow[];
@@ -66,15 +56,37 @@ export function SurplusBreakdown({
       <Row label="Closing Bid" value={formatCurrency(closingBid)} />
       <Row label="Tax / Mortgage Payoff" value={formatCurrency(outstandingDebt)} />
       <Row label="Total Liens" value={formatCurrency(liensTotal)} />
-      <Row label="Calculated Surplus" value={formatCurrency(calculatedSurplus)} superseded={hasConfirmed} />
+      <Row
+        label={
+          <>
+            Calculated Surplus <span className="text-gray-400">(Unverified)</span>
+          </>
+        }
+        value={formatCurrency(calculatedSurplus)}
+      />
       <Row
         label="Confirmed Surplus"
-        value={hasConfirmed ? formatCurrency(confirmedSurplus) : "Not Confirmed"}
+        value={
+          hasConfirmed ? (
+            formatCurrency(confirmedSurplus)
+          ) : (
+            <span className="text-gray-400">Not Yet Confirmed</span>
+          )
+        }
       />
+      <div className="grid grid-cols-[200px_1fr] items-center pb-1 leading-[1.85]">
+        <span />
+        <SurplusConfirmControl leadId={leadId} calculatedSurplus={calculatedSurplus} />
+      </div>
       <Row label="Recovery Fee" value={`${recoveryFeePercent}% · ${formatCurrency(feeAmount)}`} />
       <Row label="Attorney Fee" value={formatCurrency(attorneyCost)} />
-      <div className="mt-1 grid grid-cols-[170px_1fr] items-center border-t border-gray-200 pt-2 leading-[1.85]">
-        <span className="text-[13px] font-semibold text-[#0f1729]">Est. Net Payout</span>
+      <div className="mt-1 grid grid-cols-[200px_1fr] items-center border-t border-gray-200 pt-2 leading-[1.85]">
+        <span className="text-[13px] font-semibold text-[#0f1729]">
+          Est. Net Payout{" "}
+          <span className="font-normal text-gray-400">
+            ({hasConfirmed ? "Based On Confirmed" : "Based On Estimate"})
+          </span>
+        </span>
         <span className="text-[15px] font-bold text-[#0f1729]">{formatCurrency(netPayout)}</span>
       </div>
     </div>

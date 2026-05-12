@@ -204,9 +204,10 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
         </div>
       </div>
 
-      {/* Read-only Surplus Breakdown — the confirmed-surplus action lives on the
-          metric strip, not here. */}
+      {/* Surplus Breakdown — shows calculated + confirmed side by side and is a
+          secondary entry point for the Confirm Surplus action (Fix VVVV2). */}
       <SurplusBreakdown
+        leadId={leadId}
         closingBid={lead.closing_bid}
         outstandingDebt={lead.outstanding_debt}
         liens={lead.liens}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconCircleCheck } from "@tabler/icons-react";
 import { fetchDailyWork, type DailyWorkLead } from "@/lib/leads/fetch-daily-work";
 import { ViewToggle } from "../_components/ViewToggle";
 import { StagePill } from "@/components/StagePill";
@@ -113,8 +114,19 @@ function Section({
                   <div className="truncate text-[11.5px] text-petrol-500">
                     {lead.reason}
                   </div>
-                  <div className="truncate text-right text-[13px] font-medium text-ink">
-                    {formatCurrency(lead.estimated_surplus)}
+                  <div className="truncate text-right text-[13px] font-medium">
+                    {lead.confirmed_surplus != null && lead.confirmed_surplus !== 0 ? (
+                      <span className="text-ink">
+                        {formatCurrency(lead.confirmed_surplus)}
+                        <IconCircleCheck
+                          size={13}
+                          className="ml-1 inline-block align-text-bottom text-petrol-700"
+                          aria-label="Confirmed surplus"
+                        />
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">Est. {formatCurrency(lead.estimated_surplus)}</span>
+                    )}
                   </div>
                 </Link>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">

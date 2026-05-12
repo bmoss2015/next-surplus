@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconCircleCheck } from "@tabler/icons-react";
 import type { LeadRow } from "@/lib/leads/types";
 import { StagePill } from "@/components/StagePill";
 import { formatCurrency, primaryOwner, ownerStatusOf } from "@/lib/leads/format";
@@ -66,6 +67,7 @@ export function LeadsTable({
           {leads.map((lead) => {
             const ownerName = primaryOwner(lead);
             const ownerStatus = ownerStatusOf(lead);
+            const surplus = activeSurplus(lead);
             return (
               <tr
                 key={lead.id}
@@ -103,9 +105,23 @@ export function LeadsTable({
                   {SALE_TYPE_LABELS[lead.sale_type]}
                 </td>
                 <td className="px-4 py-[10px] text-right">
-                  <div className="font-medium text-ink">
-                    {formatCurrency(activeSurplus(lead).value)}
-                  </div>
+                  {surplus.basis === "confirmed" ? (
+                    <div className="flex items-center justify-end gap-1 font-medium text-ink">
+                      {formatCurrency(surplus.value)}
+                      <IconCircleCheck
+                        size={13}
+                        className="text-petrol-700"
+                        aria-label="Confirmed surplus"
+                      />
+                    </div>
+                  ) : (
+                    <div className="font-medium text-gray-500">
+                      <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                        Est.{" "}
+                      </span>
+                      {formatCurrency(surplus.value)}
+                    </div>
+                  )}
                   {lead.below_floor && !hideBelowFloor ? (
                     <div className="flex items-center justify-end text-[11px]">
                       <BelowFloorIcon size={14} />

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { IconCircleCheck } from "@tabler/icons-react";
 import {
   STAGES,
   STAGE_LABELS,
@@ -226,6 +227,7 @@ function KanbanCard({
   const locationLine = [lead.county ? toTitleCase(lead.county) : null, lead.state]
     .filter(Boolean)
     .join(", ");
+  const surplus = activeSurplus(lead);
   // Fix BBBB2: every card label is a uniform tag pill; show at most 2, then a
   // neutral "+N more" pill. The lead detail page still shows them all.
   const tags: Array<{ key: string; label: string; cls: string }> = [];
@@ -281,9 +283,18 @@ function KanbanCard({
           )}
           <div className="mt-[7px] whitespace-nowrap text-[11px]">
             <span className="text-gray-400">Total Surplus: </span>
-            <span className="font-medium text-ink">
-              {formatCurrency(activeSurplus(lead).value)}
-            </span>
+            {surplus.basis === "confirmed" ? (
+              <span className="font-medium text-ink">
+                {formatCurrency(surplus.value)}
+                <IconCircleCheck
+                  size={11}
+                  className="ml-0.5 inline-block align-text-bottom text-petrol-700"
+                  aria-label="Confirmed surplus"
+                />
+              </span>
+            ) : (
+              <span className="font-medium text-gray-500">Est. {formatCurrency(surplus.value)}</span>
+            )}
           </div>
           <div className="mt-[1px] whitespace-nowrap text-[10px]">
             <span className="text-gray-400">Est. Net Payout: </span>
