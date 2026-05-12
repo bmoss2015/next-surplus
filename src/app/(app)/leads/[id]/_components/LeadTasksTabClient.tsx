@@ -159,80 +159,8 @@ export function LeadTasksTabClient({
         </span>
       </div>
 
-      {total === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-200 bg-[#f8fafc] px-4 py-6 text-center text-[12.5px] text-gray-500">
-          No open tasks on this lead. Add one below.
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {GROUPS.map((g) => {
-            const rows = grouped[g];
-            if (rows.length === 0) return null;
-            return (
-              <div key={g}>
-                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-400">
-                  {g}
-                </div>
-                <div className="space-y-2">
-                  {rows.map((t) => {
-                    const overdue = t.due_date != null && t.due_date < todayKey;
-                    return (
-                      <div
-                        key={t.id}
-                        className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => complete(t)}
-                          aria-label="Mark task complete"
-                          title="Mark complete"
-                          className="mt-[2px] h-[15px] w-[15px] shrink-0 cursor-pointer rounded-[3px] border border-gray-300 transition-colors hover:border-petrol-500 hover:bg-petrol-50"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[13px] font-medium leading-snug text-ink">
-                              {t.title}
-                            </span>
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-[1px] text-[10px] font-medium leading-none",
-                                PRIORITY_PILL[t.priority]
-                              )}
-                            >
-                              {PRIORITY_LABEL[t.priority]}
-                            </span>
-                          </div>
-                          {t.description && (
-                            <div className="mt-[2px] text-[11.5px] leading-snug text-gray-500">
-                              {t.description}
-                            </div>
-                          )}
-                          {t.due_date && (
-                            <div
-                              className={cn(
-                                "mt-1 flex items-center gap-1 text-[10.5px]",
-                                overdue ? "font-medium text-petrol-500" : "text-gray-400"
-                              )}
-                            >
-                              {overdue && <IconAlertTriangle size={10} stroke={2.25} />}
-                              {overdue ? "Overdue · " : "Due "}
-                              {fmtDue(t.due_date)}
-                              {t.due_time ? ` · ${t.due_time}` : ""}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Always-visible inline add form (no modal). */}
-      <div className="mt-5 rounded-xl border border-gray-200 bg-[#f8fafc] p-4">
+      {/* Fix WWWW: the Add Task form sits at the top, above the task list. */}
+      <div className="mb-5 rounded-xl border border-gray-200 bg-[#f8fafc] p-4">
         <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
           Add Task
         </div>
@@ -305,6 +233,78 @@ export function LeadTasksTabClient({
           </button>
         </div>
       </div>
+
+      {total === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-[#f8fafc] px-4 py-6 text-center text-[12.5px] text-gray-500">
+          No open tasks on this lead. Add one above.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {GROUPS.map((g) => {
+            const rows = grouped[g];
+            if (rows.length === 0) return null;
+            return (
+              <div key={g}>
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-400">
+                  {g}
+                </div>
+                <div className="space-y-2">
+                  {rows.map((t) => {
+                    const overdue = t.due_date != null && t.due_date < todayKey;
+                    return (
+                      <div
+                        key={t.id}
+                        className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => complete(t)}
+                          aria-label="Mark task complete"
+                          title="Mark complete"
+                          className="mt-[2px] h-[15px] w-[15px] shrink-0 cursor-pointer rounded-[3px] border border-gray-300 transition-colors hover:border-petrol-500 hover:bg-petrol-50"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[13px] font-medium leading-snug text-ink">
+                              {t.title}
+                            </span>
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-[1px] text-[10px] font-medium leading-none",
+                                PRIORITY_PILL[t.priority]
+                              )}
+                            >
+                              {PRIORITY_LABEL[t.priority]}
+                            </span>
+                          </div>
+                          {t.description && (
+                            <div className="mt-[2px] text-[11.5px] leading-snug text-gray-500">
+                              {t.description}
+                            </div>
+                          )}
+                          {t.due_date && (
+                            <div
+                              className={cn(
+                                "mt-1 flex items-center gap-1 text-[10.5px]",
+                                overdue ? "font-medium text-petrol-500" : "text-gray-400"
+                              )}
+                            >
+                              {overdue && <IconAlertTriangle size={10} stroke={2.25} />}
+                              {overdue ? "Overdue · " : "Due "}
+                              {fmtDue(t.due_date)}
+                              {t.due_time ? ` · ${t.due_time}` : ""}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
