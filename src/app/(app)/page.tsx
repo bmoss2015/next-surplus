@@ -84,27 +84,29 @@ export default async function DashboardPage() {
           className="text-[12px] text-ink underline decoration-gray-300 underline-offset-[3px] hover:decoration-petrol-500"
         >View All Leads</Link>
       </div>
-      <div className="mb-[22px] grid grid-cols-9 overflow-hidden rounded-lg border border-gray-200 bg-surface">
-        {STAGES.map((stage, idx) => (
-          <Link
-            key={stage}
-            href={
-              stage === "lost"
-                ? "/leads?stage=lost"
-                : `/leads?stage=${stage}`
-            }
-            className={`px-[6px] py-[14px] text-center transition-colors hover:bg-gray-50 ${
-              idx < STAGES.length - 1 ? "border-r border-gray-200" : ""
-            }`}
-          >
-            <div className="text-[20px] font-medium tracking-tight text-ink">
-              {data.stagesCounts[stage]}
-            </div>
-            <div className="mt-1 text-[9px] tracking-[0.4px] text-gray-500">
-              {STAGE_LABELS[stage]}
-            </div>
-          </Link>
-        ))}
+      <div className="mb-[22px] grid grid-cols-9 gap-2">
+        {STAGES.map((stage) => {
+          const numColor =
+            stage === "won"
+              ? "text-[#16a34a]"
+              : stage === "lost"
+                ? "text-[#64748b]"
+                : "text-[#0a3d4a]";
+          return (
+            <Link
+              key={stage}
+              href={`/leads?stage=${stage}`}
+              className="rounded-lg border border-[#e2e8f0] bg-white p-4 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-all hover:border-[#0d6c7d] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+            >
+              <div className={`text-[28px] font-bold leading-none tracking-tight ${numColor}`}>
+                {data.stagesCounts[stage]}
+              </div>
+              <div className="mt-2 text-[12px] font-medium text-[#64748b]">
+                {STAGE_LABELS[stage]}
+              </div>
+            </Link>
+          );
+        })}
       </div>
 
       {/* Split row: Leads Needing Action + Markets/Deadlines */}
