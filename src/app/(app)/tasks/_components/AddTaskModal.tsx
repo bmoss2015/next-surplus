@@ -27,6 +27,8 @@ export function AddTaskModal({
   const [leadQuery, setLeadQuery] = useState("");
   const [leadSearchResults, setLeadSearchResults] = useState<LeadOption[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchedQuery, setSearchedQuery] = useState("");
+  const [leadSearchError, setLeadSearchError] = useState<string | null>(null);
   const [selectedLeadLabel, setSelectedLeadLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -37,33 +39,53 @@ export function AddTaskModal({
       setLeadQuery("");
       setSelectedLeadLabel("");
       setLeadSearchResults([]);
+      setSearchedQuery("");
+      setLeadSearchError(null);
     }
   }, [open, defaultLeadId]);
 
   // Predictive Linked-Lead search: 300ms debounce against lead_id / address.
   useEffect(() => {
-    if (!leadQuery.trim() || leadQuery === selectedLeadLabel) {
+    const q = leadQuery.trim();
+    if (!q || leadQuery === selectedLeadLabel) {
       setLeadSearchResults([]);
+      setSearchedQuery("");
+      setLeadSearchError(null);
       return;
     }
     const handle = window.setTimeout(async () => {
       setIsSearching(true);
+      setLeadSearchError(null);
       try {
         const res = await fetch(
-          `/api/leads/search?q=${encodeURIComponent(leadQuery.trim())}`
+          `/api/leads/search?q=${encodeURIComponent(q)}`
         );
         if (!res.ok) {
           setLeadSearchResults([]);
+          setLeadSearchError("Lead search failed. Try again.");
           return;
         }
         const data = (await res.json()) as LeadOption[];
-        setLeadSearchResults(data);
+        setLeadSearchResults(Array.isArray(data) ? data : []);
+      } catch {
+        setLeadSearchResults([]);
+        setLeadSearchError("Lead search failed. Try again.");
       } finally {
+        setSearchedQuery(q);
         setIsSearching(false);
       }
     }, 300);
     return () => window.clearTimeout(handle);
   }, [leadQuery, selectedLeadLabel]);
+
+  const showLeadDropdown =
+    leadQuery.trim().length > 0 && leadQuery !== selectedLeadLabel;
+  const showNoMatches =
+    showLeadDropdown &&
+    !isSearching &&
+    !leadSearchError &&
+    leadSearchResults.length === 0 &&
+    searchedQuery === leadQuery.trim();
 
   function reset() {
     setTitle("");
@@ -111,12 +133,7 @@ export function AddTaskModal({
     "block text-[10px] tracking-[0.5px] font-medium text-gray-500 mb-1";
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Add Task"
-      description="Track a manual task with an optional description."
-    >
+    <Modal open={open} onClose={onClose} title="Add Task">
       <div className="space-y-4">
         <div>
           <label className={labelClass}>Title</label>
@@ -175,8 +192,8 @@ export function AddTaskModal({
               </button>
             )}
           </div>
-          {leadSearchResults.length > 0 && (
-            <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-b-md border border-gray-200 bg-white shadow-lg">
+          {showLeadDropdown && (leadSearchResults.length > 0 || showNoMatches || leadSearchError) && (
+            <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
               {leadSearchResults.map((opt) => (
                 <button
                   key={opt.id}
@@ -188,12 +205,18 @@ export function AddTaskModal({
                     setSelectedLeadLabel(label);
                     setLeadSearchResults([]);
                   }}
-                  className="w-full cursor-pointer border-b border-gray-100 px-3 py-2 text-left text-[12px] text-ink hover:bg-gray-50"
+                  className="w-full cursor-pointer border-b border-gray-100 px-3 py-2 text-left text-[12px] text-ink last:border-b-0 hover:bg-gray-50"
                 >
                   <div className="font-medium">{opt.lead_id}</div>
                   <div className="truncate text-[11px] text-gray-500">{opt.address}</div>
                 </button>
               ))}
+              {showNoMatches && (
+                <div className="px-3 py-2 text-[12px] text-gray-500">No matching leads</div>
+              )}
+              {leadSearchError && (
+                <div className="px-3 py-2 text-[12px] text-danger">{leadSearchError}</div>
+              )}
             </div>
           )}
           {isSearching && (

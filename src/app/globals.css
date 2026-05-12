@@ -142,3 +142,23 @@ input[type="button"]:not(:disabled),
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
   background: #0a3d4a;
 }
+
+/* Fix GG — native date / time inputs: kill the browser-default (blue in Chrome)
+   calendar / clock picker indicator and recolor it to the portal petrol #0d6c7d.
+   The filter first forces the icon to solid black, then tints it teal. Applies
+   to every date and time input in the portal. */
+input[type="date"],
+input[type="time"] {
+  color-scheme: light;
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.8;
+  filter: brightness(0) saturate(100%) invert(33%) sepia(94%) saturate(380%)
+    hue-rotate(140deg) brightness(92%) contrast(90%);
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
