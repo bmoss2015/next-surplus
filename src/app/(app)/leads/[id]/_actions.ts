@@ -137,12 +137,13 @@ export async function pauseForReview(
 
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/leads");
+  revalidatePath("/tasks");
   return { ok: true };
 }
 
 // Clears the needs_action flag (used when a Reviewed lead is decided on).
-// Fix XXXX: also completes any open "Needs Review" task on the lead and logs an
-// activity entry.
+// Fix XXXX / CCCCC: also completes any open "Needs Review" task on the lead and
+// logs an activity entry.
 export async function clearReviewFlag(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -169,6 +170,7 @@ export async function clearReviewFlag(
 
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/leads");
+  revalidatePath("/tasks");
   return { ok: true };
 }
 

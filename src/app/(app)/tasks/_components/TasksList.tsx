@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   IconTrash,
@@ -138,7 +139,13 @@ export function TasksList({
   const [showOverdueOnly, setShowOverdueOnly] = useState(overdueOnly);
   const [, startTransition] = useTransition();
 
-  const allSections = buildSections(tasks);
+  // Fix CCCCC PART 2: the auto-created "Needs Review" tasks are pinned in their
+  // own block above every dated section — never bucketed into "No Due Date".
+  function isNeedsReview(t: TaskRow): boolean {
+    return !t.completed && t.title === "Needs Review" && t.source === "system";
+  }
+  const needsReviewTasks = tasks.filter(isNeedsReview);
+  const allSections = buildSections(tasks.filter((t) => !isNeedsReview(t)));
   const sections = showOverdueOnly
     ? allSections.filter((s) => s.key === "overdue")
     : allSections;
@@ -282,6 +289,27 @@ export function TasksList({
       )}
 
       <div className="space-y-5">
+        {needsReviewTasks.length > 0 && (
+          <div>
+            <div className="mb-2 flex items-baseline justify-between rounded-md border-l-4 border-l-[#0a3d4a] bg-[#e8f4f6] px-3 py-2">
+              <h2 className="m-0 text-[13px] font-semibold text-[#0a3d4a]">Needs Review</h2>
+              <span className="text-[11px] text-[#0a3d4a]">{needsReviewTasks.length}</span>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-l-4 border-[#0a3d4a] border-l-[#0a3d4a] bg-surface shadow-card">
+              {needsReviewTasks.map((task) => (
+                <TaskRowDisplay
+                  key={task.id}
+                  task={task}
+                  selected={selected.has(task.id)}
+                  onToggleSelect={() => toggleSelect(task.id)}
+                  onToggleComplete={() => toggle(task)}
+                  onEdit={() => setEditing(task)}
+                  onRemove={() => remove(task.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         {showOverdueOnly && sections.length === 0 && (
           <div className="rounded-lg border border-gray-200 bg-surface px-4 py-6 text-center text-[12px] text-gray-500 shadow-card">
             Nothing Overdue.
@@ -410,15 +438,23 @@ function TaskRowDisplay({
   onRemove: () => void;
 }) {
   const { isAdmin } = useRole();
+  const router = useRouter();
+  // Fix CCCCC PART 4: clicking a task row opens its linked lead; tasks with no
+  // lead open the edit drawer instead. (Selection for bulk actions moved to the
+  // explicit checkbox on the left.)
+  function openTarget() {
+    if (task.lead) router.push(`/leads/${task.lead_id}`);
+    else onEdit();
+  }
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onToggleSelect}
+      onClick={openTarget}
       onKeyDown={(e) => {
-        if (e.key === " " || e.key === "Enter") {
+        if (e.key === "Enter") {
           e.preventDefault();
-          onToggleSelect();
+          openTarget();
         }
       }}
       className={cn(
@@ -426,6 +462,14 @@ function TaskRowDisplay({
         selected && (warn ? "bg-[#e0f2f7]" : "bg-petrol-50")
       )}
     >
+      <input
+        type="checkbox"
+        checked={selected}
+        onClick={(e) => e.stopPropagation()}
+        onChange={onToggleSelect}
+        className="h-[14px] w-[14px] shrink-0 cursor-pointer"
+        aria-label="Select task"
+      />
       <button
         type="button"
         onClick={(e) => {
