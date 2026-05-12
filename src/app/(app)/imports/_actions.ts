@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/imports/format-address";
 import {
   DEFAULT_LEAD_SOURCE,
@@ -646,7 +647,13 @@ export async function revertImport(
   const { removableIds, editedCount } = await classifyImportLeads(sb, importId);
 
   if (removableIds.length > 0) {
-    const { error: delErr } = await sb.from("leads").delete().in("id", removableIds);
+    // Revert is available to anyone within the 24h window — not just admins —
+    // but `leads` DELETE is admin-only under RLS. The ids here were derived
+    // entirely from RLS-scoped reads above (this import's rows, this org's
+    // leads), so deleting exactly those via the service client stays scoped to
+    // the caller's org while letting non-admins undo a recent import.
+    const admin = createServiceClient();
+    const { error: delErr } = await admin.from("leads").delete().in("id", removableIds);
     if (delErr) return { ok: false, error: delErr.message };
   }
 
