@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   STAGES,
@@ -27,6 +27,14 @@ const STAGE_DOT: Record<Stage, string> = {
   lost: "bg-gray-500",
 };
 
+// Columns are a fixed 240px each with a 10px gap — so the board's total scroll
+// width is constant. The sticky top scrollbar mirrors this width. (Keep in sync
+// with the `w-[240px]` / `gap-[10px]` classes below.)
+const KANBAN_COLUMN_WIDTH = 240;
+const KANBAN_COLUMN_GAP = 10;
+const KANBAN_CONTENT_WIDTH =
+  STAGES.length * KANBAN_COLUMN_WIDTH + (STAGES.length - 1) * KANBAN_COLUMN_GAP;
+
 export function KanbanBoard({
   initialGrouped,
 }: {
@@ -37,6 +45,24 @@ export function KanbanBoard({
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
   const [hoverStage, setHoverStage] = useState<Stage | null>(null);
   const [, startTransition] = useTransition();
+
+  // Fix V: a sticky mirrored horizontal scrollbar above the columns, kept in
+  // sync with the real (bottom) scrollbar on the board so either can drive it.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
+  const syncing = useRef(false);
+  function syncScroll(from: "mirror" | "body") {
+    if (syncing.current) return;
+    const body = bodyRef.current;
+    const mirror = mirrorRef.current;
+    if (!body || !mirror) return;
+    syncing.current = true;
+    if (from === "mirror") body.scrollLeft = mirror.scrollLeft;
+    else mirror.scrollLeft = body.scrollLeft;
+    requestAnimationFrame(() => {
+      syncing.current = false;
+    });
+  }
 
   function findStageOfLead(leadId: string): Stage | null {
     for (const stage of STAGES) {
@@ -120,11 +146,28 @@ export function KanbanBoard({
   }
 
   return (
-    // Fix P: always show the horizontal scrollbar so every stage column is
-    // reachable — overflow-x-scroll, never auto.
-    <div className="overflow-x-scroll pb-3">
-      <div className="flex w-max gap-[10px]">
-        {STAGES.map((stage) => {
+    <div>
+      {/* Fix V: sticky mirrored scrollbar — sits at the top of the board and
+          stays visible while scrolling down through cards. Its inner spacer is
+          as wide as the board so the thumb proportions match. */}
+      <div
+        ref={mirrorRef}
+        onScroll={() => syncScroll("mirror")}
+        className="kanban-scroll sticky top-0 z-30 mb-2 h-[12px] overflow-x-scroll overflow-y-hidden bg-canvas"
+        aria-hidden
+      >
+        <div className="h-px" style={{ width: KANBAN_CONTENT_WIDTH }} />
+      </div>
+
+      {/* Fix P / Fix V: the board itself keeps a real (now styled) horizontal
+          scrollbar at the bottom — overflow-x-scroll, never auto. */}
+      <div
+        ref={bodyRef}
+        onScroll={() => syncScroll("body")}
+        className="kanban-scroll overflow-x-scroll pb-3"
+      >
+        <div className="flex w-max gap-[10px]">
+          {STAGES.map((stage) => {
           const leads = grouped[stage];
           const isHover = hoverStage === stage;
           return (
@@ -160,7 +203,8 @@ export function KanbanBoard({
               </div>
             </div>
           );
-        })}
+          })}
+        </div>
       </div>
     </div>
   );
@@ -206,11 +250,11 @@ function KanbanCard({
             <div className="mt-[2px] truncate text-[11px] text-gray-500">
               {primaryOwner(lead)}
             </div>
-            {/* Fix P: restore the status pill on Kanban cards — shown only when
-                the lead carries a status flag. */}
+            {/* Fix P / Fix V: status pill on Kanban cards — an action prompt,
+                not an error state, so it uses the btn-primary teal gradient. */}
             {lead.needs_action_flag && (
               <div className="mt-[5px]">
-                <span className="inline-block rounded bg-danger-bg px-2 py-[2px] text-[10px] font-medium text-danger">
+                <span className="btn-primary inline-block rounded px-2 py-[2px] text-[10px] font-medium text-white">
                   Needs Action
                 </span>
               </div>
