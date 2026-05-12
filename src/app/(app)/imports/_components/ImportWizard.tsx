@@ -1982,43 +1982,42 @@ function ImportSuccessModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <div className="relative w-full max-w-[400px] rounded-lg bg-surface p-6 text-center shadow-elevated">
+      <div className="relative min-w-[420px] max-w-[420px] rounded-xl bg-surface p-8 text-center shadow-lg">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 cursor-pointer text-gray-400 hover:text-ink"
+          className="absolute right-4 top-4 cursor-pointer text-[#9ca3af] hover:text-[#374151]"
         >
           <IconX size={16} stroke={1.75} />
         </button>
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-petrol-100">
-          <IconCheck size={26} stroke={2.5} className="text-petrol-500" />
+        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#e8f4f6]">
+          <IconCheck size={24} stroke={2.5} className="text-[#0d6c7d]" />
         </div>
-        <h2 className="m-0 mt-4 text-[13px] font-medium uppercase tracking-[0.4px] text-gray-500">
+        <h2 className="m-0 mb-2 text-lg font-semibold text-[#0a3d4a]">
           Import Complete
         </h2>
-        <div className="mt-1 text-[22px] font-semibold tracking-tight text-ink">
+        <div className="mb-1 text-3xl font-bold text-[#0a3d4a]">
           {result.imported} {result.imported === 1 ? "lead imported" : "leads imported"}
         </div>
         {result.skipped > 0 && (
-          <div className="mt-1.5 text-[12.5px] text-gray-500">
+          <div className="mb-1 text-sm text-[#6b7280]">
             {result.skipped} {result.skipped === 1 ? "lead skipped" : "leads skipped"}
           </div>
         )}
         {result.dedupeReview > 0 && (
-          <div className="mt-1 text-[12.5px] text-gray-500">
+          <div className="mb-1 text-sm text-[#6b7280]">
             {result.dedupeReview} flagged for dedupe review
           </div>
         )}
-        <div className="mt-5 flex items-center justify-center">
-          <button
-            type="button"
-            onClick={onImportAnother}
-            className="btn-primary cursor-pointer rounded-md px-3 py-2 text-xs font-medium"
-          >
-            Import Another File
-          </button>
-        </div>
+        <div className="mb-6 mt-6 border-t border-[#e5e7eb]" />
+        <button
+          type="button"
+          onClick={onImportAnother}
+          className="w-full cursor-pointer rounded-lg bg-[#0d6c7d] py-2.5 font-medium text-white transition-colors hover:bg-[#0a3d4a]"
+        >
+          Import Another File
+        </button>
       </div>
     </div>
   );
