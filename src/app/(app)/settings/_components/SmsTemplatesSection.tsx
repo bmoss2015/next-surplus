@@ -76,7 +76,7 @@ export function SmsTemplatesSection({ initial }: { initial: TemplateRow[] }) {
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="m-0 text-[14px] font-medium text-ink">
+          <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
             SMS Templates
           </h2>
         </div>

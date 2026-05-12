@@ -36,7 +36,7 @@ export function PipelineRulesSection({ initial }: { initial: number | null }) {
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <h2 className="m-0 text-[14px] font-medium text-ink">Pipeline Rules</h2>
+      <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">Pipeline Rules</h2>
       <div className="mt-4 flex items-center justify-between gap-4">
         <div className="text-[13px] text-ink">Needs Action Threshold</div>
         <div className="flex items-center gap-2">

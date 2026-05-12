@@ -76,8 +76,8 @@ export function TeamSection({
     <div className="rounded-lg border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="m-0 text-[14px] font-medium text-ink">Team</h2>
-          <div className="mt-[1px] text-[11px] text-gray-500">
+          <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">Team</h2>
+          <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
             Admins manage Settings and can delete records. Members can view and
             edit leads, tasks, contacts, documents, notes, and imports.
           </div>

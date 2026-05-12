@@ -74,8 +74,8 @@ export default async function DashboardPage() {
       {/* Stages strip */}
       <div className="mb-3 flex items-baseline justify-between">
         <div>
-          <h2 className="m-0 text-[14px] font-medium text-ink">Lead Stages</h2>
-          <div className="text-[11px] text-gray-500">
+          <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">Lead Stages</h2>
+          <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
             {data.totalActive} active leads
           </div>
         </div>
@@ -113,10 +113,10 @@ export default async function DashboardPage() {
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-card">
             <div className="flex items-center justify-between border-b border-gray-200 px-[18px] py-[14px]">
               <div>
-                <h2 className="m-0 text-[14px] font-medium text-ink">
+                <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
                   Leads Needing Action
                 </h2>
-                <div className="mt-[1px] text-[11px] text-gray-500">
+                <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
                   Sorted By Surplus Value
                 </div>
               </div>
@@ -168,7 +168,7 @@ export default async function DashboardPage() {
 
         <div>
           <div className="mb-[10px]">
-            <h2 className="m-0 text-[14px] font-medium text-ink">
+            <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
               Active Markets
             </h2>
           </div>
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="mb-[10px] flex items-baseline justify-between">
-            <h2 className="m-0 text-[14px] font-medium text-ink">
+            <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
               Upcoming Deadlines
             </h2>
             <Link
