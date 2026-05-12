@@ -19,7 +19,6 @@ import { DocumentsTab } from "./_components/DocumentsTab";
 import { NotesTab } from "./_components/NotesTab";
 import { DiscussionTab } from "./_components/DiscussionTab";
 import { ActivityTab } from "./_components/ActivityTab";
-import { LeadEditDrawer } from "./_components/LeadEditDrawer";
 import { RecoveryFeeField } from "./_components/RecoveryFeeField";
 import { ConfirmedSurplusProvider } from "./_components/ConfirmedSurplusContext";
 
@@ -65,23 +64,6 @@ export default async function LeadDetailPage({
       {lead.stage === "lost" && <LostBanner reason={lead.lost_reason} />}
 
       <div className="rounded-[10px] border border-gray-200 bg-surface px-6 py-5 shadow-card">
-        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-          <LeadEditDrawer
-            lead={{
-              id: lead.id,
-              address: lead.address,
-              city: lead.city,
-              state: lead.state,
-              zip: lead.zip,
-              county: lead.county,
-              sale_type: lead.sale_type,
-              sale_date: lead.sale_date,
-              case_number: lead.case_number,
-              recovery_type: lead.recovery_type,
-              parcel_number: lead.parcel_number,
-            }}
-          />
-        </div>
         <StageProgressStrip leadId={lead.id} currentStage={lead.stage} />
         <MetricStripDetail lead={lead} />
       </div>
@@ -99,21 +81,21 @@ export default async function LeadDetailPage({
             {activeTab === "activity" && <ActivityTab leadId={lead.id} />}
           </div>
 
-          {/* Fix KKKK: right rail order — Stage Actions, Recovery Fee, Quick
-              Facts, Tasks, Assigned To (Recent Activity stays at the bottom). */}
+          {/* Fix KKKK + QQ Patch: right rail order — Recovery Fee, Stage
+              Actions, Quick Facts, Tasks, Assigned To (Recent Activity last). */}
           <div className="flex flex-col gap-[14px]">
-            <StageActions
-              leadId={lead.id}
-              currentStage={lead.stage}
-              needsReview={lead.needs_action_flag}
-              lostReasons={lostReasons}
-            />
             <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
               <RecoveryFeeField
                 leadId={lead.id}
                 initial={lead.recovery_fee_percent}
               />
             </div>
+            <StageActions
+              leadId={lead.id}
+              currentStage={lead.stage}
+              needsReview={lead.needs_action_flag}
+              lostReasons={lostReasons}
+            />
             <QuickFactsCard lead={lead} />
             <LeadTasksCard leadId={lead.id} />
             <AssignToField

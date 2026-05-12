@@ -4,6 +4,7 @@ import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { primaryOwner, toTitleCase } from "@/lib/leads/format";
 import { SALE_TYPE_LABELS } from "@/lib/leads/types";
 import { LeadActionsMenu } from "./LeadActionsMenu";
+import { LeadEditDrawer } from "./LeadEditDrawer";
 
 function formatSaleDate(date: string | null): string {
   if (!date) return "Sale date pending";
@@ -72,11 +73,29 @@ export function LeadDetailHeader({
               {formatSaleDate(lead.sale_date)}
             </div>
           </div>
-          <LeadActionsMenu
-            leadId={lead.id}
-            archived={lead.archived}
-            redirectTo="/leads"
-          />
+          <div className="flex shrink-0 items-center gap-1">
+            <LeadEditDrawer
+              variant="icon"
+              lead={{
+                id: lead.id,
+                address: lead.address,
+                city: lead.city,
+                state: lead.state,
+                zip: lead.zip,
+                county: lead.county,
+                sale_type: lead.sale_type,
+                sale_date: lead.sale_date,
+                case_number: lead.case_number,
+                recovery_type: lead.recovery_type,
+                parcel_number: lead.parcel_number,
+              }}
+            />
+            <LeadActionsMenu
+              leadId={lead.id}
+              archived={lead.archived}
+              redirectTo="/leads"
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -51,7 +51,15 @@ function initialForm(lead: Lead) {
 // Fix X: Edit Lead is a centered modal. No autosave — nothing is written until
 // Save Changes is clicked; Cancel (or the X / clicking outside) closes and drops
 // any unsaved edits.
-export function LeadEditDrawer({ lead }: { lead: Lead }) {
+// Fix QQ Patch: `variant="icon"` renders a small ghost pencil button for the
+// lead-detail header's far-right action group; the default is the labeled button.
+export function LeadEditDrawer({
+  lead,
+  variant = "button",
+}: {
+  lead: Lead;
+  variant?: "button" | "icon";
+}) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(() => initialForm(lead));
   const [error, setError] = useState<string | null>(null);
@@ -100,14 +108,26 @@ export function LeadEditDrawer({ lead }: { lead: Lead }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openModal}
-        className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-surface px-3 py-2 text-[12px] font-medium text-ink hover:border-petrol-500"
-      >
-        <IconPencil size={14} stroke={1.75} />
-        Edit
-      </button>
+      {variant === "icon" ? (
+        <button
+          type="button"
+          onClick={openModal}
+          aria-label="Edit Lead"
+          title="Edit Lead"
+          className="shrink-0 cursor-pointer p-1 text-[#94a3b8] transition-colors hover:text-ink"
+        >
+          <IconPencil size={15} stroke={1.75} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={openModal}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-surface px-3 py-2 text-[12px] font-medium text-ink hover:border-petrol-500"
+        >
+          <IconPencil size={14} stroke={1.75} />
+          Edit
+        </button>
+      )}
 
       <Modal open={open} onClose={close} title="Edit Lead" width={680}>
         <div className="space-y-4">
