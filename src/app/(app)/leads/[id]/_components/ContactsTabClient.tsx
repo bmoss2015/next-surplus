@@ -18,6 +18,7 @@ import type { ContactRow, OwnerRowFull } from "@/lib/leads/fetch-detail";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
 import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
+import { SectionSubheader } from "./SectionSubheader";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_PER_CHANNEL = 5;
@@ -391,9 +392,7 @@ function OwnerCard({
       </select>
 
       <div className="flex flex-col gap-1.5">
-        <div className="text-[10px] font-medium uppercase tracking-[0.4px] text-gray-400">
-          Phone
-        </div>
+        <SectionSubheader className="mb-0">Phone</SectionSubheader>
         {phones.map((c) => (
           <ContactLine
             key={c.id}
@@ -454,9 +453,7 @@ function OwnerCard({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <div className="text-[10px] font-medium uppercase tracking-[0.4px] text-gray-400">
-          Email
-        </div>
+        <SectionSubheader className="mb-0">Email</SectionSubheader>
         {emails.map((c) => (
           <ContactLine
             key={c.id}

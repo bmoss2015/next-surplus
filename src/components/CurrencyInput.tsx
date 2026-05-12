@@ -58,7 +58,7 @@ export function CurrencyInput({
         className
       )}
     >
-      {prefix && <span className="select-none text-[12.5px] text-gray-500">{prefix}</span>}
+      {prefix && <span className="select-none text-[14px] text-gray-500">{prefix}</span>}
       <input
         type="text"
         inputMode="decimal"
@@ -73,7 +73,7 @@ export function CurrencyInput({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         className={cn(
-          "w-full bg-transparent text-[12.5px] text-ink outline-none placeholder:text-gray-400",
+          "w-full bg-transparent text-[14px] font-medium text-ink outline-none placeholder:font-normal placeholder:text-gray-400",
           align === "right" && "text-right",
           inputClassName
         )}

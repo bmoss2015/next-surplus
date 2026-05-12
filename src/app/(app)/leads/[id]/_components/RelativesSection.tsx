@@ -6,6 +6,7 @@ import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions"
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
 import { formatPhone } from "./ContactsTabClient";
+import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
 
 const RELATIONSHIP_OPTIONS = [
@@ -310,9 +311,7 @@ function RelativeCard({
       </select>
 
       <div className="flex flex-col gap-1.5">
-        <div className="text-[10px] font-medium uppercase tracking-[0.4px] text-gray-400">
-          Phone
-        </div>
+        <SectionSubheader className="mb-0">Phone</SectionSubheader>
         {visibleSlotIndices.map((i) => (
           <PhoneSlot
             key={PHONE_SLOTS[i].value}
@@ -324,9 +323,7 @@ function RelativeCard({
       </div>
 
       <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
-        <div className="text-[10px] font-medium uppercase tracking-[0.4px] text-gray-400">
-          Email
-        </div>
+        <SectionSubheader className="mb-0">Email</SectionSubheader>
         {visibleEmailIndices.map((i) => (
           <EmailSlot
             key={EMAIL_SLOTS[i]}
@@ -338,9 +335,7 @@ function RelativeCard({
       </div>
 
       <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
-        <div className="text-[10px] font-medium uppercase tracking-[0.4px] text-gray-400">
-          Address
-        </div>
+        <SectionSubheader className="mb-0">Address</SectionSubheader>
         <input
           value={street}
           onChange={(e) => setStreet(e.target.value)}

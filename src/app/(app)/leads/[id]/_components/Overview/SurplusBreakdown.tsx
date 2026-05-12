@@ -12,6 +12,7 @@ import type { LienRow } from "@/lib/leads/fetch-detail";
 import { formatCurrency } from "@/lib/leads/format";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { useConfirmedSurplus } from "../ConfirmedSurplusContext";
+import { SectionSubheader } from "../SectionSubheader";
 
 function fmt(value: number | null | undefined): string {
   return formatCurrency(value);
@@ -138,9 +139,7 @@ export function SurplusBreakdown({
 
       <div className="grid grid-cols-2 gap-6">
         <div>
-          <div className="mb-2 text-[10px] tracking-[0.5px] font-medium text-gray-500">
-            Sale Financials
-          </div>
+          <SectionSubheader>Sale Financials</SectionSubheader>
           <MoneyRow
             label="Closing Bid"
             value={fin.closing_bid}
@@ -162,10 +161,8 @@ export function SurplusBreakdown({
             onCommit={(n) => commitFin("court_costs", n)}
           />
 
-          <div className="mt-4 mb-2 flex items-center justify-between">
-            <div className="text-[10px] tracking-[0.5px] font-medium text-gray-500">
-              Liens
-            </div>
+          <div className="mt-5 mb-3 flex items-center justify-between">
+            <SectionSubheader className="mb-0">Liens</SectionSubheader>
             <button
               type="button"
               onClick={onAddLien}
@@ -176,7 +173,7 @@ export function SurplusBreakdown({
             </button>
           </div>
           {liens.length === 0 ? (
-            <div className="text-[12px] text-gray-400">No Liens On File.</div>
+            <div className="text-[13px] text-gray-400">No Liens On File.</div>
           ) : (
             <div className="space-y-2">
               {liens.map((lien) => (
@@ -187,7 +184,7 @@ export function SurplusBreakdown({
                     onChange={(e) => onLienName(lien.id, e.target.value)}
                     onBlur={(e) => commitLienName(lien.id, e.target.value)}
                     placeholder="Lien Name"
-                    className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                    className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[14px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
                   />
                   <CurrencyInput
                     value={lien.amount}
@@ -211,10 +208,8 @@ export function SurplusBreakdown({
         </div>
 
         <div>
-          <div className="mb-2 text-[10px] tracking-[0.5px] font-medium text-gray-500">
-            Surplus And Fees
-          </div>
-          <Row label="Estimated Surplus" value={fmt(liveSurplus)} strong />
+          <SectionSubheader>Surplus And Fees</SectionSubheader>
+          <Row label="Estimated Surplus" value={fmt(liveSurplus)} />
           <ConfirmedSurplusRow value={confirmed} onCommit={commitConfirmed} />
           <Row label="Total Liens" value={fmt(liensTotal)} />
           <Row
@@ -238,6 +233,11 @@ export function SurplusBreakdown({
   );
 }
 
+// Field label / value typography (Fix AA): label 13px / 400 / #64748b,
+// value 14px / 500 / #0f1729 — both clearly outranked by the SectionSubheader.
+const FIELD_LABEL = "text-[13px] font-normal text-[#64748b]";
+const FIELD_VALUE = "text-[14px] font-medium text-[#0f1729]";
+
 function MoneyRow({
   label,
   value,
@@ -248,8 +248,8 @@ function MoneyRow({
   onCommit: (n: number | null) => void;
 }) {
   return (
-    <div className="grid grid-cols-[150px_1fr] items-center text-[12.5px] leading-[1.85]">
-      <span className="text-gray-500">{label}</span>
+    <div className="grid grid-cols-[150px_1fr] items-center leading-[1.85]">
+      <span className={FIELD_LABEL}>{label}</span>
       <CurrencyInput
         value={value}
         onCommit={onCommit}
@@ -262,19 +262,11 @@ function MoneyRow({
   );
 }
 
-function Row({
-  label,
-  value,
-  strong,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[150px_1fr] text-[12.5px] leading-[1.85]">
-      <span className="text-gray-500">{label}</span>
-      <span className={strong ? "font-medium text-ink" : "text-ink"}>{value}</span>
+    <div className="grid grid-cols-[150px_1fr] items-center leading-[1.85]">
+      <span className={FIELD_LABEL}>{label}</span>
+      <span className={FIELD_VALUE}>{value}</span>
     </div>
   );
 }
@@ -290,8 +282,8 @@ function ConfirmedSurplusRow({
 }) {
   const [editing, setEditing] = useState(false);
   return (
-    <div className="grid grid-cols-[150px_1fr] items-center text-[12.5px] leading-[1.85]">
-      <span className="text-gray-500">Confirmed Surplus</span>
+    <div className="grid grid-cols-[150px_1fr] items-center leading-[1.85]">
+      <span className={FIELD_LABEL}>Confirmed Surplus</span>
       {editing ? (
         <CurrencyInput
           value={value}
@@ -312,7 +304,11 @@ function ConfirmedSurplusRow({
           title="Edit confirmed surplus"
           className="group -ml-1.5 inline-flex w-fit cursor-text items-center gap-1.5 rounded-md px-1.5 py-[2px] hover:bg-gray-100"
         >
-          <span className={value != null ? "font-medium text-ink" : "italic text-gray-400"}>
+          <span
+            className={
+              value != null ? FIELD_VALUE : "text-[14px] italic text-gray-400"
+            }
+          >
             {value != null ? fmt(value) : "Not Yet Confirmed"}
           </span>
           <IconPencil
