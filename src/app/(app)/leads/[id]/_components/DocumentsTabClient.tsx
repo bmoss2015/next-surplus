@@ -124,7 +124,7 @@ export function DocumentsTabClient({
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h3 className="m-0 text-[14px] font-medium tracking-tight text-ink">
+          <h3 className="section-subheader">
             Documents
           </h3>
           <div className="mt-[2px] text-[11px] text-gray-500">

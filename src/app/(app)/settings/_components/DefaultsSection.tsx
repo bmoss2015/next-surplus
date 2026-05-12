@@ -29,7 +29,7 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">Defaults</h2>
+      <h2 className="section-subheader">Defaults</h2>
       <div className="mt-4 space-y-3">
         <Row label="Default Recovery Fee">
           {/* % inside the border, right aligned — CurrencyInput isn't ideal

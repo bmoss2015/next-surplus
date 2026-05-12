@@ -125,7 +125,7 @@ export function MailingAddresses({
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-4 flex items-start justify-between gap-3">
-        <h3 className="m-0 text-[14px] font-medium tracking-tight text-ink">
+        <h3 className="section-subheader">
           Mailing Addresses
         </h3>
         {!adding && owners.length > 0 && addButton}

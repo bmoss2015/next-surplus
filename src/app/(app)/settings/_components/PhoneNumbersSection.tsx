@@ -32,7 +32,7 @@ export function PhoneNumbersSection({ initial }: { initial: StatePhoneRow[] }) {
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-4">
-        <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">Phone Numbers</h2>
+        <h2 className="section-subheader">Phone Numbers</h2>
         <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
           Outbound Numbers By State. Twilio Integration Coming In v0.5.
         </div>

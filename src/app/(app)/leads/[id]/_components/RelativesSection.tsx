@@ -157,7 +157,7 @@ export function RelativesSection({
   return (
     <div className="mt-4 rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="m-0 flex items-center gap-1.5 text-[14px] font-medium tracking-tight text-ink">
+        <h3 className="section-subheader flex items-center gap-1.5">
           <IconUsersGroup size={15} stroke={1.75} className="text-gray-400" />
           Relatives
         </h3>

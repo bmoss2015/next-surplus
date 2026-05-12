@@ -70,7 +70,7 @@ export function ResearchTabClient({
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <h3 className="m-0 mb-4 text-[14px] font-medium tracking-tight text-ink">
+      <h3 className="section-subheader">
         Research
       </h3>
 

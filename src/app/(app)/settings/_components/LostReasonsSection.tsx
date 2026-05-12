@@ -65,7 +65,7 @@ export function LostReasonsSection({
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">Lost Reasons</h2>
+          <h2 className="section-subheader">Lost Reasons</h2>
           <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
             Options that appear in the Mark Lost dropdown.
           </div>

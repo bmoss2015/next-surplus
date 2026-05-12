@@ -62,7 +62,7 @@ function Section({
     <div>
       <div className="mb-[10px] flex items-center gap-[10px] px-1">
         <span className={`h-4 w-1 rounded-sm ${marker}`} />
-        <h2 className="m-0 text-[14px] font-medium tracking-tight text-ink">
+        <h2 className="section-subheader">
           {title}
         </h2>
         <span className="rounded-full bg-gray-150 px-2 py-[2px] text-[11px] font-medium text-gray-500">

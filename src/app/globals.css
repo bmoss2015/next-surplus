@@ -143,6 +143,16 @@ input[type="button"]:not(:disabled),
   background: #0a3d4a;
 }
 
+/* Fix TT — one section-subheader treatment for the whole portal. */
+.section-subheader {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0a3d4a;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+
 /* Fix GG — native date / time inputs: kill the browser-default (blue in Chrome)
    calendar / clock picker indicator and recolor it to the portal petrol #0d6c7d.
    The filter first forces the icon to solid black, then tints it teal. Applies
