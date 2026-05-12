@@ -119,11 +119,12 @@ export function SurplusConfirmControl({
       </button>
     );
   }
+  // Fix CCCC3 PART 1: an actual outlined button, not plain text.
   return (
     <button
       type="button"
       onClick={open}
-      className="cursor-pointer text-[12px] font-medium text-petrol-600 underline-offset-2 hover:text-petrol-700 hover:underline"
+      className="cursor-pointer rounded border border-[#0d6c7d] px-3 py-1 text-xs text-[#0d6c7d] transition-colors hover:bg-[#0d6c7d] hover:text-white"
     >
       {confirmLabel}
     </button>

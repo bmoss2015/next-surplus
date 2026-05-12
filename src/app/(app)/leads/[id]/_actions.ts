@@ -303,6 +303,7 @@ export async function updateLeadField<K extends string>(
     outstanding_debt: true,
     court_costs: true,
     confirmed_surplus: true,
+    source_surplus: true,
     recovery_fee_percent: true,
     attorney_cost: true,
     lead_source: true,

@@ -433,13 +433,40 @@ function InlineListField({
   );
 }
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+// Fix DDDD3: a titled section in the two-column grouped Property Info layout.
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[180px_1fr] items-center gap-2 leading-[2]">
-      <span className="text-[13px] font-medium text-[#64748b]">{label}</span>
-      <span>{children}</span>
+    <div>
+      <h4 className="mb-3 border-b border-petrol-200 pb-1 text-xs font-semibold uppercase tracking-widest text-[#0d6c7d]">
+        {title}
+      </h4>
+      <div className="space-y-4">{children}</div>
     </div>
   );
+}
+
+// A label-over-value field cell. The value (an inline editor or a read-only
+// span) carries its own hover/edit affordance.
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wide text-[#6b7280]">{label}</div>
+      <div className="mt-0.5 text-sm font-medium text-[#111827]">{children}</div>
+    </div>
+  );
+}
+
+// Fix CCCC3 PART 1 / DDDD3: the "Potential Surplus" source line.
+function potentialSourceLabel(
+  sourceSurplus: number | null,
+  leadSource: string | null,
+  computedAvailable: boolean
+): string {
+  if (sourceSurplus != null) {
+    return leadSource ? `Estimated — Per ${leadSource}` : "Estimated — Manually Entered";
+  }
+  if (computedAvailable) return "Estimated — Calculated from Sale Data";
+  return "No Surplus On File Yet";
 }
 
 // Fix MMMM2: the Liens editing area lives on the Property Info tab.
@@ -486,8 +513,7 @@ function LiensSection({ leadId, initialLiens }: { leadId: string; initialLiens: 
   }
 
   return (
-    <div className="mt-4">
-      <SectionSubheader>Liens</SectionSubheader>
+    <div>
       {liens.length === 0 ? (
         <div className="text-[13px] text-gray-400">No Liens On File.</div>
       ) : (
@@ -566,71 +592,126 @@ export function PropertyInfoTab({
     void updateLeadField(id, "recovery_type", next || "unknown");
   }
 
-  return (
-    <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <SectionSubheader>Property Info</SectionSubheader>
-      <div className="space-y-0">
-        <FieldRow label="Parcel Number">
-          <InlineTextField leadId={id} field="parcel_number" initial={lead.parcel_number} placeholder={NOT_SET} />
-        </FieldRow>
-        <FieldRow label="Case Number">
-          <InlineTextField leadId={id} field="case_number" initial={lead.case_number} placeholder={NOT_SET} />
-        </FieldRow>
-        <FieldRow label="County">
-          <InlineTextField leadId={id} field="county" initial={lead.county} placeholder={NOT_SET} displayFormat={toTitleCase} />
-        </FieldRow>
-        <FieldRow label="State">
-          <InlineStateField initial={lead.state} onCommit={handleStateChange} />
-        </FieldRow>
-        <FieldRow label="Sale Type">
-          <InlineSelectField leadId={id} field="sale_type" initial={lead.sale_type} options={SALE_TYPE_OPTIONS} />
-        </FieldRow>
-        <FieldRow label="Sale Date">
-          <InlineDateField leadId={id} field="sale_date" initial={lead.sale_date} />
-        </FieldRow>
-        <FieldRow label="Closing Bid">
-          <InlineCurrencyField leadId={id} field="closing_bid" initial={lead.closing_bid} />
-        </FieldRow>
-        <FieldRow label="Opening Bid">
-          <InlineCurrencyField leadId={id} field="opening_bid" initial={lead.opening_bid} dashForZero />
-        </FieldRow>
-        <FieldRow label="Tax / Mortgage Payoff">
-          <InlineCurrencyField leadId={id} field="outstanding_debt" initial={lead.outstanding_debt} dashForZero />
-        </FieldRow>
-        <FieldRow label="Recovery Type">
-          <InlineRecoveryTypeField value={recoveryType} onCommit={handleRecoveryTypeChange} />
-        </FieldRow>
-        <FieldRow label="Lead Source">
-          <InlineListField
-            initial={lead.lead_source}
-            options={leadSources}
-            width="w-[220px]"
-            onSave={(v) => {
-              void updateLeadField(id, "lead_source", v);
-            }}
-            onAddNew={async (name) => {
-              const res = await addLeadSource(name);
-              return res.ok ? res.name : null;
-            }}
-          />
-        </FieldRow>
-        <FieldRow label="Data Source">
-          <InlineListField
-            initial={lead.data_source}
-            options={dataSourceOptions}
-            width="w-[220px]"
-            onSave={(v) => {
-              void updateLeadField(id, "data_source", v);
-            }}
-            onAddNew={async (name) => {
-              const res = await addDataSource(name);
-              return res.ok ? res.name : null;
-            }}
-          />
-        </FieldRow>
-      </div>
+  const importedAtLabel = lead.imported_at
+    ? fmtDate(lead.imported_at.slice(0, 10))
+    : "—";
+  const confirmedLabel =
+    lead.confirmed_surplus != null && lead.confirmed_surplus !== 0
+      ? formatCurrency(lead.confirmed_surplus)
+      : "Not Confirmed";
 
-      <LiensSection leadId={id} initialLiens={lead.liens} />
+  return (
+    <div className="rounded-[10px] border border-gray-200 bg-surface p-6 shadow-card">
+      <SectionSubheader>Property Info</SectionSubheader>
+      <div className="mt-4 grid grid-cols-2 gap-x-10 gap-y-8">
+        {/* LEFT COLUMN */}
+        <div className="space-y-8">
+          <Section title="Property">
+            <Field label="Property Address">
+              <InlineTextField leadId={id} field="address" initial={lead.address} placeholder={NOT_SET} />
+            </Field>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="City">
+                <InlineTextField leadId={id} field="city" initial={lead.city} placeholder={NOT_SET} />
+              </Field>
+              <Field label="State">
+                <InlineStateField initial={lead.state} onCommit={handleStateChange} />
+              </Field>
+              <Field label="ZIP">
+                <InlineTextField leadId={id} field="zip" initial={lead.zip} placeholder={NOT_SET} />
+              </Field>
+            </div>
+            <Field label="County">
+              <InlineTextField leadId={id} field="county" initial={lead.county} placeholder={NOT_SET} displayFormat={toTitleCase} />
+            </Field>
+            <Field label="Parcel Number">
+              <InlineTextField leadId={id} field="parcel_number" initial={lead.parcel_number} placeholder={NOT_SET} />
+            </Field>
+            <Field label="Case Number">
+              <InlineTextField leadId={id} field="case_number" initial={lead.case_number} placeholder={NOT_SET} />
+            </Field>
+          </Section>
+
+          <Section title="Sale">
+            <Field label="Sale Type">
+              <InlineSelectField leadId={id} field="sale_type" initial={lead.sale_type} options={SALE_TYPE_OPTIONS} />
+            </Field>
+            <Field label="Sale Date">
+              <InlineDateField leadId={id} field="sale_date" initial={lead.sale_date} />
+            </Field>
+            <Field label="Closing Bid">
+              <InlineCurrencyField leadId={id} field="closing_bid" initial={lead.closing_bid} />
+            </Field>
+            <Field label="Opening Bid">
+              <InlineCurrencyField leadId={id} field="opening_bid" initial={lead.opening_bid} dashForZero />
+            </Field>
+            <Field label="Tax / Mortgage Payoff">
+              <InlineCurrencyField leadId={id} field="outstanding_debt" initial={lead.outstanding_debt} dashForZero />
+            </Field>
+            <Field label="Recovery Type">
+              <InlineRecoveryTypeField value={recoveryType} onCommit={handleRecoveryTypeChange} />
+            </Field>
+          </Section>
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <div className="space-y-8">
+          <Section title="Surplus">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-[#6b7280]">Potential Surplus</div>
+              <div className="mt-0.5 text-sm font-medium text-[#111827]">
+                <InlineCurrencyField leadId={id} field="source_surplus" initial={lead.source_surplus} dashForZero />
+              </div>
+              <div className="mt-1 text-xs text-[#6b7280]">
+                {potentialSourceLabel(lead.source_surplus, lead.lead_source, lead.closing_bid != null)}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-[#6b7280]">Confirmed Surplus</div>
+              <div className="mt-0.5 text-sm font-medium text-[#111827]">{confirmedLabel}</div>
+              <div className="mt-1 text-xs text-[#9ca3af]">Edited from the Overview tab’s Confirm action.</div>
+            </div>
+          </Section>
+
+          <Section title="Source">
+            <Field label="Lead Source">
+              <InlineListField
+                initial={lead.lead_source}
+                options={leadSources}
+                width="w-[220px]"
+                onSave={(v) => {
+                  void updateLeadField(id, "lead_source", v);
+                }}
+                onAddNew={async (name) => {
+                  const res = await addLeadSource(name);
+                  return res.ok ? res.name : null;
+                }}
+              />
+            </Field>
+            <Field label="Data Source">
+              <InlineListField
+                initial={lead.data_source}
+                options={dataSourceOptions}
+                width="w-[220px]"
+                onSave={(v) => {
+                  void updateLeadField(id, "data_source", v);
+                }}
+                onAddNew={async (name) => {
+                  const res = await addDataSource(name);
+                  return res.ok ? res.name : null;
+                }}
+              />
+            </Field>
+            <Field label="Import Date">
+              <span className="text-sm font-medium text-[#111827]">{importedAtLabel}</span>
+            </Field>
+          </Section>
+
+          <Section title="Liens">
+            <LiensSection leadId={id} initialLiens={lead.liens} />
+          </Section>
+        </div>
+      </div>
     </div>
   );
 }
