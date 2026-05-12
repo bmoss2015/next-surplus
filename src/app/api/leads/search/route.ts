@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   let query = sb
     .from("leads")
-    .select("id, lead_id, address")
+    .select("id, lead_id, address, owners(full_name, is_primary)")
     .neq("stage", "lost")
     .eq("archived", false)
     .limit(20);
@@ -31,5 +31,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json((data ?? []) as LeadOption[]);
+  // Fix FFF Patch: flatten the primary owner's name onto each row so the search
+  // dropdown can show "Lead ID · Address · Owner". The extra `owner` field is
+  // harmless to existing consumers that only read id/lead_id/address.
+  const rows = (data ?? []).map((r) => {
+    const owners = (r.owners ?? []) as Array<{
+      full_name: string;
+      is_primary: boolean;
+    }>;
+    const owner =
+      owners.find((o) => o.is_primary)?.full_name ?? owners[0]?.full_name ?? null;
+    return { id: r.id, lead_id: r.lead_id, address: r.address, owner };
+  });
+
+  return NextResponse.json(rows as Array<LeadOption & { owner: string | null }>);
 }
