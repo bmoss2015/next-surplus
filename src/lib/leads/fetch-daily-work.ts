@@ -138,10 +138,10 @@ export async function fetchDailyWork(): Promise<{
       needsAction.push({ ...lead, reason: `${n} Docs Missing` });
     } else if (lead.stage === "with_attorney") {
       const d = lead.days_in_stage;
-      awaitingExternal.push({ ...lead, reason: `Attorney — ${d} ${d === 1 ? "day" : "days"}` });
+      awaitingExternal.push({ ...lead, reason: `Attorney — ${d} ${d === 1 ? "Day" : "Days"}` });
     } else if (lead.stage === "claim_filed") {
       const d = lead.days_in_stage;
-      awaitingExternal.push({ ...lead, reason: `County — ${d} ${d === 1 ? "day" : "days"}` });
+      awaitingExternal.push({ ...lead, reason: `County — ${d} ${d === 1 ? "Day" : "Days"}` });
     }
   }
 

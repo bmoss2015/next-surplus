@@ -34,12 +34,12 @@ export function activeNetPayout(
 export function surplusBasisLabel(basis: SurplusBasis): string {
   switch (basis) {
     case "confirmed":
-      return "Based on confirmed surplus";
+      return "Based On Confirmed Surplus";
     case "estimated":
-      return "Based on estimated surplus";
+      return "Based On Estimated Surplus";
     case "source":
-      return "Based on source surplus";
+      return "Based On Source Surplus";
     default:
-      return "No surplus on file yet";
+      return "No Surplus On File Yet";
   }
 }
