@@ -339,43 +339,44 @@ export async function importLeads(
     // Fix 93: every mapped phone / email / mailing-address column becomes its
     // own contacts row — nothing overwrites a single shared value. Each phone
     // carries its Excess Elite line type + DNC / litigator classification.
+    //
+    // Fix PPPP2 Verification: every row carries the SAME set of keys. A
+    // Supabase/PostgREST bulk insert with heterogeneous objects fills any key
+    // missing from a given object with NULL — not the column default — so an
+    // email or mailing-address row that omitted phone_type / is_dnc /
+    // is_litigator was writing NULL into the NOT NULL `contacts.is_dnc` /
+    // `is_litigator` columns and failing the whole insert (no phones, no
+    // emails, no mailing address landed). phone_type stays null and the two
+    // flags default to false for non-phone channels.
+    const contactRow = (
+      channel: "phone" | "email" | "mailing_address",
+      value: string,
+      isPrimary: boolean,
+      phone?: { phone_type: string | null; is_dnc: boolean; is_litigator: boolean }
+    ) => ({
+      owner_id: ownerRow.id,
+      lead_id: leadId,
+      channel,
+      value: value.trim(),
+      status: "untested",
+      is_primary: isPrimary,
+      phone_type: phone?.phone_type ?? null,
+      is_dnc: phone?.is_dnc ?? false,
+      is_litigator: phone?.is_litigator ?? false,
+    });
     const contactRows: Array<Record<string, unknown>> = [];
     phones.forEach((p, idx) => {
-      contactRows.push({
-        owner_id: ownerRow.id,
-        lead_id: leadId,
-        channel: "phone",
-        value: p.value.trim(),
-        status: "untested",
-        is_primary: idx === 0,
-        phone_type: p.phone_type ?? null,
-        is_dnc: p.is_dnc,
-        is_litigator: p.is_litigator,
-      });
+      contactRows.push(contactRow("phone", p.value, idx === 0, p));
     });
     emails.forEach((value, idx) => {
-      contactRows.push({
-        owner_id: ownerRow.id,
-        lead_id: leadId,
-        channel: "email",
-        value,
-        status: "untested",
-        is_primary: idx === 0 && phones.length === 0,
-      });
+      contactRows.push(contactRow("email", value, idx === 0 && phones.length === 0));
     });
     // Fix AAAAA PART 6: each mailing address (including the one composed from the
     // Mailing Street / City / State / ZIP columns) is written as a contacts row
     // with channel='mailing_address' and owner_id set, so it shows up under the
     // owner on the Contacts tab and in the Mailing Addresses section.
     mailingAddresses.forEach((value) => {
-      contactRows.push({
-        owner_id: ownerRow.id,
-        lead_id: leadId,
-        channel: "mailing_address",
-        value,
-        status: "untested",
-        is_primary: false,
-      });
+      contactRows.push(contactRow("mailing_address", value, false));
     });
     if (contactRows.length > 0) {
       const { error: contactsErr } = await sb.from("contacts").insert(contactRows);
