@@ -82,8 +82,11 @@ export async function reopenLead(
   return { ok: true, toStage };
 }
 
-// Flags the lead for review without changing stage. Sets needs_action_flag
-// + needs_action_note and writes a note-style activity row.
+// Flags the lead for review without changing stage. Fix XXXX: instead of a
+// banner, this also auto-creates a high-priority "Needs Review" task (no due
+// date) on the lead, so it surfaces at the top of the Tasks tab like any other
+// high-priority task. Sets needs_action_flag + needs_action_note and writes a
+// note-style activity row.
 export async function pauseForReview(
   leadId: string,
   reason: string
@@ -101,6 +104,29 @@ export async function pauseForReview(
     .eq("id", leadId);
   if (updateErr) return { ok: false, error: updateErr.message };
 
+  // Auto-create the "Needs Review" task — but only if there isn't already an
+  // open one on this lead.
+  const { data: existing } = await sb
+    .from("tasks")
+    .select("id")
+    .eq("lead_id", leadId)
+    .eq("title", "Needs Review")
+    .eq("completed", false)
+    .limit(1);
+  if (!existing || existing.length === 0) {
+    await sb.from("tasks").insert({
+      lead_id: leadId,
+      title: "Needs Review",
+      description: note,
+      due_date: null,
+      due_time: null,
+      priority: "high",
+      source: "manual",
+      completed: false,
+      user_id: null,
+    });
+  }
+
   const { error: actErr } = await sb.from("activities").insert({
     lead_id: leadId,
     activity_type: "note",
@@ -114,8 +140,9 @@ export async function pauseForReview(
   return { ok: true };
 }
 
-// Clears the needs_action flag (used when a Reviewed lead is decided on, or via
-// the Fix RRRR banner on the lead detail page) and logs an activity entry.
+// Clears the needs_action flag (used when a Reviewed lead is decided on).
+// Fix XXXX: also completes any open "Needs Review" task on the lead and logs an
+// activity entry.
 export async function clearReviewFlag(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -125,6 +152,13 @@ export async function clearReviewFlag(
     .update({ needs_action_flag: false, needs_action_note: null })
     .eq("id", leadId);
   if (error) return { ok: false, error: error.message };
+
+  await sb
+    .from("tasks")
+    .update({ completed: true, completed_at: new Date().toISOString() })
+    .eq("lead_id", leadId)
+    .eq("title", "Needs Review")
+    .eq("completed", false);
 
   await sb.from("activities").insert({
     lead_id: leadId,

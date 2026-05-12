@@ -47,6 +47,8 @@ const PRIORITY_LABEL: Record<Priority, string> = {
 const GROUPS = ["Overdue", "Today", "This Week", "Later", "No Due Date"] as const;
 type Group = (typeof GROUPS)[number];
 
+const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+
 export function LeadTasksTabClient({
   leadId,
   initialTasks,
@@ -88,7 +90,11 @@ export function LeadTasksTabClient({
     };
     for (const t of tasks) map[groupOf(t)].push(t);
     for (const g of GROUPS) {
+      // High-priority tasks bubble to the top of their group (so the auto
+      // "Needs Review" task surfaces), then by due date.
       map[g].sort((a, b) => {
+        const pr = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+        if (pr !== 0) return pr;
         if (a.due_date == null && b.due_date == null) return 0;
         if (a.due_date == null) return 1;
         if (b.due_date == null) return -1;
