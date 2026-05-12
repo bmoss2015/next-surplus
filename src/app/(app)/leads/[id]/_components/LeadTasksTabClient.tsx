@@ -13,6 +13,7 @@ export type TabTaskRow = {
   due_date: string | null;
   due_time: string | null;
   priority: "high" | "medium" | "low";
+  source: string | null;
 };
 
 type Priority = "high" | "medium" | "low";
@@ -49,6 +50,58 @@ type Group = (typeof GROUPS)[number];
 
 const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 
+function TaskRow({
+  task,
+  todayKey,
+  onComplete,
+}: {
+  task: TabTaskRow;
+  todayKey: string;
+  onComplete: () => void;
+}) {
+  const overdue = task.due_date != null && task.due_date < todayKey;
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3">
+      <button
+        type="button"
+        onClick={onComplete}
+        aria-label="Mark task complete"
+        title="Mark complete"
+        className="mt-[2px] h-[15px] w-[15px] shrink-0 cursor-pointer rounded-[3px] border border-gray-300 transition-colors hover:border-petrol-500 hover:bg-petrol-50"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[13px] font-medium leading-snug text-ink">{task.title}</span>
+          <span
+            className={cn(
+              "rounded-full px-2 py-[1px] text-[10px] font-medium leading-none",
+              PRIORITY_PILL[task.priority]
+            )}
+          >
+            {PRIORITY_LABEL[task.priority]}
+          </span>
+        </div>
+        {task.description && (
+          <div className="mt-[2px] text-[11.5px] leading-snug text-gray-500">{task.description}</div>
+        )}
+        {task.due_date && (
+          <div
+            className={cn(
+              "mt-1 flex items-center gap-1 text-[10.5px]",
+              overdue ? "font-medium text-petrol-500" : "text-gray-400"
+            )}
+          >
+            {overdue && <IconAlertTriangle size={10} stroke={2.25} />}
+            {overdue ? "Overdue · " : "Due "}
+            {fmtDue(task.due_date)}
+            {task.due_time ? ` · ${task.due_time}` : ""}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function LeadTasksTabClient({
   leadId,
   initialTasks,
@@ -80,6 +133,13 @@ export function LeadTasksTabClient({
     return "Later";
   }
 
+  // Fix CCCC2: system-created tasks (the auto "Needs Review" task) are pinned to
+  // the very top of the list, above every due-date group.
+  const pinned = useMemo(
+    () => tasks.filter((t) => t.source === "system"),
+    [tasks]
+  );
+
   const grouped = useMemo(() => {
     const map: Record<Group, TabTaskRow[]> = {
       Overdue: [],
@@ -88,7 +148,10 @@ export function LeadTasksTabClient({
       Later: [],
       "No Due Date": [],
     };
-    for (const t of tasks) map[groupOf(t)].push(t);
+    for (const t of tasks) {
+      if (t.source === "system") continue; // pinned above the groups
+      map[groupOf(t)].push(t);
+    }
     for (const g of GROUPS) {
       // High-priority tasks bubble to the top of their group (so the auto
       // "Needs Review" task surfaces), then by due date.
@@ -136,7 +199,7 @@ export function LeadTasksTabClient({
       if (res.ok) {
         setTasks((prev) => [
           ...prev,
-          { id: res.id, title: t, description: desc, due_date: dd, due_time: dt, priority: pr },
+          { id: res.id, title: t, description: desc, due_date: dd, due_time: dt, priority: pr, source: "manual" },
         ]);
         setTitle("");
         setDescription("");
@@ -246,6 +309,18 @@ export function LeadTasksTabClient({
         </div>
       ) : (
         <div className="space-y-4">
+          {pinned.length > 0 && (
+            <div>
+              <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-petrol-700">
+                Needs Review
+              </div>
+              <div className="space-y-2">
+                {pinned.map((t) => (
+                  <TaskRow key={t.id} task={t} todayKey={todayKey} onComplete={() => complete(t)} />
+                ))}
+              </div>
+            </div>
+          )}
           {GROUPS.map((g) => {
             const rows = grouped[g];
             if (rows.length === 0) return null;
@@ -255,56 +330,9 @@ export function LeadTasksTabClient({
                   {g}
                 </div>
                 <div className="space-y-2">
-                  {rows.map((t) => {
-                    const overdue = t.due_date != null && t.due_date < todayKey;
-                    return (
-                      <div
-                        key={t.id}
-                        className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => complete(t)}
-                          aria-label="Mark task complete"
-                          title="Mark complete"
-                          className="mt-[2px] h-[15px] w-[15px] shrink-0 cursor-pointer rounded-[3px] border border-gray-300 transition-colors hover:border-petrol-500 hover:bg-petrol-50"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[13px] font-medium leading-snug text-ink">
-                              {t.title}
-                            </span>
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-[1px] text-[10px] font-medium leading-none",
-                                PRIORITY_PILL[t.priority]
-                              )}
-                            >
-                              {PRIORITY_LABEL[t.priority]}
-                            </span>
-                          </div>
-                          {t.description && (
-                            <div className="mt-[2px] text-[11.5px] leading-snug text-gray-500">
-                              {t.description}
-                            </div>
-                          )}
-                          {t.due_date && (
-                            <div
-                              className={cn(
-                                "mt-1 flex items-center gap-1 text-[10.5px]",
-                                overdue ? "font-medium text-petrol-500" : "text-gray-400"
-                              )}
-                            >
-                              {overdue && <IconAlertTriangle size={10} stroke={2.25} />}
-                              {overdue ? "Overdue · " : "Due "}
-                              {fmtDue(t.due_date)}
-                              {t.due_time ? ` · ${t.due_time}` : ""}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {rows.map((t) => (
+                    <TaskRow key={t.id} task={t} todayKey={todayKey} onComplete={() => complete(t)} />
+                  ))}
                 </div>
               </div>
             );

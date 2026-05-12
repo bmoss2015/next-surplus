@@ -121,7 +121,7 @@ export async function pauseForReview(
       due_date: null,
       due_time: null,
       priority: "high",
-      source: "manual",
+      source: "system",
       completed: false,
       user_id: null,
     });

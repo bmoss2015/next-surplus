@@ -15,7 +15,7 @@ export async function LeadTasksTab({ leadId }: { leadId: string }) {
   const sb = await createClient();
   const { data } = await sb
     .from("tasks")
-    .select("id, title, description, due_date, due_time, priority")
+    .select("id, title, description, due_date, due_time, priority, source")
     .eq("lead_id", leadId)
     .eq("completed", false);
 
