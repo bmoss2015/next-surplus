@@ -32,9 +32,9 @@ type PhoneMetaPatch = {
 };
 const PHONE_TYPE_CYCLE: (string | null)[] = [null, "Mobile", "Residential", "Other"];
 function phoneTypeShort(t: string | null): string {
-  if (t === "Mobile") return "M";
-  if (t === "Residential") return "R";
-  if (t === "Other") return "O";
+  if (t === "Mobile") return "Mobile";
+  if (t === "Residential") return "Landline";
+  if (t === "Other") return "Other";
   return "Type";
 }
 function nextPhoneType(t: string | null): string | null {
@@ -677,13 +677,13 @@ function ContactLine({
                 "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium transition-colors",
                 active
                   ? s === "valid"
-                    ? "bg-success-bg text-success-strong"
+                    ? "bg-petrol-500 text-white"
                     : s === "invalid"
-                      ? "bg-danger-bg text-danger"
+                      ? "bg-danger text-white"
                       : s === "dnc"
-                        ? "bg-warn-bg text-warn-strong"
-                        : "bg-petrol-100 text-petrol-700"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-150"
+                        ? "bg-[#0f1729] text-white"
+                        : "bg-gray-200 text-gray-700"
+                  : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
               )}
             >
               {CONTACT_STATUS_LABELS[s]}

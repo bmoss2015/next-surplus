@@ -35,9 +35,9 @@ const EMAIL_SLOTS = ["email", "email_2", "email_3", "email_4", "email_5"] as con
 
 const PHONE_TYPE_CYCLE: (string | null)[] = [null, "Mobile", "Residential", "Other"];
 function phoneTypeShort(t: string | null): string {
-  if (t === "Mobile") return "M";
-  if (t === "Residential") return "R";
-  if (t === "Other") return "O";
+  if (t === "Mobile") return "Mobile";
+  if (t === "Residential") return "Landline";
+  if (t === "Other") return "Other";
   return "Type";
 }
 function nextPhoneType(t: string | null): string | null {
