@@ -11,10 +11,7 @@ export function LostBanner({ reason }: { reason: string | null }) {
           This lead is marked Lost
         </div>
         <div className="mt-[2px] text-[12px] text-danger/85">
-          {reason
-            ? `Reason: ${reason}`
-            : "No reason recorded."}{" "}
-          Click any stage above to reactivate it.
+          {reason ? `Reason: ${reason}` : "No reason recorded."}
         </div>
       </div>
     </div>

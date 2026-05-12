@@ -5,6 +5,7 @@ import { listTeamMembers } from "./_discussion-actions";
 import { AssignToField } from "./_components/AssignToField";
 import { LeadDetailHeader } from "./_components/LeadDetailHeader";
 import { StageProgressStrip } from "./_components/StageProgressStrip";
+import { StageActions } from "./_components/StageActions";
 import { MetricStripDetail } from "./_components/MetricStripDetail";
 import { QuickFactsCard } from "./_components/QuickFactsCard";
 import { AddTaskCard } from "./_components/AddTaskCard";
@@ -82,12 +83,7 @@ export default async function LeadDetailPage({
             }}
           />
         </div>
-        <StageProgressStrip
-          leadId={lead.id}
-          currentStage={lead.stage}
-          needsReview={lead.needs_action_flag}
-          lostReasons={lostReasons}
-        />
+        <StageProgressStrip currentStage={lead.stage} />
         <MetricStripDetail lead={lead} />
       </div>
 
@@ -105,6 +101,12 @@ export default async function LeadDetailPage({
           </div>
 
           <div className="flex flex-col gap-[14px]">
+            <StageActions
+              leadId={lead.id}
+              currentStage={lead.stage}
+              needsReview={lead.needs_action_flag}
+              lostReasons={lostReasons}
+            />
             <AssignToField
               leadId={lead.id}
               currentId={lead.assigned_to}
