@@ -128,7 +128,7 @@ export function MailingAddresses({
         <h3 className="section-subheader">
           Mailing Addresses
         </h3>
-        {!adding && owners.length > 0 && addButton}
+        {owners.length > 0 && addButton}
       </div>
 
       {owners.length === 0 ? (
