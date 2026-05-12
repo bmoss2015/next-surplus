@@ -268,28 +268,25 @@ function RelativeCard({
   const [city, setCity] = useState(relative.city ?? "");
   const [stateCode, setStateCode] = useState(relative.state ?? "");
   const [zip, setZip] = useState(relative.zip ?? "");
+  // Fix III: a discrete "+ Add Phone" / "+ Add Email" link reveals the next
+  // empty slot (capped at 5 each); hidden once all five are showing.
+  const [extraPhones, setExtraPhones] = useState(0);
+  const [extraEmails, setExtraEmails] = useState(0);
 
   const addrInputClass =
     "w-full rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
 
-  // Show every filled phone slot plus the first empty one (so a new phone can
-  // be added in order — up to 5).
-  const firstEmptyIndex = PHONE_SLOTS.findIndex(
-    (s) => !((relative[s.value] as string | null) ?? "").trim()
-  );
-  const visibleSlotIndices = PHONE_SLOTS.map((_, i) => i).filter((i) => {
-    const has = !!((relative[PHONE_SLOTS[i].value] as string | null) ?? "").trim();
-    return has || i === firstEmptyIndex;
-  });
+  const filledPhones = PHONE_SLOTS.filter(
+    (s) => ((relative[s.value] as string | null) ?? "").trim()
+  ).length;
+  const visiblePhoneCount = Math.min(5, Math.max(1, filledPhones + extraPhones));
+  const visibleSlotIndices = Array.from({ length: visiblePhoneCount }, (_, i) => i);
 
-  // Same idea for emails: every filled slot plus the first empty one.
-  const firstEmptyEmailIndex = EMAIL_SLOTS.findIndex(
-    (k) => !((relative[k] as string | null) ?? "").trim()
-  );
-  const visibleEmailIndices = EMAIL_SLOTS.map((_, i) => i).filter((i) => {
-    const has = !!((relative[EMAIL_SLOTS[i]] as string | null) ?? "").trim();
-    return has || i === firstEmptyEmailIndex;
-  });
+  const filledEmails = EMAIL_SLOTS.filter(
+    (k) => ((relative[k] as string | null) ?? "").trim()
+  ).length;
+  const visibleEmailCount = Math.min(5, Math.max(1, filledEmails + extraEmails));
+  const visibleEmailIndices = Array.from({ length: visibleEmailCount }, (_, i) => i);
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3">
@@ -326,6 +323,15 @@ function RelativeCard({
             onPatch={onPatch}
           />
         ))}
+        {visiblePhoneCount < 5 && (
+          <button
+            type="button"
+            onClick={() => setExtraPhones((e) => e + 1)}
+            className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
+          >
+            + Add Phone
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
@@ -338,6 +344,15 @@ function RelativeCard({
             onPatch={onPatch}
           />
         ))}
+        {visibleEmailCount < 5 && (
+          <button
+            type="button"
+            onClick={() => setExtraEmails((e) => e + 1)}
+            className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
+          >
+            + Add Email
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
@@ -412,7 +427,7 @@ function PhoneSlot({
   const pill = (active: boolean, activeClass: string) =>
     cn(
       "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium transition-colors",
-      active ? activeClass : "border border-gray-200 text-gray-400 hover:border-gray-300"
+      active ? activeClass : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
     );
 
   return (
