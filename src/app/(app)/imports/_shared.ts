@@ -175,10 +175,14 @@ export function parseImportDate(raw: string): string | null {
   return null;
 }
 
-// Case numbers in some feeds arrive like "$123,456.00" — strip the dollar sign
-// and commas but keep the value as text (case numbers can be alphanumeric).
+// Fix JJJJJ PART 5: case numbers in some feeds arrive like "$123,456.00" — strip
+// the dollar sign and commas, drop any trailing decimal (".00"), and keep the
+// rest as plain alphanumeric text. "$123,456.00" -> "123456".
 export function stripCaseNumber(raw: string): string {
-  return (raw ?? "").replace(/[$,]/g, "").trim();
+  return (raw ?? "")
+    .replace(/[$,]/g, "")
+    .replace(/\.\d*$/, "")
+    .trim();
 }
 
 export const PORTAL_FIELDS: PortalField[] = [

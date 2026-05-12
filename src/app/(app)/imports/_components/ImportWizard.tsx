@@ -50,6 +50,7 @@ import {
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { formatAddress, formatCity } from "@/lib/imports/format-address";
+import { toTitleCase } from "@/lib/leads/format";
 import { US_STATE_NAMES } from "@/lib/leads/types";
 
 type Step =
@@ -987,9 +988,12 @@ export function ImportWizard() {
       const mailingAddresses = [get(raw, "mailing_address_1"), get(raw, "mailing_address_2")]
         .map((m) => m.trim())
         .filter(Boolean);
-      // Owner mailing address mapped as separate street/city/state/zip columns
-      // (Fix C) — compose into a single address line and treat it like any other
-      // mapped mailing address (becomes a contacts row, channel = mailing_address).
+      // Fix C / JJJJJ PART 3: owner mailing address mapped as separate
+      // street/city/state/zip columns — compose whatever parts are present into
+      // a single line and treat it like any other mapped mailing address (it
+      // becomes a contacts row, channel='mailing_address', linked to the imported
+      // owner). A partial address (e.g. no street) is still created; warn when
+      // the street is missing.
       const ownerMailingStreet = get(raw, "owner_mailing_street");
       const ownerMailingCity = get(raw, "owner_mailing_city");
       const ownerMailingState = get(raw, "owner_mailing_state").toUpperCase();
@@ -1004,7 +1008,12 @@ export function ImportWizard() {
         .filter(Boolean)
         .join(", ")
         .trim();
-      if (ownerMailing) mailingAddresses.push(ownerMailing);
+      if (ownerMailing) {
+        if (!ownerMailingStreet && (ownerMailingCity || ownerMailingState || ownerMailingZip)) {
+          console.warn(`[import] row ${rowNumber}: mailing address has no street; importing city/state/zip only.`);
+        }
+        mailingAddresses.push(ownerMailing);
+      }
 
       // Relatives 1..RELATIVE_COUNT (Excess Elite "RELATIVE N: ..." columns).
       const relatives: ImportRelative[] = [];
@@ -1054,7 +1063,7 @@ export function ImportWizard() {
         city: formatCity(city),
         state,
         zip,
-        county: get(raw, "county") || null,
+        county: toTitleCase(get(raw, "county")) || null,
         sale_type: useMapping["sale_type"] ? parseSaleType(get(raw, "sale_type")) : "unknown",
         sale_date: parseImportDate(get(raw, "sale_date")),
         case_number: stripCaseNumber(get(raw, "case_number")) || null,
