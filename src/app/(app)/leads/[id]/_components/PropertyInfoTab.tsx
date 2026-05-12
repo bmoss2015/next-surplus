@@ -484,7 +484,7 @@ export function PropertyInfoTab({
         <FieldRow label="Opening Bid">
           <InlineCurrencyField leadId={id} field="opening_bid" initial={lead.opening_bid} />
         </FieldRow>
-        <FieldRow label="Outstanding Debt">
+        <FieldRow label="Tax / Mortgage Payoff">
           <InlineCurrencyField leadId={id} field="outstanding_debt" initial={lead.outstanding_debt} />
         </FieldRow>
         <FieldRow label="Court Costs And Fees">

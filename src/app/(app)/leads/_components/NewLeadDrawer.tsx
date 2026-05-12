@@ -179,7 +179,7 @@ export function NewLeadDrawer({
             />
           </div>
           <div>
-            <label className={labelClass}>Outstanding Debt</label>
+            <label className={labelClass}>Tax / Mortgage Payoff</label>
             <input
               type="number"
               min={0}

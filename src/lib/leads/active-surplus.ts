@@ -25,8 +25,8 @@ export function activeSurplus(lead: SurplusInputs): {
   return { value: 0, basis: "none" };
 }
 
-// Fix ZZZZ: Est. Net Surplus = active surplus − attorney cost − recovery fee $
-// (recovery fee $ = active surplus × recovery fee %).
+// Fix ZZZZ / WWWW2: Est. Net Payout = active surplus − attorney cost − recovery
+// fee $ (recovery fee $ = active surplus × recovery fee %).
 export function activeNetPayout(
   lead: SurplusInputs & { recovery_fee_percent: number; attorney_cost: number }
 ): number {
