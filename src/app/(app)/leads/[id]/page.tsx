@@ -99,6 +99,8 @@ export default async function LeadDetailPage({
             {activeTab === "activity" && <ActivityTab leadId={lead.id} />}
           </div>
 
+          {/* Fix KKKK: right rail order — Stage Actions, Recovery Fee, Quick
+              Facts, Tasks, Assigned To (Recent Activity stays at the bottom). */}
           <div className="flex flex-col gap-[14px]">
             <StageActions
               leadId={lead.id}
@@ -112,13 +114,13 @@ export default async function LeadDetailPage({
                 initial={lead.recovery_fee_percent}
               />
             </div>
+            <QuickFactsCard lead={lead} />
+            <LeadTasksCard leadId={lead.id} />
             <AssignToField
               leadId={lead.id}
               currentId={lead.assigned_to}
               members={teamMembers.map((m) => ({ id: m.id, fullName: m.fullName }))}
             />
-            <QuickFactsCard lead={lead} />
-            <LeadTasksCard leadId={lead.id} />
             <RecentActivityCard leadId={lead.id} leadSource={lead.lead_source} />
           </div>
         </div>
