@@ -167,7 +167,7 @@ const LEAD_WRITABLE_FIELDS = [
 
 function leadFieldsFromRow(
   row: IncomingLead,
-  rowSource: string,
+  rowSource: string | null,
   recoveryType: string | null
 ): Record<string, unknown> {
   return {
@@ -224,11 +224,18 @@ function relativeRowFromImport(
   return out;
 }
 
+// Fix NNNN: how the import wizard decides each row's lead_source.
+//   "file"     — use the value from the mapped column; leave it null if blank.
+//   "fallback" — use the column value, falling back to `fallbackSource` when blank.
+//   "force"    — write `fallbackSource` on every row, ignoring the column.
+export type ImportSourceMode = "file" | "fallback" | "force";
+
 export async function importLeads(
   filename: string,
   rows: IncomingLead[],
   decisions: ImportRowDecision[],
-  leadSource: string
+  sourceMode: ImportSourceMode,
+  fallbackSource: string | null
 ): Promise<
   | {
       ok: true;
@@ -245,12 +252,16 @@ export async function importLeads(
   // Fix BB: imported leads are assigned to whoever ran the import.
   const actorId = (await getCurrentProfile())?.id ?? null;
 
-  const batchSource = (leadSource && leadSource.trim()) || DEFAULT_LEAD_SOURCE;
+  const fallback = (fallbackSource && fallbackSource.trim()) || null;
+  // "force" always needs a concrete source; if one wasn't supplied, fall back
+  // to the default so we never write a NULL source on every row.
+  const forcedSource = sourceMode === "force" ? fallback || DEFAULT_LEAD_SOURCE : null;
 
-  // Make sure the chosen source exists in the list for next time.
-  await sb
-    .from("lead_sources")
-    .upsert({ name: batchSource }, { onConflict: "org_id,name", ignoreDuplicates: true });
+  // Track every source name actually written so the dropdown's "named sources"
+  // list stays current — including ones that only appear inside the file.
+  const usedSources = new Set<string>();
+  if (fallback) usedSources.add(fallback);
+  if (forcedSource) usedSources.add(forcedSource);
 
   const recoveryLookup = await loadRecoveryTypeLookup(sb);
 
@@ -407,7 +418,14 @@ export async function importLeads(
       continue;
     }
 
-    const rowSource = (row.lead_source && row.lead_source.trim()) || batchSource;
+    const fileSource = (row.lead_source && row.lead_source.trim()) || null;
+    const rowSource: string | null =
+      sourceMode === "force"
+        ? forcedSource
+        : sourceMode === "fallback"
+          ? fileSource || fallback
+          : fileSource;
+    if (rowSource) usedSources.add(rowSource);
     const recoveryType = resolveRecoveryType(recoveryLookup, row.state, row.sale_type);
     const fields = leadFieldsFromRow(row, rowSource, recoveryType);
 
@@ -515,6 +533,16 @@ export async function importLeads(
 
   if (importRowsLog.length > 0) {
     await sb.from("import_rows").insert(importRowsLog);
+  }
+
+  // Make sure every source name we just wrote is in the picker list next time.
+  if (usedSources.size > 0) {
+    await sb
+      .from("lead_sources")
+      .upsert(
+        [...usedSources].map((name) => ({ name })),
+        { onConflict: "org_id,name", ignoreDuplicates: true }
+      );
   }
 
   // Fix S: don't claim "completed" when nothing was written and rows failed —

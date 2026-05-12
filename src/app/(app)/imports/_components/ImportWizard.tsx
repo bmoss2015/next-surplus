@@ -20,6 +20,7 @@ import {
   saveSourceMapping,
   previewRevertImport,
   revertImport,
+  type ImportSourceMode,
 } from "../_actions";
 import {
   autoMapHeaders,
@@ -56,6 +57,18 @@ type Step =
   | "preview";
 
 const DISMISS_VALUE = "__dismiss__";
+
+// Fix NNNN: sentinel <select> value for "Use Lead Source In File" — the default
+// lead-source mode, which reads each row's mapped column and leaves the field
+// null when the row has no value (no batch fallback).
+const USE_FILE_SOURCE = "__use_file_source__";
+const USE_FILE_SOURCE_LABEL = "Lead Source In File";
+
+type LeadSourceConfig = {
+  mode: ImportSourceMode;
+  source: string | null; // concrete source for "fallback" / "force", null for "file"
+  mappingKey: string; // key under which this source's column mapping is remembered
+};
 
 // Fix P: a CSV row that failed validation on the preview step. `rowNumber` is
 // the 1-based position in the file (header row excluded).
@@ -619,9 +632,14 @@ export function ImportWizard() {
 
   // ---- lead source state ----
   const [sourceOptions, setSourceOptions] = useState<string[]>([]);
-  const [leadSource, setLeadSource] = useState<string>("");
+  // Default: read each row's mapped lead-source column; no batch fallback.
+  const [leadSource, setLeadSource] = useState<string>(USE_FILE_SOURCE);
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherSourceName, setOtherSourceName] = useState("");
+  // "Apply To All Rows" — force the selected source on every row, ignoring the file.
+  const [forceAllRows, setForceAllRows] = useState(false);
+  // Resolved on the upload step and reused for the actual import + saved mapping.
+  const [sourceConfig, setSourceConfig] = useState<LeadSourceConfig | null>(null);
 
   // ---- mapping state ----
   // mapping: portalFieldKey -> csvHeader
@@ -679,6 +697,8 @@ export function ImportWizard() {
     setSuccessResult(null);
     setShowOtherInput(false);
     setOtherSourceName("");
+    setForceAllRows(false);
+    setSourceConfig(null);
   }
 
   // Fix R: drop a single invalid row from the preview so the rest can import.
@@ -755,9 +775,14 @@ export function ImportWizard() {
   // Step transitions
   // -----------------------------------------------------------------------
 
-  async function resolveLeadSource(): Promise<string | null> {
+  async function resolveLeadSource(): Promise<LeadSourceConfig | null> {
+    // Default: read each row's mapped column, leave the field null when blank.
+    if (leadSource === USE_FILE_SOURCE) {
+      return { mode: "file", source: null, mappingKey: USE_FILE_SOURCE };
+    }
+    let name: string;
     if (leadSource === OTHER_SOURCE_OPTION) {
-      const name = otherSourceName.trim();
+      name = otherSourceName.trim();
       if (!name) {
         setError("Enter A Name For The New Lead Source.");
         return null;
@@ -772,13 +797,17 @@ export function ImportWizard() {
       setLeadSource(res.name);
       setShowOtherInput(false);
       setOtherSourceName("");
-      return res.name;
+      name = res.name;
+    } else {
+      if (!leadSource) {
+        setError("Choose A Lead Source.");
+        return null;
+      }
+      name = leadSource;
     }
-    if (!leadSource) {
-      setError("Choose A Lead Source.");
-      return null;
-    }
-    return leadSource;
+    // A named source is a fallback for rows the file leaves blank — unless
+    // "Apply To All Rows" is on, in which case it overrides the file entirely.
+    return { mode: forceAllRows ? "force" : "fallback", source: name, mappingKey: name };
   }
 
   function startFromUpload() {
@@ -788,10 +817,11 @@ export function ImportWizard() {
       return;
     }
     startTransition(async () => {
-      const source = await resolveLeadSource();
-      if (!source) return;
+      const cfg = await resolveLeadSource();
+      if (!cfg) return;
+      setSourceConfig(cfg);
 
-      const saved = await fetchSourceMapping(source);
+      const saved = await fetchSourceMapping(cfg.mappingKey);
       if (saved && Object.keys(saved.mapping).length > 0) {
         const filtered: Record<string, string> = {};
         for (const [k, v] of Object.entries(saved.mapping)) {
@@ -1072,15 +1102,22 @@ export function ImportWizard() {
       const res = dupResolution[i] ?? DEFAULT_DUPLICATE_RESOLUTION;
       decisions.push({ index: i, action: res, existingLeadId: matchId });
     });
-    const source = leadSource === OTHER_SOURCE_OPTION ? otherSourceName.trim() : leadSource;
+    const cfg =
+      sourceConfig ?? { mode: "file" as ImportSourceMode, source: null, mappingKey: USE_FILE_SOURCE };
     startTransition(async () => {
-      const result = await importLeads(file.name, normalized, decisions, source);
+      const result = await importLeads(
+        file.name,
+        normalized,
+        decisions,
+        cfg.mode,
+        cfg.source
+      );
       if (!result.ok) {
         setError(result.error);
         return;
       }
       if (persistMode === "save") {
-        await saveSourceMapping(source, mapping, dismissed);
+        await saveSourceMapping(cfg.mappingKey, mapping, dismissed);
       }
       // Fix MMMM: show the success popup with the real insert count from this
       // session, then refresh so the Import History below picks up the new row.
@@ -1105,6 +1142,13 @@ export function ImportWizard() {
   const sampleRow = rawRows[0];
 
   // ---- lead source selector (shared) ----
+  const usingFileSource = leadSource === USE_FILE_SOURCE;
+  const leadSourceLabel = usingFileSource
+    ? USE_FILE_SOURCE_LABEL
+    : leadSource === OTHER_SOURCE_OPTION
+      ? otherSourceName.trim() || "New Source"
+      : leadSource;
+
   const sourceSelector = (
     <div className="flex flex-col items-center gap-2">
       <label className="flex items-center gap-2 text-[12.5px] text-ink">
@@ -1115,11 +1159,12 @@ export function ImportWizard() {
             const v = e.target.value;
             setLeadSource(v);
             setShowOtherInput(v === OTHER_SOURCE_OPTION);
+            if (v === USE_FILE_SOURCE) setForceAllRows(false);
             setError(null);
           }}
           className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12px] text-ink outline-none focus:border-petrol-500"
         >
-          <option value="">Choose A Source</option>
+          <option value={USE_FILE_SOURCE}>Use Lead Source In File</option>
           {sourceOptions.map((o) => (
             <option key={o} value={o}>
               {o}
@@ -1136,6 +1181,20 @@ export function ImportWizard() {
           placeholder="New Source Name"
           className="rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12px] text-ink outline-none focus:border-petrol-500"
         />
+      )}
+      {!usingFileSource && (
+        <label
+          className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-gray-600"
+          title="Forces the selected source on every row, ignoring any value in the file"
+        >
+          <input
+            type="checkbox"
+            checked={forceAllRows}
+            onChange={(e) => setForceAllRows(e.target.checked)}
+            className="cursor-pointer"
+          />
+          Apply To All Rows
+        </label>
       )}
     </div>
   );
@@ -1202,7 +1261,7 @@ export function ImportWizard() {
         <h2 className="m-0 text-[14px] font-medium text-ink">Confirm Column Mapping</h2>
         <div className="mt-[2px] text-[11.5px] text-gray-500">
           {file?.name} · {rawRows.length} Rows · {headers.length} Columns · Lead Source:{" "}
-          {leadSource}
+          {leadSourceLabel}
         </div>
         <div className="mt-1 text-[11.5px] text-gray-500">
           Search For And Confirm The Portal Field Each CSV Column Maps To. Required Fields
@@ -1332,7 +1391,7 @@ export function ImportWizard() {
       <Shell step={step}>
         <h2 className="m-0 text-[14px] font-medium text-ink">Review Unrecognized Columns</h2>
         <div className="mt-[2px] text-[11.5px] text-gray-500">
-          {file?.name} · Lead Source: {leadSource}
+          {file?.name} · Lead Source: {leadSourceLabel}
         </div>
 
         {/* Sticky top bar — status banner (Fix I) + progress, pager, actions. */}
@@ -1442,7 +1501,7 @@ export function ImportWizard() {
 
   // ===================== CHANGE PROMPT =====================
   if (step === "change_prompt") {
-    const sourceName = leadSource === OTHER_SOURCE_OPTION ? otherSourceName.trim() : leadSource;
+    const sourceName = leadSourceLabel;
     return (
       <Shell step={step}>
         <h2 className="m-0 text-[14px] font-medium text-ink">
@@ -1484,7 +1543,7 @@ export function ImportWizard() {
   // ===================== PREVIEW =====================
   const totalRows = normalized.length;
   const dupCount = dupMatches.filter(Boolean).length;
-  const sourceName = leadSource === OTHER_SOURCE_OPTION ? otherSourceName.trim() : leadSource;
+  const sourceName = leadSourceLabel;
   const importableCount = summary.newRows + summary.updatedBlank + summary.replaced;
   const RES_OPTIONS: DuplicateResolution[] = ["skip", "update_blank", "replace_all"];
 
