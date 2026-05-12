@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { cn } from "@/lib/cn";
 import { useConfirmedSurplus } from "./ConfirmedSurplusContext";
 import { updateLeadField } from "../_actions";
 
@@ -12,25 +11,25 @@ function parseMoney(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-// Fix VVVV2: the shared inline "Confirm Surplus" / "Edit" control used on both
+// Fix XXXX2: the shared inline "Confirm Surplus" / "Edit" control used on both
 // the metric strip and the Surplus Breakdown card. It reads/writes the confirmed
 // surplus through ConfirmedSurplusContext so every figure on the lead page
 // re-derives the instant it changes; the server action persists + revalidates
 // afterward. No modal, no separate page — the input opens right on the card.
 //
-//   Unconfirmed: a clearly labelled petrol "Confirm Surplus" button. Opening it
-//                pre-fills the input with the calculated surplus as a starting
-//                point.
-//   Confirmed:   a small, muted "Edit" link. Opening it pre-fills with the
+//   Unconfirmed: a small teal "Confirm Surplus" text link. Opening it pre-fills
+//                the input with the current active surplus as a starting point.
+//   Confirmed:   a small, muted "Edit" text link. Opening it pre-fills with the
 //                current confirmed value.
 export function SurplusConfirmControl({
   leadId,
-  calculatedSurplus,
-  size = "default",
+  prefillSurplus,
+  confirmLabel = "Confirm Surplus",
 }: {
   leadId: string;
-  calculatedSurplus: number | null;
-  size?: "default" | "compact";
+  // Seed for the input when confirming for the first time (the active surplus).
+  prefillSurplus: number | null;
+  confirmLabel?: string;
 }) {
   const { confirmedSurplus, setConfirmedSurplus } = useConfirmedSurplus();
   const hasConfirmed = confirmedSurplus != null && confirmedSurplus !== 0;
@@ -43,7 +42,7 @@ export function SurplusConfirmControl({
 
   function open() {
     committedRef.current = false;
-    const seed = hasConfirmed ? confirmedSurplus : calculatedSurplus;
+    const seed = hasConfirmed ? confirmedSurplus : prefillSurplus;
     setText(seed != null ? String(seed) : "");
     setEditing(true);
   }
@@ -83,7 +82,7 @@ export function SurplusConfirmControl({
               discard();
             }
           }}
-          className="w-[110px] rounded-md border border-petrol-500 bg-surface px-2 py-[3px] text-[14px] text-ink outline-none focus:ring-2 focus:ring-petrol-200"
+          className="w-[120px] rounded-md border border-petrol-500 bg-surface px-2 py-[3px] text-[14px] text-ink outline-none focus:ring-2 focus:ring-petrol-200"
         />
         <button
           type="button"
@@ -114,7 +113,7 @@ export function SurplusConfirmControl({
       <button
         type="button"
         onClick={open}
-        className="cursor-pointer text-[11px] text-gray-500 underline-offset-2 hover:text-petrol-700 hover:underline"
+        className="cursor-pointer text-[11.5px] text-gray-500 underline-offset-2 hover:text-petrol-700 hover:underline"
       >
         Edit
       </button>
@@ -124,12 +123,9 @@ export function SurplusConfirmControl({
     <button
       type="button"
       onClick={open}
-      className={cn(
-        "inline-flex cursor-pointer items-center justify-center rounded-md border border-petrol-500 font-medium text-petrol-700 hover:bg-petrol-50",
-        size === "compact" ? "px-2.5 py-[4px] text-[11px]" : "px-3 py-[5px] text-[12px]"
-      )}
+      className="cursor-pointer text-[12px] font-medium text-petrol-600 underline-offset-2 hover:text-petrol-700 hover:underline"
     >
-      Confirm Surplus
+      {confirmLabel}
     </button>
   );
 }

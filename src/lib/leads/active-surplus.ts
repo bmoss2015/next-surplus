@@ -1,10 +1,11 @@
-// Fix SS / Fix LLL: the single "active surplus" a lead's money math runs on.
-// Priority:
-//   1. confirmed_surplus  — if set and non-zero (county-verified)
-//   2. estimated_surplus  — if a closing bid exists (closing bid − debt − costs − liens)
-//   3. source_surplus     — if the lead source reported one
-//   4. 0                  — fallback
-export type SurplusBasis = "confirmed" | "estimated" | "source" | "none";
+// Fix XXXX2: the single "active surplus" a lead's money math runs on. Three
+// tiers, evaluated strictly in order:
+//   1. confirmed_surplus  — set only by explicit user confirmation
+//   2. source_surplus     — the figure the lead source reported on import
+//   3. computed           — closing bid − outstanding debt − junior liens,
+//                           used only when 1 and 2 are both null
+//   (none)                — nothing on file → 0
+export type SurplusBasis = "confirmed" | "source" | "computed" | "none";
 
 export type SurplusInputs = {
   confirmed_surplus: number | null | undefined;
@@ -19,9 +20,8 @@ export function activeSurplus(lead: SurplusInputs): {
 } {
   const confirmed = lead.confirmed_surplus;
   if (confirmed != null && confirmed !== 0) return { value: confirmed, basis: "confirmed" };
-  if (lead.closing_bid != null) return { value: lead.estimated_surplus ?? 0, basis: "estimated" };
-  const source = lead.source_surplus;
-  if (source != null) return { value: source, basis: "source" };
+  if (lead.source_surplus != null) return { value: lead.source_surplus, basis: "source" };
+  if (lead.closing_bid != null) return { value: lead.estimated_surplus ?? 0, basis: "computed" };
   return { value: 0, basis: "none" };
 }
 
@@ -39,10 +39,10 @@ export function surplusBasisLabel(basis: SurplusBasis): string {
   switch (basis) {
     case "confirmed":
       return "Based On Confirmed Surplus";
-    case "estimated":
-      return "Based On Estimated Surplus";
     case "source":
       return "Based On Source Surplus";
+    case "computed":
+      return "Based On Calculated Surplus";
     default:
       return "No Surplus On File Yet";
   }

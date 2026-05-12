@@ -1,6 +1,5 @@
 "use client";
 
-import { IconCircleCheck } from "@tabler/icons-react";
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { formatCurrency, daysSince, ownerStatusOf, toTitleCase } from "@/lib/leads/format";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
@@ -94,31 +93,44 @@ function Cell({
   );
 }
 
-// Fix VVVV2: the metric strip's surplus card has two distinct states. When no
-// confirmed surplus is set it shows the *calculated* figure under an "Est.
-// Surplus" label, an "Unconfirmed" warning pill, and a labelled "Confirm
-// Surplus" action. Once confirmed it shows the confirmed figure (larger / bold)
-// under a "Confirmed Surplus" label with a petrol "Verified" pill and a small
-// muted "Edit" link — the calculated figure no longer appears here (it lives on
-// the Surplus Breakdown card).
+// Fix XXXX2: the metric strip's surplus card. Two states, both laid out the
+// same way (label / value / one muted line / a small text action — no pills,
+// no buttons floating in dead space):
+//   Unconfirmed — "Est. Surplus" over the active surplus (source_surplus, else
+//                 the figure computed from sale data), a "Per <source>" /
+//                 "Calculated" line, then a teal "Confirm Surplus" link.
+//   Confirmed   — "Confirmed Surplus" over the confirmed figure (a touch
+//                 bigger/bolder), "Manually Verified", then a muted "Edit" link.
 export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
   const days = daysSince(lead.sale_date);
   const ownerStatusKey = ownerStatusOf(lead);
   const { confirmedSurplus } = useConfirmedSurplus();
 
-  const liensTotal = lead.total_liens ?? 0;
-  const calculatedSurplus =
-    lead.closing_bid != null ? lead.closing_bid - (lead.outstanding_debt ?? 0) - liensTotal : null;
+  // PART 2 three-tier hierarchy: confirmed → source → computed (closing bid −
+  // outstanding debt − junior liens).
+  const computedSurplus =
+    lead.closing_bid != null
+      ? lead.closing_bid - (lead.outstanding_debt ?? 0) - (lead.total_liens ?? 0)
+      : null;
+  const hasSource = lead.source_surplus != null;
+  const potentialSurplus = hasSource ? lead.source_surplus : computedSurplus;
   const hasConfirmed = confirmedSurplus != null && confirmedSurplus !== 0;
-  const surplusForMath = hasConfirmed ? (confirmedSurplus as number) : calculatedSurplus ?? 0;
+  const surplusForMath = hasConfirmed ? (confirmedSurplus as number) : potentialSurplus ?? 0;
   const recoveryFeeAmount = surplusForMath * (lead.recovery_fee_percent / 100);
   // Fix EEEEE: Est. Net Payout = recovery fee $ − attorney cost. Always tracks
   // the confirmed surplus the instant it's set.
   const netPayout = recoveryFeeAmount - lead.attorney_cost;
   const payoutSub = hasConfirmed
     ? "Based On Confirmed Surplus"
-    : lead.closing_bid != null
-      ? "Based On Calculated Surplus"
+    : hasSource
+      ? `Based On ${lead.lead_source ? lead.lead_source : "Source"} Surplus`
+      : computedSurplus != null
+        ? "Based On Calculated Surplus"
+        : "No Surplus On File Yet";
+  const surplusSourceLine = hasSource
+    ? `Per ${lead.lead_source ?? "Lead Source"}`
+    : computedSurplus != null
+      ? "Calculated"
       : "No Surplus On File Yet";
 
   return (
@@ -127,45 +139,26 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
         <div className="flex h-full flex-col bg-gradient-to-br from-petrol-50 to-petrol-100 px-4 py-[14px]">
           {hasConfirmed ? (
             <>
-              <div className="mb-1 text-[11px] font-medium tracking-[0.4px] text-petrol-700">
+              <div className="mb-1 text-[11px] tracking-[0.4px] text-gray-500">
                 Confirmed Surplus
               </div>
-              <div className="text-[22px] font-bold tracking-tight text-ink">
+              <div className="text-[20px] font-bold tracking-tight text-ink">
                 {formatCurrency(confirmedSurplus)}
               </div>
+              <div className="mt-[5px] text-[11px] text-gray-500">Manually Verified</div>
               <div className="mt-[6px]">
-                <span className="inline-flex items-center gap-1 rounded-full bg-petrol-700 px-2 py-[2px] text-[10px] font-medium text-white">
-                  <IconCircleCheck size={11} stroke={2} />
-                  Verified
-                </span>
-              </div>
-              <div className="mt-[8px]">
-                <SurplusConfirmControl
-                  leadId={lead.id}
-                  calculatedSurplus={calculatedSurplus}
-                  size="compact"
-                />
+                <SurplusConfirmControl leadId={lead.id} prefillSurplus={confirmedSurplus} />
               </div>
             </>
           ) : (
             <>
-              <div className="mb-1 text-[11px] tracking-[0.4px] text-gray-500">
-                Est. Surplus
-              </div>
+              <div className="mb-1 text-[11px] tracking-[0.4px] text-gray-500">Est. Surplus</div>
               <div className="text-[18px] font-medium tracking-tight text-ink">
-                {formatCurrency(calculatedSurplus)}
+                {formatCurrency(potentialSurplus)}
               </div>
+              <div className="mt-[5px] text-[11px] text-gray-500">{surplusSourceLine}</div>
               <div className="mt-[6px]">
-                <span className="inline-flex items-center rounded-full bg-warn-bg px-2 py-[2px] text-[10px] font-medium text-warn-strong">
-                  Unconfirmed
-                </span>
-              </div>
-              <div className="mt-[8px]">
-                <SurplusConfirmControl
-                  leadId={lead.id}
-                  calculatedSurplus={calculatedSurplus}
-                  size="compact"
-                />
+                <SurplusConfirmControl leadId={lead.id} prefillSurplus={potentialSurplus} />
               </div>
             </>
           )}

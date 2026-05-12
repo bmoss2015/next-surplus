@@ -23,12 +23,14 @@ import { SurplusBreakdown } from "./Overview/SurplusBreakdown";
 import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
 
-// Fix IIIII / MMMMM: Overview is a read-only deal snapshot — no hero section,
-// no large duplicate of the metric-strip numbers. It opens straight into four
-// equal-weight panel cards (Owner / Research | Notes / Documents), then the
-// read-only Surplus Breakdown, then a full-width Recent Activity strip. Each
-// card has 24px padding, a bold Proper Case header, its content, and a link
-// arrow to the relevant tab. 24px gap between cards.
+// Fix XXXX2: Overview is a read-only deal snapshot. Order, top to bottom:
+//   1. Surplus Breakdown — full width (its inline Confirm Surplus action is the
+//      ONLY edit affordance anywhere on this tab)
+//   2. Owner (left) + Research (right)
+//   3. Notes (left) + Documents (right)
+//   4. Recent Activity — full width
+// Each panel card has 24px padding, a bold Proper Case header, its content, and
+// a link arrow to the relevant tab. 24px gap between cards. No hero section.
 
 const ACTIVITY_ICONS = {
   create: IconSparkles,
@@ -117,6 +119,19 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
 
   return (
     <div className="space-y-6">
+      {/* Surplus Breakdown — first card, full width (Fix XXXX2). Carries the
+          only edit affordance on the Overview tab: the Confirm Surplus action. */}
+      <SurplusBreakdown
+        leadId={leadId}
+        leadSource={lead.lead_source}
+        sourceSurplus={lead.source_surplus}
+        closingBid={lead.closing_bid}
+        outstandingDebt={lead.outstanding_debt}
+        liens={lead.liens}
+        recoveryFeePercent={lead.recovery_fee_percent}
+        attorneyCost={lead.attorney_cost}
+      />
+
       <div className="grid grid-cols-2 gap-6">
         {/* Owner */}
         <div className={CARD}>
@@ -203,17 +218,6 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
           <CardLink href={`/leads/${leadId}?tab=documents`}>Open Documents</CardLink>
         </div>
       </div>
-
-      {/* Surplus Breakdown — shows calculated + confirmed side by side and is a
-          secondary entry point for the Confirm Surplus action (Fix VVVV2). */}
-      <SurplusBreakdown
-        leadId={leadId}
-        closingBid={lead.closing_bid}
-        outstandingDebt={lead.outstanding_debt}
-        liens={lead.liens}
-        recoveryFeePercent={lead.recovery_fee_percent}
-        attorneyCost={lead.attorney_cost}
-      />
 
       {/* Recent Activity — full width */}
       <div className={CARD}>

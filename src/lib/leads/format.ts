@@ -13,6 +13,13 @@ export function formatCurrency(value: number | null | undefined): string {
   return CURRENCY.format(value);
 }
 
+// Fix XXXX2 — for "reference" fields (Tax / Mortgage Payoff, Total Liens, …)
+// where a stored 0 means "not entered" rather than a real $0: show a dash.
+export function formatCurrencyOrDash(value: number | null | undefined): string {
+  if (value == null || value === 0) return "—";
+  return CURRENCY.format(value);
+}
+
 // Fix 28 — title-case a free-text place name (county, city) at read time,
 // regardless of how it was stored ("YORK" / "york county" -> "York County").
 export function toTitleCase(value: string | null | undefined): string {
