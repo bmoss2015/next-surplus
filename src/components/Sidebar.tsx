@@ -66,10 +66,10 @@ export function Sidebar({
               <Link
                 href={item.href}
                 className={cn(
-                  "mb-[2px] block rounded-md px-3 py-2 text-[13px] transition-colors",
+                  "mb-[2px] block rounded-md px-3 py-2 text-[13px] outline-none transition-colors focus-visible:outline-none",
                   isActive
-                    ? "btn-primary font-medium text-white shadow-sm"
-                    : "text-white/80 hover:bg-white/[0.06]"
+                    ? "bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] font-medium text-white"
+                    : "bg-transparent text-white/70 hover:bg-white/10"
                 )}
               >
                 {item.label}
