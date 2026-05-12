@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { IconPlus, IconMinus } from "@tabler/icons-react";
-import { addLien, updateLien, removeLien } from "../../_actions";
+import { addLien, updateLien, removeLien, updateLeadField } from "../../_actions";
 import type { LienRow } from "@/lib/leads/fetch-detail";
 import { formatCurrency } from "@/lib/leads/format";
 import { CurrencyInput } from "@/components/CurrencyInput";
@@ -40,10 +40,21 @@ export function SurplusBreakdown({
   attorneyCost: number;
 }) {
   const [liens, setLiens] = useState<LocalLien[]>(initialLiens);
+  const [attorneyCostVal, setAttorneyCostVal] = useState(attorneyCost);
   const { confirmedSurplus: confirmed } = useConfirmedSurplus();
   const [, startTransition] = useTransition();
 
   const liensTotal = liens.reduce((sum, l) => sum + (l.amount ?? 0), 0);
+
+  // Fix LLLL2: Attorney Cost is inline editable; the metric strip's Est. Net
+  // Surplus updates on the next render after the server revalidates.
+  function commitAttorneyCost(n: number) {
+    if (n === attorneyCostVal) return;
+    setAttorneyCostVal(n);
+    startTransition(async () => {
+      await updateLeadField(leadId, "attorney_cost", n);
+    });
+  }
 
   const calculatedSurplus =
     closingBid != null
@@ -155,7 +166,11 @@ export function SurplusBreakdown({
             label="Recovery Fee"
             value={`${recoveryFeePercent}% · ${fmt(feeAmount)}`}
           />
-          <Row label="Attorney Cost" value={fmt(attorneyCost)} />
+          <MoneyEditRow
+            label="Attorney Cost"
+            value={attorneyCostVal}
+            onCommit={commitAttorneyCost}
+          />
         </div>
       </div>
     </div>
@@ -172,6 +187,78 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="grid grid-cols-[150px_1fr] items-center leading-[1.85]">
       <span className={FIELD_LABEL}>{label}</span>
       <span className={FIELD_VALUE}>{value}</span>
+    </div>
+  );
+}
+
+function parseMoney(s: string): number | null {
+  const cleaned = s.replace(/[^\d.]/g, "").trim();
+  if (cleaned === "" || cleaned === ".") return null;
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Fix LLLL2: an inline-editable money row — display as text, click to edit,
+// commit on blur / Enter, revert on Escape; uses the standardized input style.
+function MoneyEditRow({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  onCommit: (n: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value ? String(value) : "");
+  const cancelNext = useRef(false);
+
+  function startEdit() {
+    setText(value ? String(value) : "");
+    setEditing(true);
+  }
+  function commit() {
+    setEditing(false);
+    if (cancelNext.current) {
+      cancelNext.current = false;
+      return;
+    }
+    onCommit(parseMoney(text) ?? 0);
+  }
+
+  return (
+    <div className="grid grid-cols-[150px_1fr] items-center leading-[1.85]">
+      <span className={FIELD_LABEL}>{label}</span>
+      {editing ? (
+        <input
+          type="text"
+          inputMode="decimal"
+          autoFocus
+          value={text}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            } else if (e.key === "Escape") {
+              cancelNext.current = true;
+              e.currentTarget.blur();
+            }
+          }}
+          className={cn(INLINE_INPUT_CLASS, "w-[150px]")}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={startEdit}
+          title="Click To Edit"
+          className="-ml-0.5 w-fit cursor-text rounded-[3px] px-0.5 text-left text-[14px] font-medium text-[#0f1729] hover:bg-petrol-50"
+        >
+          {formatCurrency(value)}
+        </button>
+      )}
     </div>
   );
 }
