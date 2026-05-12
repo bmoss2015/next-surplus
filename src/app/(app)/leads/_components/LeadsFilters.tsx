@@ -101,10 +101,14 @@ export function LeadsFilters({ states }: { states: string[] }) {
 
   const hasFilters = pills.length > 0 || params.has("q");
 
+  // Fix T: filter selects match the Min/Max inputs — white bg, light gray
+  // border, dark text, teal border on focus. The arrow inherits the text
+  // color, so text-ink (#0f1729) gives a dark-gray chevron. The bar itself
+  // keeps its dark petrol background.
   const selectClass =
-    "rounded-md border border-white/20 bg-white/10 px-2.5 py-[6px] text-xs text-white outline-none transition-colors hover:bg-white/15 focus:border-petrol-300 focus:bg-white/15 cursor-pointer [&>option]:bg-petrol-700 [&>option]:text-white";
-  // Plain text inputs styled to match the search bar — no number spinners,
-  // light gray border, white background, teal border on focus.
+    "rounded-md border border-[#e2e8f0] bg-white px-2.5 py-[6px] text-xs text-ink outline-none transition-colors focus:border-[#0d6c7d] cursor-pointer";
+  // Plain text inputs styled to match — no number spinners, light gray border,
+  // white background, teal border on focus.
   const numberClass =
     "w-20 rounded-md border border-[#e2e8f0] bg-white px-2.5 py-[6px] text-xs text-ink outline-none transition-colors placeholder:text-[#94a3b8] focus:border-[#0d6c7d]";
 
