@@ -77,12 +77,12 @@ function Section({
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-[120px_1fr_130px_120px_140px] items-center gap-[14px] border-b border-gray-200 bg-gray-50 px-[18px] py-[9px] text-[11px] tracking-[0.4px] text-gray-500">
+            <div className="grid grid-cols-[120px_1fr_140px_150px_120px] items-center gap-[14px] border-b border-gray-200 bg-gray-50 px-[18px] py-[9px] text-[11px] tracking-[0.4px] text-gray-500">
               <span>Lead ID</span>
               <span>Address</span>
               <span>Stage</span>
+              <span>Awaiting</span>
               <span className="text-right">Est. Surplus</span>
-              <span className="text-right">Reason</span>
             </div>
             {leads.map((lead) => (
               <div
@@ -91,7 +91,7 @@ function Section({
               >
                 <Link
                   href={`/leads/${lead.id}`}
-                  className="grid grid-cols-[120px_1fr_130px_120px_140px] items-center gap-[14px] px-[18px] py-[13px] pr-[44px]"
+                  className="grid grid-cols-[120px_1fr_140px_150px_120px] items-center gap-[14px] px-[18px] py-[13px] pr-[44px]"
                 >
                   <span className="truncate font-mono text-[11px] text-gray-500">
                     {lead.lead_id}
@@ -110,11 +110,11 @@ function Section({
                   <div className="min-w-0">
                     <StagePill stage={lead.stage} />
                   </div>
+                  <div className="truncate text-[11.5px] text-petrol-500">
+                    {lead.reason}
+                  </div>
                   <div className="truncate text-right text-[13px] font-medium text-ink">
                     {formatCurrency(lead.estimated_surplus)}
-                  </div>
-                  <div className="truncate text-right text-[11.5px] text-petrol-500">
-                    {lead.reason}
                   </div>
                 </Link>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">

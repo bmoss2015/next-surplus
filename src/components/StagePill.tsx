@@ -24,7 +24,7 @@ export function StagePill({
   return (
     <span
       className={cn(
-        "inline-block rounded px-2 py-[3px] text-[11px] font-medium",
+        "inline-block min-w-[120px] rounded px-2 py-[3px] text-center text-[11px] font-medium",
         STAGE_CLASSES[stage],
         className
       )}
