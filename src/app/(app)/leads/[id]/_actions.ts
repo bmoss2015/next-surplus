@@ -926,6 +926,32 @@ export async function createLeadTask(input: {
   return { ok: true, id: data.id as string };
 }
 
+// Fix MM: complete a task from the lead's right-rail Tasks card and log it on
+// the lead's activity feed.
+export async function completeLeadTask(
+  taskId: string,
+  leadId: string,
+  title: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { error } = await sb
+    .from("tasks")
+    .update({ completed: true, completed_at: new Date().toISOString() })
+    .eq("id", taskId);
+  if (error) return { ok: false, error: error.message };
+
+  await sb.from("activities").insert({
+    lead_id: leadId,
+    activity_type: "task_completed",
+    payload: { title: title.trim() },
+    user_id: await currentUserId(),
+  });
+
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/tasks");
+  return { ok: true };
+}
+
 // -- Liens (dynamic list; DB triggers keep leads.total_liens in sync) --------
 
 export async function addLien(

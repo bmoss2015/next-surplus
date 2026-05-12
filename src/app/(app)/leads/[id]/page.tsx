@@ -8,7 +8,7 @@ import { StageProgressStrip } from "./_components/StageProgressStrip";
 import { StageActions } from "./_components/StageActions";
 import { MetricStripDetail } from "./_components/MetricStripDetail";
 import { QuickFactsCard } from "./_components/QuickFactsCard";
-import { AddTaskCard } from "./_components/AddTaskCard";
+import { LeadTasksCard } from "./_components/LeadTasksCard";
 import { RecentActivityCard } from "./_components/RecentActivityCard";
 import { LostBanner } from "./_components/LostBanner";
 import { TabBar, type TabKey } from "./_components/TabBar";
@@ -116,7 +116,7 @@ export default async function LeadDetailPage({
               members={teamMembers.map((m) => ({ id: m.id, fullName: m.fullName }))}
             />
             <QuickFactsCard lead={lead} />
-            <AddTaskCard leadId={lead.id} />
+            <LeadTasksCard leadId={lead.id} />
             <RecentActivityCard leadId={lead.id} leadSource={lead.lead_source} />
           </div>
         </div>

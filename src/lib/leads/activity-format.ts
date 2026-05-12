@@ -87,6 +87,11 @@ export function formatActivity(
         text: `Task Created${p.title ? ` — ${p.title as string}` : ""}`,
         icon: "note",
       };
+    case "task_completed":
+      return {
+        text: `Task Completed${p.title ? ` — ${p.title as string}` : ""}`,
+        icon: "note",
+      };
     case "verification_added":
       return { text: "Pre Call Checklist Item Added", icon: "note" };
     case "verification_checked":
