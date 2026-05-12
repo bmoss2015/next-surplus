@@ -267,10 +267,13 @@ function FieldPicker({
         ? portalFieldLabel(value)
         : "";
 
+  // Filter the portal-field list by the typed query. Match is case insensitive
+  // and looks for the text anywhere in the field label, not just at the start —
+  // so "relat" surfaces every Relative field and "phone" every phone field.
   const q = query.trim().toLowerCase();
-  const filtered = PORTAL_FIELDS.filter((f) =>
-    q === "" ? true : f.label.toLowerCase().includes(q)
-  );
+  const filtered = q
+    ? PORTAL_FIELDS.filter((f) => f.label.toLowerCase().includes(q))
+    : PORTAL_FIELDS;
 
   function pick(v: string) {
     onChange(v);
@@ -293,8 +296,14 @@ function FieldPicker({
           placeholder="Type To Search Fields"
           onFocus={openMenu}
           onChange={(e) => {
-            if (!open) openMenu();
-            setQuery(e.target.value);
+            // Keep the typed text and open the menu without clobbering `query`
+            // — routing through openMenu() here would reset it to "".
+            const typed = e.target.value;
+            if (!open) {
+              measure();
+              setOpen(true);
+            }
+            setQuery(typed);
           }}
           className="w-full cursor-pointer bg-transparent text-ink outline-none placeholder:text-gray-400"
         />

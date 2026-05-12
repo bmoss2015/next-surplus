@@ -12,9 +12,6 @@ export default async function ImportsPage() {
         <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
           Imports
         </h1>
-        <div className="mt-1 text-[13px] text-gray-500">
-          Upload a CSV of leads. Auto-import via email comes in v2.
-        </div>
       </div>
 
       <ImportWizard />
