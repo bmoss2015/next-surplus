@@ -50,16 +50,16 @@ export function LeadTasksList({
       {tasks.map((t) => {
         const overdue = t.due_date != null && t.due_date < todayKey;
         return (
-          <div key={t.id} className="flex items-start gap-2">
+          <div key={t.id} className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => complete(t)}
               aria-label="Mark task complete"
               title="Mark complete"
-              className="mt-[2px] h-[14px] w-[14px] shrink-0 cursor-pointer rounded-[3px] border border-gray-300 transition-colors hover:border-petrol-500 hover:bg-petrol-50"
+              className="h-[14px] w-[14px] shrink-0 cursor-pointer rounded-[3px] border border-gray-300 transition-colors hover:border-petrol-500 hover:bg-petrol-50"
             />
             <div className="min-w-0 flex-1">
-              <div className="text-[12px] leading-snug text-ink">{t.title}</div>
+              <div className="text-[12px] font-medium leading-snug text-ink">{t.title}</div>
               {t.due_date && (
                 <div
                   className={`mt-[1px] flex items-center gap-1 text-[10.5px] ${
