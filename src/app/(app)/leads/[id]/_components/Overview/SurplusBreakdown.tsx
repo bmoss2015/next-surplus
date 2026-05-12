@@ -82,7 +82,8 @@ export function SurplusBreakdown({
     return { value: 0, basis: "none" };
   })();
   const liveFeeAmount = activeSurplusValue * (recoveryFeePercent / 100);
-  const liveNetPayout = liveFeeAmount - attorneyCost;
+  // Fix ZZZZ: Est. Net Surplus = active surplus − attorney cost − recovery fee $.
+  const liveNetPayout = activeSurplusValue - attorneyCost - liveFeeAmount;
 
   function commitFin(key: FinKey, n: number | null) {
     if (fin[key] === n) return;

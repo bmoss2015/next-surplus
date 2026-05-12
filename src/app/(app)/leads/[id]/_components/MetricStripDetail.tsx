@@ -105,7 +105,9 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
     closing_bid: lead.closing_bid,
     source_surplus: lead.source_surplus,
   });
-  const netPayout = active * (1 - lead.recovery_fee_percent / 100) - lead.attorney_cost;
+  // Fix ZZZZ: Est. Net Surplus = active surplus − attorney cost − recovery fee $.
+  const recoveryFeeAmount = active * (lead.recovery_fee_percent / 100);
+  const netPayout = active - lead.attorney_cost - recoveryFeeAmount;
 
   return (
     <div className="grid grid-cols-6 overflow-hidden rounded-lg border border-gray-200 bg-surface">

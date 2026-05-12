@@ -5,7 +5,6 @@ import {
   IconPlus,
   IconTrash,
   IconStarFilled,
-  IconTag,
   IconPencil,
 } from "@tabler/icons-react";
 import {
@@ -447,13 +446,13 @@ function OwnerCard({
                 }
               }}
               placeholder="(555) 555-5555"
-              className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+              className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
             />
             <button
               type="button"
               onClick={submitPhone}
               disabled={!newPhone.trim()}
-              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-1.5 py-[4px] text-gray-500 hover:border-petrol-500 hover:text-petrol-500 disabled:opacity-50"
+              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-1.5 py-[3px] text-gray-500 hover:border-petrol-500 hover:text-petrol-500 disabled:opacity-50"
               aria-label="Save Phone"
             >
               <IconPlus size={11} stroke={2} />
@@ -464,10 +463,9 @@ function OwnerCard({
             <button
               type="button"
               onClick={() => setAddingPhone(true)}
-              className="inline-flex w-fit cursor-pointer items-center gap-0.5 text-[11px] text-petrol-500 hover:text-petrol-700"
+              className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
             >
-              <IconPlus size={11} stroke={2} />
-              Add Phone {phones.length + 1}
+              + Add Phone
             </button>
           )
         )}
@@ -517,7 +515,7 @@ function OwnerCard({
                 }}
                 placeholder="name@example.com"
                 className={cn(
-                  "min-w-0 flex-1 rounded-md border bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500",
+                  "min-w-0 flex-1 rounded-md border bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500",
                   emailError ? "border-danger" : "border-gray-200"
                 )}
               />
@@ -525,7 +523,7 @@ function OwnerCard({
                 type="button"
                 onClick={submitEmail}
                 disabled={!newEmail.trim()}
-                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-1.5 py-[4px] text-gray-500 hover:border-petrol-500 hover:text-petrol-500 disabled:opacity-50"
+                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-1.5 py-[3px] text-gray-500 hover:border-petrol-500 hover:text-petrol-500 disabled:opacity-50"
                 aria-label="Save Email"
               >
                 <IconPlus size={11} stroke={2} />
@@ -540,10 +538,9 @@ function OwnerCard({
             <button
               type="button"
               onClick={() => setAddingEmail(true)}
-              className="inline-flex w-fit cursor-pointer items-center gap-0.5 text-[11px] text-petrol-500 hover:text-petrol-700"
+              className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
             >
-              <IconPlus size={11} stroke={2} />
-              Add Email {emails.length + 1}
+              + Add Email
             </button>
           )
         )}
@@ -580,7 +577,6 @@ function ContactLine({
   const isPhone = kind === "phone";
   const [editingType, setEditingType] = useState(false);
   const [editingStatus, setEditingStatus] = useState(false);
-  const [editingFlags, setEditingFlags] = useState(false);
   const ptype = phoneType ?? null;
 
   const statusClass = (s: ContactStatus) =>
@@ -612,16 +608,15 @@ function ContactLine({
               onClick={() => {
                 setEditingType((v) => !v);
                 setEditingStatus(false);
-                setEditingFlags(false);
               }}
               className={cn(
                 "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
                 ptype
-                  ? "bg-gray-150 text-gray-500 hover:bg-gray-200"
-                  : "bg-[#f1f5f9] text-[#94a3b8] hover:bg-gray-150"
+                  ? "bg-petrol-100 text-petrol-700"
+                  : "border border-dashed border-gray-300 text-gray-400"
               )}
             >
-              {ptype ? phoneTypeShort(ptype) : "+ Type"}
+              {phoneTypeShort(ptype)}
             </button>
             {editingType && (
               <div className="absolute left-0 top-full z-20 mt-1 w-[100px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-elevated">
@@ -695,7 +690,6 @@ function ContactLine({
               onClick={() => {
                 setEditingStatus(true);
                 setEditingType(false);
-                setEditingFlags(false);
               }}
               className="cursor-pointer text-gray-300 hover:text-petrol-500"
             >
@@ -703,28 +697,12 @@ function ContactLine({
             </button>
           </>
         )}
-        {isPhone && (
-          <button
-            type="button"
-            aria-label="Edit DNC and litigator flags"
-            onClick={() => {
-              setEditingFlags((v) => !v);
-              setEditingType(false);
-              setEditingStatus(false);
-            }}
-            className={cn(
-              "ml-auto shrink-0 cursor-pointer text-gray-300 hover:text-petrol-500",
-              editingFlags && "text-petrol-500"
-            )}
-          >
-            <IconTag size={11} stroke={1.75} />
-          </button>
-        )}
       </div>
 
-      {/* Flags editor (opened from the tag icon) — DNC + Litigator toggles. */}
-      {isPhone && editingFlags && (
-        <div className="mt-1 flex items-center gap-1 border-t border-gray-150 pt-1">
+      {/* Line 3 (phones): DNC + Litigator toggle pills — always visible,
+          matching the Relatives layout. */}
+      {isPhone && (
+        <div className="mt-1 flex flex-wrap items-center gap-1">
           <button
             type="button"
             onClick={() => onSetPhoneMeta?.({ is_dnc: !isDnc })}
@@ -732,6 +710,7 @@ function ContactLine({
               "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
               isDnc ? "bg-danger-bg text-danger" : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
             )}
+            aria-label="Do Not Call"
           >
             DNC
           </button>
@@ -742,25 +721,10 @@ function ContactLine({
               "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
               isLitigator ? "bg-[#7f1d1d] text-white" : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
             )}
+            aria-label="Litigator"
           >
             Litigator
           </button>
-        </div>
-      )}
-
-      {/* Line 3: DNC / Litigator pills — only shown when flagged. */}
-      {isPhone && (isDnc || isLitigator) && !editingFlags && (
-        <div className="mt-1 flex items-center gap-1">
-          {isDnc && (
-            <span className="rounded-full bg-danger-bg px-1.5 py-[1px] text-[9px] font-medium leading-none text-danger">
-              DNC
-            </span>
-          )}
-          {isLitigator && (
-            <span className="rounded-full bg-[#7f1d1d] px-1.5 py-[1px] text-[9px] font-medium leading-none text-white">
-              Litigator
-            </span>
-          )}
         </div>
       )}
     </div>
