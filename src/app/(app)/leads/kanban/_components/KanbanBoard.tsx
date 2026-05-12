@@ -286,7 +286,7 @@ function KanbanCard({
             </span>
           </div>
           <div className="mt-[1px] whitespace-nowrap text-[10px]">
-            <span className="text-gray-400">Est. Net Surplus: </span>
+            <span className="text-gray-400">Est. Net Payout: </span>
             <span className="text-gray-400">
               {formatCurrency(activeNetPayout(lead))}
             </span>

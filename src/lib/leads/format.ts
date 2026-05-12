@@ -23,6 +23,22 @@ export function toTitleCase(value: string | null | undefined): string {
     .replace(/\bMc([a-z])/g, (_, c: string) => "Mc" + c.toUpperCase());
 }
 
+// Fix DDDDD — the one full-address display formatter: "3574 Magnolia Ave,
+// Charleston, SC 29205" (comma after street, comma after city, then state zip).
+// Skips empty parts so partial addresses still read correctly.
+export function formatFullAddress(
+  address: string | null | undefined,
+  city: string | null | undefined,
+  state: string | null | undefined,
+  zip: string | null | undefined
+): string {
+  const stateZip = [state, zip].map((p) => (p ?? "").trim()).filter(Boolean).join(" ");
+  return [address, city, stateZip]
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 export function daysSince(date: string | null | undefined): number | null {
   if (!date) return null;
   const ms = Date.now() - new Date(date).getTime();

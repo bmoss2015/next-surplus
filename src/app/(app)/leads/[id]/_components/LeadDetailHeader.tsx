@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { IconChevronRight } from "@tabler/icons-react";
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
-import { primaryOwner, toTitleCase } from "@/lib/leads/format";
+import { primaryOwner, toTitleCase, formatFullAddress } from "@/lib/leads/format";
 import { SALE_TYPE_LABELS } from "@/lib/leads/types";
 import { LeadActionsMenu } from "./LeadActionsMenu";
 import { LeadEditDrawer } from "./LeadEditDrawer";
@@ -64,7 +64,7 @@ export function LeadDetailHeader({
               )}
             </div>
             <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-              {lead.address}, {lead.city} {lead.state} {lead.zip}
+              {formatFullAddress(lead.address, lead.city, lead.state, lead.zip)}
             </h1>
             <div className="mt-1 text-[13px] text-gray-500">
               {owner}
