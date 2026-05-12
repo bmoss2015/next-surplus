@@ -6,6 +6,7 @@ import { OWNER_STATUS_LABELS, SALE_TYPE_LABELS } from "@/lib/leads/types";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
 import { LitigatorBadge } from "@/components/LitigatorBadge";
 import { SortHeader } from "./SortHeader";
+import { LeadActionsMenu } from "../[id]/_components/LeadActionsMenu";
 
 export function LeadsTable({
   leads,
@@ -57,6 +58,7 @@ export function LeadsTable({
                 Status
               </span>
             </th>
+            <th className="w-[44px] px-2 py-3" aria-hidden />
           </tr>
         </thead>
         <tbody>
@@ -66,7 +68,7 @@ export function LeadsTable({
             return (
               <tr
                 key={lead.id}
-                className="border-b border-gray-150 transition-colors hover:bg-gray-50"
+                className="group border-b border-gray-150 transition-colors hover:bg-gray-50"
               >
                 <td className="px-4 py-[10px]">
                   <Link
@@ -132,6 +134,15 @@ export function LeadsTable({
                       <span className="text-[11px] text-gray-400">—</span>
                     )}
                     {lead.has_litigator && <LitigatorBadge />}
+                  </div>
+                </td>
+                <td className="px-2 py-[10px] text-right">
+                  <div className="flex justify-end">
+                    <LeadActionsMenu
+                      leadId={lead.id}
+                      archived={lead.archived}
+                      triggerClassName="opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+                    />
                   </div>
                 </td>
               </tr>

@@ -12,6 +12,7 @@ import { advanceStage } from "@/app/(app)/leads/[id]/_actions";
 import { formatCurrency, primaryOwner } from "@/lib/leads/format";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
 import { LitigatorBadge } from "@/components/LitigatorBadge";
+import { LeadActionsMenu } from "@/app/(app)/leads/[id]/_components/LeadActionsMenu";
 import { cn } from "@/lib/cn";
 
 const STAGE_DOT: Record<Stage, string> = {
@@ -42,6 +43,17 @@ export function KanbanBoard({
       if (grouped[stage].some((l) => l.id === leadId)) return stage;
     }
     return null;
+  }
+
+  // Fix U: a lead archived or deleted from its card disappears from the board.
+  function removeLead(leadId: string) {
+    setGrouped((prev) => {
+      const next = { ...prev };
+      for (const stage of STAGES) {
+        next[stage] = prev[stage].filter((l) => l.id !== leadId);
+      }
+      return next;
+    });
   }
 
   function onDragStart(e: React.DragEvent, leadId: string) {
@@ -142,6 +154,7 @@ export function KanbanBoard({
                     isDragging={draggingLeadId === lead.id}
                     onDragStart={(e) => onDragStart(e, lead.id)}
                     onDragEnd={onDragEnd}
+                    onRemoved={() => removeLead(lead.id)}
                   />
                 ))}
               </div>
@@ -158,67 +171,83 @@ function KanbanCard({
   isDragging,
   onDragStart,
   onDragEnd,
+  onRemoved,
 }: {
   lead: LeadRow;
   isDragging: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
+  onRemoved: () => void;
 }) {
   return (
-    <a
-      href={`/leads/${lead.id}`}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onClick={(e) => {
-        if (isDragging) e.preventDefault();
-      }}
+    // Fix U: the ⋯ menu sits OUTSIDE the <a> so its clicks never trigger card
+    // navigation or the card drag.
+    <div
       className={cn(
-        "block rounded-md border border-gray-200 bg-surface px-[11px] py-[10px] shadow-card cursor-grab active:cursor-grabbing transition-opacity",
+        "group relative rounded-md border border-gray-200 bg-surface shadow-card transition-opacity",
         isDragging && "opacity-40"
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] font-medium text-ink">
-            {lead.address}
-          </div>
-          <div className="mt-[2px] truncate text-[11px] text-gray-500">
-            {primaryOwner(lead)}
-          </div>
-          {/* Fix P: restore the status pill on Kanban cards — shown only when
-              the lead carries a status flag. */}
-          {lead.needs_action_flag && (
-            <div className="mt-[5px]">
-              <span className="inline-block rounded bg-danger-bg px-2 py-[2px] text-[10px] font-medium text-danger">
-                Needs Action
+      <a
+        href={`/leads/${lead.id}`}
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onClick={(e) => {
+          if (isDragging) e.preventDefault();
+        }}
+        className="block cursor-grab px-[11px] py-[10px] active:cursor-grabbing"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="truncate pr-5 text-[12px] font-medium text-ink">
+              {lead.address}
+            </div>
+            <div className="mt-[2px] truncate text-[11px] text-gray-500">
+              {primaryOwner(lead)}
+            </div>
+            {/* Fix P: restore the status pill on Kanban cards — shown only when
+                the lead carries a status flag. */}
+            {lead.needs_action_flag && (
+              <div className="mt-[5px]">
+                <span className="inline-block rounded bg-danger-bg px-2 py-[2px] text-[10px] font-medium text-danger">
+                  Needs Action
+                </span>
+              </div>
+            )}
+            {lead.has_litigator && (
+              <div className="mt-[5px]">
+                <LitigatorBadge />
+              </div>
+            )}
+            <div className="mt-[7px] whitespace-nowrap text-[11px]">
+              <span className="text-gray-400">Total Surplus: </span>
+              <span className="font-medium text-ink">
+                {formatCurrency(lead.estimated_surplus)}
               </span>
             </div>
-          )}
-          {lead.has_litigator && (
-            <div className="mt-[5px]">
-              <LitigatorBadge />
+            <div className="mt-[1px] whitespace-nowrap text-[10px]">
+              <span className="text-gray-400">Est. Net Surplus: </span>
+              <span className="text-gray-400">
+                {formatCurrency(lead.estimated_net_payout)}
+              </span>
+            </div>
+          </div>
+          {lead.below_floor && (
+            <div className="shrink-0 pt-[1px]">
+              <BelowFloorIcon size={13} />
             </div>
           )}
-          <div className="mt-[7px] whitespace-nowrap text-[11px]">
-            <span className="text-gray-400">Total Surplus: </span>
-            <span className="font-medium text-ink">
-              {formatCurrency(lead.estimated_surplus)}
-            </span>
-          </div>
-          <div className="mt-[1px] whitespace-nowrap text-[10px]">
-            <span className="text-gray-400">Est. Net Surplus: </span>
-            <span className="text-gray-400">
-              {formatCurrency(lead.estimated_net_payout)}
-            </span>
-          </div>
         </div>
-        {lead.below_floor && (
-          <div className="shrink-0 pt-[1px]">
-            <BelowFloorIcon size={13} />
-          </div>
-        )}
+      </a>
+      <div className="absolute right-[7px] top-[7px]">
+        <LeadActionsMenu
+          leadId={lead.id}
+          archived={lead.archived}
+          onDone={onRemoved}
+          triggerClassName="opacity-0 transition-opacity group-hover:opacity-100"
+        />
       </div>
-    </a>
+    </div>
   );
 }

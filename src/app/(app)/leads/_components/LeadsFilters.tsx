@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTransition } from "react";
-import { IconX, IconFilter } from "@tabler/icons-react";
+import { IconX, IconFilter, IconArchive } from "@tabler/icons-react";
 import {
   STAGES,
   STAGE_LABELS,
@@ -99,7 +99,8 @@ export function LeadsFilters({ states }: { states: string[] }) {
     });
   }
 
-  const hasFilters = pills.length > 0 || params.has("q");
+  const archivedView = params.get("archived") === "1" || params.get("archived") === "true";
+  const hasFilters = pills.length > 0 || params.has("q") || archivedView;
 
   // Fix T: filter selects match the Min/Max inputs — white bg, light gray
   // border, dark text, teal border on focus. The arrow inherits the text
@@ -175,6 +176,23 @@ export function LeadsFilters({ states }: { states: string[] }) {
             </option>
           ))}
         </select>
+
+        {/* Fix U: a separate Archived view — when on, the table shows only
+            archived leads (other filters still apply within that set). */}
+        <button
+          type="button"
+          onClick={() => update({ archived: archivedView ? null : "1" })}
+          className={cn(
+            "inline-flex cursor-pointer items-center gap-1 rounded-md px-2.5 py-[6px] text-xs transition-colors",
+            archivedView
+              ? "border border-[#0d6c7d] bg-white text-ink"
+              : "border border-white/30 bg-white/5 text-white/80 hover:border-white/60 hover:text-white"
+          )}
+          aria-pressed={archivedView}
+        >
+          <IconArchive size={13} stroke={1.75} />
+          Archived
+        </button>
 
         <div className="ml-1 flex items-center gap-1 border-l border-white/20 pl-3">
           <span className="text-[11px] font-medium tracking-[0.4px] text-white/70">

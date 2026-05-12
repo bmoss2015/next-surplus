@@ -78,7 +78,11 @@ export function LeadDetailHeader({
               {formatSaleDate(lead.sale_date)}
             </div>
           </div>
-          <LeadActionsMenu leadId={lead.id} archived={lead.archived} />
+          <LeadActionsMenu
+            leadId={lead.id}
+            archived={lead.archived}
+            redirectTo="/leads"
+          />
         </div>
       </div>
     </div>

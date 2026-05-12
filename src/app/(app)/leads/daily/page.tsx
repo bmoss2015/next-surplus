@@ -3,6 +3,7 @@ import { fetchDailyWork, type DailyWorkLead } from "@/lib/leads/fetch-daily-work
 import { ViewToggle } from "../_components/ViewToggle";
 import { StagePill } from "@/components/StagePill";
 import { LitigatorBadge } from "@/components/LitigatorBadge";
+import { LeadActionsMenu } from "../[id]/_components/LeadActionsMenu";
 import { formatCurrency, primaryOwner } from "@/lib/leads/format";
 
 export const dynamic = "force-dynamic";
@@ -84,35 +85,46 @@ function Section({
               <span className="text-right">Reason</span>
             </div>
             {leads.map((lead) => (
-              <Link
+              <div
                 key={lead.id}
-                href={`/leads/${lead.id}`}
-                className="grid grid-cols-[120px_1fr_130px_120px_140px] items-center gap-[14px] border-b border-gray-150 px-[18px] py-[13px] last:border-b-0 hover:bg-gray-50"
+                className="group relative border-b border-gray-150 last:border-b-0 hover:bg-gray-50"
               >
-                <span className="truncate font-mono text-[11px] text-gray-500">
-                  {lead.lead_id}
-                </span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-[13px] font-medium text-ink">
-                      {lead.address}
-                    </span>
-                    {lead.has_litigator && <LitigatorBadge className="shrink-0" />}
+                <Link
+                  href={`/leads/${lead.id}`}
+                  className="grid grid-cols-[120px_1fr_130px_120px_140px] items-center gap-[14px] px-[18px] py-[13px] pr-[44px]"
+                >
+                  <span className="truncate font-mono text-[11px] text-gray-500">
+                    {lead.lead_id}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-[13px] font-medium text-ink">
+                        {lead.address}
+                      </span>
+                      {lead.has_litigator && <LitigatorBadge className="shrink-0" />}
+                    </div>
+                    <div className="truncate text-[11px] text-gray-500">
+                      {primaryOwner(lead)} · {lead.city}, {lead.state}
+                    </div>
                   </div>
-                  <div className="truncate text-[11px] text-gray-500">
-                    {primaryOwner(lead)} · {lead.city}, {lead.state}
+                  <div className="min-w-0">
+                    <StagePill stage={lead.stage} />
                   </div>
+                  <div className="truncate text-right text-[13px] font-medium text-ink">
+                    {formatCurrency(lead.estimated_surplus)}
+                  </div>
+                  <div className="truncate text-right text-[11.5px] text-petrol-500">
+                    {lead.reason}
+                  </div>
+                </Link>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <LeadActionsMenu
+                    leadId={lead.id}
+                    archived={lead.archived}
+                    triggerClassName="opacity-0 transition-opacity group-hover:opacity-100"
+                  />
                 </div>
-                <div className="min-w-0">
-                  <StagePill stage={lead.stage} />
-                </div>
-                <div className="truncate text-right text-[13px] font-medium text-ink">
-                  {formatCurrency(lead.estimated_surplus)}
-                </div>
-                <div className="truncate text-right text-[11.5px] text-petrol-500">
-                  {lead.reason}
-                </div>
-              </Link>
+              </div>
             ))}
           </>
         )}

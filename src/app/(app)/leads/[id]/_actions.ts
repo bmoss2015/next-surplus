@@ -180,7 +180,24 @@ export async function setLeadArchived(
   });
 
   revalidatePath(`/leads/${leadId}`);
-  revalidatePath("/leads");
+  revalidatePath("/leads", "layout");
+  return { ok: true };
+}
+
+// -- Hard delete (Fix U) -----------------------------------------------------
+// Permanently removes the lead and every related record (owners, contacts,
+// documents, activities, tasks, etc.) via the on-delete-cascade FKs. Not
+// reversible. Admin-only (RLS also enforces this).
+export async function hardDeleteLead(
+  leadId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { error } = await sb.from("leads").delete().eq("id", leadId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads", "layout");
   return { ok: true };
 }
 

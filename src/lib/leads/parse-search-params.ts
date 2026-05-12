@@ -53,6 +53,10 @@ export function parseLeadsSearchParams(
       : undefined,
     surplus_min: parseInt(single("surplus_min")),
     surplus_max: parseInt(single("surplus_max")),
+    archived: (() => {
+      const v = single("archived");
+      return v === "1" || v === "true";
+    })(),
     sort: SORT_COLUMNS.includes(sort as SortColumn)
       ? (sort as SortColumn)
       : undefined,

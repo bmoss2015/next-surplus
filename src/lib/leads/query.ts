@@ -68,6 +68,9 @@ export type LeadsFilter = {
   owner_status?: OwnerStatus;
   surplus_min?: number;
   surplus_max?: number;
+  // Fix U: when true, the table shows ONLY archived leads (all other filters
+  // still apply within that set). Default/false = the normal active view.
+  archived?: boolean;
 };
 
 export type LeadsQuery = LeadsFilter & {
@@ -126,9 +129,9 @@ export async function fetchLeads(query: LeadsQuery): Promise<{
       { count: "exact" }
     );
 
-  // Default views always hide archived leads; archiving/restoring happens from
-  // the lead detail page.
-  req = req.eq("archived", false);
+  // Fix U: the Archived view is a separate slice — it shows only archived
+  // leads; every other view shows only active (non-archived) ones.
+  req = req.eq("archived", query.archived === true);
   const assignFilter = await currentAssignmentFilterId();
   if (assignFilter) req = req.eq("assigned_to", assignFilter);
   if (query.state) req = req.eq("state", query.state);
