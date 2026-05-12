@@ -321,7 +321,7 @@ export async function importLeads(
         is_primary: true,
         // The DB trigger forces status='deceased' when is_deceased is true, but
         // set it here too so the value is right regardless of trigger state.
-        status: row.owner_deceased ? "deceased" : "unknown",
+        status: row.owner_deceased ? "deceased" : row.owner_living ? "living" : "unknown",
         is_deceased: row.owner_deceased,
         age: row.owner_age ?? null,
       })

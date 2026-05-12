@@ -36,6 +36,9 @@ import {
   RELATIVE_EMAIL_COUNT,
   parsePhoneType,
   parseDncLitigator,
+  normalizePhone,
+  parseImportDate,
+  stripCaseNumber,
   type IncomingLead,
   type ImportRelative,
   type ImportPhone,
@@ -142,6 +145,21 @@ function splitFullName(name: string): string {
 }
 function combineName(first: string, last: string): string {
   return [first.trim(), last.trim()].filter(Boolean).join(" ");
+}
+// Fix PPPP2 PART 6: imported names arrive in mixed/lower case — Title Case each
+// word (also handles hyphenated names).
+function properCaseName(name: string): string {
+  return name
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) =>
+      word
+        .split("-")
+        .map((part) => (part ? part[0].toUpperCase() + part.slice(1).toLowerCase() : part))
+        .join("-")
+    )
+    .join(" ");
 }
 function parseAge(raw: string): number | null {
   if (!raw) return null;
@@ -931,13 +949,13 @@ export function ImportWizard() {
       const ownerFull = get(raw, "owner_full_name");
       const ownerFirst = get(raw, "owner_first_name");
       const ownerLast = get(raw, "owner_last_name");
-      const ownerName = ownerFull
-        ? splitFullName(ownerFull)
-        : combineName(ownerFirst, ownerLast);
+      const ownerName = properCaseName(
+        ownerFull ? splitFullName(ownerFull) : combineName(ownerFirst, ownerLast)
+      );
 
       const phones: ImportPhone[] = [];
       for (let pm = 1; pm <= 5; pm++) {
-        const pv = get(raw, `phone_${pm}`).trim();
+        const pv = normalizePhone(get(raw, `phone_${pm}`));
         if (!pv) continue;
         const { is_dnc, is_litigator } = parseDncLitigator(get(raw, `phone_${pm}_dnc`));
         phones.push({
@@ -982,12 +1000,14 @@ export function ImportWizard() {
       const relatives: ImportRelative[] = [];
       for (let rn = 1; rn <= RELATIVE_COUNT; rn++) {
         const rk = (s: string) => relativeFieldKey(rn, s);
-        const rName = combineName(get(raw, rk("first_name")), get(raw, rk("last_name"))) || null;
+        const rName = properCaseName(
+          combineName(get(raw, rk("first_name")), get(raw, rk("last_name")))
+        ) || null;
         const rRelationship = get(raw, rk("possible_type")) || null;
         const rAge = parseAge(get(raw, rk("age")));
         const rPhones: ImportPhone[] = [];
         for (let pm = 1; pm <= RELATIVE_PHONE_COUNT; pm++) {
-          const pv = get(raw, rk(`phone_${pm}`)).trim();
+          const pv = normalizePhone(get(raw, rk(`phone_${pm}`)));
           if (!pv) continue;
           const { is_dnc, is_litigator } = parseDncLitigator(get(raw, rk(`phone_${pm}_dnc`)));
           rPhones.push({
@@ -1013,6 +1033,12 @@ export function ImportWizard() {
         }
       }
 
+      const deceasedRaw = get(raw, "owner_deceased_flag");
+      const ownerDeceased = isYes(deceasedRaw);
+      const ownerLiving =
+        !ownerDeceased &&
+        ["n", "no", "false", "0"].includes(deceasedRaw.trim().toLowerCase());
+
       rows.push({
         address: formatAddress(address),
         city: formatCity(city),
@@ -1020,8 +1046,8 @@ export function ImportWizard() {
         zip,
         county: get(raw, "county") || null,
         sale_type: useMapping["sale_type"] ? parseSaleType(get(raw, "sale_type")) : "unknown",
-        sale_date: get(raw, "sale_date") || null,
-        case_number: get(raw, "case_number") || null,
+        sale_date: parseImportDate(get(raw, "sale_date")),
+        case_number: stripCaseNumber(get(raw, "case_number")) || null,
         parcel_number: get(raw, "parcel_number") || null,
         closing_bid: parseMoney(get(raw, "closing_bid")),
         opening_bid: parseMoney(get(raw, "opening_bid")),
@@ -1029,7 +1055,8 @@ export function ImportWizard() {
         lead_source: get(raw, "lead_source") || null,
         owner_full_name: ownerName || null,
         owner_age: parseAge(get(raw, "owner_age")),
-        owner_deceased: isYes(get(raw, "owner_deceased_flag")),
+        owner_deceased: ownerDeceased,
+        owner_living: ownerLiving,
         phones,
         emails,
         mailing_addresses: mailingAddresses,

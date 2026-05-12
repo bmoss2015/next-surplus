@@ -128,16 +128,57 @@ export function parsePhoneType(raw: string): string | null {
   return "Other";
 }
 
-// Excess Elite carries a "Phone N: DNC/Litigator" column. A "Y" (or "DNC")
-// marks the number do-not-call; anything mentioning "litigator" additionally
-// marks it litigation risk (which also implies DNC).
+// Excess Elite carries a "Phone N: DNC/Litigator" column. The column conflates
+// the two flags, so a plain "Y" (or anything mentioning "litigator") sets BOTH
+// the DNC flag and the litigator tag on that number; an explicit "DNC" marks
+// only do-not-call.
 export function parseDncLitigator(raw: string): { is_dnc: boolean; is_litigator: boolean } {
   const v = (raw ?? "").trim().toLowerCase();
   if (!v) return { is_dnc: false, is_litigator: false };
-  const is_litigator = v.includes("litig");
   const yes = ["y", "yes", "t", "true", "1", "x"].includes(v);
-  const is_dnc = is_litigator || yes || v.includes("dnc") || v.includes("do not call");
+  const is_litigator = yes || v.includes("litig");
+  const is_dnc = is_litigator || v.includes("dnc") || v.includes("do not call");
   return { is_dnc, is_litigator };
+}
+
+// Strip everything but digits from a phone string — accepts "(240) 506-7777",
+// "555-222-6666", "6668889999", etc. Returns "" when nothing's left.
+export function normalizePhone(raw: string): string {
+  return (raw ?? "").replace(/\D/g, "");
+}
+
+// Parse a CSV date cell ("01/15/2024", "1/2/24", "2024-01-15", ...) to an ISO
+// "YYYY-MM-DD" string. Returns null when the value isn't a recognizable date.
+export function parseImportDate(raw: string): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  // Already ISO-ish.
+  const iso = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    const [, y, m, d] = iso;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  // M/D/YYYY or M-D-YYYY (also 2-digit year).
+  const mdy = v.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
+  if (mdy) {
+    let [, mo, da, yr] = mdy;
+    if (yr.length === 2) yr = (Number(yr) >= 70 ? "19" : "20") + yr;
+    const n = (s: string) => Number(s);
+    if (n(mo) >= 1 && n(mo) <= 12 && n(da) >= 1 && n(da) <= 31) {
+      return `${yr}-${mo.padStart(2, "0")}-${da.padStart(2, "0")}`;
+    }
+  }
+  const parsed = new Date(v);
+  if (!Number.isNaN(parsed.getTime())) {
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+  }
+  return null;
+}
+
+// Case numbers in some feeds arrive like "$123,456.00" — strip the dollar sign
+// and commas but keep the value as text (case numbers can be alphanumeric).
+export function stripCaseNumber(raw: string): string {
+  return (raw ?? "").replace(/[$,]/g, "").trim();
 }
 
 export const PORTAL_FIELDS: PortalField[] = [
@@ -659,6 +700,7 @@ export type IncomingLead = {
   owner_full_name: string | null;
   owner_age: number | null;
   owner_deceased: boolean;
+  owner_living: boolean; // true when the Deceased column is an explicit "N"
   phones: ImportPhone[]; // each mapped phone column, in order (only the non-empty ones)
   emails: string[]; // each mapped email column, in order (only the non-empty ones)
   mailing_addresses: string[]; // each mapped mailing-address column (non-empty only)
