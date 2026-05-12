@@ -57,8 +57,10 @@ export function AddTaskCard({ leadId }: { leadId: string }) {
     });
   }
 
+  // Fix PPPP — same border / radius / padding / background as the form's text
+  // inputs; the native picker popup highlight is recolored to petrol globally.
   const pickerClass =
-    "w-full cursor-pointer rounded-md border border-[#e2e8f0] bg-white px-2 py-[6px] text-[12px] text-ink outline-none focus:border-[#0d6c7d]";
+    "w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12px] text-ink outline-none focus:border-petrol-500";
   const labelClass =
     "mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500";
 

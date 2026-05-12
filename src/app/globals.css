@@ -160,6 +160,10 @@ input[type="button"]:not(:disabled),
 input[type="date"],
 input[type="time"] {
   color-scheme: light;
+  /* Fix PPPP — the time picker scroll-wheel (hour / minute / AM-PM columns) and
+     the date picker's selected day use accent-color for their highlight; pin it
+     to the portal petrol so it never renders the browser-default blue. */
+  accent-color: #0d6c7d;
 }
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
