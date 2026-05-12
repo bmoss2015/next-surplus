@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { IconPlus, IconX } from "@tabler/icons-react";
 import { createTask } from "@/app/(app)/tasks/_actions";
+import { SectionSubheader } from "./SectionSubheader";
 
 export function AddTaskCard({ leadId }: { leadId: string }) {
   const [open, setOpen] = useState(false);
@@ -55,9 +56,7 @@ export function AddTaskCard({ leadId }: { leadId: string }) {
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
       <div className="mb-[11px] flex items-center justify-between">
-        <div className="text-[10px] tracking-[0.5px] font-medium text-gray-500">
-          Tasks
-        </div>
+        <SectionSubheader className="mb-0">Tasks</SectionSubheader>
         {open && (
           <button
             type="button"

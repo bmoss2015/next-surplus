@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { IconUser } from "@tabler/icons-react";
-import { updateLeadField } from "../_actions";
+import { assignLead } from "../_actions";
 import { useRole } from "@/components/RoleProvider";
+import { SectionSubheader } from "./SectionSubheader";
 
 // Fix 75: assign a lead to a team member. Admins can reassign anyone; non-admins
 // only ever see leads already assigned to them, so for them this is read-only.
@@ -25,10 +26,10 @@ export function AssignToField({
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
-      <div className="mb-2 flex items-center gap-1.5 text-[11px] tracking-[0.4px] text-gray-500">
+      <SectionSubheader className="flex items-center gap-1.5">
         <IconUser size={13} stroke={1.75} />
         Assigned To
-      </div>
+      </SectionSubheader>
       {isAdmin ? (
         <select
           value={value}
@@ -36,7 +37,7 @@ export function AssignToField({
             const next = e.target.value;
             setValue(next);
             startTransition(async () => {
-              await updateLeadField(leadId, "assigned_to", next === "" ? null : next);
+              await assignLead(leadId, next === "" ? null : next);
             });
           }}
           className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[12.5px] text-ink outline-none focus:border-petrol-500"

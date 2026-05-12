@@ -6,6 +6,7 @@ import {
   IconFile,
   IconCircleDot,
 } from "@tabler/icons-react";
+import { SectionSubheader } from "./SectionSubheader";
 import {
   fetchRecentActivity,
   formatActivity,
@@ -33,9 +34,7 @@ export async function RecentActivityCard({
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
-      <div className="mb-[11px] text-[10px] tracking-[0.5px] font-medium text-gray-500">
-        Recent Activity
-      </div>
+      <SectionSubheader>Recent Activity</SectionSubheader>
 
       {rows.length === 0 ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-4 text-center text-[11.5px] text-gray-500">

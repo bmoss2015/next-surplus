@@ -1,4 +1,5 @@
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
+import { SectionSubheader } from "./SectionSubheader";
 
 // Fix 90: how a recovery type reads on screen. Proper Case, no dashes.
 function recoveryTypeLabel(value: string | null | undefined): string {
@@ -40,9 +41,15 @@ function Row({
   muted?: boolean;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 text-[12px] leading-[1.9]">
-      <span className="shrink-0 text-gray-500">{label}</span>
-      <span className={muted ? "italic text-gray-400" : "text-ink"}>{value}</span>
+    <div className="flex items-baseline justify-between gap-2 leading-[1.9]">
+      <span className="shrink-0 text-[13px] font-normal text-[#64748b]">{label}</span>
+      <span
+        className={
+          muted ? "text-[13px] italic text-gray-400" : "text-[13px] font-medium text-[#0f1729]"
+        }
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -50,9 +57,7 @@ function Row({
 export function QuickFactsCard({ lead }: { lead: LeadDetailWithCounts }) {
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
-      <div className="mb-[11px] text-[10px] tracking-[0.5px] font-medium text-gray-500">
-        Quick Facts
-      </div>
+      <SectionSubheader>Quick Facts</SectionSubheader>
       <div className="space-y-0">
         <Row label="Sale Date" value={fmtDate(lead.sale_date)} />
         <Row label="Recovery Type" value={recoveryTypeLabel(lead.recovery_type)} />
@@ -72,7 +77,6 @@ export function QuickFactsCard({ lead }: { lead: LeadDetailWithCounts }) {
           value={lead.attorney?.name ?? "Not Assigned"}
           muted={!lead.attorney?.name}
         />
-        <Row label="Assigned To" value="Bree Moss" />
       </div>
     </div>
   );

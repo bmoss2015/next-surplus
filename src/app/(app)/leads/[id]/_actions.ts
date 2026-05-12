@@ -263,7 +263,6 @@ export async function updateLeadField<K extends string>(
     attorney_cost: true,
     lead_source: true,
     attorney_id: true,
-    assigned_to: true,
     court_records: true,
     custom_data: true,
     dnc: true,
@@ -331,6 +330,52 @@ export async function updateLeadCoreFields(
   const sb = await createClient();
   const { error } = await sb.from("leads").update(update).eq("id", leadId);
   if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads", "layout");
+  return { ok: true };
+}
+
+// Fix BB: assign / reassign a lead to a team member (or clear it) and log an
+// `assignment_change` activity attributed to whoever made the change.
+export async function assignLead(
+  leadId: string,
+  assigneeId: string | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+
+  const { data: current } = await sb
+    .from("leads")
+    .select("assigned_to")
+    .eq("id", leadId)
+    .maybeSingle();
+  const prev = (current?.assigned_to as string | null) ?? null;
+  if (prev === assigneeId) return { ok: true };
+
+  let fullName: string | null = null;
+  if (assigneeId) {
+    const { data: prof } = await sb
+      .from("profiles")
+      .select("full_name")
+      .eq("id", assigneeId)
+      .maybeSingle();
+    fullName = (prof?.full_name as string | null) ?? null;
+  }
+
+  const { error } = await sb
+    .from("leads")
+    .update({ assigned_to: assigneeId })
+    .eq("id", leadId);
+  if (error) return { ok: false, error: error.message };
+
+  await sb.from("activities").insert({
+    lead_id: leadId,
+    activity_type: "assignment_change",
+    payload: assigneeId
+      ? { assigned_to: assigneeId, full_name: fullName }
+      : { assigned_to: null },
+    user_id: await currentUserId(),
+  });
 
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/leads", "layout");

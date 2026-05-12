@@ -96,6 +96,13 @@ export function formatActivity(
         text: (p.text as string) ?? "Research Updated",
         icon: "default",
       };
+    case "assignment_change": {
+      const name = ((p.full_name as string | null) ?? "").trim();
+      return {
+        text: name ? `Lead Assigned To ${name}` : "Lead Unassigned",
+        icon: "default",
+      };
+    }
     default:
       return { text: toTitleish(row.activity_type.replace(/_/g, " ")), icon: "default" };
   }

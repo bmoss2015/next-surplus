@@ -18,6 +18,7 @@ import {
   archiveLostReason,
 } from "../_actions";
 import type { LostReasonOption } from "@/lib/leads/lost-reasons";
+import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
 
 // The 8-step pipeline excludes "lost" — that path is the Mark Lost button.
@@ -112,9 +113,7 @@ export function StageActions({
   return (
     <>
       <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
-        <div className="mb-3 text-[10px] font-medium uppercase tracking-[0.5px] text-gray-500">
-          Stage Actions
-        </div>
+        <SectionSubheader>Stage Actions</SectionSubheader>
         <div className="space-y-2">
           <button
             type="button"

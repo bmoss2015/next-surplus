@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getCurrentProfile } from "@/lib/auth/current-user";
 import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/imports/format-address";
 import {
   DEFAULT_LEAD_SOURCE,
@@ -239,6 +240,9 @@ export async function importLeads(
 > {
   const sb = await createClient();
 
+  // Fix BB: imported leads are assigned to whoever ran the import.
+  const actorId = (await getCurrentProfile())?.id ?? null;
+
   const batchSource = (leadSource && leadSource.trim()) || DEFAULT_LEAD_SOURCE;
 
   // Make sure the chosen source exists in the list for next time.
@@ -257,7 +261,7 @@ export async function importLeads(
       imported_count: 0,
       skipped_count: 0,
       status: "processing",
-      user_id: null,
+      user_id: actorId,
     })
     .select("id")
     .single();
@@ -410,7 +414,7 @@ export async function importLeads(
       // total_liens) — leave it to its default.
       const { data: leadRow, error: leadErr } = await sb
         .from("leads")
-        .insert({ ...fields, assigned_to: null })
+        .insert({ ...fields, assigned_to: actorId })
         .select("id")
         .single();
 
