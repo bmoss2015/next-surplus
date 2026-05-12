@@ -20,48 +20,48 @@ import { TeamSection } from "./_components/TeamSection";
 
 export const dynamic = "force-dynamic";
 
+// Fix ZZZZ2 PART 4: Settings is no longer admin-only. Members see Lost Reasons,
+// Attorney Directory, Email Templates, SMS Templates, and Research Templates.
+// Team, Pipeline Rules, and Defaults stay admin-only (and their data is only
+// fetched for admins). Admins see everything, unchanged.
 export default async function SettingsPage() {
   const profile = await getCurrentProfile();
-  if (!profile?.isAdmin) redirect("/");
+  if (!profile) redirect("/");
+  const isAdmin = profile.isAdmin;
 
-  const [
-    defaults,
-    attorneys,
-    lostReasons,
-    templates,
-    researchTemplates,
-    members,
-    needsActionThreshold,
-  ] = await Promise.all([
-    fetchAppSettings(),
+  const [attorneys, lostReasons, templates, researchTemplates] = await Promise.all([
     fetchAttorneys(),
     fetchLostReasonsAdmin(),
     fetchTemplates(),
     fetchResearchTemplates(),
-    fetchOrgMembers(),
-    fetchNeedsActionThreshold(),
   ]);
+  const [defaults, members, needsActionThreshold] = isAdmin
+    ? await Promise.all([fetchAppSettings(), fetchOrgMembers(), fetchNeedsActionThreshold()])
+    : [null, null, null];
 
   return (
     <div className="px-7 py-6">
       <div className="mb-[22px]">
-        <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-          Settings
-        </h1>
+        <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">Settings</h1>
         <div className="mt-1 text-[13px] text-gray-500">
-          Team, defaults, attorneys, lost reasons, templates, and research
-          templates.
+          {isAdmin
+            ? "Team, defaults, attorneys, lost reasons, templates, and research templates."
+            : "Attorneys, lost reasons, templates, and research templates."}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-[18px]">
-        <div className="col-span-2">
-          <TeamSection initial={members} currentUserId={profile.id} />
-        </div>
-        <div className="col-span-2">
-          <PipelineRulesSection initial={needsActionThreshold} />
-        </div>
-        <DefaultsSection initial={defaults} />
+        {isAdmin && (
+          <div className="col-span-2">
+            <TeamSection initial={members!} currentUserId={profile.id} />
+          </div>
+        )}
+        {isAdmin && (
+          <div className="col-span-2">
+            <PipelineRulesSection initial={needsActionThreshold!} />
+          </div>
+        )}
+        {isAdmin && <DefaultsSection initial={defaults!} />}
         <LostReasonsSection initial={lostReasons} />
         <AttorneysSection initial={attorneys} />
         <TemplatesSection initial={templates} />

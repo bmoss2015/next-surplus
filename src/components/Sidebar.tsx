@@ -21,7 +21,9 @@ const NAV: NavItem[] = [
   { label: "Claims", href: "/claims" },
   { label: "Imports", href: "/imports", divider: true },
   { label: "Reports", href: "/reports", divider: true },
-  { label: "Settings", href: "/settings", adminOnly: true },
+  // Fix ZZZZ2 PART 4: Settings is visible to members too — the page itself
+  // shows only the member-allowed sections (admin-only sections stay hidden).
+  { label: "Settings", href: "/settings" },
 ];
 
 function initials(name: string): string {

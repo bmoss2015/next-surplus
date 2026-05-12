@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   IconExternalLink,
@@ -24,19 +24,21 @@ import type {
 import { Modal } from "@/components/Modal";
 import { cn } from "@/lib/cn";
 
-// Fix JJJJ / UUUU / OOOO2 / SSSS2 / ZZZZ2: Research tab. A lead carries its own
-// snapshot of one or more checklists. Each checklist is a collapsible section
-// with a petrol-tinted header (name · "X / Y Steps Done" · collapse chevron ·
-// Remove) and a thin petrol progress bar that updates immediately on toggle.
-// Step cards are a strict 3-per-row grid (each card — and the findings textarea
-// inside it — is exactly 1/3 of the row width, never wider; extra cards wrap to
-// the next row, left-aligned). "Add From Template" opens a modal of the org's
-// templates; picking one writes its steps onto the lead. Template names render
-// as section headers with dashes replaced by spaces. Removing a checklist (with
-// confirmation) deletes only this lead's copy — the Settings template is kept.
+// Fix ZZZZ2: Research tab. A lead carries its own snapshot of one or more
+// checklists. Each checklist is a collapsible section with a petrol-tinted
+// header (name · "X / Y Steps Done" · collapse chevron · X to remove) and a thin
+// petrol progress bar. PART 6: steps render as a single-column list (no boxes,
+// no grid) — checkbox, step name (font-medium; struck-through and faded when
+// done), description in muted text below, and an "Add Findings" / "Edit
+// Findings" link on the right; the findings textarea is hidden until clicked (or
+// shown automatically when findings already exist), indented under the step
+// name, no border, with a subtle tint. PART 5: "Add From Template" opens a modal
+// listing the org's templates with state / sale-type tags and a step count;
+// templates already on the lead show as "Added" and can't be added again;
+// picking one writes its steps onto the lead and appears immediately.
 
-// Fix OOOO2 / ZZZZ2 PART 5: dashes in a template name become spaces when shown
-// as a section header. "Pre-Call Checklist" → "Pre Call Checklist".
+// Fix OOOO2 / ZZZZ2: dashes in a template name become spaces when shown as a
+// section header. "Pre-Call Checklist" → "Pre Call Checklist".
 function displayHeader(name: string): string {
   return name.replace(/-/g, " ");
 }
@@ -58,8 +60,17 @@ export function ResearchTabClient({
   const [overall, setOverall] = useState(overallFindings ?? "");
   const [savedOverall, setSavedOverall] = useState(overallFindings ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Step keys (`${tIdx}:${sIdx}`) whose findings editor the user has opened.
+  const [openFindings, setOpenFindings] = useState<Set<string>>(new Set());
   // Index of the checklist pending removal confirmation, or null.
   const [confirmRemoveIdx, setConfirmRemoveIdx] = useState<number | null>(null);
+
+  // Source-template ids already on this lead — kept in sync with local state so
+  // the picker reflects an optimistic add right away.
+  const addedSourceIds = useMemo(
+    () => new Set(templates.map((t) => t.sourceTemplateId).filter((x): x is string => !!x)),
+    [templates]
+  );
 
   function updateStep(
     tIdx: number,
@@ -69,10 +80,7 @@ export function ResearchTabClient({
     setTemplates((prev) =>
       prev.map((t, i) =>
         i === tIdx
-          ? {
-              ...t,
-              steps: t.steps.map((s, j) => (j === sIdx ? { ...s, ...patch } : s)),
-            }
+          ? { ...t, steps: t.steps.map((s, j) => (j === sIdx ? { ...s, ...patch } : s)) }
           : t
       )
     );
@@ -93,20 +101,35 @@ export function ResearchTabClient({
     });
   }
 
+  function openFindingsEditor(tIdx: number, sIdx: number) {
+    setOpenFindings((prev) => new Set(prev).add(`${tIdx}:${sIdx}`));
+  }
+
   function toggleCollapsed(tIdx: number, lrtId: string) {
     const next = !templates[tIdx].collapsed;
-    setTemplates((prev) =>
-      prev.map((t, i) => (i === tIdx ? { ...t, collapsed: next } : t))
-    );
+    setTemplates((prev) => prev.map((t, i) => (i === tIdx ? { ...t, collapsed: next } : t)));
     startTransition(async () => {
       await setLeadResearchTemplateCollapsed(lrtId, next);
     });
   }
 
   function pickTemplate(templateId: string) {
+    if (addedSourceIds.has(templateId)) return;
     setPickerOpen(false);
     startTransition(async () => {
-      await addResearchTemplateToLead(leadId, templateId);
+      const res = await addResearchTemplateToLead(leadId, templateId);
+      if (res.ok) {
+        setTemplates((prev) => [
+          ...prev,
+          {
+            id: res.template.id,
+            sourceTemplateId: res.template.sourceTemplateId,
+            name: res.template.name,
+            collapsed: res.template.collapsed,
+            steps: res.template.steps,
+          },
+        ]);
+      }
     });
   }
 
@@ -178,10 +201,9 @@ export function ResearchTabClient({
             return (
               <div
                 key={t.id}
-                className="overflow-hidden rounded-xl border border-gray-200 bg-[#f8fafc]"
+                className="overflow-hidden rounded-xl border border-gray-200 bg-surface"
               >
-                {/* Fix SSSS2 PART 3: petrol-tinted header — name · progress ·
-                    collapse toggle · Remove. */}
+                {/* Petrol-tinted section header — name · progress · collapse · X. */}
                 <div className="flex items-center gap-2 border-b border-gray-200 bg-[#e8f4f6] px-3 py-[10px]">
                   <button
                     type="button"
@@ -210,7 +232,7 @@ export function ResearchTabClient({
                     <IconX size={14} stroke={2.25} />
                   </button>
                 </div>
-                {/* Fix SSSS2 PART 4: thin progress bar reflecting done / total. */}
+                {/* Thin progress bar reflecting done / total. */}
                 <div className="h-[3px] w-full bg-gray-200">
                   <div
                     className="h-full bg-[#0d6c7d] transition-[width] duration-200"
@@ -218,70 +240,74 @@ export function ResearchTabClient({
                   />
                 </div>
                 {!t.collapsed && (
-                  // Fix ZZZZ2 / LLLLL: strict 3-per-row CSS grid —
-                  // grid-template-columns: repeat(3, minmax(0, 1fr)); gap 16px.
-                  // Each step card fills its cell (exactly 1/3 of the row),
-                  // left-aligned, wrapping after the third; max-w-[33%] is a hard
-                  // cap fallback. The findings textarea inside is w-full of the
-                  // card and never grows past it. No flexbox for the step grid.
-                  <div className="grid grid-cols-3 gap-4 p-3">
-                    {t.steps.map((step, sIdx) => (
-                      <div
-                        key={sIdx}
-                        className={cn(
-                          "flex min-w-0 max-w-[33%] gap-2 rounded-xl border p-3 transition-colors",
-                          step.done
-                            ? "border-gray-200 bg-[#f1f5f9]"
-                            : "border-gray-200 bg-white"
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={step.done}
-                          onChange={() => toggleDone(tIdx, sIdx, t.id)}
-                          className="mt-[3px] h-[14px] w-[14px] shrink-0 cursor-pointer"
-                          aria-label={step.done ? "Mark not done" : "Mark done"}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <span
-                            className={cn(
-                              "block text-[13px] font-medium leading-snug text-ink",
-                              step.done && "text-gray-400 line-through"
-                            )}
-                          >
-                            {step.name}
-                          </span>
-                          {step.url && (
-                            <a
-                              href={step.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-[2px] inline-flex cursor-pointer items-center gap-1 break-all text-[11px] text-petrol-500 underline hover:text-petrol-700"
-                            >
-                              {step.url}
-                              <IconExternalLink size={10} stroke={1.75} className="shrink-0" />
-                            </a>
+                  <div className="divide-y divide-gray-150">
+                    {t.steps.map((step, sIdx) => {
+                      const hasFindings = (step.findings ?? "").trim() !== "";
+                      const findingsOpen = hasFindings || openFindings.has(`${tIdx}:${sIdx}`);
+                      return (
+                        <div
+                          key={sIdx}
+                          className={cn(
+                            "flex items-start gap-3 px-3 py-[10px] transition-opacity",
+                            step.done && "opacity-60"
                           )}
-                          {step.instructions && (
-                            <div className="mt-[2px] text-[11px] leading-snug text-gray-500">
-                              {step.instructions}
-                            </div>
-                          )}
-                          {/* Findings textarea is full-width *of the card* —
-                              i.e. it never exceeds the card's 1/3 row width. */}
-                          <textarea
-                            value={step.findings ?? ""}
-                            onChange={(e) =>
-                              updateStep(tIdx, sIdx, { findings: e.target.value })
-                            }
-                            onBlur={() => commitStepFindings(tIdx, sIdx, t.id)}
-                            rows={3}
-                            placeholder="Findings"
-                            className="mt-2 w-full resize-y rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={step.done}
+                            onChange={() => toggleDone(tIdx, sIdx, t.id)}
+                            className="mt-[3px] h-[14px] w-[14px] shrink-0 cursor-pointer"
+                            aria-label={step.done ? "Mark not done" : "Mark done"}
                           />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <span
+                                className={cn(
+                                  "text-[13px] font-medium leading-snug text-ink",
+                                  step.done && "text-gray-400 line-through"
+                                )}
+                              >
+                                {step.name}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => openFindingsEditor(tIdx, sIdx)}
+                                className="shrink-0 cursor-pointer whitespace-nowrap text-[11px] text-gray-500 underline-offset-2 hover:text-petrol-700 hover:underline"
+                              >
+                                {hasFindings ? "Edit Findings" : "Add Findings"}
+                              </button>
+                            </div>
+                            {step.instructions && (
+                              <div className="mt-[2px] text-[11.5px] leading-snug text-gray-500">
+                                {step.instructions}
+                              </div>
+                            )}
+                            {step.url && (
+                              <a
+                                href={step.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-[2px] inline-flex cursor-pointer items-center gap-1 break-all text-[11px] text-petrol-500 underline hover:text-petrol-700"
+                              >
+                                {step.url}
+                                <IconExternalLink size={10} stroke={1.75} className="shrink-0" />
+                              </a>
+                            )}
+                            {findingsOpen && (
+                              <textarea
+                                value={step.findings ?? ""}
+                                onChange={(e) => updateStep(tIdx, sIdx, { findings: e.target.value })}
+                                onBlur={() => commitStepFindings(tIdx, sIdx, t.id)}
+                                rows={3}
+                                placeholder="Findings"
+                                autoFocus={!hasFindings}
+                                className="mt-2 w-full resize-y rounded-md bg-[#f1f5f9] px-2 py-[6px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:ring-1 focus:ring-petrol-200"
+                              />
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -314,32 +340,50 @@ export function ResearchTabClient({
         />
       </div>
 
-      {/* Fix OOOO2 PART 2: Add From Template modal. */}
+      {/* PART 5: Add From Template modal. */}
       <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Add From Template">
         {availableTemplates.length === 0 ? (
           <div className="text-[13px] text-gray-600">
-            No templates found.{" "}
+            No research templates yet. Add templates in{" "}
             <Link href="/settings" className="font-medium text-petrol-500 hover:text-petrol-700">
-              Go to Settings to create one.
+              Settings
             </Link>
+            .
           </div>
         ) : (
           <div className="space-y-1">
-            {availableTemplates.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => pickTemplate(t.id)}
-                className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-[13px] text-ink hover:bg-[#e0f2f7]"
-              >
-                <span className="font-medium">{displayHeader(t.name)}</span>
-                {(t.state || t.saleType) && (
-                  <span className="shrink-0 text-[11px] text-gray-400">
-                    {[t.state, t.saleType].filter(Boolean).join(" · ")}
+            {availableTemplates.map((t) => {
+              const isAdded = t.alreadyAdded || addedSourceIds.has(t.id);
+              const meta = [
+                ...(t.state ? [t.state] : []),
+                ...(t.saleType ? [t.saleType] : []),
+                `${t.stepCount} ${t.stepCount === 1 ? "step" : "steps"}`,
+              ].join(" · ");
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  disabled={isAdded}
+                  onClick={() => pickTemplate(t.id)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-[13px]",
+                    isAdded
+                      ? "cursor-not-allowed text-gray-400"
+                      : "cursor-pointer text-ink hover:bg-[#e0f2f7]"
+                  )}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{displayHeader(t.name)}</span>
+                    <span className="block text-[11px] text-gray-400">{meta}</span>
                   </span>
-                )}
-              </button>
-            ))}
+                  {isAdded && (
+                    <span className="shrink-0 rounded bg-gray-150 px-2 py-[2px] text-[10.5px] font-medium text-gray-500">
+                      Added
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </Modal>

@@ -1163,10 +1163,24 @@ export async function setLeadResearchTemplateCollapsed(
   return { ok: true };
 }
 
+type NewLeadResearchTemplate = {
+  id: string;
+  sourceTemplateId: string | null;
+  name: string;
+  collapsed: boolean;
+  steps: Array<{
+    name: string;
+    url: string | null;
+    instructions: string | null;
+    done: boolean;
+    findings: string | null;
+  }>;
+};
+
 export async function addResearchTemplateToLead(
   leadId: string,
   templateId: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; template: NewLeadResearchTemplate } | { ok: false; error: string }> {
   const sb = await createClient();
   const { data: tpl, error: e1 } = await sb
     .from("research_templates")
@@ -1175,6 +1189,15 @@ export async function addResearchTemplateToLead(
     .maybeSingle();
   if (e1) return { ok: false, error: e1.message };
   if (!tpl) return { ok: false, error: "Template not found" };
+
+  // ZZZZ2 PART 5 item 8: never add the same Settings template to a lead twice.
+  const { data: existing } = await sb
+    .from("lead_research_templates")
+    .select("id")
+    .eq("lead_id", leadId)
+    .eq("source_template_id", templateId)
+    .maybeSingle();
+  if (existing) return { ok: false, error: "This template is already on the lead." };
 
   const { data: last } = await sb
     .from("lead_research_templates")
@@ -1185,32 +1208,41 @@ export async function addResearchTemplateToLead(
   const nextPos =
     last && last.length > 0 ? ((last[0].position as number) ?? 0) + 1 : 0;
 
-  const steps = (Array.isArray(tpl.steps) ? (tpl.steps as RawJsonStep[]) : []).map(
-    (s) => ({
-      name: String(s.name ?? ""),
-      url: (s.url as string | null) ?? null,
-      instructions: (s.instructions as string | null) ?? null,
-      done: false,
-      findings: null,
-    })
-  );
+  const steps = (Array.isArray(tpl.steps) ? (tpl.steps as RawJsonStep[]) : []).map((s) => ({
+    name: String(s.name ?? ""),
+    url: (s.url as string | null) ?? null,
+    instructions: (s.instructions as string | null) ?? null,
+    done: false,
+    findings: null as string | null,
+  }));
 
-  const { error } = await sb.from("lead_research_templates").insert({
-    lead_id: leadId,
-    source_template_id: tpl.id,
-    name: tpl.name,
-    position: nextPos,
-    steps,
-  });
-  if (error) return { ok: false, error: error.message };
+  const { data: inserted, error } = await sb
+    .from("lead_research_templates")
+    .insert({
+      lead_id: leadId,
+      source_template_id: tpl.id,
+      name: tpl.name,
+      position: nextPos,
+      steps,
+    })
+    .select("id")
+    .single();
+  if (error || !inserted) return { ok: false, error: error?.message ?? "Insert failed" };
+
   // Adding a template manually also counts as initializing the tab.
-  await sb
-    .from("leads")
-    .update({ research_initialized: true })
-    .eq("id", leadId);
+  await sb.from("leads").update({ research_initialized: true }).eq("id", leadId);
   await logResearchUpdate(sb, leadId, `Added research checklist "${tpl.name}"`);
   revalidatePath(`/leads/${leadId}`);
-  return { ok: true };
+  return {
+    ok: true,
+    template: {
+      id: inserted.id as string,
+      sourceTemplateId: tpl.id as string,
+      name: tpl.name as string,
+      collapsed: false,
+      steps,
+    },
+  };
 }
 
 // Fix SSSS2 PART 1: drop one checklist (and all its steps/findings) from this

@@ -13,11 +13,15 @@ export function InlineTextField({
   field,
   initial,
   placeholder = "Not Set",
+  displayFormat,
 }: {
   leadId: string;
   field: string;
   initial: string | null;
   placeholder?: string;
+  // Optional transform applied to the *displayed* value only (e.g. Proper Case
+  // for County). The raw stored value is still what gets edited and persisted.
+  displayFormat?: (value: string) => string;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(initial ?? "");
@@ -74,18 +78,19 @@ export function InlineTextField({
     );
   }
 
+  const display = saved.trim() ? (displayFormat ? displayFormat(saved.trim()) : saved.trim()) : "";
   return (
     <button
       type="button"
       onClick={startEdit}
       title="Click To Edit"
       className={
-        saved.trim()
+        display
           ? "cursor-text rounded-[3px] px-0.5 text-[13px] font-medium text-[#0f1729] hover:bg-petrol-50"
           : "cursor-text rounded-[3px] px-0.5 text-[13px] italic text-gray-400 hover:bg-petrol-50"
       }
     >
-      {saved.trim() || placeholder}
+      {display || placeholder}
     </button>
   );
 }

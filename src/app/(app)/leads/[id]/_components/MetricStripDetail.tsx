@@ -5,7 +5,6 @@ import { formatCurrency, daysSince, ownerStatusOf, toTitleCase } from "@/lib/lea
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
 import { cn } from "@/lib/cn";
 import { useConfirmedSurplus } from "./ConfirmedSurplusContext";
-import { SurplusConfirmControl } from "./SurplusConfirm";
 
 function ownerSummary(lead: LeadDetailWithCounts): string {
   const owners = lead.owners ?? [];
@@ -94,13 +93,14 @@ function Cell({
 }
 
 // Fix XXXX2: the metric strip's surplus card. Two states, both laid out the
-// same way (label / value / one muted line / a small text action — no pills,
-// no buttons floating in dead space):
+// same way (label / value / one muted line — read only; the metric strip has
+// no actions on any card. The Confirm Surplus action lives on the Surplus
+// Breakdown card on the Overview tab only):
 //   Unconfirmed — "Est. Surplus" over the active surplus (source_surplus, else
-//                 the figure computed from sale data), a "Per <source>" /
-//                 "Calculated" line, then a teal "Confirm Surplus" link.
+//                 the figure computed from sale data), then a "Per <source>" /
+//                 "Calculated" line.
 //   Confirmed   — "Confirmed Surplus" over the confirmed figure (a touch
-//                 bigger/bolder), "Manually Verified", then a muted "Edit" link.
+//                 bigger/bolder), then "Manually Verified".
 export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
   const days = daysSince(lead.sale_date);
   const ownerStatusKey = ownerStatusOf(lead);
@@ -146,9 +146,6 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
                 {formatCurrency(confirmedSurplus)}
               </div>
               <div className="mt-[5px] text-[11px] text-gray-500">Manually Verified</div>
-              <div className="mt-[6px]">
-                <SurplusConfirmControl leadId={lead.id} prefillSurplus={confirmedSurplus} />
-              </div>
             </>
           ) : (
             <>
@@ -157,9 +154,6 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
                 {formatCurrency(potentialSurplus)}
               </div>
               <div className="mt-[5px] text-[11px] text-gray-500">{surplusSourceLine}</div>
-              <div className="mt-[6px]">
-                <SurplusConfirmControl leadId={lead.id} prefillSurplus={potentialSurplus} />
-              </div>
             </>
           )}
         </div>

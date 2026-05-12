@@ -6,13 +6,36 @@ import type { LeadDetailWithCounts, LienRow } from "@/lib/leads/fetch-detail";
 import { updateLeadField, addDataSource, addLien, updateLien, removeLien } from "../_actions";
 import { addLeadSource } from "../../../imports/_actions";
 import { CurrencyInput } from "@/components/CurrencyInput";
-import { formatCurrency } from "@/lib/leads/format";
+import { formatCurrency, formatCurrencyOrDash, toTitleCase } from "@/lib/leads/format";
 import { US_STATE_NAMES } from "@/lib/leads/types";
 import { RECOVERY_TYPE_LABELS } from "@/lib/leads/recovery-type";
 import { cn } from "@/lib/cn";
 import { INLINE_INPUT_CLASS } from "@/lib/inline-field";
 import { SectionSubheader } from "./SectionSubheader";
 import { InlineTextField } from "./InlineTextField";
+
+// Fix ZZZZ2 PART 2: default foreclosure process per state. Changing the state
+// field re-applies this default to recovery_type (a state change is a deliberate
+// reset). States that use either process depending on the instrument (SC, MA)
+// default to non-judicial — the more common case for surplus recovery — and the
+// user can still override recovery_type by hand afterward.
+const STATE_RECOVERY_DEFAULT: Record<string, "judicial" | "non_judicial"> = {
+  // Non-judicial (incl. SC and PA; MA below is overridden to non-judicial too):
+  AL: "non_judicial", AK: "non_judicial", AR: "non_judicial", AZ: "non_judicial",
+  CA: "non_judicial", CO: "non_judicial", DC: "non_judicial", GA: "non_judicial",
+  ID: "non_judicial", MD: "non_judicial", MI: "non_judicial", MN: "non_judicial",
+  MS: "non_judicial", MO: "non_judicial", MT: "non_judicial", NE: "non_judicial",
+  NV: "non_judicial", NH: "non_judicial", NM: "non_judicial", NC: "non_judicial",
+  OK: "non_judicial", OR: "non_judicial", RI: "non_judicial", SD: "non_judicial",
+  TN: "non_judicial", TX: "non_judicial", UT: "non_judicial", VA: "non_judicial",
+  WA: "non_judicial", WV: "non_judicial", WI: "non_judicial", WY: "non_judicial",
+  SC: "non_judicial", PA: "non_judicial", MA: "non_judicial",
+  // Judicial:
+  CT: "judicial", DE: "judicial", FL: "judicial", HI: "judicial", IA: "judicial",
+  IL: "judicial", IN: "judicial", KS: "judicial", KY: "judicial", LA: "judicial",
+  ME: "judicial", NJ: "judicial", ND: "judicial", NY: "judicial", OH: "judicial",
+  PR: "judicial", VT: "judicial",
+};
 
 // Fix FFFF2 / XXXX2: a Property Info tab — every property / sale-financial
 // field on the lead, each inline editable (display as text, click to edit,
@@ -114,19 +137,23 @@ function InlineSelectField({
 }
 
 // Fix XXXX2: State is a typed-but-constrained picker — a native select over the
-// 50 states (you can type the first letter to jump); no free text.
-function InlineStateField({ leadId, initial }: { leadId: string; initial: string | null }) {
+// 50 states (you can type the first letter to jump); no free text. Fix ZZZZ2
+// PART 2: the parent handles the commit so it can also re-derive recovery_type.
+function InlineStateField({
+  initial,
+  onCommit,
+}: {
+  initial: string | null;
+  onCommit: (value: string | null) => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState((initial ?? "").toUpperCase());
-  const [, startTransition] = useTransition();
 
   function commit(next: string) {
     setEditing(false);
-    if (next === (initial ?? "").toUpperCase()) return;
+    if (next === value) return;
     setValue(next);
-    startTransition(async () => {
-      await updateLeadField(leadId, "state", next || null);
-    });
+    onCommit(next || null);
   }
 
   if (editing) {
@@ -160,34 +187,34 @@ function InlineStateField({ leadId, initial }: { leadId: string; initial: string
   );
 }
 
-// Fix KKKKK: Recovery Type is derived from the state + sale-type lookup by a DB
-// trigger and shown read-only. The only case it's editable is when the lookup
-// has no rule for the lead's state/sale type, in which case it reads "Unknown"
-// and can be set by hand. No "Auto" badge anywhere.
+// Fix KKKKK / ZZZZ2 PART 2: Recovery Type defaults from the state (re-applied on
+// every state change) but is also directly editable so the user can override —
+// click to pick Judicial / Non Judicial / Unknown. Controlled by the parent.
 function recoveryTypeLabel(v: string | null): string {
   if (v === "judicial" || v === "non_judicial") return RECOVERY_TYPE_LABELS[v];
   return "Unknown";
 }
-function InlineRecoveryTypeField({ leadId, initial }: { leadId: string; initial: string | null }) {
+function InlineRecoveryTypeField({
+  value,
+  onCommit,
+}: {
+  value: string | null;
+  onCommit: (value: string | null) => void;
+}) {
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(initial ?? "unknown");
-  const [, startTransition] = useTransition();
-  const editable = value === "unknown" || !value;
+  const current = value === "judicial" || value === "non_judicial" ? value : "unknown";
 
   function commit(next: string) {
     setEditing(false);
-    if (next === value) return;
-    setValue(next);
-    startTransition(async () => {
-      await updateLeadField(leadId, "recovery_type", next || "unknown");
-    });
+    if (next === current) return;
+    onCommit(next || "unknown");
   }
 
-  if (editing && editable) {
+  if (editing) {
     return (
       <select
         autoFocus
-        value={value === "" ? "unknown" : value}
+        value={current}
         onChange={(e) => commit(e.target.value)}
         onBlur={() => setEditing(false)}
         onKeyDown={(e) => {
@@ -201,14 +228,11 @@ function InlineRecoveryTypeField({ leadId, initial }: { leadId: string; initial:
       </select>
     );
   }
-  if (editable) {
-    return (
-      <button type="button" onClick={() => setEditing(true)} title="Click To Edit" className={DISPLAY_SET}>
-        {recoveryTypeLabel(value)}
-      </button>
-    );
-  }
-  return <span className="text-[13px] font-medium text-[#0f1729]">{recoveryTypeLabel(value)}</span>;
+  return (
+    <button type="button" onClick={() => setEditing(true)} title="Click To Edit" className={DISPLAY_SET}>
+      {recoveryTypeLabel(current)}
+    </button>
+  );
 }
 
 function InlineDateField({ leadId, field, initial }: { leadId: string; field: string; initial: string | null }) {
@@ -256,7 +280,19 @@ function InlineDateField({ leadId, field, initial }: { leadId: string; field: st
   );
 }
 
-function InlineCurrencyField({ leadId, field, initial }: { leadId: string; field: string; initial: number | null }) {
+function InlineCurrencyField({
+  leadId,
+  field,
+  initial,
+  dashForZero,
+}: {
+  leadId: string;
+  field: string;
+  initial: number | null;
+  // Fix ZZZZ2 PART 7: show "—" instead of "$0" when this field's zero means
+  // "not entered" (Tax / Mortgage Payoff, Opening Bid, …).
+  dashForZero?: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState<number | null>(initial);
   const [, startTransition] = useTransition();
@@ -283,9 +319,11 @@ function InlineCurrencyField({ leadId, field, initial }: { leadId: string; field
       />
     );
   }
+  const display =
+    value == null ? NOT_SET : dashForZero ? formatCurrencyOrDash(value) : formatCurrency(value);
   return (
     <button type="button" onClick={() => setEditing(true)} title="Click To Edit" className={value != null ? DISPLAY_SET : DISPLAY_UNSET}>
-      {value != null ? formatCurrency(value) : NOT_SET}
+      {display}
     </button>
   );
 }
@@ -509,6 +547,25 @@ export function PropertyInfoTab({
     ...DATA_SOURCE_PRESETS,
     ...dataSources.filter((d) => !DATA_SOURCE_PRESETS.includes(d)),
   ];
+  // Fix ZZZZ2 PART 2: recovery_type lives in local state so a user-initiated
+  // state change can reset it to that state's default, with the change visible
+  // immediately. It never auto-updates on load — only on an explicit edit.
+  const [recoveryType, setRecoveryType] = useState<string | null>(lead.recovery_type);
+
+  function handleStateChange(next: string | null) {
+    void updateLeadField(id, "state", next);
+    const code = (next ?? "").toUpperCase();
+    const rt = code ? STATE_RECOVERY_DEFAULT[code] ?? null : null;
+    if (rt && rt !== recoveryType) {
+      setRecoveryType(rt);
+      void updateLeadField(id, "recovery_type", rt);
+    }
+  }
+  function handleRecoveryTypeChange(next: string | null) {
+    setRecoveryType(next);
+    void updateLeadField(id, "recovery_type", next || "unknown");
+  }
+
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <SectionSubheader>Property Info</SectionSubheader>
@@ -520,10 +577,10 @@ export function PropertyInfoTab({
           <InlineTextField leadId={id} field="case_number" initial={lead.case_number} placeholder={NOT_SET} />
         </FieldRow>
         <FieldRow label="County">
-          <InlineTextField leadId={id} field="county" initial={lead.county} placeholder={NOT_SET} />
+          <InlineTextField leadId={id} field="county" initial={lead.county} placeholder={NOT_SET} displayFormat={toTitleCase} />
         </FieldRow>
         <FieldRow label="State">
-          <InlineStateField leadId={id} initial={lead.state} />
+          <InlineStateField initial={lead.state} onCommit={handleStateChange} />
         </FieldRow>
         <FieldRow label="Sale Type">
           <InlineSelectField leadId={id} field="sale_type" initial={lead.sale_type} options={SALE_TYPE_OPTIONS} />
@@ -535,13 +592,13 @@ export function PropertyInfoTab({
           <InlineCurrencyField leadId={id} field="closing_bid" initial={lead.closing_bid} />
         </FieldRow>
         <FieldRow label="Opening Bid">
-          <InlineCurrencyField leadId={id} field="opening_bid" initial={lead.opening_bid} />
+          <InlineCurrencyField leadId={id} field="opening_bid" initial={lead.opening_bid} dashForZero />
         </FieldRow>
         <FieldRow label="Tax / Mortgage Payoff">
-          <InlineCurrencyField leadId={id} field="outstanding_debt" initial={lead.outstanding_debt} />
+          <InlineCurrencyField leadId={id} field="outstanding_debt" initial={lead.outstanding_debt} dashForZero />
         </FieldRow>
         <FieldRow label="Recovery Type">
-          <InlineRecoveryTypeField leadId={id} initial={lead.recovery_type} />
+          <InlineRecoveryTypeField value={recoveryType} onCommit={handleRecoveryTypeChange} />
         </FieldRow>
         <FieldRow label="Lead Source">
           <InlineListField

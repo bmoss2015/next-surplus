@@ -26,6 +26,9 @@ export type AvailableTemplate = {
   name: string;
   state: string | null;
   saleType: string | null;
+  stepCount: number;
+  // True when this Settings template has already been added to the lead.
+  alreadyAdded: boolean;
 };
 
 export type ResearchData = {
@@ -138,11 +141,16 @@ export async function fetchResearch(
     steps: normalizeSteps(r.steps),
   }));
 
+  const addedSourceIds = new Set(
+    templates.map((t) => t.sourceTemplateId).filter((x): x is string => !!x)
+  );
   const availableTemplates: AvailableTemplate[] = allTemplates.map((t) => ({
     id: t.id,
     name: t.name,
     state: t.state,
     saleType: t.sale_type,
+    stepCount: Array.isArray(t.steps) ? t.steps.length : 0,
+    alreadyAdded: addedSourceIds.has(t.id),
   }));
 
   return { templates, availableTemplates, overallFindings };
