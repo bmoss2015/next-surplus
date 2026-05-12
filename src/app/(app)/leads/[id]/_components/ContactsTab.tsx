@@ -43,6 +43,7 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
           initialContacts={contacts}
         />
       </div>
+      <RelativesSection leadId={leadId} initial={relatives} />
       <div className="mt-4">
         <MailingAddresses
           leadId={leadId}
@@ -50,7 +51,6 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
           owners={owners}
         />
       </div>
-      <RelativesSection leadId={leadId} initial={relatives} />
     </>
   );
 }
