@@ -24,16 +24,19 @@ import type {
 import { Modal } from "@/components/Modal";
 import { cn } from "@/lib/cn";
 
-// Fix JJJJ / UUUU / OOOO2 / SSSS2: Research tab. A lead carries its own snapshot
-// of one or more checklists. Each checklist is a collapsible section with a
-// petrol-tinted header (name · progress · collapse toggle · Remove) and a thin
-// progress bar; its steps lay out 3 per row at 1/3 width (wrapping). "Add From
-// Template" opens a modal of the org's templates; picking one writes its steps
-// onto the lead. Template names render as section headers with dashes replaced
-// by spaces. Removing a checklist deletes only this lead's copy.
+// Fix JJJJ / UUUU / OOOO2 / SSSS2 / ZZZZ2: Research tab. A lead carries its own
+// snapshot of one or more checklists. Each checklist is a collapsible section
+// with a petrol-tinted header (name · "X / Y Steps Done" · collapse chevron ·
+// Remove) and a thin petrol progress bar that updates immediately on toggle.
+// Step cards are a strict 3-per-row grid (each card — and the findings textarea
+// inside it — is exactly 1/3 of the row width, never wider; extra cards wrap to
+// the next row, left-aligned). "Add From Template" opens a modal of the org's
+// templates; picking one writes its steps onto the lead. Template names render
+// as section headers with dashes replaced by spaces. Removing a checklist (with
+// confirmation) deletes only this lead's copy — the Settings template is kept.
 
-// Fix OOOO2 PART 3: dashes in a template name become spaces when shown as a
-// section header.
+// Fix OOOO2 / ZZZZ2 PART 5: dashes in a template name become spaces when shown
+// as a section header. "Pre-Call Checklist" → "Pre Call Checklist".
 function displayHeader(name: string): string {
   return name.replace(/-/g, " ");
 }
@@ -215,12 +218,15 @@ export function ResearchTabClient({
                   />
                 </div>
                 {!t.collapsed && (
-                  <div className="grid grid-cols-3 gap-3 p-3">
+                  // Fix ZZZZ2 PART 1: strict 3-per-row grid — every step card is
+                  // exactly 1/3 of the row width (1fr columns), left-aligned,
+                  // wrapping to a new row after the third. No full-width cards.
+                  <div className="grid auto-rows-fr grid-cols-3 gap-3 p-3">
                     {t.steps.map((step, sIdx) => (
                       <div
                         key={sIdx}
                         className={cn(
-                          "flex gap-2 rounded-xl border p-3 transition-colors",
+                          "flex min-w-0 gap-2 rounded-xl border p-3 transition-colors",
                           step.done
                             ? "border-gray-200 bg-[#f1f5f9]"
                             : "border-gray-200 bg-white"
@@ -258,6 +264,8 @@ export function ResearchTabClient({
                               {step.instructions}
                             </div>
                           )}
+                          {/* Findings textarea is full-width *of the card* —
+                              i.e. it never exceeds the card's 1/3 row width. */}
                           <textarea
                             value={step.findings ?? ""}
                             onChange={(e) =>
