@@ -133,16 +133,26 @@ export async function fetchLeadDetail(
   };
 }
 
-export type AttorneyOption = { id: string; name: string };
+export type AttorneyOption = {
+  id: string;
+  name: string;
+  states_covered: string[];
+  default_cost: number | null;
+};
 
 export async function fetchAttorneyOptions(): Promise<AttorneyOption[]> {
   const sb = await createClient();
   const { data, error } = await sb
     .from("attorneys")
-    .select("id, name")
+    .select("id, name, states_covered, default_cost")
     .order("name", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as AttorneyOption[];
+  return (data ?? []).map((a) => ({
+    id: a.id as string,
+    name: a.name as string,
+    states_covered: (a.states_covered as string[] | null) ?? [],
+    default_cost: (a.default_cost as number | null) ?? null,
+  }));
 }
 
 export async function fetchVerificationItems(
