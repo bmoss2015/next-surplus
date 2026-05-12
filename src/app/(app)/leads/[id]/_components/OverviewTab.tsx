@@ -1,13 +1,9 @@
-import {
-  fetchOwnersWithContacts,
-  type LeadDetailWithCounts,
-} from "@/lib/leads/fetch-detail";
+import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { SurplusBreakdown } from "./Overview/SurplusBreakdown";
-import { MailingAddresses } from "./Overview/MailingAddresses";
 
-export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
-  const ownersAndContacts = await fetchOwnersWithContacts(lead.id);
-
+// Fix KK: Overview is just the Surplus Breakdown card now — Mailing Addresses
+// moved to the Contacts tab, and there is no research content here.
+export function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
   return (
     <div className="space-y-4">
       <SurplusBreakdown
@@ -20,11 +16,6 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
         estimatedSurplus={lead.estimated_surplus}
         recoveryFeePercent={lead.recovery_fee_percent}
         attorneyCost={lead.attorney_cost}
-      />
-      <MailingAddresses
-        leadId={lead.id}
-        initialAddresses={ownersAndContacts.contacts}
-        owners={ownersAndContacts.owners}
       />
     </div>
   );

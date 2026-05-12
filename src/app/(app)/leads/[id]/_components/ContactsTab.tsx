@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ContactsTabClient } from "./ContactsTabClient";
 import { RelativesSection } from "./RelativesSection";
 import { AttorneyAssignment } from "./AttorneyAssignment";
+import { MailingAddresses } from "./Overview/MailingAddresses";
 
 export async function ContactsTab({ leadId }: { leadId: string }) {
   const sb = await createClient();
@@ -40,6 +41,13 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
           leadId={leadId}
           initialOwners={owners}
           initialContacts={contacts}
+        />
+      </div>
+      <div className="mt-4">
+        <MailingAddresses
+          leadId={leadId}
+          initialAddresses={contacts}
+          owners={owners}
         />
       </div>
       <RelativesSection leadId={leadId} initial={relatives} />
