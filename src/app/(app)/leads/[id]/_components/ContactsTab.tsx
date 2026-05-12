@@ -49,6 +49,7 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
           leadId={leadId}
           initialAddresses={contacts}
           owners={owners}
+          relatives={relatives}
         />
       </div>
     </>

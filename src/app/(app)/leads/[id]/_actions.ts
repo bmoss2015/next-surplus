@@ -443,7 +443,11 @@ export async function deleteVerificationItem(
 export async function addMailingAddress(
   leadId: string,
   ownerId: string,
-  address: string
+  address: string,
+  // Fix AAA Patch: full recipient label ("Jane Doe (Relative)" / "John Doe
+  // (Owner)") — stored in contacts.notes so a relative can be the recipient
+  // while owner_id still satisfies the FK.
+  recipientLabel?: string | null
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const trimmed = address.trim();
   if (trimmed.length === 0) {
@@ -459,6 +463,7 @@ export async function addMailingAddress(
     is_primary: false,
     mailed: false,
     mailed_at: null,
+    notes: recipientLabel?.trim() || null,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/leads/${leadId}`);

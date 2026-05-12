@@ -7,7 +7,11 @@ import {
   setMailingAddressMailed,
   deleteContact,
 } from "../../_actions";
-import type { ContactRow, OwnerRowFull } from "@/lib/leads/fetch-detail";
+import type {
+  ContactRow,
+  OwnerRowFull,
+  RelativeRow,
+} from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
 
@@ -30,14 +34,42 @@ function joinAddress(d: AddrDraft): string {
   return [d.line1.trim(), tail].filter(Boolean).join(", ");
 }
 
+// Fix AAA Patch: a mailing address can be addressed to any owner OR any
+// relative. We keep contacts.owner_id (FK) pointing at an owner, and store the
+// full recipient label (e.g. "Jane Doe (Relative)") in contacts.notes.
+type Recipient = { key: string; label: string; ownerId: string };
+
+function buildRecipients(
+  owners: OwnerRowFull[],
+  relatives: RelativeRow[]
+): Recipient[] {
+  if (owners.length === 0) return [];
+  const fallbackOwnerId =
+    owners.find((o) => o.is_primary)?.id ?? owners[0].id;
+  return [
+    ...owners.map((o) => ({
+      key: `o:${o.id}`,
+      label: `${o.full_name} (Owner)`,
+      ownerId: o.id,
+    })),
+    ...relatives.map((r) => ({
+      key: `r:${r.id}`,
+      label: `${r.full_name} (Relative)`,
+      ownerId: fallbackOwnerId,
+    })),
+  ];
+}
+
 export function MailingAddresses({
   leadId,
   initialAddresses,
   owners,
+  relatives = [],
 }: {
   leadId: string;
   initialAddresses: ContactRow[];
   owners: OwnerRowFull[];
+  relatives?: RelativeRow[];
 }) {
   const { isAdmin } = useRole();
   const [rows, setRows] = useState<ContactRow[]>(
@@ -45,20 +77,29 @@ export function MailingAddresses({
   );
   const [adding, setAdding] = useState(false);
   const [addr, setAddr] = useState<AddrDraft>(EMPTY_ADDR);
-  const [newOwnerId, setNewOwnerId] = useState(owners[0]?.id ?? "");
+  const recipients = buildRecipients(owners, relatives);
+  const [newRecipientKey, setNewRecipientKey] = useState(
+    recipients[0]?.key ?? ""
+  );
   const [, startTransition] = useTransition();
 
   function add() {
     const value = joinAddress(addr);
-    if (!addr.line1.trim() || !newOwnerId) return;
+    const recipient = recipients.find((r) => r.key === newRecipientKey);
+    if (!addr.line1.trim() || !recipient) return;
     startTransition(async () => {
-      const result = await addMailingAddress(leadId, newOwnerId, value);
+      const result = await addMailingAddress(
+        leadId,
+        recipient.ownerId,
+        value,
+        recipient.label
+      );
       if (result.ok) {
         setRows((prev) => [
           ...prev,
           {
             id: crypto.randomUUID(),
-            owner_id: newOwnerId,
+            owner_id: recipient.ownerId,
             lead_id: leadId,
             channel: "mailing_address",
             value,
@@ -72,7 +113,7 @@ export function MailingAddresses({
             is_litigator: false,
             mailed: false,
             mailed_at: null,
-            notes: null,
+            notes: recipient.label,
           },
         ]);
         setAddr(EMPTY_ADDR);
@@ -104,6 +145,17 @@ export function MailingAddresses({
 
   function ownerName(ownerId: string) {
     return owners.find((o) => o.id === ownerId)?.full_name ?? "—";
+  }
+
+  function recipientLabel(row: ContactRow) {
+    if (row.notes && row.notes.trim()) return row.notes;
+    return `${ownerName(row.owner_id)} (Owner)`;
+  }
+
+  function addressLines(value: string): { street: string; rest: string } {
+    const parts = value.split(", ");
+    if (parts.length <= 1) return { street: value, rest: "" };
+    return { street: parts[0], rest: parts.slice(1).join(", ") };
   }
 
   const inputClass =
@@ -142,46 +194,50 @@ export function MailingAddresses({
       ) : (
         rows.length > 0 && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {rows.map((row) => (
-              <div
-                key={row.id}
-                className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3"
-              >
-                <div className="text-[12px] leading-snug text-ink">
-                  {row.value}
-                </div>
-                <div className="text-[11px] text-gray-500">
-                  {ownerName(row.owner_id)}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleMailed(row)}
-                  className={cn(
-                    "inline-flex w-fit cursor-pointer items-center gap-1 rounded-full px-2.5 py-[3px] text-[10px] font-medium transition-colors",
-                    row.mailed
-                      ? "border-none bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] text-white"
-                      : "border border-[#e2e8f0] bg-[#f1f5f9] text-[#64748b] hover:border-petrol-200"
-                  )}
-                  title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
+            {rows.map((row) => {
+              const { street, rest } = addressLines(row.value);
+              return (
+                <div
+                  key={row.id}
+                  className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3"
                 >
-                  {row.mailed && <IconCheck size={11} stroke={2.5} />}
-                  {row.mailed && row.mailed_at
-                    ? `Mailed ${fmtMailedAt(row.mailed_at)}`
-                    : "Not Mailed"}
-                </button>
-                {isAdmin && (
+                  <div className="text-[11px] text-gray-500">
+                    {recipientLabel(row)}
+                  </div>
+                  <div className="text-[12px] leading-snug text-ink">
+                    <div>{street}</div>
+                    {rest && <div className="text-gray-500">{rest}</div>}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => remove(row)}
-                    className="mt-auto inline-flex w-fit cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-danger"
-                    aria-label="Remove Mailing Address"
+                    onClick={() => toggleMailed(row)}
+                    className={cn(
+                      "inline-flex w-fit cursor-pointer items-center gap-1 rounded-full px-2.5 py-[3px] text-[10px] font-medium transition-colors",
+                      row.mailed
+                        ? "border-none bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] text-white"
+                        : "border border-[#e2e8f0] bg-[#f1f5f9] text-[#64748b] hover:border-petrol-200"
+                    )}
+                    title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
                   >
-                    <IconTrash size={12} stroke={1.75} />
-                    Remove
+                    {row.mailed && <IconCheck size={11} stroke={2.5} />}
+                    {row.mailed && row.mailed_at
+                      ? `Mailed ${fmtMailedAt(row.mailed_at)}`
+                      : "Not Mailed"}
                   </button>
-                )}
-              </div>
-            ))}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => remove(row)}
+                      className="mt-auto inline-flex w-fit cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-danger"
+                      aria-label="Remove Mailing Address"
+                    >
+                      <IconTrash size={12} stroke={1.75} />
+                      Remove
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )
       )}
@@ -189,14 +245,14 @@ export function MailingAddresses({
       {adding && (
         <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-3">
           <div className="mb-2">
-            <label className={labelClass}>Owner</label>
+            <label className={labelClass}>Recipient</label>
             <select
-              value={newOwnerId}
-              onChange={(e) => setNewOwnerId(e.target.value)}
+              value={newRecipientKey}
+              onChange={(e) => setNewRecipientKey(e.target.value)}
               className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12.5px] text-ink outline-none focus:border-petrol-500"
             >
-              {owners.map((o) => (
-                <option key={o.id} value={o.id}>{o.full_name}</option>
+              {recipients.map((r) => (
+                <option key={r.key} value={r.key}>{r.label}</option>
               ))}
             </select>
           </div>
@@ -231,7 +287,7 @@ export function MailingAddresses({
             <button
               type="button"
               onClick={add}
-              disabled={!addr.line1.trim() || !newOwnerId}
+              disabled={!addr.line1.trim() || !newRecipientKey}
               className="btn-primary cursor-pointer rounded-md px-3 py-[6px] text-[12px] font-medium disabled:opacity-50"
             >
               Add Mailing Address
