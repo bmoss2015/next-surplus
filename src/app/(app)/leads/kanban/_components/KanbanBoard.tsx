@@ -11,7 +11,6 @@ import {
 import { advanceStage } from "@/app/(app)/leads/[id]/_actions";
 import { formatCurrency, primaryOwner, toTitleCase } from "@/lib/leads/format";
 import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
-import { BelowFloorIcon } from "@/components/BelowFloorIcon";
 import { LeadActionsMenu } from "@/app/(app)/leads/[id]/_components/LeadActionsMenu";
 import { cn } from "@/lib/cn";
 
@@ -227,7 +226,17 @@ function KanbanCard({
   const locationLine = [lead.county ? toTitleCase(lead.county) : null, lead.state]
     .filter(Boolean)
     .join(", ");
-  const hasTags = lead.has_litigator || lead.needs_action_flag || lead.below_floor;
+  // Fix BBBB2: every card label is a uniform tag pill; show at most 2, then a
+  // neutral "+N more" pill. The lead detail page still shows them all.
+  const tags: Array<{ key: string; label: string; cls: string }> = [];
+  if (lead.below_floor)
+    tags.push({ key: "below_floor", label: "Below Floor", cls: "border-warn-border bg-warn-bg text-warn-strong" });
+  if (lead.has_litigator)
+    tags.push({ key: "litigator", label: "Litigator", cls: "border-[#fca5a5] bg-[#fef2f2] text-[#991b1b]" });
+  if (lead.needs_action_flag)
+    tags.push({ key: "needs_action", label: "Needs Action", cls: "border-petrol-200 bg-[#e0f2f7] text-[#0a3d4a]" });
+  const visibleTags = tags.slice(0, 2);
+  const hiddenTagCount = tags.length - visibleTags.length;
 
   return (
     // Fix U: the ⋯ menu sits OUTSIDE the <a> so its clicks never trigger card
@@ -282,17 +291,16 @@ function KanbanCard({
               {formatCurrency(activeNetPayout(lead))}
             </span>
           </div>
-          {hasTags && (
+          {tags.length > 0 && (
             <div className="mt-[9px] flex flex-wrap items-center gap-1.5">
-              {lead.below_floor && <BelowFloorIcon size={13} />}
-              {lead.has_litigator && (
-                <span className={cn(KANBAN_TAG_PILL, "border-[#fca5a5] bg-[#fef2f2] text-[#991b1b]")}>
-                  Litigator
+              {visibleTags.map((t) => (
+                <span key={t.key} className={cn(KANBAN_TAG_PILL, t.cls)}>
+                  {t.label}
                 </span>
-              )}
-              {lead.needs_action_flag && (
-                <span className={cn(KANBAN_TAG_PILL, "border-petrol-200 bg-[#e0f2f7] text-[#0a3d4a]")}>
-                  Needs Action
+              ))}
+              {hiddenTagCount > 0 && (
+                <span className={cn(KANBAN_TAG_PILL, "border-gray-200 bg-gray-100 text-gray-500")}>
+                  +{hiddenTagCount} more
                 </span>
               )}
             </div>
