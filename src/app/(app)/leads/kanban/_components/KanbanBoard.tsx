@@ -12,7 +12,6 @@ import { advanceStage } from "@/app/(app)/leads/[id]/_actions";
 import { formatCurrency, primaryOwner } from "@/lib/leads/format";
 import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
-import { LitigatorBadge } from "@/components/LitigatorBadge";
 import { LeadActionsMenu } from "@/app/(app)/leads/[id]/_components/LeadActionsMenu";
 import { cn } from "@/lib/cn";
 
@@ -226,9 +225,9 @@ function KanbanCard({
 }) {
   return (
     // Fix U: the ⋯ menu sits OUTSIDE the <a> so its clicks never trigger card
-    // navigation or the card drag. Fix EE: the status pill, ⋯ menu and
-    // below-floor warning all live in a single absolutely-positioned top-right
-    // overlay, so card content beneath flows normally and is never pushed down.
+    // navigation or the card drag. Fix BBB: corner pills are absolutely
+    // positioned (Litigator top-left, Needs Action top-right) and the card
+    // content keeps 28px of top padding so nothing collides with them.
     <div
       className={cn(
         "group relative rounded-md border border-gray-200 bg-surface shadow-card transition-opacity",
@@ -243,25 +242,15 @@ function KanbanCard({
         onClick={(e) => {
           if (isDragging) e.preventDefault();
         }}
-        className="block cursor-grab px-[11px] py-[10px] active:cursor-grabbing"
+        className="block cursor-grab px-[11px] pb-[10px] pt-[28px] active:cursor-grabbing"
       >
         <div className="min-w-0">
-          <div
-            className={cn(
-              "truncate text-[12px] font-medium text-ink",
-              lead.needs_action_flag ? "pr-[84px]" : "pr-5"
-            )}
-          >
+          <div className="truncate pr-5 text-[12px] font-medium text-ink">
             {lead.address}
           </div>
           <div className="mt-[2px] truncate text-[11px] text-gray-500">
             {primaryOwner(lead)}
           </div>
-          {lead.has_litigator && (
-            <div className="mt-[5px]">
-              <LitigatorBadge />
-            </div>
-          )}
           <div className="mt-[7px] whitespace-nowrap text-[11px]">
             <span className="text-gray-400">Total Surplus: </span>
             <span className="font-medium text-ink">
@@ -277,8 +266,14 @@ function KanbanCard({
         </div>
       </a>
 
-      {/* Top-right overlay: below-floor warning, ⋯ menu (on hover), and the
-          status pill anchored at top: 8px / right: 8px. */}
+      {/* Top-left: Litigator pill. */}
+      {lead.has_litigator && (
+        <span className="absolute left-2 top-2 z-10 rounded-[10px] border border-[#fca5a5] bg-[#fef2f2] px-2 py-[2px] text-[10px] font-medium leading-none text-[#991b1b]">
+          Litigator
+        </span>
+      )}
+
+      {/* Top-right: below-floor warning, ⋯ menu (on hover), Needs Action pill. */}
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
         {lead.below_floor && <BelowFloorIcon size={13} />}
         <LeadActionsMenu
@@ -288,7 +283,7 @@ function KanbanCard({
           triggerClassName="opacity-0 transition-opacity group-hover:opacity-100"
         />
         {lead.needs_action_flag && (
-          <span className="rounded-[10px] bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-2 py-[2px] text-[11px] font-medium leading-none text-white">
+          <span className="rounded-[10px] bg-[#e0f2f7] px-2 py-[2px] text-[10px] font-medium leading-none text-[#0a3d4a]">
             Needs Action
           </span>
         )}
