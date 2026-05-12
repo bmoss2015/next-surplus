@@ -5,7 +5,8 @@ import { IconPlus, IconTrash, IconUsersGroup } from "@tabler/icons-react";
 import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
-import { formatPhone } from "./ContactsTabClient";
+import { formatPhone, AgeEditField } from "./ContactsTabClient";
+import { properCaseName } from "@/lib/format/proper-case-name";
 import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
 
@@ -291,12 +292,8 @@ function RelativeCard({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3">
       <div className="text-[13px] font-medium leading-tight text-ink">
-        {relative.full_name}
-        {relative.age != null && (
-          <span className="ml-1.5 text-[10px] font-normal text-gray-400">
-            Age {relative.age}
-          </span>
-        )}
+        {properCaseName(relative.full_name)}
+        <AgeEditField value={relative.age} onCommit={(n) => onPatch({ age: n })} />
       </div>
 
       <select

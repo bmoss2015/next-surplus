@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   IconPlus,
   IconTrash,
-  IconStarFilled,
   IconPencil,
 } from "@tabler/icons-react";
 import {
@@ -58,6 +57,75 @@ export function formatPhone(raw: string): string {
   if (digits.length < 4) return `(${digits}`;
   if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+// Fix BBBBB PART 3: a tiny inline age editor used on owner *and* relative cards
+// — shows "Age N" (or "Add Age"); click to edit, commit on blur / Enter, revert
+// on Escape; clearing the value stores null.
+export function AgeEditField({
+  value,
+  onCommit,
+}: {
+  value: number | null;
+  onCommit: (n: number | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value != null ? String(value) : "");
+  const cancelNext = useRef(false);
+
+  function startEdit() {
+    setText(value != null ? String(value) : "");
+    setEditing(true);
+  }
+  function commit() {
+    setEditing(false);
+    if (cancelNext.current) {
+      cancelNext.current = false;
+      return;
+    }
+    const digits = text.replace(/[^\d]/g, "");
+    const n = digits ? parseInt(digits, 10) : NaN;
+    const next = Number.isFinite(n) && n > 0 && n < 130 ? n : null;
+    if (next !== value) onCommit(next);
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="text"
+        inputMode="numeric"
+        autoFocus
+        value={text}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          } else if (e.key === "Escape") {
+            cancelNext.current = true;
+            e.currentTarget.blur();
+          }
+        }}
+        className="ml-1.5 w-[44px] rounded border border-petrol-500 bg-white px-1 py-[1px] text-[10px] text-ink outline-none"
+        aria-label="Age"
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      title="Click To Edit Age"
+      className={cn(
+        "ml-1.5 cursor-text rounded px-0.5 text-[10px] hover:bg-petrol-50",
+        value != null ? "font-normal text-gray-400" : "italic text-gray-300"
+      )}
+    >
+      {value != null ? `Age ${value}` : "Add Age"}
+    </button>
+  );
 }
 
 export function ContactsTabClient({
@@ -127,15 +195,11 @@ export function ContactsTabClient({
     });
   }
 
-  // Fix KKK: promote an owner to primary (and demote whoever was primary).
-  function makePrimaryOwner(ownerId: string) {
-    const prevPrimary = owners.find((o) => o.is_primary && o.id !== ownerId);
-    setOwners((prev) =>
-      prev.map((o) => ({ ...o, is_primary: o.id === ownerId }))
-    );
+  // Fix BBBBB PART 3: Age is an inline-editable field on the owner card.
+  function changeOwnerAge(ownerId: string, age: number | null) {
+    setOwners((prev) => prev.map((o) => (o.id === ownerId ? { ...o, age } : o)));
     startTransition(async () => {
-      if (prevPrimary) await upsertOwner(leadId, prevPrimary.id, { is_primary: false });
-      await upsertOwner(leadId, ownerId, { is_primary: true });
+      await upsertOwner(leadId, ownerId, { age });
     });
   }
 
@@ -290,6 +354,7 @@ export function ContactsTabClient({
                 (c) => c.owner_id === owner.id && c.channel === "email"
               )}
               onChangeStatus={(s) => changeOwnerStatus(owner.id, s)}
+              onChangeAge={(n) => changeOwnerAge(owner.id, n)}
               onRemoveOwner={() => removeOwner(owner.id)}
               onAddContact={(channel, value) =>
                 addContact(owner.id, channel, value)
@@ -297,8 +362,6 @@ export function ContactsTabClient({
               onRemoveContact={removeContact}
               onSetContactStatus={setContactStatus}
               onSetPhoneMeta={setPhoneMeta}
-              multipleOwners={owners.length > 1}
-              onMakePrimary={() => makePrimaryOwner(owner.id)}
             />
           ))}
         </div>
@@ -312,25 +375,23 @@ function OwnerCard({
   phones,
   emails,
   onChangeStatus,
+  onChangeAge,
   onRemoveOwner,
   onAddContact,
   onRemoveContact,
   onSetContactStatus,
   onSetPhoneMeta,
-  multipleOwners,
-  onMakePrimary,
 }: {
   owner: OwnerRowFull;
   phones: ContactRow[];
   emails: ContactRow[];
   onChangeStatus: (s: OwnerStatus) => void;
+  onChangeAge: (n: number | null) => void;
   onRemoveOwner: () => void;
   onAddContact: (channel: "phone" | "email", value: string) => void;
   onRemoveContact: (id: string) => void;
   onSetContactStatus: (id: string, s: ContactStatus) => void;
   onSetPhoneMeta: (id: string, patch: PhoneMetaPatch) => void;
-  multipleOwners: boolean;
-  onMakePrimary: () => void;
 }) {
   const { isAdmin } = useRole();
   const [addingPhone, setAddingPhone] = useState(false);
@@ -363,28 +424,9 @@ function OwnerCard({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3">
       <div className="flex items-start gap-1.5">
-        {multipleOwners && owner.is_primary && (
-          <IconStarFilled
-            size={13}
-            className="mt-[2px] shrink-0 text-warn"
-            aria-label="Primary Owner"
-            title="Primary owner of record"
-          />
-        )}
         <div className="min-w-0 flex-1 leading-tight">
           <span className="text-[13px] font-medium text-ink">{owner.full_name}</span>
-          {owner.age != null && (
-            <span className="ml-1.5 text-[10px] font-normal text-gray-400">Age {owner.age}</span>
-          )}
-          {multipleOwners && !owner.is_primary && (
-            <button
-              type="button"
-              onClick={onMakePrimary}
-              className="ml-1.5 cursor-pointer text-[10px] text-petrol-500 hover:text-petrol-700"
-            >
-              Make Primary
-            </button>
-          )}
+          <AgeEditField value={owner.age} onCommit={onChangeAge} />
         </div>
         {isAdmin && (
           <button
@@ -471,7 +513,7 @@ function OwnerCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
         <SectionSubheader className="mb-0">Email</SectionSubheader>
         {emails.map((c) => (
           <ContactLine
