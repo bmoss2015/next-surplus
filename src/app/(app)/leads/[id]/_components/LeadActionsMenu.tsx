@@ -173,7 +173,7 @@ export function LeadActionsMenu({
                 <button
                   type="button"
                   onClick={onArchiveClick}
-                  className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[13px] text-ink hover:bg-gray-50"
+                  className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[13px] text-[#0f1729] hover:bg-gray-50"
                 >
                   {archived ? (
                     <IconArchiveOff size={14} stroke={1.75} className="shrink-0 text-gray-500" />
