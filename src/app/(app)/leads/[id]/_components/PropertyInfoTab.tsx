@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
-import { updateLeadField, addDataSource } from "../_actions";
+import { IconPlus, IconMinus } from "@tabler/icons-react";
+import type { LeadDetailWithCounts, LienRow } from "@/lib/leads/fetch-detail";
+import { updateLeadField, addDataSource, addLien, updateLien, removeLien } from "../_actions";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { formatCurrency } from "@/lib/leads/format";
 import { cn } from "@/lib/cn";
@@ -342,6 +343,111 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
+// Fix MMMM2: the Liens editing area lives on the Property Info tab now. Each
+// lien row is the standardized inline name input + amount field on one row with
+// a remove control; "Add Lien" sits below the list. Writes to the same `liens`
+// table — the Overview Fees section just shows the computed Total Liens.
+type LocalLien = LienRow & { _tempId?: string };
+
+function LiensSection({
+  leadId,
+  initialLiens,
+}: {
+  leadId: string;
+  initialLiens: LienRow[];
+}) {
+  const [liens, setLiens] = useState<LocalLien[]>(initialLiens);
+  const [, startTransition] = useTransition();
+
+  function onAddLien() {
+    const tempId = `temp-${Date.now()}`;
+    setLiens((prev) => [
+      ...prev,
+      { id: tempId, _tempId: tempId, lead_id: leadId, name: "", amount: 0, position: prev.length },
+    ]);
+    startTransition(async () => {
+      const res = await addLien(leadId);
+      if (res.ok) {
+        setLiens((prev) =>
+          prev.map((l) => (l.id === tempId ? { ...l, id: res.id, _tempId: undefined } : l))
+        );
+      } else {
+        setLiens((prev) => prev.filter((l) => l.id !== tempId));
+      }
+    });
+  }
+  function onLienName(id: string, name: string) {
+    setLiens((prev) => prev.map((l) => (l.id === id ? { ...l, name } : l)));
+  }
+  function commitLienName(id: string, name: string) {
+    if (id.startsWith("temp-")) return;
+    startTransition(async () => {
+      await updateLien(id, leadId, { name });
+    });
+  }
+  function commitLienAmount(id: string, amount: number | null) {
+    setLiens((prev) => prev.map((l) => (l.id === id ? { ...l, amount: amount ?? 0 } : l)));
+    if (id.startsWith("temp-")) return;
+    startTransition(async () => {
+      await updateLien(id, leadId, { amount });
+    });
+  }
+  function onRemoveLien(id: string) {
+    setLiens((prev) => prev.filter((l) => l.id !== id));
+    if (id.startsWith("temp-")) return;
+    startTransition(async () => {
+      await removeLien(id, leadId);
+    });
+  }
+
+  return (
+    <div className="mt-4">
+      <SectionSubheader>Liens</SectionSubheader>
+      {liens.length === 0 ? (
+        <div className="text-[13px] text-gray-400">No Liens On File.</div>
+      ) : (
+        <div className="space-y-2">
+          {liens.map((lien) => (
+            <div key={lien.id} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={lien.name}
+                onChange={(e) => onLienName(lien.id, e.target.value)}
+                onBlur={(e) => commitLienName(lien.id, e.target.value)}
+                placeholder="Lien Name"
+                className={cn(INLINE_INPUT_CLASS, "min-w-0 max-w-[300px] flex-1 placeholder:text-gray-400")}
+              />
+              <CurrencyInput
+                value={lien.amount}
+                onCommit={(n) => commitLienAmount(lien.id, n)}
+                prefix="$"
+                align="left"
+                className={cn(INLINE_INPUT_CLASS, "inline-flex w-[130px] shrink-0 items-center gap-1")}
+              />
+              <button
+                type="button"
+                onClick={() => onRemoveLien(lien.id)}
+                className="shrink-0 cursor-pointer rounded-md border border-gray-200 p-[5px] text-gray-400 hover:border-danger hover:text-danger"
+                aria-label="Remove Lien"
+              >
+                <IconMinus size={13} stroke={2} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onAddLien}
+        className="mt-2 inline-flex cursor-pointer items-center gap-1 rounded border border-petrol-500 px-2 py-[3px] text-[11px] font-medium text-petrol-500 hover:bg-petrol-50"
+      >
+        <IconPlus size={12} stroke={2} />
+        Add Lien
+      </button>
+    </div>
+  );
+}
+
 export function PropertyInfoTab({
   lead,
   dataSources,
@@ -394,6 +500,8 @@ export function PropertyInfoTab({
           <InlineDataSourceField leadId={id} initial={lead.data_source} options={dataSources} />
         </FieldRow>
       </div>
+
+      <LiensSection leadId={id} initialLiens={lead.liens} />
     </div>
   );
 }

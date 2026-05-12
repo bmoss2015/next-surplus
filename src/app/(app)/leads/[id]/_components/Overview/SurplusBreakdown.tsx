@@ -1,11 +1,9 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { IconPlus, IconMinus } from "@tabler/icons-react";
-import { addLien, updateLien, removeLien, updateLeadField } from "../../_actions";
+import { updateLeadField } from "../../_actions";
 import type { LienRow } from "@/lib/leads/fetch-detail";
 import { formatCurrency } from "@/lib/leads/format";
-import { CurrencyInput } from "@/components/CurrencyInput";
 import { cn } from "@/lib/cn";
 import { INLINE_INPUT_CLASS } from "@/lib/inline-field";
 import { useConfirmedSurplus } from "../ConfirmedSurplusContext";
@@ -15,19 +13,18 @@ function fmt(value: number | null | undefined): string {
   return formatCurrency(value);
 }
 
-type LocalLien = LienRow & { _tempId?: string };
-
-// Fix IIII2: the surplus numbers (Confirmed / Calculated / Est. Net Surplus)
-// live in the metric strip at the top of the page — this section is just the
-// Liens inputs and the Fees breakdown (Total Liens, Recovery Fee $, Attorney
-// Cost). The recovery-fee dollar amount still tracks the active surplus
-// (confirmed when set, otherwise the closing bid − debt − costs − liens value).
+// Fix IIII2 / MMMM2: the surplus numbers live in the metric strip; the lien
+// inputs moved to the Property Info tab. This section is just the Fees
+// breakdown — Total Liens (read-only computed), Recovery Fee $, and Attorney
+// Cost (inline editable, Fix LLLL2). The recovery-fee dollar amount tracks the
+// active surplus (confirmed when set, otherwise closing bid − debt − costs −
+// liens).
 export function SurplusBreakdown({
   leadId,
   closingBid,
   outstandingDebt,
   courtCosts,
-  liens: initialLiens,
+  liens,
   recoveryFeePercent,
   attorneyCost,
 }: {
@@ -39,15 +36,14 @@ export function SurplusBreakdown({
   recoveryFeePercent: number;
   attorneyCost: number;
 }) {
-  const [liens, setLiens] = useState<LocalLien[]>(initialLiens);
   const [attorneyCostVal, setAttorneyCostVal] = useState(attorneyCost);
   const { confirmedSurplus: confirmed } = useConfirmedSurplus();
   const [, startTransition] = useTransition();
 
   const liensTotal = liens.reduce((sum, l) => sum + (l.amount ?? 0), 0);
 
-  // Fix LLLL2: Attorney Cost is inline editable; the metric strip's Est. Net
-  // Surplus updates on the next render after the server revalidates.
+  // Fix LLLL2 / NNNN2: Attorney Cost is inline editable; the metric strip's
+  // Est. Net Surplus updates on the next render after the server revalidates.
   function commitAttorneyCost(n: number) {
     if (n === attorneyCostVal) return;
     setAttorneyCostVal(n);
@@ -64,115 +60,20 @@ export function SurplusBreakdown({
   const surplusForMath = hasConfirmed ? (confirmed as number) : calculatedSurplus ?? 0;
   const feeAmount = surplusForMath * (recoveryFeePercent / 100);
 
-  function onAddLien() {
-    const tempId = `temp-${Date.now()}`;
-    setLiens((prev) => [
-      ...prev,
-      { id: tempId, _tempId: tempId, lead_id: leadId, name: "", amount: 0, position: prev.length },
-    ]);
-    startTransition(async () => {
-      const res = await addLien(leadId);
-      if (res.ok) {
-        setLiens((prev) =>
-          prev.map((l) => (l.id === tempId ? { ...l, id: res.id, _tempId: undefined } : l))
-        );
-      } else {
-        setLiens((prev) => prev.filter((l) => l.id !== tempId));
-      }
-    });
-  }
-
-  function onLienName(id: string, name: string) {
-    setLiens((prev) => prev.map((l) => (l.id === id ? { ...l, name } : l)));
-  }
-
-  function commitLienName(id: string, name: string) {
-    if (id.startsWith("temp-")) return;
-    startTransition(async () => {
-      await updateLien(id, leadId, { name });
-    });
-  }
-
-  function commitLienAmount(id: string, amount: number | null) {
-    setLiens((prev) => prev.map((l) => (l.id === id ? { ...l, amount: amount ?? 0 } : l)));
-    if (id.startsWith("temp-")) return;
-    startTransition(async () => {
-      await updateLien(id, leadId, { amount });
-    });
-  }
-
-  function onRemoveLien(id: string) {
-    setLiens((prev) => prev.filter((l) => l.id !== id));
-    if (id.startsWith("temp-")) return;
-    startTransition(async () => {
-      await removeLien(id, leadId);
-    });
-  }
-
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <h3 className="section-subheader">Surplus Breakdown</h3>
-
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <SectionSubheader>Liens</SectionSubheader>
-          {liens.length === 0 ? (
-            <div className="text-[13px] text-gray-400">No Liens On File.</div>
-          ) : (
-            <div className="space-y-2">
-              {liens.map((lien) => (
-                <div key={lien.id} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={lien.name}
-                    onChange={(e) => onLienName(lien.id, e.target.value)}
-                    onBlur={(e) => commitLienName(lien.id, e.target.value)}
-                    placeholder="Lien Name"
-                    className={cn(INLINE_INPUT_CLASS, "min-w-0 max-w-[300px] flex-1 placeholder:text-gray-400")}
-                  />
-                  <CurrencyInput
-                    value={lien.amount}
-                    onCommit={(n) => commitLienAmount(lien.id, n)}
-                    prefix="$"
-                    align="left"
-                    className={cn(INLINE_INPUT_CLASS, "inline-flex w-[130px] shrink-0 items-center gap-1")}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onRemoveLien(lien.id)}
-                    className="shrink-0 cursor-pointer rounded-md border border-gray-200 p-[5px] text-gray-400 hover:border-danger hover:text-danger"
-                    aria-label="Remove Lien"
-                  >
-                    <IconMinus size={13} stroke={2} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={onAddLien}
-            className="mt-2 inline-flex cursor-pointer items-center gap-1 rounded border border-petrol-500 px-2 py-[3px] text-[11px] font-medium text-petrol-500 hover:bg-petrol-50"
-          >
-            <IconPlus size={12} stroke={2} />
-            Add Lien
-          </button>
-        </div>
-
-        <div>
-          <SectionSubheader>Fees</SectionSubheader>
-          <Row label="Total Liens" value={fmt(liensTotal)} />
-          <Row
-            label="Recovery Fee"
-            value={`${recoveryFeePercent}% · ${fmt(feeAmount)}`}
-          />
-          <MoneyEditRow
-            label="Attorney Cost"
-            value={attorneyCostVal}
-            onCommit={commitAttorneyCost}
-          />
-        </div>
-      </div>
+      <SectionSubheader>Fees</SectionSubheader>
+      <Row label="Total Liens" value={fmt(liensTotal)} />
+      <Row
+        label="Recovery Fee"
+        value={`${recoveryFeePercent}% · ${fmt(feeAmount)}`}
+      />
+      <MoneyEditRow
+        label="Attorney Cost"
+        value={attorneyCostVal}
+        onCommit={commitAttorneyCost}
+      />
     </div>
   );
 }
