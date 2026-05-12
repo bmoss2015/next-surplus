@@ -66,10 +66,6 @@ export default async function LeadDetailPage({
 
       <div className="rounded-[10px] border border-gray-200 bg-surface px-6 py-5 shadow-card">
         <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-          <RecoveryFeeField
-            leadId={lead.id}
-            initial={lead.recovery_fee_percent}
-          />
           <LeadEditDrawer
             lead={{
               id: lead.id,
@@ -110,6 +106,12 @@ export default async function LeadDetailPage({
               needsReview={lead.needs_action_flag}
               lostReasons={lostReasons}
             />
+            <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
+              <RecoveryFeeField
+                leadId={lead.id}
+                initial={lead.recovery_fee_percent}
+              />
+            </div>
             <AssignToField
               leadId={lead.id}
               currentId={lead.assigned_to}
