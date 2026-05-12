@@ -80,6 +80,7 @@ export default async function LeadDetailPage({
               sale_date: lead.sale_date,
               case_number: lead.case_number,
               recovery_type: lead.recovery_type,
+              parcel_number: lead.parcel_number,
             }}
           />
         </div>

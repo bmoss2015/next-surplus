@@ -293,6 +293,50 @@ export async function updateLeadField<K extends string>(
   return { ok: true };
 }
 
+// Fix X: the Edit Lead modal saves all of its fields in one shot when the user
+// clicks Save Changes (no more autosave-on-blur). One UPDATE; a tight whitelist.
+export async function updateLeadCoreFields(
+  leadId: string,
+  patch: {
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    county: string | null;
+    sale_type: string;
+    sale_date: string | null;
+    case_number: string | null;
+    recovery_type: string | null;
+    parcel_number: string | null;
+  }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!patch.address.trim()) return { ok: false, error: "Street Address is required" };
+  if (!patch.city.trim()) return { ok: false, error: "City is required" };
+  if (!patch.state.trim()) return { ok: false, error: "State is required" };
+  if (!patch.zip.trim()) return { ok: false, error: "Zip is required" };
+
+  const update = {
+    address: patch.address.trim(),
+    city: patch.city.trim(),
+    state: patch.state,
+    zip: patch.zip.trim(),
+    county: patch.county,
+    sale_type: patch.sale_type,
+    sale_date: patch.sale_date,
+    case_number: patch.case_number,
+    recovery_type: patch.recovery_type,
+    parcel_number: patch.parcel_number,
+  };
+
+  const sb = await createClient();
+  const { error } = await sb.from("leads").update(update).eq("id", leadId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads", "layout");
+  return { ok: true };
+}
+
 export async function addVerificationItem(
   leadId: string,
   rawLabel: string

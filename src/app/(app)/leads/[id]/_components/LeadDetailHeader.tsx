@@ -21,7 +21,6 @@ export function LeadDetailHeader({
   lead: LeadDetailWithCounts;
 }) {
   const owner = primaryOwner(lead);
-  const unchecked = lead.unchecked_verification_count;
 
   return (
     <div className="mb-4">
@@ -50,11 +49,6 @@ export function LeadDetailHeader({
               {lead.stage === "won" && (
                 <span className="rounded-[5px] border border-success-strong/30 bg-success-bg px-[10px] py-1 text-[11px] font-medium text-success-strong">
                   Won
-                </span>
-              )}
-              {unchecked > 0 && lead.stage !== "lost" && (
-                <span className="rounded-[5px] border border-danger-border bg-danger-bg px-[10px] py-1 text-[11px] font-medium text-danger">
-                  {unchecked} {unchecked === 1 ? "Item" : "Items"} Unchecked
                 </span>
               )}
               {lead.below_floor && lead.stage !== "lost" && (
