@@ -73,6 +73,7 @@ export async function fetchDashboard(): Promise<DashboardData> {
        owners(full_name, is_primary, status)`
     )
     .neq("stage", "lost")
+    .eq("archived", false)
     .order("estimated_surplus", { ascending: false });
   if (error) throw error;
   const leads = (leadsRaw ?? []) as LeadRow[];
@@ -84,7 +85,8 @@ export async function fetchDashboard(): Promise<DashboardData> {
   const { count: lostCount } = await sb
     .from("leads")
     .select("*", { count: "exact", head: true })
-    .eq("stage", "lost");
+    .eq("stage", "lost")
+    .eq("archived", false);
   stagesCounts.lost = lostCount ?? 0;
 
   const activeStageSet = new Set<string>(ACTIVE_PIPELINE_STAGES);

@@ -39,7 +39,8 @@ export async function fetchReports(): Promise<ReportData> {
     .from("leads")
     .select(
       "id, state, sale_type, stage, stage_changed_at, estimated_surplus, recovery_fee_percent, attorney_cost, lost_reason, imported_at, sale_date"
-    );
+    )
+    .eq("archived", false);
   const assignFilter = await currentAssignmentFilterId();
   if (assignFilter) leadsReq = leadsReq.eq("assigned_to", assignFilter);
   const { data: leads, error } = await leadsReq;

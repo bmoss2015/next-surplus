@@ -43,7 +43,15 @@ export default async function LeadsTablePage({
               : `${total} ${total === 1 ? "lead" : "leads"} matching filters`}
           </div>
         </div>
-        <ViewToggle active="table" />
+        <div className="flex items-center gap-4">
+          <Link
+            href="/leads/table?archived=1"
+            className="text-[12px] text-gray-400 underline-offset-[3px] hover:text-petrol-500"
+          >
+            Archived
+          </Link>
+          <ViewToggle active="table" />
+        </div>
       </div>
 
       <LeadsFilters states={states} />
