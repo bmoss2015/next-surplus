@@ -225,15 +225,41 @@ function KanbanCard({
 }) {
   return (
     // Fix U: the ⋯ menu sits OUTSIDE the <a> so its clicks never trigger card
-    // navigation or the card drag. Fix BBB: corner pills are absolutely
-    // positioned (Litigator top-left, Needs Action top-right) and the card
-    // content keeps 28px of top padding so nothing collides with them.
+    // navigation or the card drag. Fix TTTT: all card tags live on a single
+    // top row — tags left-aligned (Litigator, below-floor), status badge
+    // (Needs Action) right-aligned on the same row, no wrapping. The ⋯ button
+    // keeps a fixed footprint so the row height is consistent on every card
+    // regardless of which tags are present.
     <div
       className={cn(
         "group relative rounded-md border border-gray-200 bg-surface shadow-card transition-opacity",
         isDragging && "opacity-40"
       )}
     >
+      <div className="flex h-[24px] items-center justify-between gap-2 px-[11px] pt-[6px]">
+        <div className="flex min-w-0 items-center gap-1.5">
+          {lead.has_litigator && (
+            <span className="rounded-[10px] border border-[#fca5a5] bg-[#fef2f2] px-2 py-[2px] text-[10px] font-medium leading-none text-[#991b1b]">
+              Litigator
+            </span>
+          )}
+          {lead.below_floor && <BelowFloorIcon size={13} />}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <LeadActionsMenu
+            leadId={lead.id}
+            archived={lead.archived}
+            onDone={onRemoved}
+            triggerClassName="opacity-0 transition-opacity group-hover:opacity-100"
+          />
+          {lead.needs_action_flag && (
+            <span className="rounded-[10px] bg-[#e0f2f7] px-2 py-[2px] text-[10px] font-medium leading-none text-[#0a3d4a]">
+              Needs Action
+            </span>
+          )}
+        </div>
+      </div>
+
       <a
         href={`/leads/${lead.id}`}
         draggable
@@ -242,10 +268,10 @@ function KanbanCard({
         onClick={(e) => {
           if (isDragging) e.preventDefault();
         }}
-        className="block cursor-grab px-[11px] pb-[10px] pt-[28px] active:cursor-grabbing"
+        className="block cursor-grab px-[11px] pb-[10px] pt-[6px] active:cursor-grabbing"
       >
         <div className="min-w-0">
-          <div className="truncate pr-5 text-[12px] font-medium text-ink">
+          <div className="truncate text-[12px] font-medium text-ink">
             {lead.address}
           </div>
           <div className="mt-[2px] truncate text-[11px] text-gray-500">
@@ -265,29 +291,6 @@ function KanbanCard({
           </div>
         </div>
       </a>
-
-      {/* Top-left: Litigator pill. */}
-      {lead.has_litigator && (
-        <span className="absolute left-2 top-2 z-10 rounded-[10px] border border-[#fca5a5] bg-[#fef2f2] px-2 py-[2px] text-[10px] font-medium leading-none text-[#991b1b]">
-          Litigator
-        </span>
-      )}
-
-      {/* Top-right: below-floor warning, ⋯ menu (on hover), Needs Action pill. */}
-      <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
-        {lead.below_floor && <BelowFloorIcon size={13} />}
-        <LeadActionsMenu
-          leadId={lead.id}
-          archived={lead.archived}
-          onDone={onRemoved}
-          triggerClassName="opacity-0 transition-opacity group-hover:opacity-100"
-        />
-        {lead.needs_action_flag && (
-          <span className="rounded-[10px] bg-[#e0f2f7] px-2 py-[2px] text-[10px] font-medium leading-none text-[#0a3d4a]">
-            Needs Action
-          </span>
-        )}
-      </div>
     </div>
   );
 }
