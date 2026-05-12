@@ -13,6 +13,7 @@ import { RecentActivityCard } from "./_components/RecentActivityCard";
 import { LostBanner } from "./_components/LostBanner";
 import { TabBar, type TabKey } from "./_components/TabBar";
 import { fetchDataSources } from "./_actions";
+import { fetchLeadSources } from "../../imports/_actions";
 import { OverviewTab } from "./_components/OverviewTab";
 import { PropertyInfoTab } from "./_components/PropertyInfoTab";
 import { ContactsTab } from "./_components/ContactsTab";
@@ -67,7 +68,10 @@ export default async function LeadDetailPage({
   ]);
   if (!lead) notFound();
   const openTaskCount = openTaskRes.count ?? 0;
-  const dataSources = activeTab === "property" ? await fetchDataSources() : [];
+  const [dataSources, leadSources] =
+    activeTab === "property"
+      ? await Promise.all([fetchDataSources(), fetchLeadSources()])
+      : [[] as string[], [] as string[]];
 
   return (
     <ConfirmedSurplusProvider initial={lead.confirmed_surplus}>
@@ -87,7 +91,7 @@ export default async function LeadDetailPage({
           <div className="min-w-0">
             {activeTab === "overview" && <OverviewTab lead={lead} />}
             {activeTab === "property" && (
-              <PropertyInfoTab lead={lead} dataSources={dataSources} />
+              <PropertyInfoTab lead={lead} dataSources={dataSources} leadSources={leadSources} />
             )}
             {activeTab === "contacts" && <ContactsTab leadId={lead.id} />}
             {activeTab === "research" && <ResearchTab lead={lead} />}
