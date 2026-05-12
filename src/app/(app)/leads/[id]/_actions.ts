@@ -1211,6 +1211,28 @@ export async function addResearchTemplateToLead(
   return { ok: true };
 }
 
+// Fix SSSS2 PART 1: drop one checklist (and all its steps/findings) from this
+// lead only. The source template in Settings is untouched and can be re-added.
+export async function removeResearchTemplateFromLead(
+  leadResearchTemplateId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const loaded = await loadLeadResearchTemplate(sb, leadResearchTemplateId);
+  if (!loaded.ok) return loaded;
+  const { error } = await sb
+    .from("lead_research_templates")
+    .delete()
+    .eq("id", leadResearchTemplateId);
+  if (error) return { ok: false, error: error.message };
+  await logResearchUpdate(
+    sb,
+    loaded.lead_id,
+    `Removed research checklist "${loaded.name}"`
+  );
+  revalidatePath(`/leads/${loaded.lead_id}`);
+  return { ok: true };
+}
+
 export async function saveOverallFindings(
   leadId: string,
   findings: string

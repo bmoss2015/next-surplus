@@ -7,12 +7,14 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconPlus,
+  IconX,
 } from "@tabler/icons-react";
 import {
   setLeadResearchStepDone,
   saveLeadResearchStepFindings,
   setLeadResearchTemplateCollapsed,
   addResearchTemplateToLead,
+  removeResearchTemplateFromLead,
   saveOverallFindings,
 } from "../_actions";
 import type {
@@ -22,11 +24,13 @@ import type {
 import { Modal } from "@/components/Modal";
 import { cn } from "@/lib/cn";
 
-// Fix JJJJ / UUUU / OOOO2: Research tab. A lead carries its own snapshot of one
-// or more checklists. Each checklist is a collapsible section; its steps lay
-// out 3 per row at 1/3 width (wrapping). "Add From Template" opens a modal of
-// the org's templates; picking one writes its steps onto the lead. Template
-// names render as section headers with dashes replaced by spaces.
+// Fix JJJJ / UUUU / OOOO2 / SSSS2: Research tab. A lead carries its own snapshot
+// of one or more checklists. Each checklist is a collapsible section with a
+// petrol-tinted header (name · progress · collapse toggle · Remove) and a thin
+// progress bar; its steps lay out 3 per row at 1/3 width (wrapping). "Add From
+// Template" opens a modal of the org's templates; picking one writes its steps
+// onto the lead. Template names render as section headers with dashes replaced
+// by spaces. Removing a checklist deletes only this lead's copy.
 
 // Fix OOOO2 PART 3: dashes in a template name become spaces when shown as a
 // section header.
@@ -51,6 +55,8 @@ export function ResearchTabClient({
   const [overall, setOverall] = useState(overallFindings ?? "");
   const [savedOverall, setSavedOverall] = useState(overallFindings ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Index of the checklist pending removal confirmation, or null.
+  const [confirmRemoveIdx, setConfirmRemoveIdx] = useState<number | null>(null);
 
   function updateStep(
     tIdx: number,
@@ -101,6 +107,18 @@ export function ResearchTabClient({
     });
   }
 
+  function confirmRemove() {
+    const tIdx = confirmRemoveIdx;
+    if (tIdx == null) return;
+    const lrtId = templates[tIdx]?.id;
+    setConfirmRemoveIdx(null);
+    if (!lrtId) return;
+    setTemplates((prev) => prev.filter((_, i) => i !== tIdx));
+    startTransition(async () => {
+      await removeResearchTemplateFromLead(lrtId);
+    });
+  }
+
   function commitOverall() {
     if (overall === savedOverall) return;
     setSavedOverall(overall);
@@ -121,6 +139,9 @@ export function ResearchTabClient({
       Add From Template
     </button>
   );
+
+  const pendingRemoveName =
+    confirmRemoveIdx != null ? templates[confirmRemoveIdx]?.name ?? "" : "";
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
@@ -148,32 +169,51 @@ export function ResearchTabClient({
       ) : (
         <div className="space-y-4">
           {templates.map((t, tIdx) => {
+            const total = t.steps.length;
             const doneCount = t.steps.filter((s) => s.done).length;
+            const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
             return (
               <div
                 key={t.id}
                 className="overflow-hidden rounded-xl border border-gray-200 bg-[#f8fafc]"
               >
-                <button
-                  type="button"
-                  onClick={() => toggleCollapsed(tIdx, t.id)}
-                  className={cn(
-                    "flex w-full cursor-pointer items-center gap-2 px-3 py-[10px] text-left",
-                    !t.collapsed && "border-b border-gray-200"
-                  )}
-                >
-                  {t.collapsed ? (
-                    <IconChevronRight size={14} stroke={2.25} className="text-gray-500" />
-                  ) : (
-                    <IconChevronDown size={14} stroke={2.25} className="text-gray-500" />
-                  )}
-                  <span className="text-[12.5px] font-extrabold uppercase tracking-[0.07em] text-[#0a3d4a]">
-                    {displayHeader(t.name)}
+                {/* Fix SSSS2 PART 3: petrol-tinted header — name · progress ·
+                    collapse toggle · Remove. */}
+                <div className="flex items-center gap-2 border-b border-gray-200 bg-[#e8f4f6] px-3 py-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => toggleCollapsed(tIdx, t.id)}
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+                  >
+                    {t.collapsed ? (
+                      <IconChevronRight size={14} stroke={2.25} className="shrink-0 text-gray-500" />
+                    ) : (
+                      <IconChevronDown size={14} stroke={2.25} className="shrink-0 text-gray-500" />
+                    )}
+                    <span className="truncate text-[13px] font-medium text-[#0a3d4a]">
+                      {displayHeader(t.name)}
+                    </span>
+                  </button>
+                  <span className="shrink-0 text-[11px] font-medium text-gray-500">
+                    {doneCount} / {total} {total === 1 ? "Step" : "Steps"} Done
                   </span>
-                  <span className="text-[11px] font-medium text-gray-400">
-                    {doneCount}/{t.steps.length}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRemoveIdx(tIdx)}
+                    className="shrink-0 cursor-pointer rounded p-[2px] text-gray-400 hover:bg-white hover:text-danger"
+                    aria-label="Remove template from lead"
+                    title="Remove from lead"
+                  >
+                    <IconX size={14} stroke={2.25} />
+                  </button>
+                </div>
+                {/* Fix SSSS2 PART 4: thin progress bar reflecting done / total. */}
+                <div className="h-[3px] w-full bg-gray-200">
+                  <div
+                    className="h-full bg-[#0d6c7d] transition-[width] duration-200"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
                 {!t.collapsed && (
                   <div className="grid grid-cols-3 gap-3 p-3">
                     {t.steps.map((step, sIdx) => (
@@ -291,6 +331,33 @@ export function ResearchTabClient({
             ))}
           </div>
         )}
+      </Modal>
+
+      {/* Fix SSSS2 PART 1: confirm before removing a checklist from this lead. */}
+      <Modal
+        open={confirmRemoveIdx != null}
+        onClose={() => setConfirmRemoveIdx(null)}
+        title="Remove Template From Lead"
+      >
+        <p className="text-[13px] leading-relaxed text-gray-700">
+          Remove{pendingRemoveName ? ` "${displayHeader(pendingRemoveName)}"` : " this template"} from this lead? Steps and findings will be deleted. This does not affect the template in Settings.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirmRemoveIdx(null)}
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirmRemove}
+            className="cursor-pointer rounded-md bg-danger px-3 py-[6px] text-xs font-medium text-white hover:opacity-90"
+          >
+            Remove From Lead
+          </button>
+        </div>
       </Modal>
     </div>
   );

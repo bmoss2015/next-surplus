@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { IconPlus, IconTrash, IconEdit } from "@tabler/icons-react";
 import { upsertResearchTemplate, deleteResearchTemplate } from "../_actions";
 import { US_STATE_NAMES, SALE_TYPE_LABELS } from "@/lib/leads/types";
+import { Modal } from "@/components/Modal";
 import type {
   ResearchTemplateRow,
   ResearchStep,
@@ -42,6 +43,8 @@ export function ResearchTemplatesSection({
   const [editing, setEditing] = useState<ResearchTemplateRow | "new" | null>(
     null
   );
+  // Fix SSSS2 PART 2: confirm before permanently deleting a template.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function save(form: {
@@ -88,11 +91,17 @@ export function ResearchTemplatesSection({
   }
 
   function remove(id: string) {
+    setConfirmDeleteId(null);
     setRows((prev) => prev.filter((r) => r.id !== id));
     startTransition(async () => {
       await deleteResearchTemplate(id);
     });
   }
+
+  const confirmDeleteName =
+    confirmDeleteId != null
+      ? rows.find((r) => r.id === confirmDeleteId)?.name ?? ""
+      : "";
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
@@ -160,7 +169,7 @@ export function ResearchTemplatesSection({
               </button>
               <button
                 type="button"
-                onClick={() => remove(row.id)}
+                onClick={() => setConfirmDeleteId(row.id)}
                 className="cursor-pointer text-gray-400 hover:text-danger"
                 aria-label="Delete"
               >
@@ -170,6 +179,33 @@ export function ResearchTemplatesSection({
           ))}
         </div>
       )}
+
+      {/* Fix SSSS2 PART 2: permanent-delete confirmation. */}
+      <Modal
+        open={confirmDeleteId != null}
+        onClose={() => setConfirmDeleteId(null)}
+        title="Delete Research Template"
+      >
+        <p className="text-[13px] leading-relaxed text-gray-700">
+          Delete{confirmDeleteName ? ` "${confirmDeleteName}"` : " this template"} permanently? It will no longer be available for any leads. Steps already saved on existing leads are not affected.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirmDeleteId(null)}
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => confirmDeleteId && remove(confirmDeleteId)}
+            className="cursor-pointer rounded-md bg-danger px-3 py-[6px] text-xs font-medium text-white hover:opacity-90"
+          >
+            Delete Permanently
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
