@@ -156,11 +156,24 @@ export function RelativesSection({
 
   return (
     <div className="mt-4 rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <h3 className="section-subheader flex items-center gap-1.5">
           <IconUsersGroup size={15} stroke={1.75} className="text-gray-400" />
           Relatives
         </h3>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(true);
+              setError(null);
+            }}
+            className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-[6px] text-[12px] font-medium"
+          >
+            <IconPlus size={13} stroke={2} />
+            Add Relative
+          </button>
+        )}
       </div>
 
       {relatives.length === 0 ? (
@@ -181,7 +194,7 @@ export function RelativesSection({
         </div>
       )}
 
-      {adding ? (
+      {adding && (
         <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <input
@@ -235,18 +248,6 @@ export function RelativesSection({
             </button>
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => {
-            setAdding(true);
-            setError(null);
-          }}
-          className="btn-primary mt-3 inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-[6px] text-[12px] font-medium"
-        >
-          <IconPlus size={13} stroke={2} />
-          Add Relative
-        </button>
       )}
     </div>
   );
