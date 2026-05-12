@@ -41,6 +41,47 @@ export async function advanceStage(
   return { ok: true };
 }
 
+// Fix W: reopen a closed (lost/won) lead — put it back into the stage it was in
+// right before it closed, read from the most recent stage_change activity (the
+// DB trigger logs `{ from, to }` on every transition). Falls back to New Leads
+// when that can't be determined.
+export async function reopenLead(
+  leadId: string
+): Promise<{ ok: true; toStage: Stage } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { data: lead, error: leadErr } = await sb
+    .from("leads")
+    .select("stage")
+    .eq("id", leadId)
+    .single();
+  if (leadErr || !lead) return { ok: false, error: leadErr?.message ?? "Lead not found" };
+  const currentStage = lead.stage as Stage;
+  if (currentStage !== "lost" && currentStage !== "won") {
+    return { ok: false, error: "Lead is not closed." };
+  }
+
+  const { data: acts } = await sb
+    .from("activities")
+    .select("payload")
+    .eq("lead_id", leadId)
+    .eq("activity_type", "stage_change")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const fromRaw = (acts?.[0]?.payload as Record<string, unknown> | undefined)?.from;
+  const prior =
+    typeof fromRaw === "string" && (STAGES as readonly string[]).includes(fromRaw)
+      ? (fromRaw as Stage)
+      : null;
+  const toStage: Stage =
+    prior && prior !== "lost" && prior !== "won" ? prior : "new_leads";
+
+  const { error } = await sb.from("leads").update({ stage: toStage }).eq("id", leadId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads", "layout");
+  return { ok: true, toStage };
+}
+
 // Flags the lead for review without changing stage. Sets needs_action_flag
 // + needs_action_note and writes a note-style activity row.
 export async function pauseForReview(

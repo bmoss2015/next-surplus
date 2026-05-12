@@ -11,6 +11,7 @@ import {
 import { STAGES, STAGE_LABELS, type Stage } from "@/lib/leads/types";
 import {
   advanceStage,
+  reopenLead,
   pauseForReview,
   clearReviewFlag,
   addLostReason,
@@ -98,6 +99,15 @@ export function StageActions({
       await clearReviewFlag(leadId);
     });
   }
+  function doReopen() {
+    if (!window.confirm("Reopen this lead and put it back in its previous stage?")) {
+      return;
+    }
+    startTransition(async () => {
+      const res = await reopenLead(leadId);
+      if (!res.ok) window.alert(res.error);
+    });
+  }
 
   return (
     <>
@@ -146,11 +156,12 @@ export function StageActions({
             </button>
           )}
         </div>
-        {/* A lost/won lead can be put back into the pipeline — kept low-key. */}
+        {/* A lost/won lead can be put back into its previous stage — kept
+            low-key (text link, no big button). */}
         {isTerminal && (
           <button
             type="button"
-            onClick={() => openStage("new_leads")}
+            onClick={doReopen}
             disabled={pending}
             className="mt-2 cursor-pointer text-[11px] text-gray-500 underline hover:text-petrol-500 disabled:opacity-50"
           >
