@@ -42,7 +42,7 @@ export function Modal({
         className="relative flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-lg bg-surface shadow-elevated"
         style={{ maxWidth: `${width}px` }}
       >
-        <div className="flex items-start justify-between border-b border-gray-200 px-5 py-4">
+        <div className="flex items-start justify-between border-b border-gray-200 px-6 py-5">
           <div>
             <h2 className="m-0 text-[15px] font-medium tracking-tight text-ink">
               {title}
@@ -60,7 +60,7 @@ export function Modal({
             <IconX size={16} stroke={1.75} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 text-left">{children}</div>
       </div>
     </div>
   );
