@@ -1,0 +1,89 @@
+"use client";
+
+import { useRef, useState, useTransition } from "react";
+import { updateLeadField } from "../_actions";
+
+// Fix VVVV: a plain-text inline editor matching the surplus-field pattern —
+// displays as text until clicked, becomes an input on click, commits on blur or
+// Enter, reverts on Escape. No edit button, no modal.
+export function InlineTextField({
+  leadId,
+  field,
+  initial,
+  placeholder = "Not Set",
+}: {
+  leadId: string;
+  field: string;
+  initial: string | null;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(initial ?? "");
+  const [saved, setSaved] = useState(initial ?? "");
+  const [, startTransition] = useTransition();
+  const cancelNext = useRef(false);
+
+  function startEdit() {
+    setText(saved);
+    setEditing(true);
+  }
+
+  function commit() {
+    setEditing(false);
+    if (cancelNext.current) {
+      cancelNext.current = false;
+      setText(saved);
+      return;
+    }
+    const next = text.trim();
+    if (next === saved.trim()) {
+      setText(saved);
+      return;
+    }
+    setSaved(next);
+    setText(next);
+    startTransition(async () => {
+      await updateLeadField(leadId, field, next || null);
+    });
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="text"
+        autoFocus
+        value={text}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          } else if (e.key === "Escape") {
+            cancelNext.current = true;
+            e.currentTarget.blur();
+          } else if (e.key === "Tab") {
+            cancelNext.current = true;
+          }
+        }}
+        className="w-[150px] rounded-md border border-petrol-500 bg-surface px-1.5 py-[1px] text-right text-[13px] text-ink outline-none focus:ring-2 focus:ring-petrol-200"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      title="Click To Edit"
+      className={
+        saved.trim()
+          ? "cursor-text rounded-[3px] px-0.5 text-[13px] font-medium text-[#0f1729] hover:bg-petrol-50"
+          : "cursor-text rounded-[3px] px-0.5 text-[13px] italic text-gray-400 hover:bg-petrol-50"
+      }
+    >
+      {saved.trim() || placeholder}
+    </button>
+  );
+}
