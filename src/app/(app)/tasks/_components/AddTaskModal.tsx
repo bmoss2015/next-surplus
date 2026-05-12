@@ -193,7 +193,7 @@ export function AddTaskModal({
             )}
           </div>
           {showLeadDropdown && (leadSearchResults.length > 0 || showNoMatches || leadSearchError) && (
-            <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+            <div className="absolute inset-x-0 top-full z-[9999] mt-1 max-h-[320px] min-w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
               {leadSearchResults.map((opt) => (
                 <button
                   key={opt.id}
