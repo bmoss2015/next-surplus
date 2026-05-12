@@ -1261,3 +1261,36 @@ export async function addDataSource(
   if (error) return { ok: false, error: error.message };
   return { ok: true, name: trimmed };
 }
+
+// -- Attorney assignment + default cost (Fix NNNN2) -------------------------
+// Assigns (or clears) the lead's attorney. When applyDefaultCost is true and
+// the attorney has a default_cost, the lead's attorney_cost is set to it. The
+// caller (the AttorneyAssignment component) decides whether to apply the
+// default: it does so automatically when no attorney cost is set yet, and only
+// after the user confirms an override when one already is.
+export async function assignAttorney(
+  leadId: string,
+  attorneyId: string | null,
+  applyDefaultCost: boolean
+): Promise<{ ok: true; attorneyCost: number | null } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const update: Record<string, unknown> = { attorney_id: attorneyId };
+  let newCost: number | null = null;
+  if (attorneyId && applyDefaultCost) {
+    const { data: att } = await sb
+      .from("attorneys")
+      .select("default_cost")
+      .eq("id", attorneyId)
+      .maybeSingle();
+    const dc = att?.default_cost as number | null | undefined;
+    if (dc != null) {
+      newCost = dc;
+      update.attorney_cost = dc;
+    }
+  }
+  const { error } = await sb.from("leads").update(update).eq("id", leadId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads");
+  return { ok: true, attorneyCost: newCost };
+}
