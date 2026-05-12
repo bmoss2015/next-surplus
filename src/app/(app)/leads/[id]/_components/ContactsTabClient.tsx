@@ -7,6 +7,7 @@ import {
   IconStar,
   IconStarFilled,
   IconTag,
+  IconPencil,
 } from "@tabler/icons-react";
 import {
   upsertContact,
@@ -23,23 +24,18 @@ import { SectionSubheader } from "./SectionSubheader";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_PER_CHANNEL = 5;
 
-// Phone-line classification — a type pill (M / R / O) plus DNC and Litigator
-// flags, all stored on the contacts row.
+// Phone-line classification — a type pill (Mobile / Landline / Other) plus DNC
+// and Litigator flags, all stored on the contacts row.
 type PhoneMetaPatch = {
   phone_type?: string | null;
   is_dnc?: boolean;
   is_litigator?: boolean;
 };
-const PHONE_TYPE_CYCLE: (string | null)[] = [null, "Mobile", "Residential", "Other"];
 function phoneTypeShort(t: string | null): string {
   if (t === "Mobile") return "Mobile";
   if (t === "Residential") return "Landline";
   if (t === "Other") return "Other";
   return "Type";
-}
-function nextPhoneType(t: string | null): string | null {
-  const i = PHONE_TYPE_CYCLE.indexOf(t ?? null);
-  return PHONE_TYPE_CYCLE[(i + 1) % PHONE_TYPE_CYCLE.length] ?? null;
 }
 
 type ContactStatus = "untested" | "valid" | "invalid" | "dnc";
@@ -557,18 +553,24 @@ function ContactLine({
   breakAll?: boolean;
 }) {
   const isPhone = kind === "phone";
-  const [editingTags, setEditingTags] = useState(false);
+  const [editingType, setEditingType] = useState(false);
+  const [editingStatus, setEditingStatus] = useState(false);
+  const [editingFlags, setEditingFlags] = useState(false);
   const ptype = phoneType ?? null;
 
-  const tagToggle = (active: boolean, activeClass: string) =>
-    cn(
-      "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
-      active ? activeClass : "bg-gray-100 text-gray-500 hover:bg-gray-150"
-    );
+  const statusClass = (s: ContactStatus) =>
+    s === "valid"
+      ? "bg-petrol-500 text-white"
+      : s === "invalid"
+        ? "bg-danger text-white"
+        : s === "dnc"
+          ? "bg-[#0f1729] text-white"
+          : "bg-gray-200 text-gray-700";
 
   return (
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">
-      <div className="flex items-start gap-1">
+      {/* Line 1: number + phone type pill (click to change), then remove. */}
+      <div className="flex items-center gap-1.5">
         <span
           className={cn(
             "min-w-0 text-[11.5px] font-medium text-ink",
@@ -577,52 +579,48 @@ function ContactLine({
         >
           {value}
         </span>
-        {/* Active classification pills, inline with the number — only when set. */}
-        {isPhone && ptype && (
-          <button
-            type="button"
-            title={ptype}
-            aria-label={`Phone Type ${ptype}`}
-            onClick={() => onSetPhoneMeta?.({ phone_type: nextPhoneType(ptype) })}
-            className="shrink-0 cursor-pointer rounded-full bg-gray-150 px-1.5 py-[1px] text-[9px] font-medium leading-none text-gray-500 hover:bg-gray-200"
-          >
-            {phoneTypeShort(ptype)}
-          </button>
-        )}
-        {isPhone && isDnc && (
-          <button
-            type="button"
-            aria-label="Do Not Call"
-            onClick={() => onSetPhoneMeta?.({ is_dnc: false })}
-            className="shrink-0 cursor-pointer rounded-full bg-danger-bg px-1.5 py-[1px] text-[9px] font-medium leading-none text-danger"
-          >
-            DNC
-          </button>
-        )}
-        {isPhone && isLitigator && (
-          <button
-            type="button"
-            aria-label="Litigator"
-            onClick={() => onSetPhoneMeta?.({ is_litigator: false })}
-            className="shrink-0 cursor-pointer rounded-full bg-[#7f1d1d] px-1.5 py-[1px] text-[9px] font-medium leading-none text-white"
-          >
-            Litigator
-          </button>
+        {isPhone && (
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              aria-label="Phone type"
+              onClick={() => {
+                setEditingType((v) => !v);
+                setEditingStatus(false);
+                setEditingFlags(false);
+              }}
+              className={cn(
+                "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
+                ptype
+                  ? "bg-gray-150 text-gray-500 hover:bg-gray-200"
+                  : "bg-[#f1f5f9] text-[#94a3b8] hover:bg-gray-150"
+              )}
+            >
+              {ptype ? phoneTypeShort(ptype) : "+ Type"}
+            </button>
+            {editingType && (
+              <div className="absolute left-0 top-full z-20 mt-1 w-[100px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-elevated">
+                {(["Mobile", "Residential", "Other"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      onSetPhoneMeta?.({ phone_type: ptype === t ? null : t });
+                      setEditingType(false);
+                    }}
+                    className={cn(
+                      "block w-full cursor-pointer px-2 py-1 text-left text-[11px] hover:bg-gray-50",
+                      ptype === t ? "font-medium text-petrol-700" : "text-ink"
+                    )}
+                  >
+                    {phoneTypeShort(t)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
         <span className="flex-1" />
-        {isPhone && (
-          <button
-            type="button"
-            aria-label="Edit Phone Tags"
-            onClick={() => setEditingTags((v) => !v)}
-            className={cn(
-              "shrink-0 cursor-pointer text-gray-300 hover:text-petrol-500",
-              editingTags && "text-petrol-500"
-            )}
-          >
-            <IconTag size={11} stroke={1.75} />
-          </button>
-        )}
         {canRemove && (
           <button
             type="button"
@@ -635,62 +633,111 @@ function ContactLine({
         )}
       </div>
 
-      {isPhone && editingTags && (
-        <div className="mt-1 flex flex-wrap items-center gap-1 border-t border-gray-150 pt-1">
-          <span className="text-[9px] uppercase tracking-[0.3px] text-gray-400">Type</span>
-          {(["Mobile", "Residential", "Other"] as const).map((t) => (
+      {/* Line 2: the single selected status pill + a pencil to change it. */}
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        {editingStatus ? (
+          CONTACT_STATUS_ORDER.map((s) => (
             <button
-              key={t}
+              key={s}
               type="button"
-              onClick={() => onSetPhoneMeta?.({ phone_type: ptype === t ? null : t })}
-              className={tagToggle(ptype === t, "bg-gray-200 text-ink")}
+              onClick={() => {
+                onSetStatus(s);
+                setEditingStatus(false);
+              }}
+              className={cn(
+                "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium transition-colors",
+                status === s
+                  ? statusClass(s)
+                  : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
+              )}
             >
-              {phoneTypeShort(t)}
+              {CONTACT_STATUS_LABELS[s]}
             </button>
-          ))}
+          ))
+        ) : (
+          <>
+            <span
+              className={cn(
+                "rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none",
+                statusClass(status)
+              )}
+            >
+              {CONTACT_STATUS_LABELS[status]}
+            </span>
+            <button
+              type="button"
+              aria-label="Change status"
+              onClick={() => {
+                setEditingStatus(true);
+                setEditingType(false);
+                setEditingFlags(false);
+              }}
+              className="cursor-pointer text-gray-300 hover:text-petrol-500"
+            >
+              <IconPencil size={10} stroke={1.75} />
+            </button>
+          </>
+        )}
+        {isPhone && (
+          <button
+            type="button"
+            aria-label="Edit DNC and litigator flags"
+            onClick={() => {
+              setEditingFlags((v) => !v);
+              setEditingType(false);
+              setEditingStatus(false);
+            }}
+            className={cn(
+              "ml-auto shrink-0 cursor-pointer text-gray-300 hover:text-petrol-500",
+              editingFlags && "text-petrol-500"
+            )}
+          >
+            <IconTag size={11} stroke={1.75} />
+          </button>
+        )}
+      </div>
+
+      {/* Flags editor (opened from the tag icon) — DNC + Litigator toggles. */}
+      {isPhone && editingFlags && (
+        <div className="mt-1 flex items-center gap-1 border-t border-gray-150 pt-1">
           <button
             type="button"
             onClick={() => onSetPhoneMeta?.({ is_dnc: !isDnc })}
-            className={tagToggle(!!isDnc, "bg-danger-bg text-danger")}
+            className={cn(
+              "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
+              isDnc ? "bg-danger-bg text-danger" : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
+            )}
           >
             DNC
           </button>
           <button
             type="button"
             onClick={() => onSetPhoneMeta?.({ is_litigator: !isLitigator })}
-            className={tagToggle(!!isLitigator, "bg-[#7f1d1d] text-white")}
+            className={cn(
+              "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
+              isLitigator ? "bg-[#7f1d1d] text-white" : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
+            )}
           >
             Litigator
           </button>
         </div>
       )}
 
-      <div className="mt-1 flex flex-wrap gap-1">
-        {CONTACT_STATUS_ORDER.map((s) => {
-          const active = status === s;
-          return (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onSetStatus(s)}
-              className={cn(
-                "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium transition-colors",
-                active
-                  ? s === "valid"
-                    ? "bg-petrol-500 text-white"
-                    : s === "invalid"
-                      ? "bg-danger text-white"
-                      : s === "dnc"
-                        ? "bg-[#0f1729] text-white"
-                        : "bg-gray-200 text-gray-700"
-                  : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
-              )}
-            >
-              {CONTACT_STATUS_LABELS[s]}
-            </button>
-          );
-        })}
-      </div>
+      {/* Line 3: DNC / Litigator pills — only shown when flagged. */}
+      {isPhone && (isDnc || isLitigator) && !editingFlags && (
+        <div className="mt-1 flex items-center gap-1">
+          {isDnc && (
+            <span className="rounded-full bg-danger-bg px-1.5 py-[1px] text-[9px] font-medium leading-none text-danger">
+              DNC
+            </span>
+          )}
+          {isLitigator && (
+            <span className="rounded-full bg-[#7f1d1d] px-1.5 py-[1px] text-[9px] font-medium leading-none text-white">
+              Litigator
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
