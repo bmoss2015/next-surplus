@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import {
   IconPlus,
   IconTrash,
-  IconStar,
   IconStarFilled,
   IconTag,
   IconPencil,
@@ -126,6 +125,18 @@ export function ContactsTabClient({
     );
     startTransition(async () => {
       await upsertOwner(leadId, ownerId, { status });
+    });
+  }
+
+  // Fix KKK: promote an owner to primary (and demote whoever was primary).
+  function makePrimaryOwner(ownerId: string) {
+    const prevPrimary = owners.find((o) => o.is_primary && o.id !== ownerId);
+    setOwners((prev) =>
+      prev.map((o) => ({ ...o, is_primary: o.id === ownerId }))
+    );
+    startTransition(async () => {
+      if (prevPrimary) await upsertOwner(leadId, prevPrimary.id, { is_primary: false });
+      await upsertOwner(leadId, ownerId, { is_primary: true });
     });
   }
 
@@ -287,6 +298,8 @@ export function ContactsTabClient({
               onRemoveContact={removeContact}
               onSetContactStatus={setContactStatus}
               onSetPhoneMeta={setPhoneMeta}
+              multipleOwners={owners.length > 1}
+              onMakePrimary={() => makePrimaryOwner(owner.id)}
             />
           ))}
         </div>
@@ -305,6 +318,8 @@ function OwnerCard({
   onRemoveContact,
   onSetContactStatus,
   onSetPhoneMeta,
+  multipleOwners,
+  onMakePrimary,
 }: {
   owner: OwnerRowFull;
   phones: ContactRow[];
@@ -315,6 +330,8 @@ function OwnerCard({
   onRemoveContact: (id: string) => void;
   onSetContactStatus: (id: string, s: ContactStatus) => void;
   onSetPhoneMeta: (id: string, patch: PhoneMetaPatch) => void;
+  multipleOwners: boolean;
+  onMakePrimary: () => void;
 }) {
   const { isAdmin } = useRole();
   const [addingPhone, setAddingPhone] = useState(false);
@@ -347,19 +364,27 @@ function OwnerCard({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3">
       <div className="flex items-start gap-1.5">
-        {owner.is_primary ? (
+        {multipleOwners && owner.is_primary && (
           <IconStarFilled
             size={13}
             className="mt-[2px] shrink-0 text-warn"
             aria-label="Primary Owner"
+            title="Primary owner of record"
           />
-        ) : (
-          <IconStar size={13} className="mt-[2px] shrink-0 text-gray-300" />
         )}
         <div className="min-w-0 flex-1 leading-tight">
           <span className="text-[13px] font-medium text-ink">{owner.full_name}</span>
           {owner.age != null && (
             <span className="ml-1.5 text-[10px] font-normal text-gray-400">Age {owner.age}</span>
+          )}
+          {multipleOwners && !owner.is_primary && (
+            <button
+              type="button"
+              onClick={onMakePrimary}
+              className="ml-1.5 cursor-pointer text-[10px] text-petrol-500 hover:text-petrol-700"
+            >
+              Make Primary
+            </button>
           )}
         </div>
         {isAdmin && (
