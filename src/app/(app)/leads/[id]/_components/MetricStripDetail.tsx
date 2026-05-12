@@ -1,14 +1,10 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { IconCheck, IconPencil } from "@tabler/icons-react";
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { formatCurrency, daysSince, ownerStatusOf, toTitleCase } from "@/lib/leads/format";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
 import { cn } from "@/lib/cn";
 import { useConfirmedSurplus } from "./ConfirmedSurplusContext";
-import { updateLeadField } from "../_actions";
-import { INLINE_INPUT_CLASS } from "@/lib/inline-field";
 
 function ownerSummary(lead: LeadDetailWithCounts): string {
   const owners = lead.owners ?? [];
@@ -42,25 +38,16 @@ function formatSaleDate(date: string | null): string {
   });
 }
 
-function parseMoney(s: string): number | null {
-  const cleaned = s.replace(/[^\d.]/g, "").trim();
-  if (cleaned === "" || cleaned === ".") return null;
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
 function Cell({
   label,
   children,
   variant,
   sub,
-  action,
 }: {
   label: string;
   children: React.ReactNode;
   variant?: "default" | "highlight" | "payout";
   sub?: React.ReactNode;
-  action?: React.ReactNode;
 }) {
   return (
     <div
@@ -70,17 +57,14 @@ function Cell({
         variant === "payout" && "bg-gradient-to-br from-petrol-700 to-petrol-500 text-white"
       )}
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div
-          className={cn(
-            "text-[11px] tracking-[0.4px]",
-            variant === "payout" ? "text-white/85" : "text-gray-500",
-            variant === "highlight" && "text-petrol-700"
-          )}
-        >
-          {label}
-        </div>
-        {action}
+      <div
+        className={cn(
+          "mb-2 text-[11px] tracking-[0.4px]",
+          variant === "payout" ? "text-white/85" : "text-gray-500",
+          variant === "highlight" && "text-petrol-700"
+        )}
+      >
+        {label}
       </div>
       <div
         className={cn(
@@ -108,18 +92,13 @@ function Cell({
   );
 }
 
-// Fix WWWW2: the metric strip's surplus card — title flips between "Confirmed
-// Surplus" and "Calculated Surplus", with a small Confirm / Edit link that
-// opens an inline input. Saving updates the shared ConfirmedSurplusContext so
-// every downstream figure re-derives immediately.
+// Fix UUUU2: the metric strip's surplus card — title flips between "Confirmed
+// Surplus" and "Calculated Surplus". The surplus figure is read-only here; the
+// inline Confirm / Edit button has been removed.
 export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
   const days = daysSince(lead.sale_date);
   const ownerStatusKey = ownerStatusOf(lead);
-  const { confirmedSurplus, setConfirmedSurplus } = useConfirmedSurplus();
-  const [, startTransition] = useTransition();
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState("");
-  const cancelNext = useRef(false);
+  const { confirmedSurplus } = useConfirmedSurplus();
 
   const liensTotal = lead.total_liens ?? 0;
   const calculatedSurplus =
@@ -138,70 +117,11 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
       ? "Based On Calculated Surplus"
       : "No Surplus On File Yet";
 
-  function startEdit() {
-    setText(hasConfirmed ? String(confirmedSurplus) : "");
-    setEditing(true);
-  }
-  function commit() {
-    setEditing(false);
-    if (cancelNext.current) {
-      cancelNext.current = false;
-      return;
-    }
-    const n = parseMoney(text);
-    setConfirmedSurplus(n);
-    startTransition(async () => {
-      await updateLeadField(lead.id, "confirmed_surplus", n);
-    });
-  }
-
-  const surplusAction = editing ? null : (
-    <button
-      type="button"
-      onClick={startEdit}
-      className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-petrol-500 px-2 py-[2px] text-[10px] font-medium text-petrol-700 hover:bg-petrol-50"
-    >
-      {hasConfirmed ? (
-        <>
-          <IconPencil size={10} stroke={1.75} />
-          Edit
-        </>
-      ) : (
-        <>
-          <IconCheck size={10} stroke={2} />
-          Confirm
-        </>
-      )}
-    </button>
-  );
-
   return (
     <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-gray-200 bg-surface">
       <div className="border-r border-petrol-200">
-        <Cell label={surplusTitle} variant="highlight" sub={surplusSub} action={surplusAction}>
-          {editing ? (
-            <input
-              type="text"
-              inputMode="decimal"
-              autoFocus
-              value={text}
-              onFocus={(e) => e.currentTarget.select()}
-              onChange={(e) => setText(e.target.value)}
-              onBlur={commit}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                } else if (e.key === "Escape") {
-                  cancelNext.current = true;
-                  e.currentTarget.blur();
-                }
-              }}
-              className={cn(INLINE_INPUT_CLASS, "w-[130px] text-[15px]")}
-            />
-          ) : (
-            formatCurrency(surplusValue)
-          )}
+        <Cell label={surplusTitle} variant="highlight" sub={surplusSub}>
+          {formatCurrency(surplusValue)}
         </Cell>
       </div>
 
