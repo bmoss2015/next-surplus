@@ -10,6 +10,7 @@ import {
 } from "@tabler/icons-react";
 import { setLeadArchived, hardDeleteLead } from "../_actions";
 import { Modal } from "@/components/Modal";
+import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
 
 // Fix U: shared ⋯ menu for a lead — Archive (soft delete, reversible) and
@@ -36,6 +37,7 @@ export function LeadActionsMenu({
   triggerClassName?: string;
 }) {
   const router = useRouter();
+  const { isAdmin } = useRole();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,19 +137,22 @@ export function LeadActionsMenu({
                 </>
               )}
             </button>
-            <button
-              type="button"
-              onClick={openDeleteConfirm}
-              className="flex w-full cursor-pointer items-center gap-2 border-t border-gray-150 px-3 py-2 text-left text-[12.5px] text-danger hover:bg-danger-bg"
-            >
-              <IconTrash size={15} stroke={1.75} /> Delete Lead
-            </button>
+            {/* Fix U: hard delete is admin-only — hide it entirely otherwise. */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={openDeleteConfirm}
+                className="flex w-full cursor-pointer items-center gap-2 border-t border-gray-150 px-3 py-2 text-left text-[12.5px] text-danger hover:bg-danger-bg"
+              >
+                <IconTrash size={15} stroke={1.75} /> Delete Lead
+              </button>
+            )}
           </div>
         )}
       </div>
 
       <Modal
-        open={confirmOpen}
+        open={isAdmin && confirmOpen}
         onClose={() => setConfirmOpen(false)}
         title="Delete Lead"
       >
