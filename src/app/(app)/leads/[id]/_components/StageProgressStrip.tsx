@@ -7,11 +7,11 @@ import { advanceStage } from "../_actions";
 import { StageTransitionDialog } from "./StageActions";
 import { cn } from "@/lib/cn";
 
-// Fix W: the strip mostly shows current position — forward moves and lost/review
-// live in the right-rail "Stage Actions" card. The one interaction left here:
-// click an EARLIER step to move the lead back to that stage (with a confirm).
-// "lost" isn't in the 8-step strip, so a lost lead shows no active step (and
-// nothing here is clickable — use "Reopen lead" in Stage Actions).
+// Fix W: the strip shows current position and lets you jump to ANY stage —
+// click a step (forward or back) to move the lead there, with a confirm.
+// Forward also has the right-rail "Next Stage" shortcut. "lost" isn't one of
+// the 8 steps, so a lost lead shows no active step, but every step is still
+// clickable (which doubles as a reopen).
 const FORWARD_STAGES: Stage[] = STAGES.filter((s) => s !== "lost");
 
 export function StageProgressStrip({
@@ -22,15 +22,15 @@ export function StageProgressStrip({
   currentStage: Stage;
 }) {
   const currentIdx = FORWARD_STAGES.indexOf(currentStage);
-  const [backTo, setBackTo] = useState<Stage | null>(null);
+  const [jumpTo, setJumpTo] = useState<Stage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function confirmBack(stage: Stage) {
+  function confirmJump(stage: Stage) {
     startTransition(async () => {
       const result = await advanceStage(leadId, stage);
       if (result.ok) {
-        setBackTo(null);
+        setJumpTo(null);
         setError(null);
       } else {
         setError(result.error);
@@ -46,18 +46,18 @@ export function StageProgressStrip({
           const isCurrent = idx === currentIdx;
           const isUpcoming = idx > currentIdx;
           const isLast = idx === FORWARD_STAGES.length - 1;
-          const canGoBack = idx < currentIdx; // earlier step → move the lead back
+          const isClickable = !isCurrent; // any stage but the current one
 
           return (
             <button
               key={stage}
               type="button"
-              disabled={!canGoBack}
-              onClick={() => canGoBack && setBackTo(stage)}
-              title={canGoBack ? `Move back to ${STAGE_LABELS[stage]}` : undefined}
+              disabled={!isClickable}
+              onClick={() => isClickable && setJumpTo(stage)}
+              title={isClickable ? `Move to ${STAGE_LABELS[stage]}` : undefined}
               className={cn(
                 "relative flex flex-1 flex-col items-center",
-                canGoBack ? "cursor-pointer" : "cursor-default"
+                isClickable ? "cursor-pointer" : "cursor-default"
               )}
             >
               {!isLast && (
@@ -94,15 +94,15 @@ export function StageProgressStrip({
         })}
       </div>
 
-      {backTo && (
+      {jumpTo && (
         <StageTransitionDialog
           fromStage={currentStage}
-          toStage={backTo}
+          toStage={jumpTo}
           isTransitioning={pending}
           error={error}
-          onConfirm={() => confirmBack(backTo)}
+          onConfirm={() => confirmJump(jumpTo)}
           onCancel={() => {
-            setBackTo(null);
+            setJumpTo(null);
             setError(null);
           }}
         />
