@@ -218,15 +218,18 @@ export function ResearchTabClient({
                   />
                 </div>
                 {!t.collapsed && (
-                  // Fix ZZZZ2 PART 1: strict 3-per-row grid — every step card is
-                  // exactly 1/3 of the row width (1fr columns), left-aligned,
-                  // wrapping to a new row after the third. No full-width cards.
-                  <div className="grid auto-rows-fr grid-cols-3 gap-3 p-3">
+                  // Fix ZZZZ2 / LLLLL: strict 3-per-row CSS grid —
+                  // grid-template-columns: repeat(3, minmax(0, 1fr)); gap 16px.
+                  // Each step card fills its cell (exactly 1/3 of the row),
+                  // left-aligned, wrapping after the third; max-w-[33%] is a hard
+                  // cap fallback. The findings textarea inside is w-full of the
+                  // card and never grows past it. No flexbox for the step grid.
+                  <div className="grid grid-cols-3 gap-4 p-3">
                     {t.steps.map((step, sIdx) => (
                       <div
                         key={sIdx}
                         className={cn(
-                          "flex min-w-0 gap-2 rounded-xl border p-3 transition-colors",
+                          "flex min-w-0 max-w-[33%] gap-2 rounded-xl border p-3 transition-colors",
                           step.done
                             ? "border-gray-200 bg-[#f1f5f9]"
                             : "border-gray-200 bg-white"
