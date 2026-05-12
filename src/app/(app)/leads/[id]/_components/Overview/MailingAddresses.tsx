@@ -212,11 +212,11 @@ export function MailingAddresses({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className={labelClass}>State</label>
-                <input value={addr.state} onChange={(e) => setAddr((d) => ({ ...d, state: e.target.value }))} className={inputClass} />
+                <input value={addr.state} onChange={(e) => setAddr((d) => ({ ...d, state: e.target.value }))} className={cn(inputClass, "max-w-[120px]")} />
               </div>
               <div>
                 <label className={labelClass}>Zip</label>
-                <input value={addr.zip} onChange={(e) => setAddr((d) => ({ ...d, zip: e.target.value }))} className={inputClass} />
+                <input value={addr.zip} onChange={(e) => setAddr((d) => ({ ...d, zip: e.target.value }))} className={cn(inputClass, "max-w-[120px]")} />
               </div>
             </div>
           </div>

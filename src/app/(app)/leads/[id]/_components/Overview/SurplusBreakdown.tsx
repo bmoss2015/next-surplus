@@ -191,7 +191,7 @@ export function SurplusBreakdown({
                     onChange={(e) => onLienName(lien.id, e.target.value)}
                     onBlur={(e) => commitLienName(lien.id, e.target.value)}
                     placeholder="Lien Name"
-                    className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[14px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                    className="min-w-0 max-w-[300px] flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[14px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
                   />
                   <CurrencyInput
                     value={lien.amount}
