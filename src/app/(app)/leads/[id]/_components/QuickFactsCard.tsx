@@ -42,7 +42,7 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2 leading-[1.9]">
-      <span className="shrink-0 text-[13px] font-normal text-[#64748b]">{label}</span>
+      <span className="shrink-0 text-[13px] font-medium text-[#64748b]">{label}</span>
       <span
         className={
           muted ? "text-[13px] italic text-gray-400" : "text-[13px] font-medium text-[#0f1729]"
