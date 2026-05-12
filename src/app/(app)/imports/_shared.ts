@@ -67,18 +67,23 @@ export type PortalFieldKey =
   | "phone_1"
   | "phone_1_type"
   | "phone_1_dnc"
+  | "phone_1_litigator"
   | "phone_2"
   | "phone_2_type"
   | "phone_2_dnc"
+  | "phone_2_litigator"
   | "phone_3"
   | "phone_3_type"
   | "phone_3_dnc"
+  | "phone_3_litigator"
   | "phone_4"
   | "phone_4_type"
   | "phone_4_dnc"
+  | "phone_4_litigator"
   | "phone_5"
   | "phone_5_type"
   | "phone_5_dnc"
+  | "phone_5_litigator"
   | "email"
   | "email_2"
   | "email_3"
@@ -116,32 +121,24 @@ export function normalizeHeader(header: string): string {
   return header.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-// Excess Elite carries a "Phone N: Type" column with values like "Mobile",
-// "Wireless", "Residential", "LandLine", "VOIP", etc. Collapse to the three
-// values the portal stores (or null when blank / unrecognized as a class).
+// Fix AAAA3 PART 7: a "Phone N: Type" column carries one of "Mobile" /
+// "Residential" / "Landline" / "Other Phone". Map each explicitly to its stored
+// value; a blank or unrecognized value is null (not "Other").
 export function parsePhoneType(raw: string): string | null {
   const v = (raw ?? "").trim().toLowerCase();
   if (!v) return null;
-  if (v.startsWith("m") || v.includes("cell") || v.includes("wireless") || v.includes("mobile"))
-    return "Mobile";
-  // GAP 2: "Landline" is its own stored value — distinct from "Residential".
-  if (v.includes("land")) return "Landline";
-  if (v.startsWith("r") || v.includes("home") || v.includes("residential"))
-    return "Residential";
-  return "Other";
+  if (v === "mobile" || v === "cell" || v === "cell phone" || v === "wireless") return "Mobile";
+  if (v === "landline" || v === "land line") return "Landline";
+  if (v === "residential" || v === "home" || v === "home phone") return "Residential";
+  if (v === "other" || v === "other phone") return "Other";
+  return null;
 }
 
-// Excess Elite carries a "Phone N: DNC/Litigator" column. The column conflates
-// the two flags, so a plain "Y" (or anything mentioning "litigator") sets BOTH
-// the DNC flag and the litigator tag on that number; an explicit "DNC" marks
-// only do-not-call.
-export function parseDncLitigator(raw: string): { is_dnc: boolean; is_litigator: boolean } {
-  const v = (raw ?? "").trim().toLowerCase();
-  if (!v) return { is_dnc: false, is_litigator: false };
-  const yes = ["y", "yes", "t", "true", "1", "x"].includes(v);
-  const is_litigator = yes || v.includes("litig");
-  const is_dnc = is_litigator || v.includes("dnc") || v.includes("do not call");
-  return { is_dnc, is_litigator };
+// Fix AAAA3 PART 3: DNC and Litigator are now two fully independent CSV columns.
+// Each is a plain yes/no flag — "Y" (or yes/true/1) → true, "N" or blank → false.
+// Nothing is ever inferred from the other.
+export function parseImportFlag(raw: string): boolean {
+  return ["y", "yes", "t", "true", "1", "x"].includes((raw ?? "").trim().toLowerCase());
 }
 
 // Strip everything but digits from a phone string — accepts "(240) 506-7777",
@@ -451,9 +448,15 @@ export const PORTAL_FIELDS: PortalField[] = [
   },
   {
     key: "phone_1_dnc",
-    label: "Phone 1 DNC/Litigator",
+    label: "Phone 1 DNC",
     required: false,
-    aliases: ["phone1dnclitigator", "phone1dnc", "phone1litigator", "phonednclitigator"],
+    aliases: ["phone1dnc", "dnc1"],
+  },
+  {
+    key: "phone_1_litigator",
+    label: "Phone 1 Litigator",
+    required: false,
+    aliases: ["phone1litigator", "litigator1"],
   },
   {
     key: "phone_2",
@@ -469,9 +472,15 @@ export const PORTAL_FIELDS: PortalField[] = [
   },
   {
     key: "phone_2_dnc",
-    label: "Phone 2 DNC/Litigator",
+    label: "Phone 2 DNC",
     required: false,
-    aliases: ["phone2dnclitigator", "phone2dnc", "phone2litigator"],
+    aliases: ["phone2dnc", "dnc2"],
+  },
+  {
+    key: "phone_2_litigator",
+    label: "Phone 2 Litigator",
+    required: false,
+    aliases: ["phone2litigator", "litigator2"],
   },
   {
     key: "phone_3",
@@ -487,9 +496,15 @@ export const PORTAL_FIELDS: PortalField[] = [
   },
   {
     key: "phone_3_dnc",
-    label: "Phone 3 DNC/Litigator",
+    label: "Phone 3 DNC",
     required: false,
-    aliases: ["phone3dnclitigator", "phone3dnc", "phone3litigator"],
+    aliases: ["phone3dnc", "dnc3"],
+  },
+  {
+    key: "phone_3_litigator",
+    label: "Phone 3 Litigator",
+    required: false,
+    aliases: ["phone3litigator", "litigator3"],
   },
   {
     key: "phone_4",
@@ -505,9 +520,15 @@ export const PORTAL_FIELDS: PortalField[] = [
   },
   {
     key: "phone_4_dnc",
-    label: "Phone 4 DNC/Litigator",
+    label: "Phone 4 DNC",
     required: false,
-    aliases: ["phone4dnclitigator", "phone4dnc", "phone4litigator"],
+    aliases: ["phone4dnc", "dnc4"],
+  },
+  {
+    key: "phone_4_litigator",
+    label: "Phone 4 Litigator",
+    required: false,
+    aliases: ["phone4litigator", "litigator4"],
   },
   {
     key: "phone_5",
@@ -523,9 +544,15 @@ export const PORTAL_FIELDS: PortalField[] = [
   },
   {
     key: "phone_5_dnc",
-    label: "Phone 5 DNC/Litigator",
+    label: "Phone 5 DNC",
     required: false,
-    aliases: ["phone5dnclitigator", "phone5dnc", "phone5litigator"],
+    aliases: ["phone5dnc", "dnc5"],
+  },
+  {
+    key: "phone_5_litigator",
+    label: "Phone 5 Litigator",
+    required: false,
+    aliases: ["phone5litigator", "litigator5"],
   },
   {
     key: "email",
@@ -649,14 +676,19 @@ for (let n = 1; n <= RELATIVE_COUNT; n++) {
       aliases: [`relative${n}lastname`, `rel${n}lastname`],
     },
     {
+      // Stored verbatim — never Proper-Cased. "RELATIVE n: Possible Type" maps
+      // here whether it arrives as "relativeNpossibletype" or "rNpossibletype".
       key: relativeFieldKey(n, "possible_type"),
       label: `Relative ${n} Possible Type`,
       required: false,
       aliases: [
         `relative${n}possibletype`,
+        `r${n}possibletype`,
         `relative${n}type`,
         `relative${n}relationship`,
         `rel${n}type`,
+        `rel${n}relationship`,
+        `r${n}relationship`,
       ],
     },
     {
@@ -682,13 +714,15 @@ for (let n = 1; n <= RELATIVE_COUNT; n++) {
       },
       {
         key: relativeFieldKey(n, `phone_${m}_dnc`),
-        label: `Relative ${n} Phone ${m} DNC/Litigator`,
+        label: `Relative ${n} Phone ${m} DNC`,
         required: false,
-        aliases: [
-          `relative${n}phone${m}dnclitigator`,
-          `relative${n}phone${m}dnc`,
-          `relative${n}phone${m}litigator`,
-        ],
+        aliases: [`relative${n}phone${m}dnc`, `rel${n}phone${m}dnc`],
+      },
+      {
+        key: relativeFieldKey(n, `phone_${m}_litigator`),
+        label: `Relative ${n} Phone ${m} Litigator`,
+        required: false,
+        aliases: [`relative${n}phone${m}litigator`, `rel${n}phone${m}litigator`],
       }
     );
   }

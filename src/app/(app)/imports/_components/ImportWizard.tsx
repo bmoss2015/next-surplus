@@ -36,7 +36,7 @@ import {
   RELATIVE_PHONE_COUNT,
   RELATIVE_EMAIL_COUNT,
   parsePhoneType,
-  parseDncLitigator,
+  parseImportFlag,
   normalizePhoneStrict,
   parseImportDate,
   stripCaseNumber,
@@ -1047,12 +1047,13 @@ export function ImportWizard() {
           continue;
         }
         seenPhones.add(pv);
-        const { is_dnc, is_litigator } = parseDncLitigator(get(raw, `phone_${pm}_dnc`));
+        // DNC and Litigator are two independent CSV columns now — never inferred
+        // from each other; an unmapped column reads as "" → false.
         phones.push({
           value: pv,
           phone_type: parsePhoneType(get(raw, `phone_${pm}_type`)),
-          is_dnc,
-          is_litigator,
+          is_dnc: parseImportFlag(get(raw, `phone_${pm}_dnc`)),
+          is_litigator: parseImportFlag(get(raw, `phone_${pm}_litigator`)),
         });
       }
       const emails: string[] = [];
@@ -1081,8 +1082,8 @@ export function ImportWizard() {
       // becomes a contacts row, channel='mailing_address', linked to the imported
       // owner). A partial address (e.g. no street) is still created; warn when
       // the street is missing.
-      const ownerMailingStreet = get(raw, "owner_mailing_street");
-      const ownerMailingCity = get(raw, "owner_mailing_city");
+      const ownerMailingStreet = formatAddress(get(raw, "owner_mailing_street"));
+      const ownerMailingCity = formatCity(get(raw, "owner_mailing_city"));
       const ownerMailingState = get(raw, "owner_mailing_state").toUpperCase();
       const ownerMailingZip = padZip(get(raw, "owner_mailing_zip"));
       const ownerMailingTail = [
@@ -1127,12 +1128,11 @@ export function ImportWizard() {
             continue;
           }
           rSeenPhones.add(pv);
-          const { is_dnc, is_litigator } = parseDncLitigator(get(raw, rk(`phone_${pm}_dnc`)));
           rPhones.push({
             value: pv,
             phone_type: parsePhoneType(get(raw, rk(`phone_${pm}_type`))),
-            is_dnc,
-            is_litigator,
+            is_dnc: parseImportFlag(get(raw, rk(`phone_${pm}_dnc`))),
+            is_litigator: parseImportFlag(get(raw, rk(`phone_${pm}_litigator`))),
           });
         }
         const rEmails: string[] = [];
@@ -1954,19 +1954,16 @@ export function ImportWizard() {
 // Fix R: centered success popup shown after an import completes.
 // ---------------------------------------------------------------------------
 
+// Fix BBBB3 PART 12: a deliberately minimal post-import popup — the headline
+// count, plus muted lines for skipped / dedupe-flagged only when non-zero, and a
+// single "Import Another File" button. The detailed per-import breakdown lives
+// on the Import History row below, not here.
 function ImportSuccessModal({
   result,
   onImportAnother,
   onClose,
 }: {
-  result: {
-    imported: number;
-    skipped: number;
-    dedupeReview: number;
-    contactsWritten: number;
-    contactsSkipped: { invalidPhone: number; invalidEmail: number; duplicate: number };
-    notImportedColumns: string[];
-  };
+  result: { imported: number; skipped: number; dedupeReview: number };
   onImportAnother: () => void;
   onClose: () => void;
 }) {
@@ -1982,34 +1979,10 @@ function ImportSuccessModal({
     };
   }, [onClose]);
 
-  const cs = result.contactsSkipped;
-  const contactsSkippedTotal = cs.invalidPhone + cs.invalidEmail + cs.duplicate;
-
-  // IMPORT SUMMARY: one labelled line per metric.
-  const lines: { label: string; value: string }[] = [
-    { label: "Leads imported", value: String(result.imported) },
-    {
-      label: "Leads skipped",
-      value:
-        result.skipped === 0
-          ? "0"
-          : `${result.skipped} (user choice or duplicate match)`,
-    },
-    { label: "Leads flagged for dedupe review", value: String(result.dedupeReview) },
-    { label: "Contact rows written", value: String(result.contactsWritten) },
-    {
-      label: "Contact rows skipped",
-      value:
-        contactsSkippedTotal === 0
-          ? "0"
-          : `${contactsSkippedTotal} (invalid phone: ${cs.invalidPhone}, invalid email: ${cs.invalidEmail}, duplicate: ${cs.duplicate})`,
-    },
-  ];
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <div className="relative w-full max-w-[440px] rounded-lg bg-surface p-6 text-center shadow-elevated">
+      <div className="relative w-full max-w-[400px] rounded-lg bg-surface p-6 text-center shadow-elevated">
         <button
           type="button"
           onClick={onClose}
@@ -2021,21 +1994,20 @@ function ImportSuccessModal({
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-petrol-100">
           <IconCheck size={26} stroke={2.5} className="text-petrol-500" />
         </div>
-        <h2 className="m-0 mt-4 text-[18px] font-medium tracking-tight text-ink">
+        <h2 className="m-0 mt-4 text-[13px] font-medium uppercase tracking-[0.4px] text-gray-500">
           Import Complete
         </h2>
-        <dl className="mt-4 space-y-1 text-left text-[12.5px]">
-          {lines.map((l) => (
-            <div key={l.label} className="flex items-baseline justify-between gap-3">
-              <dt className="text-gray-600">{l.label}</dt>
-              <dd className="m-0 font-medium text-ink">{l.value}</dd>
-            </div>
-          ))}
-        </dl>
-        {result.notImportedColumns.length > 0 && (
-          <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-left text-[11.5px] text-gray-600">
-            These columns were not recognized and were not imported:{" "}
-            <span className="text-ink">{result.notImportedColumns.join(", ")}</span>
+        <div className="mt-1 text-[22px] font-semibold tracking-tight text-ink">
+          {result.imported} {result.imported === 1 ? "lead imported" : "leads imported"}
+        </div>
+        {result.skipped > 0 && (
+          <div className="mt-1.5 text-[12.5px] text-gray-500">
+            {result.skipped} {result.skipped === 1 ? "lead skipped" : "leads skipped"}
+          </div>
+        )}
+        {result.dedupeReview > 0 && (
+          <div className="mt-1 text-[12.5px] text-gray-500">
+            {result.dedupeReview} flagged for dedupe review
           </div>
         )}
         <div className="mt-5 flex items-center justify-center">

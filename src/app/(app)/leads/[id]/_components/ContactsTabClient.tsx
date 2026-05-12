@@ -761,7 +761,9 @@ function ContactLine({
             onClick={() => onSetPhoneMeta?.({ is_litigator: !isLitigator })}
             className={cn(
               "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
-              isLitigator ? "bg-[#7f1d1d] text-white" : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
+              isLitigator
+                ? "bg-[#ffedd5] text-[#9a3412]"
+                : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
             )}
             aria-label="Litigator"
           >
