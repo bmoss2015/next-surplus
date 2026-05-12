@@ -1,3 +1,16 @@
+\## CRITICAL — READ BEFORE EVERY COMMAND
+
+Before running ANY supabase command, run: cat supabase/.temp/project-ref
+
+If the output is NOT sghfmudgnddybsayfqbd, stop immediately and run:
+npx supabase link --project-ref sghfmudgnddybsayfqbd
+
+Then verify again before proceeding.
+
+Never assume the link state is correct. Always verify first. Every time. No exceptions.
+
+
+
 @AGENTS.md
 
 

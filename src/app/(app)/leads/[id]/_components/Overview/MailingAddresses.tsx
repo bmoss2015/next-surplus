@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { IconPlus, IconTrash, IconMail, IconMailOff } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconCheck } from "@tabler/icons-react";
 import {
   addMailingAddress,
   setMailingAddressMailed,
@@ -91,7 +91,7 @@ export function MailingAddresses({
       )
     );
     startTransition(async () => {
-      await setMailingAddressMailed(row.id, next, leadId);
+      await setMailingAddressMailed(row.id, next, leadId, row.value);
     });
   }
 
@@ -157,18 +157,14 @@ export function MailingAddresses({
                   type="button"
                   onClick={() => toggleMailed(row)}
                   className={cn(
-                    "inline-flex w-fit cursor-pointer items-center gap-1 rounded-full px-2 py-[2px] text-[10px] font-medium transition-colors",
+                    "inline-flex w-fit cursor-pointer items-center gap-1 rounded-full px-2.5 py-[3px] text-[10px] font-medium transition-colors",
                     row.mailed
-                      ? "bg-success-bg text-success-strong"
-                      : "bg-gray-150 text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
+                      ? "border-none bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] text-white"
+                      : "border border-[#e2e8f0] bg-[#f1f5f9] text-[#64748b] hover:border-petrol-200"
                   )}
                   title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
                 >
-                  {row.mailed ? (
-                    <IconMail size={11} stroke={1.75} />
-                  ) : (
-                    <IconMailOff size={11} stroke={1.75} />
-                  )}
+                  {row.mailed && <IconCheck size={11} stroke={2.5} />}
                   {row.mailed && row.mailed_at
                     ? `Mailed ${fmtMailedAt(row.mailed_at)}`
                     : "Not Mailed"}

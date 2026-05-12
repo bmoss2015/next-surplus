@@ -103,6 +103,11 @@ export function formatActivity(
         icon: "default",
       };
     }
+    case "mailer_marked_sent": {
+      const text = ((p.text as string | null) ?? "").trim();
+      if (text) return { text, icon: "default" };
+      return { text: p.mailed === false ? "Mailer Status Cleared" : "Mailer Sent", icon: "default" };
+    }
     default:
       return { text: toTitleish(row.activity_type.replace(/_/g, " ")), icon: "default" };
   }

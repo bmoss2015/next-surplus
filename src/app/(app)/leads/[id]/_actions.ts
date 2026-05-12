@@ -460,7 +460,8 @@ export async function addMailingAddress(
 export async function setMailingAddressMailed(
   contactId: string,
   mailed: boolean,
-  leadId: string
+  leadId: string,
+  address: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const sb = await createClient();
   const { error } = await sb
@@ -471,6 +472,22 @@ export async function setMailingAddressMailed(
     })
     .eq("id", contactId);
   if (error) return { ok: false, error: error.message };
+
+  // Fix CC: log the mailer status flip on the lead's activity feed.
+  const addr = (address ?? "").trim();
+  await sb.from("activities").insert({
+    lead_id: leadId,
+    activity_type: "mailer_marked_sent",
+    payload: {
+      mailed,
+      address: addr,
+      text: mailed
+        ? `Mailer Sent To ${addr}`
+        : `Mailer Status Cleared For ${addr}`,
+    },
+    user_id: await currentUserId(),
+  });
+
   revalidatePath(`/leads/${leadId}`);
   return { ok: true };
 }
