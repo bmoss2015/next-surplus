@@ -210,9 +210,9 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
             attorneyCost={lead.attorney_cost}
           />
 
-          {/* Documents Checklist */}
+          {/* Documents */}
           <div className={CARD}>
-            <SectionSubheader>Documents Checklist</SectionSubheader>
+            <SectionSubheader>Documents</SectionSubheader>
             {documents.length === 0 ? (
               <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center">
                 <div className="text-[12.5px] text-gray-500">No Documents Yet</div>
