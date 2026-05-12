@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
-import { updateLeadField } from "../_actions";
+import { updateLeadField, addDataSource } from "../_actions";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { formatCurrency } from "@/lib/leads/format";
 import { cn } from "@/lib/cn";
@@ -218,6 +218,121 @@ function InlineCurrencyField({
   );
 }
 
+// Fix JJJJ2: the Data Source field is a dropdown of preset + custom sources,
+// with an "Add New" option that lets the user type and persist a new source.
+const ADD_NEW_SOURCE = "__add_new_source__";
+
+function InlineDataSourceField({
+  leadId,
+  initial,
+  options,
+}: {
+  leadId: string;
+  initial: string | null;
+  options: string[];
+}) {
+  const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [value, setValue] = useState(initial ?? "");
+  const [newName, setNewName] = useState("");
+  const [opts, setOpts] = useState(options);
+  const [, startTransition] = useTransition();
+
+  const allOpts = value && !opts.includes(value) ? [value, ...opts] : opts;
+
+  function commitValue(next: string) {
+    setEditing(false);
+    if (next === value) return;
+    setValue(next);
+    startTransition(async () => {
+      await updateLeadField(leadId, "data_source", next || null);
+    });
+  }
+
+  function commitNew() {
+    const n = newName.trim();
+    if (!n) {
+      setAdding(false);
+      setNewName("");
+      return;
+    }
+    startTransition(async () => {
+      const res = await addDataSource(n);
+      if (res.ok) {
+        setOpts((prev) => (prev.includes(res.name) ? prev : [...prev, res.name].sort()));
+        setValue(res.name);
+        await updateLeadField(leadId, "data_source", res.name);
+      }
+      setAdding(false);
+      setNewName("");
+    });
+  }
+
+  if (adding) {
+    return (
+      <input
+        type="text"
+        autoFocus
+        value={newName}
+        onChange={(e) => setNewName(e.target.value)}
+        onBlur={commitNew}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          else if (e.key === "Escape") {
+            setNewName("");
+            setAdding(false);
+          }
+        }}
+        placeholder="New Source Name"
+        className={cn(INLINE_INPUT_CLASS, "w-[200px]")}
+      />
+    );
+  }
+  if (editing) {
+    return (
+      <select
+        autoFocus
+        value={value}
+        onChange={(e) => {
+          if (e.target.value === ADD_NEW_SOURCE) {
+            setEditing(false);
+            setAdding(true);
+          } else {
+            commitValue(e.target.value);
+          }
+        }}
+        onBlur={() => setEditing(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setEditing(false);
+        }}
+        className={cn(INLINE_INPUT_CLASS, "w-[200px] cursor-pointer")}
+      >
+        <option value="">{NOT_SET}</option>
+        {allOpts.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+        <option value={ADD_NEW_SOURCE}>+ Add New…</option>
+      </select>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      title="Click To Edit"
+      className={
+        value
+          ? "cursor-text rounded-[3px] px-0.5 text-[13px] font-medium text-[#0f1729] hover:bg-petrol-50"
+          : "cursor-text rounded-[3px] px-0.5 text-[13px] italic text-gray-400 hover:bg-petrol-50"
+      }
+    >
+      {value || NOT_SET}
+    </button>
+  );
+}
+
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[180px_1fr] items-center gap-2 leading-[2]">
@@ -227,7 +342,13 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
-export function PropertyInfoTab({ lead }: { lead: LeadDetailWithCounts }) {
+export function PropertyInfoTab({
+  lead,
+  dataSources,
+}: {
+  lead: LeadDetailWithCounts;
+  dataSources: string[];
+}) {
   const id = lead.id;
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
@@ -235,6 +356,9 @@ export function PropertyInfoTab({ lead }: { lead: LeadDetailWithCounts }) {
       <div className="space-y-0">
         <FieldRow label="Parcel Number">
           <InlineTextField leadId={id} field="parcel_number" initial={lead.parcel_number} placeholder={NOT_SET} />
+        </FieldRow>
+        <FieldRow label="Case Number">
+          <InlineTextField leadId={id} field="case_number" initial={lead.case_number} placeholder={NOT_SET} />
         </FieldRow>
         <FieldRow label="County">
           <InlineTextField leadId={id} field="county" initial={lead.county} placeholder={NOT_SET} />
@@ -267,7 +391,7 @@ export function PropertyInfoTab({ lead }: { lead: LeadDetailWithCounts }) {
           <InlineTextField leadId={id} field="lead_source" initial={lead.lead_source} placeholder={NOT_SET} />
         </FieldRow>
         <FieldRow label="Data Source">
-          <InlineTextField leadId={id} field="data_source" initial={lead.data_source} placeholder={NOT_SET} />
+          <InlineDataSourceField leadId={id} initial={lead.data_source} options={dataSources} />
         </FieldRow>
       </div>
     </div>

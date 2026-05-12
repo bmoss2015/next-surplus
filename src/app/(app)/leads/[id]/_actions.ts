@@ -1236,3 +1236,28 @@ export async function saveOverallFindings(
   revalidatePath(`/leads/${leadId}`);
   return { ok: true };
 }
+
+// -- Data sources (Fix JJJJ2) -----------------------------------------------
+// Org-scoped list backing the Property Info "Data Source" dropdown.
+
+export async function fetchDataSources(): Promise<string[]> {
+  const sb = await createClient();
+  const { data } = await sb
+    .from("data_sources")
+    .select("name")
+    .order("name", { ascending: true });
+  return ((data ?? []) as Array<{ name: string }>).map((r) => r.name);
+}
+
+export async function addDataSource(
+  name: string
+): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "Name cannot be empty" };
+  const sb = await createClient();
+  const { error } = await sb
+    .from("data_sources")
+    .upsert({ name: trimmed }, { onConflict: "org_id,name", ignoreDuplicates: true });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, name: trimmed };
+}

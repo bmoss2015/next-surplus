@@ -12,6 +12,7 @@ import { QuickFactsCard } from "./_components/QuickFactsCard";
 import { RecentActivityCard } from "./_components/RecentActivityCard";
 import { LostBanner } from "./_components/LostBanner";
 import { TabBar, type TabKey } from "./_components/TabBar";
+import { fetchDataSources } from "./_actions";
 import { OverviewTab } from "./_components/OverviewTab";
 import { PropertyInfoTab } from "./_components/PropertyInfoTab";
 import { ContactsTab } from "./_components/ContactsTab";
@@ -66,6 +67,7 @@ export default async function LeadDetailPage({
   ]);
   if (!lead) notFound();
   const openTaskCount = openTaskRes.count ?? 0;
+  const dataSources = activeTab === "property" ? await fetchDataSources() : [];
 
   return (
     <ConfirmedSurplusProvider initial={lead.confirmed_surplus}>
@@ -84,7 +86,9 @@ export default async function LeadDetailPage({
         <div className="grid grid-cols-[1fr_280px] gap-[18px]">
           <div className="min-w-0">
             {activeTab === "overview" && <OverviewTab lead={lead} />}
-            {activeTab === "property" && <PropertyInfoTab lead={lead} />}
+            {activeTab === "property" && (
+              <PropertyInfoTab lead={lead} dataSources={dataSources} />
+            )}
             {activeTab === "contacts" && <ContactsTab leadId={lead.id} />}
             {activeTab === "research" && <ResearchTab lead={lead} />}
             {activeTab === "documents" && <DocumentsTab leadId={lead.id} />}
