@@ -130,12 +130,15 @@ async function loadRecoveryTypeLookup(
   return map;
 }
 
+// Fix S: when there's no lookup entry, leave recovery_type NULL rather than
+// writing the literal "unknown". The leads.recovery_type column is nullable,
+// and writing a value the enum may not carry was failing the whole insert.
 function resolveRecoveryType(
   lookup: Map<string, string>,
   state: string,
   saleType: string
-): string {
-  return lookup.get(`${state}|${saleType}`) ?? "unknown";
+): string | null {
+  return lookup.get(`${state}|${saleType}`) ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +165,7 @@ const LEAD_WRITABLE_FIELDS = [
 function leadFieldsFromRow(
   row: IncomingLead,
   rowSource: string,
-  recoveryType: string
+  recoveryType: string | null
 ): Record<string, unknown> {
   return {
     address: formatAddress(row.address),
@@ -263,6 +266,10 @@ export async function importLeads(
   let skipped = 0;
   let updatedBlank = 0;
   let replaced = 0;
+  // Fix S: track per-row failures so we can log them and refuse to report a
+  // bogus "success" when nothing actually landed in the database.
+  let errors = 0;
+  let firstError: string | null = null;
   const importRowsLog: Array<Record<string, unknown>> = [];
 
   const decisionByIndex = new Map<number, ImportRowDecision>();
@@ -288,7 +295,7 @@ export async function importLeads(
       return;
     }
 
-    const { data: ownerRow } = await sb
+    const { data: ownerRow, error: ownerErr } = await sb
       .from("owners")
       .insert({
         lead_id: leadId,
@@ -302,7 +309,14 @@ export async function importLeads(
       })
       .select("id")
       .single();
-    if (!ownerRow) return;
+    // Fix S: a failed owner insert never rolls back the lead row (separate
+    // statement) — but log it so the cause is visible during debugging.
+    if (ownerErr || !ownerRow) {
+      console.error(
+        `[importLeads] owner insert failed for lead ${leadId}: ${ownerErr?.message ?? "no row returned"}`
+      );
+      return;
+    }
 
     // Fix 93: every mapped phone / email / mailing-address column becomes its
     // own contacts row — nothing overwrites a single shared value. Each phone
@@ -342,7 +356,12 @@ export async function importLeads(
       });
     });
     if (contactRows.length > 0) {
-      await sb.from("contacts").insert(contactRows);
+      const { error: contactsErr } = await sb.from("contacts").insert(contactRows);
+      if (contactsErr) {
+        console.error(
+          `[importLeads] contacts insert failed for lead ${leadId}: ${contactsErr.message}`
+        );
+      }
     }
   }
 
@@ -355,7 +374,12 @@ export async function importLeads(
     );
     if (relatives.length === 0) return;
     const relativeRows = relatives.map((r) => relativeRowFromImport(leadId, r));
-    await sb.from("relatives").insert(relativeRows);
+    const { error: relativesErr } = await sb.from("relatives").insert(relativeRows);
+    if (relativesErr) {
+      console.error(
+        `[importLeads] relatives insert failed for lead ${leadId}: ${relativesErr.message}`
+      );
+    }
   }
 
   for (let i = 0; i < rows.length; i++) {
@@ -389,12 +413,18 @@ export async function importLeads(
         .select("id")
         .single();
 
-      if (leadErr) {
+      if (leadErr || !leadRow?.id) {
+        const msg = leadErr?.message ?? "insert returned no row";
+        errors += 1;
+        if (!firstError) firstError = msg;
+        console.error(
+          `[importLeads] lead insert failed (row ${i + 1}: ${row.address}, ${row.city} ${row.state} ${row.zip}): ${msg}`
+        );
         importRowsLog.push({
           import_id: importRow.id,
           raw_row: row,
           action_taken: "error",
-          error_message: leadErr.message,
+          error_message: msg,
         });
         continue;
       }
@@ -442,6 +472,11 @@ export async function importLeads(
     }
 
     if (updateErr) {
+      errors += 1;
+      if (!firstError) firstError = updateErr.message;
+      console.error(
+        `[importLeads] lead update failed (row ${i + 1}, existing lead ${leadId}): ${updateErr.message}`
+      );
       importRowsLog.push({
         import_id: importRow.id,
         raw_row: row,
@@ -475,12 +510,17 @@ export async function importLeads(
     await sb.from("import_rows").insert(importRowsLog);
   }
 
+  // Fix S: don't claim "completed" when nothing was written and rows failed —
+  // mark the run "failed" and return an error so the wizard surfaces the cause
+  // instead of a "0 leads imported" success popup.
+  const wroteSomething = imported > 0 || updatedBlank > 0 || replaced > 0;
+  const finalStatus = !wroteSomething && errors > 0 ? "failed" : "completed";
   await sb
     .from("imports")
     .update({
       imported_count: imported,
       skipped_count: skipped,
-      status: "completed",
+      status: finalStatus,
     })
     .eq("id", importRow.id);
 
@@ -489,6 +529,16 @@ export async function importLeads(
   // /leads/table; Kanban is now /leads).
   revalidatePath("/imports");
   revalidatePath("/leads", "layout");
+
+  if (finalStatus === "failed") {
+    return {
+      ok: false,
+      error: `Import failed — no rows were written to the database${
+        firstError ? ` (first error: ${firstError})` : ""
+      }. Check the server console for details.`,
+    };
+  }
+
   return {
     ok: true,
     importId: importRow.id as string,
