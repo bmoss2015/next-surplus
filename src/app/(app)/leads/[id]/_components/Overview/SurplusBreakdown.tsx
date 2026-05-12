@@ -230,8 +230,8 @@ export function SurplusBreakdown({
               <span className={FIELD_LABEL}>Source Surplus</span>
               <span>
                 <span className={FIELD_VALUE}>{fmt(sourceSurplus)}</span>
-                <span className="ml-1 block text-[10.5px] text-gray-400">
-                  As reported by lead source
+                <span className="ml-1.5 text-[10.5px] text-gray-400">
+                  · As Reported By Lead Source
                 </span>
               </span>
             </div>
