@@ -5,6 +5,8 @@ import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { updateLeadField } from "../_actions";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { formatCurrency } from "@/lib/leads/format";
+import { cn } from "@/lib/cn";
+import { INLINE_INPUT_CLASS } from "@/lib/inline-field";
 import { SectionSubheader } from "./SectionSubheader";
 import { InlineTextField } from "./InlineTextField";
 
@@ -76,7 +78,7 @@ function InlineSelectField({
             setEditing(false);
           }
         }}
-        className="w-[180px] cursor-pointer rounded-md border border-petrol-500 bg-surface px-1.5 py-[2px] text-[13px] text-ink outline-none focus:ring-2 focus:ring-petrol-200"
+        className={cn(INLINE_INPUT_CLASS, "w-[180px] cursor-pointer")}
       >
         <option value="">{NOT_SET}</option>
         {options.map((o) => (
@@ -145,7 +147,7 @@ function InlineDateField({
             e.currentTarget.blur();
           }
         }}
-        className="w-[170px] cursor-pointer rounded-md border border-petrol-500 bg-surface px-1.5 py-[2px] text-[13px] text-ink outline-none focus:ring-2 focus:ring-petrol-200"
+        className={cn(INLINE_INPUT_CLASS, "w-[170px] cursor-pointer")}
       />
     );
   }
@@ -196,7 +198,7 @@ function InlineCurrencyField({
         align="left"
         placeholder="0"
         autoFocus
-        className="w-[150px]"
+        className={cn(INLINE_INPUT_CLASS, "inline-flex w-[150px] items-center gap-1")}
       />
     );
   }

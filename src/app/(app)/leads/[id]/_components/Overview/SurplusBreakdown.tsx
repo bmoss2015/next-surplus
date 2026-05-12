@@ -6,6 +6,8 @@ import { addLien, updateLien, removeLien } from "../../_actions";
 import type { LienRow } from "@/lib/leads/fetch-detail";
 import { formatCurrency } from "@/lib/leads/format";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { cn } from "@/lib/cn";
+import { INLINE_INPUT_CLASS } from "@/lib/inline-field";
 import { useConfirmedSurplus } from "../ConfirmedSurplusContext";
 import { SectionSubheader } from "../SectionSubheader";
 
@@ -115,14 +117,14 @@ export function SurplusBreakdown({
                     onChange={(e) => onLienName(lien.id, e.target.value)}
                     onBlur={(e) => commitLienName(lien.id, e.target.value)}
                     placeholder="Lien Name"
-                    className="min-w-0 max-w-[300px] flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[14px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                    className={cn(INLINE_INPUT_CLASS, "min-w-0 max-w-[300px] flex-1 placeholder:text-gray-400")}
                   />
                   <CurrencyInput
                     value={lien.amount}
                     onCommit={(n) => commitLienAmount(lien.id, n)}
                     prefix="$"
                     align="left"
-                    className="w-[130px] shrink-0"
+                    className={cn(INLINE_INPUT_CLASS, "inline-flex w-[130px] shrink-0 items-center gap-1")}
                   />
                   <button
                     type="button"

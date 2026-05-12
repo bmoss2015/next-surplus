@@ -2,6 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { updateLeadField } from "../_actions";
+import { cn } from "@/lib/cn";
+import { INLINE_INPUT_CLASS } from "@/lib/inline-field";
 
 // Fix VVVV: a plain-text inline editor matching the surplus-field pattern —
 // displays as text until clicked, becomes an input on click, commits on blur or
@@ -67,7 +69,7 @@ export function InlineTextField({
             cancelNext.current = true;
           }
         }}
-        className="w-[150px] rounded-md border border-petrol-500 bg-surface px-1.5 py-[1px] text-right text-[13px] text-ink outline-none focus:ring-2 focus:ring-petrol-200"
+        className={cn(INLINE_INPUT_CLASS, "w-[150px] text-right")}
       />
     );
   }
