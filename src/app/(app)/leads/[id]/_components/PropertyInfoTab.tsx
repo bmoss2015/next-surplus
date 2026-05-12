@@ -8,7 +8,7 @@ import { addLeadSource } from "../../../imports/_actions";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { formatCurrency } from "@/lib/leads/format";
 import { US_STATE_NAMES } from "@/lib/leads/types";
-import { recoveryTypeFor, RECOVERY_TYPE_LABELS } from "@/lib/leads/recovery-type";
+import { RECOVERY_TYPE_LABELS } from "@/lib/leads/recovery-type";
 import { cn } from "@/lib/cn";
 import { INLINE_INPUT_CLASS } from "@/lib/inline-field";
 import { SectionSubheader } from "./SectionSubheader";
@@ -160,74 +160,55 @@ function InlineStateField({ leadId, initial }: { leadId: string; initial: string
   );
 }
 
-// Fix XXXX2: Recovery Type auto-derives from the lead's state + sale type. If
-// no explicit value is stored, the derived value shows (marked "Auto"); editing
-// stores an override on the lead.
-function InlineRecoveryTypeField({
-  leadId,
-  initial,
-  state,
-  saleType,
-}: {
-  leadId: string;
-  initial: string | null;
-  state: string | null;
-  saleType: string | null;
-}) {
+// Fix KKKKK: Recovery Type is derived from the state + sale-type lookup by a DB
+// trigger and shown read-only. The only case it's editable is when the lookup
+// has no rule for the lead's state/sale type, in which case it reads "Unknown"
+// and can be set by hand. No "Auto" badge anywhere.
+function recoveryTypeLabel(v: string | null): string {
+  if (v === "judicial" || v === "non_judicial") return RECOVERY_TYPE_LABELS[v];
+  return "Unknown";
+}
+function InlineRecoveryTypeField({ leadId, initial }: { leadId: string; initial: string | null }) {
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(initial ?? "");
+  const [value, setValue] = useState(initial ?? "unknown");
   const [, startTransition] = useTransition();
-
-  const derived = recoveryTypeFor(state, saleType);
-  const effective = value || derived;
-  const isAuto = !value && !!derived;
+  const editable = value === "unknown" || !value;
 
   function commit(next: string) {
     setEditing(false);
-    if (next === (initial ?? "")) {
-      setValue(initial ?? "");
-      return;
-    }
+    if (next === value) return;
     setValue(next);
     startTransition(async () => {
-      await updateLeadField(leadId, "recovery_type", next || null);
+      await updateLeadField(leadId, "recovery_type", next || "unknown");
     });
   }
 
-  if (editing) {
+  if (editing && editable) {
     return (
       <select
         autoFocus
-        value={value}
+        value={value === "" ? "unknown" : value}
         onChange={(e) => commit(e.target.value)}
         onBlur={() => setEditing(false)}
         onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            setValue(initial ?? "");
-            setEditing(false);
-          }
+          if (e.key === "Escape") setEditing(false);
         }}
-        className={cn(INLINE_INPUT_CLASS, "w-[220px] cursor-pointer")}
+        className={cn(INLINE_INPUT_CLASS, "w-[200px] cursor-pointer")}
       >
-        <option value="">{derived ? `Auto — ${RECOVERY_TYPE_LABELS[derived]}` : "Not Set"}</option>
         <option value="judicial">{RECOVERY_TYPE_LABELS.judicial}</option>
         <option value="non_judicial">{RECOVERY_TYPE_LABELS.non_judicial}</option>
         <option value="unknown">Unknown</option>
       </select>
     );
   }
-  const label =
-    effective === "judicial" || effective === "non_judicial"
-      ? RECOVERY_TYPE_LABELS[effective]
-      : effective === "unknown"
-        ? "Unknown"
-        : null;
-  return (
-    <button type="button" onClick={() => setEditing(true)} title="Click To Edit" className={label ? DISPLAY_SET : DISPLAY_UNSET}>
-      {label ?? NOT_SET}
-      {label && isAuto && <span className="ml-1.5 rounded bg-gray-150 px-1 py-[1px] text-[9.5px] font-medium uppercase tracking-wide text-gray-500">Auto</span>}
-    </button>
-  );
+  if (editable) {
+    return (
+      <button type="button" onClick={() => setEditing(true)} title="Click To Edit" className={DISPLAY_SET}>
+        {recoveryTypeLabel(value)}
+      </button>
+    );
+  }
+  return <span className="text-[13px] font-medium text-[#0f1729]">{recoveryTypeLabel(value)}</span>;
 }
 
 function InlineDateField({ leadId, field, initial }: { leadId: string; field: string; initial: string | null }) {
@@ -560,7 +541,7 @@ export function PropertyInfoTab({
           <InlineCurrencyField leadId={id} field="outstanding_debt" initial={lead.outstanding_debt} />
         </FieldRow>
         <FieldRow label="Recovery Type">
-          <InlineRecoveryTypeField leadId={id} initial={lead.recovery_type} state={lead.state} saleType={lead.sale_type} />
+          <InlineRecoveryTypeField leadId={id} initial={lead.recovery_type} />
         </FieldRow>
         <FieldRow label="Lead Source">
           <InlineListField
