@@ -1,22 +1,43 @@
 import Link from "next/link";
-import { IconArrowRight, IconFile } from "@tabler/icons-react";
+import {
+  IconArrowRight,
+  IconNote,
+  IconSparkles,
+  IconClock,
+  IconFile,
+  IconCircleDot,
+} from "@tabler/icons-react";
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { fetchOwnersWithContacts } from "@/lib/leads/fetch-detail";
 import { fetchNotes, fetchDocuments } from "@/lib/leads/fetch-tab-data";
+import { fetchRecentActivity } from "@/lib/leads/activities";
+import {
+  formatActivity,
+  relativeTime,
+  activityActorName,
+  noteByline,
+} from "@/lib/leads/activity-format";
 import { createClient } from "@/lib/supabase/server";
-import { noteByline } from "@/lib/leads/activity-format";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
-import { HeroSection } from "./Overview/HeroSection";
 import { SurplusBreakdown } from "./Overview/SurplusBreakdown";
 import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
 
-// Fix IIIII: Overview leads with two hero cards (Est. Net Payout — dominant,
-// dark petrol; the active Surplus — lighter petrol tint with the Confirm/Edit
-// link), then four equal-weight panel cards (Owner, Research, Notes, Documents),
-// then the read-only Surplus Breakdown. Visual weight drives the hierarchy; the
-// eye lands on Est. Net Payout first. Everything here is read-only except the
-// Confirm Surplus action on the hero card.
+// Fix IIIII / MMMMM: Overview is a read-only deal snapshot — no hero section,
+// no large duplicate of the metric-strip numbers. It opens straight into four
+// equal-weight panel cards (Owner / Research | Notes / Documents), then the
+// read-only Surplus Breakdown, then a full-width Recent Activity strip. Each
+// card has 24px padding, a bold Proper Case header, its content, and a link
+// arrow to the relevant tab. 24px gap between cards.
+
+const ACTIVITY_ICONS = {
+  create: IconSparkles,
+  stage: IconArrowRight,
+  note: IconNote,
+  review: IconClock,
+  doc: IconFile,
+  default: IconCircleDot,
+} as const;
 
 const DOC_CATEGORY_LABELS: Record<string, string> = {
   agreement: "Recovery Agreement",
@@ -69,10 +90,11 @@ const EMPTY =
 export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
   const leadId = lead.id;
   const sb = await createClient();
-  const [{ owners, contacts }, notes, documents, lrtRes] = await Promise.all([
+  const [{ owners, contacts }, notes, documents, activity, lrtRes] = await Promise.all([
     fetchOwnersWithContacts(leadId),
     fetchNotes(leadId),
     fetchDocuments(leadId),
+    fetchRecentActivity(leadId, 5),
     sb.from("lead_research_templates").select("steps").eq("lead_id", leadId),
   ]);
 
@@ -82,8 +104,7 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
   );
   const totalSteps = allSteps.length;
   const doneSteps = allSteps.filter((s) => s?.done).length;
-  const hasTemplates = lrt.length > 0 && totalSteps > 0;
-  const stepLabel = hasTemplates ? `${doneSteps} of ${totalSteps} Steps Complete` : null;
+  const stepLabel = lrt.length > 0 && totalSteps > 0 ? `${doneSteps} Of ${totalSteps} Steps Complete` : null;
 
   const primaryOwner = owners.find((o) => o.is_primary) ?? owners[0] ?? null;
   const phoneContacts = contacts.filter((c) => c.channel === "phone" && c.value.trim());
@@ -93,20 +114,10 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
   const hasAnyContacts = owners.length > 0 || contacts.length > 0;
   const findings = (lead.research_overall_findings ?? "").trim();
   const recentNotes = notes.slice(0, 2);
-  const liensTotal = lead.liens.reduce((sum, l) => sum + (l.amount ?? 0), 0);
 
   return (
-    <div className="space-y-5">
-      <HeroSection
-        leadId={leadId}
-        closingBid={lead.closing_bid}
-        outstandingDebt={lead.outstanding_debt}
-        totalLiens={liensTotal}
-        recoveryFeePercent={lead.recovery_fee_percent}
-        attorneyCost={lead.attorney_cost}
-      />
-
-      <div className="grid grid-cols-2 gap-5">
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-6">
         {/* Owner */}
         <div className={CARD}>
           <SectionSubheader>Owner</SectionSubheader>
@@ -193,6 +204,8 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
         </div>
       </div>
 
+      {/* Read-only Surplus Breakdown — the confirmed-surplus action lives on the
+          metric strip, not here. */}
       <SurplusBreakdown
         closingBid={lead.closing_bid}
         outstandingDebt={lead.outstanding_debt}
@@ -200,6 +213,35 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
         recoveryFeePercent={lead.recovery_fee_percent}
         attorneyCost={lead.attorney_cost}
       />
+
+      {/* Recent Activity — full width */}
+      <div className={CARD}>
+        <SectionSubheader>Recent Activity</SectionSubheader>
+        {activity.length === 0 ? (
+          <div className={EMPTY}>No Activity Yet</div>
+        ) : (
+          <div className="divide-y divide-gray-150">
+            {activity.map((row) => {
+              const { text, icon } = formatActivity(row, { leadSource: lead.lead_source });
+              const Icon = ACTIVITY_ICONS[icon];
+              return (
+                <div key={row.id} className="flex gap-2 py-2 text-[12px] first:pt-0 last:pb-0">
+                  <div className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-gray-150">
+                    <Icon size={11} stroke={1.75} className="text-gray-500" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="leading-[1.4] text-ink">{text}</div>
+                    <div className="mt-[2px] text-[10.5px] text-gray-500">
+                      {activityActorName(row)} · {relativeTime(row.created_at)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <CardLink href={`/leads/${leadId}?tab=activity`}>View All Activity</CardLink>
+      </div>
     </div>
   );
 }
