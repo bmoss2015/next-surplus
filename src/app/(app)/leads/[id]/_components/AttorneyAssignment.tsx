@@ -18,12 +18,13 @@ function attorneySub(a: AttorneyOption): string | null {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-// Fix VV: a custom Assigned Attorney dropdown — each option shows the attorney
-// name plus their first covered state and default fee in a muted second line.
-// Fix NNNN2: assigning an attorney auto-fills the lead's attorney cost with the
-// attorney's default (prompting before overwriting an existing value); an
-// always-visible Attorney Fee Override input below the selector lets you change
-// just this lead's cost without touching the attorney's standard rate.
+// Fix VV / NNNN2 / HHHHH: a custom Assigned Attorney dropdown plus one always-
+// visible, always-editable "Attorney Fee" field. Assigning an attorney fills
+// the fee with their default — but only when the fee is still empty; an existing
+// fee is never overwritten and there is no prompt. A muted "Default: $X" line
+// below shows the assigned attorney's standard rate. Editing the fee writes
+// only the lead's attorney_cost (never the attorney's standard rate) and the
+// Surplus Breakdown / Est. Net Payout pick it up on the next render.
 export function AttorneyAssignment({
   leadId,
   attorneys,
@@ -36,9 +37,8 @@ export function AttorneyAssignment({
   currentAttorneyCost: number | null;
 }) {
   const [value, setValue] = useState(currentAttorneyId ?? "");
-  const [attorneyCost, setAttorneyCost] = useState<number | null>(currentAttorneyCost);
+  const [attorneyFee, setAttorneyFee] = useState<number | null>(currentAttorneyCost);
   const [open, setOpen] = useState(false);
-  const [pendingOverride, setPendingOverride] = useState<AttorneyOption | null>(null);
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -53,12 +53,12 @@ export function AttorneyAssignment({
 
   const selected = attorneys.find((a) => a.id === value) ?? null;
   const selectedDefault = selected?.default_cost ?? null;
-  const hasExistingCost = attorneyCost != null && attorneyCost !== 0;
+  const feeIsEmpty = attorneyFee == null || attorneyFee === 0;
 
   function applyAssignment(attorneyId: string | null, applyDefault: boolean) {
     startTransition(async () => {
       const res = await assignAttorney(leadId, attorneyId, applyDefault);
-      if (res.ok && res.attorneyCost != null) setAttorneyCost(res.attorneyCost);
+      if (res.ok && res.attorneyCost != null) setAttorneyFee(res.attorneyCost);
     });
   }
 
@@ -70,34 +70,15 @@ export function AttorneyAssignment({
       return;
     }
     const a = attorneys.find((x) => x.id === next) ?? null;
-    if (a && a.default_cost != null && hasExistingCost && next !== value) {
-      // Don't overwrite an existing cost without confirmation.
-      setPendingOverride(a);
-      return;
-    }
     setValue(next);
-    applyAssignment(next, a?.default_cost != null);
+    // Auto-fill the default fee only when there isn't one yet — never overwrite.
+    applyAssignment(next, a?.default_cost != null && feeIsEmpty);
   }
 
-  function confirmOverride() {
-    const a = pendingOverride;
-    if (!a) return;
-    setPendingOverride(null);
-    setValue(a.id);
-    applyAssignment(a.id, true);
-  }
-  function keepExisting() {
-    const a = pendingOverride;
-    if (!a) return;
-    setPendingOverride(null);
-    setValue(a.id);
-    applyAssignment(a.id, false);
-  }
-
-  function commitOverrideCost(n: number | null) {
+  function commitFee(n: number | null) {
     const v = n ?? 0;
-    if (v === (attorneyCost ?? 0)) return;
-    setAttorneyCost(v);
+    if (v === (attorneyFee ?? 0)) return;
+    setAttorneyFee(v);
     startTransition(async () => {
       await updateLeadField(leadId, "attorney_cost", v);
     });
@@ -121,9 +102,7 @@ export function AttorneyAssignment({
             <span className="text-gray-500">Not Assigned</span>
           )}
           {selected && attorneySub(selected) && (
-            <span className="block truncate text-[10.5px] text-gray-400">
-              {attorneySub(selected)}
-            </span>
+            <span className="block truncate text-[10.5px] text-gray-400">{attorneySub(selected)}</span>
           )}
         </span>
         <IconChevronDown size={14} stroke={1.75} className="shrink-0 text-gray-400" />
@@ -170,55 +149,24 @@ export function AttorneyAssignment({
         </div>
       )}
 
-      {/* Fix NNNN2: confirm before overwriting an existing attorney cost. */}
-      {pendingOverride && (
-        <div className="mt-2 rounded-md border border-warn-border bg-warn-bg p-2.5">
-          <div className="text-[11.5px] leading-snug text-warn-strong">
-            Override existing attorney cost of {formatCurrency(attorneyCost)} with{" "}
-            {pendingOverride.name}&apos;s default of {formatCurrency(pendingOverride.default_cost)}?
-          </div>
-          <div className="mt-2 flex gap-1.5">
-            <button
-              type="button"
-              onClick={keepExisting}
-              disabled={pending}
-              className="flex-1 cursor-pointer rounded-md border border-gray-200 bg-white px-2 py-[5px] text-[11.5px] text-ink hover:border-petrol-500 disabled:opacity-50"
-            >
-              Keep Existing
-            </button>
-            <button
-              type="button"
-              onClick={confirmOverride}
-              disabled={pending}
-              className="btn-primary flex-1 cursor-pointer rounded-md px-2 py-[5px] text-[11.5px] font-medium disabled:opacity-50"
-            >
-              Confirm
-            </button>
-          </div>
+      {/* Fix HHHHH: one always-visible, always-editable Attorney Fee for this
+          lead. Editing it never touches the attorney's standard rate. */}
+      <div className="mt-2">
+        <label className="mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500">
+          Attorney Fee
+        </label>
+        <CurrencyInput
+          value={attorneyFee}
+          onCommit={commitFee}
+          prefix="$"
+          align="left"
+          placeholder="0"
+          className={cn(INLINE_INPUT_CLASS, "inline-flex w-[160px] items-center gap-1")}
+        />
+        <div className="mt-1 text-[10.5px] text-gray-400">
+          Default: {selectedDefault != null ? formatCurrency(selectedDefault) : "Not Set"}
         </div>
-      )}
-
-      {/* Fix NNNN2: per-lead Attorney Fee Override (always visible while an
-          attorney is assigned). Editing this updates the lead only, never the
-          attorney's standard rate in Settings. */}
-      {value !== "" && !pendingOverride && (
-        <div className="mt-2">
-          <label className="mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500">
-            Attorney Fee Override
-          </label>
-          <CurrencyInput
-            value={attorneyCost}
-            onCommit={commitOverrideCost}
-            prefix="$"
-            align="left"
-            placeholder="0"
-            className={cn(INLINE_INPUT_CLASS, "inline-flex w-[160px] items-center gap-1")}
-          />
-          <div className="mt-1 text-[10.5px] text-gray-400">
-            Default: {selectedDefault != null ? formatCurrency(selectedDefault) : "Not Set"}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
