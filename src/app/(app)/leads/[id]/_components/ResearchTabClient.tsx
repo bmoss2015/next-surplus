@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
   IconExternalLink,
@@ -19,14 +19,20 @@ import type {
   LeadResearchTemplate,
   AvailableTemplate,
 } from "@/lib/leads/fetch-research";
+import { Modal } from "@/components/Modal";
 import { cn } from "@/lib/cn";
 
-// Fix JJJJ + Fix UUUU: Research tab. A lead carries its own snapshot of one or
-// more checklists. Each checklist is a collapsible section (heavier header with
-// a divider above its steps); steps are a full-width vertical stack of cards —
-// checkbox left, title/description/findings stacked in the body, completed rows
-// strikethrough + greyed. Overall Findings gets its own card with a Save
-// button; "Add From Template" pulls a checklist in from Settings.
+// Fix JJJJ / UUUU / OOOO2: Research tab. A lead carries its own snapshot of one
+// or more checklists. Each checklist is a collapsible section; its steps lay
+// out 3 per row at 1/3 width (wrapping). "Add From Template" opens a modal of
+// the org's templates; picking one writes its steps onto the lead. Template
+// names render as section headers with dashes replaced by spaces.
+
+// Fix OOOO2 PART 3: dashes in a template name become spaces when shown as a
+// section header.
+function displayHeader(name: string): string {
+  return name.replace(/-/g, " ");
+}
 
 export function ResearchTabClient({
   leadId,
@@ -44,19 +50,7 @@ export function ResearchTabClient({
     useState<LeadResearchTemplate[]>(initialTemplates);
   const [overall, setOverall] = useState(overallFindings ?? "");
   const [savedOverall, setSavedOverall] = useState(overallFindings ?? "");
-  const [addOpen, setAddOpen] = useState(false);
-  const addRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!addOpen) return;
-    function onClick(e: MouseEvent) {
-      if (addRef.current && !addRef.current.contains(e.target as Node)) {
-        setAddOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [addOpen]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   function updateStep(
     tIdx: number,
@@ -100,8 +94,8 @@ export function ResearchTabClient({
     });
   }
 
-  function addTemplate(templateId: string) {
-    setAddOpen(false);
+  function pickTemplate(templateId: string) {
+    setPickerOpen(false);
     startTransition(async () => {
       await addResearchTemplateToLead(leadId, templateId);
     });
@@ -118,47 +112,14 @@ export function ResearchTabClient({
   const overallDirty = overall !== savedOverall;
 
   const addButton = (
-    <div className="relative" ref={addRef}>
-      <button
-        type="button"
-        onClick={() => setAddOpen((o) => !o)}
-        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-petrol-500 px-3 py-[6px] text-xs font-medium text-petrol-500 hover:bg-petrol-50"
-      >
-        <IconPlus size={13} stroke={1.75} />
-        Add From Template
-      </button>
-      {addOpen && (
-        <div className="absolute right-0 z-30 mt-1 max-h-72 w-[280px] overflow-y-auto rounded-md border border-gray-200 bg-white shadow-elevated">
-          {availableTemplates.length === 0 ? (
-            <div className="px-3 py-3 text-[12px] text-gray-500">
-              No research templates exist yet.{" "}
-              <Link
-                href="/settings"
-                className="font-medium text-petrol-500 hover:text-petrol-700"
-              >
-                Create one in Settings →
-              </Link>
-            </div>
-          ) : (
-            availableTemplates.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => addTemplate(t.id)}
-                className="block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] text-ink hover:bg-[#e0f2f7]"
-              >
-                {t.name}
-                {(t.state || t.saleType) && (
-                  <span className="ml-1 text-[11px] text-gray-400">
-                    {[t.state, t.saleType].filter(Boolean).join(" · ")}
-                  </span>
-                )}
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={() => setPickerOpen(true)}
+      className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-petrol-500 px-3 py-[6px] text-xs font-medium text-petrol-500 hover:bg-petrol-50"
+    >
+      <IconPlus size={13} stroke={1.75} />
+      Add From Template
+    </button>
   );
 
   return (
@@ -177,7 +138,7 @@ export function ResearchTabClient({
           </div>
           <button
             type="button"
-            onClick={() => setAddOpen(true)}
+            onClick={() => setPickerOpen(true)}
             className="btn-primary mt-3 inline-flex items-center gap-1 rounded-md px-3 py-[6px] text-[12px] font-medium"
           >
             <IconPlus size={13} stroke={1.75} />
@@ -207,19 +168,19 @@ export function ResearchTabClient({
                     <IconChevronDown size={14} stroke={2.25} className="text-gray-500" />
                   )}
                   <span className="text-[12.5px] font-extrabold uppercase tracking-[0.07em] text-[#0a3d4a]">
-                    {t.name}
+                    {displayHeader(t.name)}
                   </span>
                   <span className="text-[11px] font-medium text-gray-400">
                     {doneCount}/{t.steps.length}
                   </span>
                 </button>
                 {!t.collapsed && (
-                  <div className="space-y-3 p-3">
+                  <div className="grid grid-cols-3 gap-3 p-3">
                     {t.steps.map((step, sIdx) => (
                       <div
                         key={sIdx}
                         className={cn(
-                          "flex gap-3 rounded-xl border p-3 transition-colors",
+                          "flex gap-2 rounded-xl border p-3 transition-colors",
                           step.done
                             ? "border-gray-200 bg-[#f1f5f9]"
                             : "border-gray-200 bg-white"
@@ -233,29 +194,27 @@ export function ResearchTabClient({
                           aria-label={step.done ? "Mark not done" : "Mark done"}
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-baseline gap-x-2">
-                            <span
-                              className={cn(
-                                "text-[13px] font-medium leading-snug text-ink",
-                                step.done && "text-gray-400 line-through"
-                              )}
-                            >
-                              {step.name}
-                            </span>
-                            {step.url && (
-                              <a
-                                href={step.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex cursor-pointer items-center gap-1 break-all text-[11.5px] text-petrol-500 underline hover:text-petrol-700"
-                              >
-                                {step.url}
-                                <IconExternalLink size={11} stroke={1.75} className="shrink-0" />
-                              </a>
+                          <span
+                            className={cn(
+                              "block text-[13px] font-medium leading-snug text-ink",
+                              step.done && "text-gray-400 line-through"
                             )}
-                          </div>
+                          >
+                            {step.name}
+                          </span>
+                          {step.url && (
+                            <a
+                              href={step.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-[2px] inline-flex cursor-pointer items-center gap-1 break-all text-[11px] text-petrol-500 underline hover:text-petrol-700"
+                            >
+                              {step.url}
+                              <IconExternalLink size={10} stroke={1.75} className="shrink-0" />
+                            </a>
+                          )}
                           {step.instructions && (
-                            <div className="mt-[2px] text-[11.5px] leading-snug text-gray-500">
+                            <div className="mt-[2px] text-[11px] leading-snug text-gray-500">
                               {step.instructions}
                             </div>
                           )}
@@ -265,9 +224,9 @@ export function ResearchTabClient({
                               updateStep(tIdx, sIdx, { findings: e.target.value })
                             }
                             onBlur={() => commitStepFindings(tIdx, sIdx, t.id)}
-                            rows={2}
-                            placeholder="Findings For This Step"
-                            className="mt-2 w-full resize-y rounded-md border border-gray-200 bg-surface px-2.5 py-[7px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                            rows={3}
+                            placeholder="Findings"
+                            className="mt-2 w-full resize-y rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
                           />
                         </div>
                       </div>
@@ -303,6 +262,36 @@ export function ResearchTabClient({
           className="w-full resize-y rounded-md border border-gray-200 bg-surface px-3 py-2 text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
         />
       </div>
+
+      {/* Fix OOOO2 PART 2: Add From Template modal. */}
+      <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Add From Template">
+        {availableTemplates.length === 0 ? (
+          <div className="text-[13px] text-gray-600">
+            No templates found.{" "}
+            <Link href="/settings" className="font-medium text-petrol-500 hover:text-petrol-700">
+              Go to Settings to create one.
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {availableTemplates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => pickTemplate(t.id)}
+                className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-[13px] text-ink hover:bg-[#e0f2f7]"
+              >
+                <span className="font-medium">{displayHeader(t.name)}</span>
+                {(t.state || t.saleType) && (
+                  <span className="shrink-0 text-[11px] text-gray-400">
+                    {[t.state, t.saleType].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
