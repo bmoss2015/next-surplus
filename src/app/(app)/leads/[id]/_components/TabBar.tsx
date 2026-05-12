@@ -10,13 +10,20 @@ const TABS = [
   { key: "research", label: "Research" },
   { key: "documents", label: "Documents" },
   { key: "notes", label: "Notes" },
+  { key: "tasks", label: "Tasks" },
   { key: "discussion", label: "Discussion" },
   { key: "activity", label: "Activity" },
 ] as const;
 
 export type TabKey = (typeof TABS)[number]["key"];
 
-export function TabBar({ active }: { active: TabKey }) {
+export function TabBar({
+  active,
+  openTaskCount = 0,
+}: {
+  active: TabKey;
+  openTaskCount?: number;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -38,19 +45,30 @@ export function TabBar({ active }: { active: TabKey }) {
     <div className="mb-4 inline-flex gap-[3px] rounded-lg bg-gray-150 p-1">
       {TABS.map((tab) => {
         const isActive = tab.key === active;
+        const showBadge = tab.key === "tasks" && openTaskCount > 0;
         return (
           <button
             key={tab.key}
             type="button"
             onClick={() => go(tab.key)}
             className={cn(
-              "cursor-pointer rounded-md px-[14px] py-[7px] text-xs transition-colors",
+              "inline-flex cursor-pointer items-center gap-1.5 rounded-md px-[14px] py-[7px] text-xs transition-colors",
               isActive
                 ? "bg-petrol-500 font-medium text-white"
                 : "text-gray-500 hover:text-ink"
             )}
           >
             {tab.label}
+            {showBadge && (
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-[1px] text-[10px] font-semibold leading-none",
+                  isActive ? "bg-white/25 text-white" : "bg-petrol-100 text-petrol-700"
+                )}
+              >
+                {openTaskCount}
+              </span>
+            )}
           </button>
         );
       })}

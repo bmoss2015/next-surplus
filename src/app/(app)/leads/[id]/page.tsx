@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { fetchLeadDetail } from "@/lib/leads/fetch-detail";
 import { fetchLostReasons } from "@/lib/leads/lost-reasons";
+import { createClient } from "@/lib/supabase/server";
 import { listTeamMembers } from "./_discussion-actions";
 import { AssignToField } from "./_components/AssignToField";
 import { LeadDetailHeader } from "./_components/LeadDetailHeader";
@@ -8,7 +9,6 @@ import { StageProgressStrip } from "./_components/StageProgressStrip";
 import { StageActions } from "./_components/StageActions";
 import { MetricStripDetail } from "./_components/MetricStripDetail";
 import { QuickFactsCard } from "./_components/QuickFactsCard";
-import { LeadTasksCard } from "./_components/LeadTasksCard";
 import { RecentActivityCard } from "./_components/RecentActivityCard";
 import { LostBanner } from "./_components/LostBanner";
 import { NeedsReviewBanner } from "./_components/NeedsReviewBanner";
@@ -18,6 +18,7 @@ import { ContactsTab } from "./_components/ContactsTab";
 import { ResearchTab } from "./_components/ResearchTab";
 import { DocumentsTab } from "./_components/DocumentsTab";
 import { NotesTab } from "./_components/NotesTab";
+import { LeadTasksTab } from "./_components/LeadTasksTab";
 import { DiscussionTab } from "./_components/DiscussionTab";
 import { ActivityTab } from "./_components/ActivityTab";
 import { RecoveryFeeField } from "./_components/RecoveryFeeField";
@@ -31,6 +32,7 @@ const VALID_TABS: TabKey[] = [
   "research",
   "documents",
   "notes",
+  "tasks",
   "discussion",
   "activity",
 ];
@@ -50,12 +52,19 @@ export default async function LeadDetailPage({
       ? (rawTab as TabKey)
       : "overview";
 
-  const [lead, lostReasons, teamMembers] = await Promise.all([
+  const sb = await createClient();
+  const [lead, lostReasons, teamMembers, openTaskRes] = await Promise.all([
     fetchLeadDetail(id),
     fetchLostReasons(),
     listTeamMembers(),
+    sb
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("lead_id", id)
+      .eq("completed", false),
   ]);
   if (!lead) notFound();
+  const openTaskCount = openTaskRes.count ?? 0;
 
   return (
     <ConfirmedSurplusProvider initial={lead.confirmed_surplus}>
@@ -74,7 +83,7 @@ export default async function LeadDetailPage({
       </div>
 
       <div className="mt-4">
-        <TabBar active={activeTab} />
+        <TabBar active={activeTab} openTaskCount={openTaskCount} />
         <div className="grid grid-cols-[1fr_280px] gap-[18px]">
           <div className="min-w-0">
             {activeTab === "overview" && <OverviewTab lead={lead} />}
@@ -82,12 +91,13 @@ export default async function LeadDetailPage({
             {activeTab === "research" && <ResearchTab lead={lead} />}
             {activeTab === "documents" && <DocumentsTab leadId={lead.id} />}
             {activeTab === "notes" && <NotesTab leadId={lead.id} />}
+            {activeTab === "tasks" && <LeadTasksTab leadId={lead.id} />}
             {activeTab === "discussion" && <DiscussionTab leadId={lead.id} />}
             {activeTab === "activity" && <ActivityTab leadId={lead.id} />}
           </div>
 
-          {/* Fix KKKK + QQ Patch: right rail order — Recovery Fee, Stage
-              Actions, Quick Facts, Tasks, Assigned To (Recent Activity last). */}
+          {/* Fix QQQQ: Tasks moved to a body tab — the right rail is Recovery
+              Fee, Stage Actions, Quick Facts, Assigned To, Recent Activity. */}
           <div className="flex flex-col gap-[14px]">
             <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
               <RecoveryFeeField
@@ -102,7 +112,6 @@ export default async function LeadDetailPage({
               lostReasons={lostReasons}
             />
             <QuickFactsCard lead={lead} />
-            <LeadTasksCard leadId={lead.id} />
             <AssignToField
               leadId={lead.id}
               currentId={lead.assigned_to}
