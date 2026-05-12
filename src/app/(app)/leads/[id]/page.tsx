@@ -83,7 +83,7 @@ export default async function LeadDetailPage({
             }}
           />
         </div>
-        <StageProgressStrip currentStage={lead.stage} />
+        <StageProgressStrip leadId={lead.id} currentStage={lead.stage} />
         <MetricStripDetail lead={lead} />
       </div>
 

@@ -146,6 +146,17 @@ export function StageActions({
             </button>
           )}
         </div>
+        {/* A lost/won lead can be put back into the pipeline — kept low-key. */}
+        {isTerminal && (
+          <button
+            type="button"
+            onClick={() => openStage("new_leads")}
+            disabled={pending}
+            className="mt-2 cursor-pointer text-[11px] text-gray-500 underline hover:text-petrol-500 disabled:opacity-50"
+          >
+            Reopen lead
+          </button>
+        )}
       </div>
 
       {dialog?.kind === "stage" && (
@@ -179,7 +190,8 @@ export function StageActions({
   );
 }
 
-function StageTransitionDialog({
+// Exported so the (display-only) progress strip can reuse it for backward jumps.
+export function StageTransitionDialog({
   fromStage,
   toStage,
   isTransitioning,
