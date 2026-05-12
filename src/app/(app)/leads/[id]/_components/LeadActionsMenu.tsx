@@ -4,27 +4,21 @@ import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   IconDots,
-  IconArchive,
   IconArchiveOff,
   IconTrash,
+  IconTrashFilled,
 } from "@tabler/icons-react";
 import { setLeadArchived, hardDeleteLead } from "../_actions";
 import { Modal } from "@/components/Modal";
 import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
 
-// Fix U: shared ⋯ menu for a lead — Archive (soft delete, reversible, with an
+// Fix DDD / Fix YYY: shared ⋯ menu for a lead — Archive (soft delete, reversible,
 // inline confirm) and Delete Permanently (hard delete, behind a modal). Used on
 // the lead detail header, leads-table rows, Kanban cards, and Daily Work.
-//
-//  - `triggerClassName` lets a host hide the trigger until the row/card is
-//    hovered (e.g. "opacity-0 group-hover:opacity-100"); when the menu or the
-//    delete modal is open the trigger stays visible regardless.
-//  - After a successful action: `onDone()` if given, else `router.push(
-//    redirectTo)` if given (used by the detail page to return to /leads),
-//    else `router.refresh()`.
-//  - Fix FF: the dropdown opens to the LEFT when the trigger sits in the right
-//    30% of the viewport (otherwise to the right), so it never clips off-screen.
+// The ⋯ trigger is a bare 14px #94a3b8 glyph (hosts pass triggerClassName to
+// reveal it on row hover); the menu is a compact 160px popover that always opens
+// to the LEFT of the trigger at z-index 9999.
 export function LeadActionsMenu({
   leadId,
   archived,
@@ -41,7 +35,6 @@ export function LeadActionsMenu({
   const router = useRouter();
   const { isAdmin } = useRole();
   const [open, setOpen] = useState(false);
-  const [openLeft, setOpenLeft] = useState(true);
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,10 +70,6 @@ export function LeadActionsMenu({
       setOpen(false);
       return;
     }
-    // Smart direction: if the trigger is in the right 30% of the viewport, open
-    // the dropdown leftward; otherwise rightward.
-    const rect = ref.current?.getBoundingClientRect();
-    if (rect) setOpenLeft(rect.right > window.innerWidth * 0.7);
     setArchiveConfirm(false);
     setOpen(true);
   }
@@ -88,7 +77,6 @@ export function LeadActionsMenu({
   function onArchiveClick(e: React.MouseEvent) {
     stop(e);
     if (archived) {
-      // Restoring is harmless — do it immediately, no confirm.
       setOpen(false);
       startTransition(async () => {
         const res = await setLeadArchived(leadId, false);
@@ -147,20 +135,15 @@ export function LeadActionsMenu({
           onClick={toggleMenu}
           disabled={pending}
           aria-label="Lead actions"
-          className="cursor-pointer rounded-md border border-gray-200 bg-surface p-[6px] text-gray-500 hover:bg-gray-50 hover:text-ink disabled:opacity-50"
+          className="cursor-pointer p-1 text-[#94a3b8] transition-colors hover:text-ink disabled:opacity-50"
         >
-          <IconDots size={16} stroke={1.75} />
+          <IconDots size={14} stroke={1.75} />
         </button>
         {open && (
-          <div
-            className={cn(
-              "absolute z-30 mt-1 w-[220px] overflow-hidden rounded-md border border-gray-200 bg-surface shadow-elevated",
-              openLeft ? "right-0" : "left-0"
-            )}
-          >
+          <div className="absolute right-0 z-[9999] mt-1 w-[160px] overflow-hidden rounded-lg border border-[#e2e8f0] bg-surface shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
             {archiveConfirm ? (
               <div className="p-3">
-                <div className="mb-2 text-[12.5px] font-medium text-ink">
+                <div className="mb-2 text-[13px] font-medium text-ink">
                   Archive this lead?
                 </div>
                 <div className="flex gap-2">
@@ -181,7 +164,7 @@ export function LeadActionsMenu({
                     disabled={pending}
                     className="btn-primary flex-1 rounded-md px-2 py-[6px] text-[12px] font-medium"
                   >
-                    {pending ? "Archiving" : "Confirm Archive"}
+                    {pending ? "…" : "Yes"}
                   </button>
                 </div>
               </div>
@@ -190,40 +173,24 @@ export function LeadActionsMenu({
                 <button
                   type="button"
                   onClick={onArchiveClick}
-                  className="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-left hover:bg-gray-50"
+                  className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[13px] text-ink hover:bg-gray-50"
                 >
                   {archived ? (
-                    <IconArchiveOff size={15} stroke={1.75} className="mt-[2px] shrink-0 text-gray-500" />
+                    <IconArchiveOff size={14} stroke={1.75} className="shrink-0 text-gray-500" />
                   ) : (
-                    <IconArchive size={15} stroke={1.75} className="mt-[2px] shrink-0 text-gray-500" />
+                    <IconTrash size={14} stroke={1.75} className="shrink-0 text-gray-500" />
                   )}
-                  <span className="min-w-0">
-                    <span className="block text-[12.5px] text-ink">
-                      {archived ? "Restore" : "Archive"}
-                    </span>
-                    <span className="block text-[11px] leading-snug text-gray-400">
-                      {archived
-                        ? "Move back to active views"
-                        : "Hide from active views, recoverable"}
-                    </span>
-                  </span>
+                  {archived ? "Restore" : "Archive"}
                 </button>
                 {/* Fix U: hard delete is admin-only — hide it entirely otherwise. */}
                 {isAdmin && (
                   <button
                     type="button"
                     onClick={openDeleteConfirm}
-                    className="flex w-full cursor-pointer items-start gap-2 border-t border-gray-150 px-3 py-2 text-left hover:bg-danger-bg"
+                    className="flex w-full cursor-pointer items-center gap-2 border-t border-gray-150 px-3 py-2 text-left text-[13px] text-danger hover:bg-danger-bg"
                   >
-                    <IconTrash size={15} stroke={1.75} className="mt-[2px] shrink-0 text-danger" />
-                    <span className="min-w-0">
-                      <span className="block text-[12.5px] font-medium text-danger">
-                        Delete Permanently
-                      </span>
-                      <span className="block text-[11px] leading-snug text-gray-400">
-                        Cannot be undone
-                      </span>
-                    </span>
+                    <IconTrashFilled size={14} className="shrink-0 text-danger" />
+                    Delete Permanently
                   </button>
                 )}
               </>
