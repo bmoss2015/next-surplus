@@ -363,6 +363,10 @@ export async function importLeads(
         is_primary: idx === 0 && phones.length === 0,
       });
     });
+    // Fix AAAAA PART 6: each mailing address (including the one composed from the
+    // Mailing Street / City / State / ZIP columns) is written as a contacts row
+    // with channel='mailing_address' and owner_id set, so it shows up under the
+    // owner on the Contacts tab and in the Mailing Addresses section.
     mailingAddresses.forEach((value) => {
       contactRows.push({
         owner_id: ownerRow.id,

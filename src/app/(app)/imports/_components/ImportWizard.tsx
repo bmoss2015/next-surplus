@@ -327,10 +327,20 @@ function FieldPicker({
   // Filter the portal-field list by the typed query. Match is case insensitive
   // and looks for the text anywhere in the field label, not just at the start —
   // so "relat" surfaces every Relative field and "phone" every phone field.
+  // Fix AAAAA PART 5: fields already mapped to another CSV column ("In Use")
+  // sink to the bottom so what still needs mapping is on top. (Array#sort is
+  // stable, so the original field order is preserved within each group.)
   const q = query.trim().toLowerCase();
-  const filtered = q
+  const filtered = (q
     ? PORTAL_FIELDS.filter((f) => f.label.toLowerCase().includes(q))
-    : PORTAL_FIELDS;
+    : PORTAL_FIELDS
+  )
+    .slice()
+    .sort((a, b) => {
+      const aTaken = disabledKeys.has(a.key) && a.key !== value ? 1 : 0;
+      const bTaken = disabledKeys.has(b.key) && b.key !== value ? 1 : 0;
+      return aTaken - bTaken;
+    });
 
   function pick(v: string) {
     onChange(v);
