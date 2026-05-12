@@ -81,6 +81,8 @@ export type LeadRow = {
   stage_changed_at: string;
   closing_bid: number | null;
   estimated_surplus: number | null;
+  confirmed_surplus: number | null;
+  source_surplus: number | null;
   estimated_net_payout: number | null;
   recovery_fee_percent: number;
   attorney_cost: number;

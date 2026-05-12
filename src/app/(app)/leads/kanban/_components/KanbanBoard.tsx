@@ -10,6 +10,7 @@ import {
 } from "@/lib/leads/types";
 import { advanceStage } from "@/app/(app)/leads/[id]/_actions";
 import { formatCurrency, primaryOwner } from "@/lib/leads/format";
+import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
 import { LitigatorBadge } from "@/components/LitigatorBadge";
 import { LeadActionsMenu } from "@/app/(app)/leads/[id]/_components/LeadActionsMenu";
@@ -264,13 +265,13 @@ function KanbanCard({
           <div className="mt-[7px] whitespace-nowrap text-[11px]">
             <span className="text-gray-400">Total Surplus: </span>
             <span className="font-medium text-ink">
-              {formatCurrency(lead.estimated_surplus)}
+              {formatCurrency(activeSurplus(lead).value)}
             </span>
           </div>
           <div className="mt-[1px] whitespace-nowrap text-[10px]">
             <span className="text-gray-400">Est. Net Surplus: </span>
             <span className="text-gray-400">
-              {formatCurrency(lead.estimated_net_payout)}
+              {formatCurrency(activeNetPayout(lead))}
             </span>
           </div>
         </div>

@@ -13,6 +13,7 @@ import { formatCurrency } from "@/lib/leads/format";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { useConfirmedSurplus } from "../ConfirmedSurplusContext";
 import { SectionSubheader } from "../SectionSubheader";
+import { surplusBasisLabel, type SurplusBasis } from "@/lib/leads/active-surplus";
 
 function fmt(value: number | null | undefined): string {
   return formatCurrency(value);
@@ -30,6 +31,7 @@ export function SurplusBreakdown({
   courtCosts,
   liens: initialLiens,
   estimatedSurplus,
+  sourceSurplus,
   recoveryFeePercent,
   attorneyCost,
 }: {
@@ -40,6 +42,7 @@ export function SurplusBreakdown({
   courtCosts: number | null;
   liens: LienRow[];
   estimatedSurplus: number | null;
+  sourceSurplus: number | null;
   recoveryFeePercent: number;
   attorneyCost: number;
 }) {
@@ -58,16 +61,27 @@ export function SurplusBreakdown({
 
   // Optimistic estimated surplus = closing bid - outstanding debt - court costs
   // - sum(liens). DB regenerates the authoritative value on revalidate.
-  const liveSurplus = (() => {
+  const liveEstimated = (() => {
     const cb = fin.closing_bid;
-    if (cb == null) return estimatedSurplus;
+    if (cb == null) return null;
     const od = fin.outstanding_debt ?? 0;
     const cc = fin.court_costs ?? 0;
     return cb - od - cc - liensTotal;
   })();
+  const liveSurplus = liveEstimated ?? estimatedSurplus;
 
-  const surplusForFee = liveSurplus ?? 0;
-  const liveFeeAmount = surplusForFee * (recoveryFeePercent / 100);
+  // Fix SS / Fix LLL: the active surplus the money math runs on —
+  // confirmed (non-zero) > estimated (when a closing bid exists) > source > 0.
+  const { value: activeSurplusValue, basis } = ((): {
+    value: number;
+    basis: SurplusBasis;
+  } => {
+    if (confirmed != null && confirmed !== 0) return { value: confirmed, basis: "confirmed" };
+    if (fin.closing_bid != null) return { value: liveEstimated ?? 0, basis: "estimated" };
+    if (sourceSurplus != null) return { value: sourceSurplus, basis: "source" };
+    return { value: 0, basis: "none" };
+  })();
+  const liveFeeAmount = activeSurplusValue * (recoveryFeePercent / 100);
   const liveNetPayout = liveFeeAmount - attorneyCost;
 
   function commitFin(key: FinKey, n: number | null) {
@@ -211,6 +225,17 @@ export function SurplusBreakdown({
         <div>
           <SectionSubheader>Surplus And Fees</SectionSubheader>
           <Row label="Estimated Surplus" value={fmt(liveSurplus)} />
+          {sourceSurplus != null && (
+            <div className="grid grid-cols-[150px_1fr] leading-[1.85]">
+              <span className={FIELD_LABEL}>Source Surplus</span>
+              <span>
+                <span className={FIELD_VALUE}>{fmt(sourceSurplus)}</span>
+                <span className="ml-1 block text-[10.5px] text-gray-400">
+                  As reported by lead source
+                </span>
+              </span>
+            </div>
+          )}
           <ConfirmedSurplusRow value={confirmed} onCommit={commitConfirmed} />
           <Row label="Total Liens" value={fmt(liensTotal)} />
           <Row
@@ -226,8 +251,13 @@ export function SurplusBreakdown({
         <span className="text-[13px] font-medium text-petrol-700">
           Est. Net Surplus
         </span>
-        <span className="text-[18px] font-medium tracking-tight text-petrol-500">
-          {fmt(liveNetPayout)}
+        <span>
+          <span className="block text-[18px] font-medium tracking-tight text-petrol-500">
+            {fmt(liveNetPayout)}
+          </span>
+          <span className="block text-[10.5px] text-petrol-700">
+            {surplusBasisLabel(basis)}
+          </span>
         </span>
       </div>
     </div>

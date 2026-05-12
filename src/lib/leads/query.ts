@@ -121,7 +121,7 @@ export async function fetchLeads(query: LeadsQuery): Promise<{
     .select(
       `id, lead_id, address, city, state, zip, county,
        sale_type, sale_date, stage, stage_changed_at,
-       closing_bid, estimated_surplus, estimated_net_payout,
+       closing_bid, estimated_surplus, confirmed_surplus, source_surplus, estimated_net_payout,
        recovery_fee_percent, attorney_cost,
        redemption_ends, filing_deadline,
        needs_action_flag, below_floor, archived, imported_at,

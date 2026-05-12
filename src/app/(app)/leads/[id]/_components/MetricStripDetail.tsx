@@ -5,6 +5,7 @@ import { formatCurrency, daysSince, ownerStatusOf, toTitleCase } from "@/lib/lea
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
 import { cn } from "@/lib/cn";
 import { useConfirmedSurplus } from "./ConfirmedSurplusContext";
+import { activeSurplus, surplusBasisLabel } from "@/lib/leads/active-surplus";
 
 function ownerSummary(lead: LeadDetailWithCounts): string {
   const owners = lead.owners ?? [];
@@ -98,6 +99,13 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
   const days = daysSince(lead.sale_date);
   const ownerStatusKey = ownerStatusOf(lead);
   const { confirmedSurplus } = useConfirmedSurplus();
+  const { value: active, basis } = activeSurplus({
+    confirmed_surplus: confirmedSurplus,
+    estimated_surplus: lead.estimated_surplus,
+    closing_bid: lead.closing_bid,
+    source_surplus: lead.source_surplus,
+  });
+  const netPayout = active * (1 - lead.recovery_fee_percent / 100) - lead.attorney_cost;
 
   return (
     <div className="grid grid-cols-6 overflow-hidden rounded-lg border border-gray-200 bg-surface">
@@ -125,9 +133,9 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
         <Cell
           label="Est. Net Surplus"
           variant="payout"
-          sub="Recovery Fee Minus Attorney Cost"
+          sub={surplusBasisLabel(basis)}
         >
-          {formatCurrency(lead.estimated_net_payout)}
+          {formatCurrency(netPayout)}
         </Cell>
       </div>
 

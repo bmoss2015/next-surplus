@@ -14,6 +14,7 @@ export function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
         courtCosts={lead.court_costs}
         liens={lead.liens}
         estimatedSurplus={lead.estimated_surplus}
+        sourceSurplus={lead.source_surplus}
         recoveryFeePercent={lead.recovery_fee_percent}
         attorneyCost={lead.attorney_cost}
       />

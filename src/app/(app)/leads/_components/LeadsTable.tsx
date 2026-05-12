@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { LeadRow } from "@/lib/leads/types";
 import { StagePill } from "@/components/StagePill";
 import { formatCurrency, primaryOwner, ownerStatusOf } from "@/lib/leads/format";
+import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
 import { OWNER_STATUS_LABELS, SALE_TYPE_LABELS } from "@/lib/leads/types";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
 import { LitigatorBadge } from "@/components/LitigatorBadge";
@@ -103,7 +104,7 @@ export function LeadsTable({
                 </td>
                 <td className="px-4 py-[10px] text-right">
                   <div className="font-medium text-ink">
-                    {formatCurrency(lead.estimated_surplus)}
+                    {formatCurrency(activeSurplus(lead).value)}
                   </div>
                   {lead.below_floor && !hideBelowFloor ? (
                     <div className="flex items-center justify-end text-[11px]">
@@ -111,7 +112,7 @@ export function LeadsTable({
                     </div>
                   ) : (
                     <div className="text-[11px] text-gray-500">
-                      Est. Net Surplus {formatCurrency(lead.estimated_net_payout)}
+                      Est. Net Surplus {formatCurrency(activeNetPayout(lead))}
                     </div>
                   )}
                 </td>

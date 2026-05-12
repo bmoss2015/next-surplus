@@ -59,6 +59,7 @@ export type LeadDetail = LeadRow & {
   recovery_type: string | null;
   redemption_period_months: number | null;
   parcel_number: string | null;
+  source_surplus: number | null;
   lost_reason: string | null;
   lead_source: string | null;
   attorney_id: string | null;
@@ -90,7 +91,7 @@ export async function fetchLeadDetail(
       `id, lead_id, address, city, state, zip, county,
        sale_type, sale_date, stage, stage_changed_at,
        closing_bid, opening_bid, outstanding_debt, court_costs, total_liens,
-       estimated_surplus, confirmed_surplus, estimated_net_payout,
+       estimated_surplus, confirmed_surplus, source_surplus, estimated_net_payout,
        recovery_fee_percent, attorney_cost, case_number, parcel_number,
        redemption_ends, redemption_period_months, filing_deadline,
        recovery_type, needs_action_flag, needs_action_note,
