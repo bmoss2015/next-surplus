@@ -136,10 +136,7 @@ export default async function ReportsPage() {
                   </div>
                 </div>
                 <span className="w-[80px] shrink-0 text-right text-[12px] font-medium text-ink">
-                  {row.avgDays} days
-                </span>
-                <span className="w-[80px] shrink-0 text-right text-[10.5px] text-gray-500">
-                  n={row.sampleSize}
+                  {row.avgDays} {row.avgDays === 1 ? "Day" : "Days"}
                 </span>
               </div>
             ))}
