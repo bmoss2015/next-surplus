@@ -13,9 +13,9 @@ import { Modal } from "@/components/Modal";
 import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
 
-// Fix U: shared ⋯ menu for a lead — Archive (soft delete, reversible) and
-// Delete (permanent hard delete, behind a confirmation modal). Used on the
-// lead detail header, leads-table rows, Kanban cards, and the Daily Work board.
+// Fix U: shared ⋯ menu for a lead — Archive (soft delete, reversible, with an
+// inline confirm) and Delete Permanently (hard delete, behind a modal). Used on
+// the lead detail header, leads-table rows, Kanban cards, and Daily Work.
 //
 //  - `triggerClassName` lets a host hide the trigger until the row/card is
 //    hovered (e.g. "opacity-0 group-hover:opacity-100"); when the menu or the
@@ -23,6 +23,8 @@ import { cn } from "@/lib/cn";
 //  - After a successful action: `onDone()` if given, else `router.push(
 //    redirectTo)` if given (used by the detail page to return to /leads),
 //    else `router.refresh()`.
+//  - Fix FF: the dropdown opens to the LEFT when the trigger sits in the right
+//    30% of the viewport (otherwise to the right), so it never clips off-screen.
 export function LeadActionsMenu({
   leadId,
   archived,
@@ -39,13 +41,18 @@ export function LeadActionsMenu({
   const router = useRouter();
   const { isAdmin } = useRole();
   const [open, setOpen] = useState(false);
+  const [openLeft, setOpenLeft] = useState(true);
+  const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setArchiveConfirm(false);
+      return;
+    }
     function onClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
@@ -64,15 +71,42 @@ export function LeadActionsMenu({
     e.stopPropagation();
   }
 
-  function toggleArchived(e: React.MouseEvent) {
+  function toggleMenu(e: React.MouseEvent) {
     stop(e);
-    setOpen(false);
-    if (!archived && !window.confirm("Archive this lead? It will be hidden from all views but can be restored later.")) {
+    if (open) {
+      setOpen(false);
       return;
     }
+    // Smart direction: if the trigger is in the right 30% of the viewport, open
+    // the dropdown leftward; otherwise rightward.
+    const rect = ref.current?.getBoundingClientRect();
+    if (rect) setOpenLeft(rect.right > window.innerWidth * 0.7);
+    setArchiveConfirm(false);
+    setOpen(true);
+  }
+
+  function onArchiveClick(e: React.MouseEvent) {
+    stop(e);
+    if (archived) {
+      // Restoring is harmless — do it immediately, no confirm.
+      setOpen(false);
+      startTransition(async () => {
+        const res = await setLeadArchived(leadId, false);
+        if (res.ok) afterAction();
+      });
+      return;
+    }
+    setArchiveConfirm(true);
+  }
+
+  function confirmArchive(e: React.MouseEvent) {
+    stop(e);
     startTransition(async () => {
-      const res = await setLeadArchived(leadId, !archived);
-      if (res.ok) afterAction();
+      const res = await setLeadArchived(leadId, true);
+      if (res.ok) {
+        setOpen(false);
+        afterAction();
+      }
     });
   }
 
@@ -110,10 +144,7 @@ export function LeadActionsMenu({
         <button
           type="button"
           draggable={false}
-          onClick={(e) => {
-            stop(e);
-            setOpen((v) => !v);
-          }}
+          onClick={toggleMenu}
           disabled={pending}
           aria-label="Lead actions"
           className="cursor-pointer rounded-md border border-gray-200 bg-surface p-[6px] text-gray-500 hover:bg-gray-50 hover:text-ink disabled:opacity-50"
@@ -121,31 +152,81 @@ export function LeadActionsMenu({
           <IconDots size={16} stroke={1.75} />
         </button>
         {open && (
-          <div className="absolute right-0 z-30 mt-1 w-[180px] overflow-hidden rounded-md border border-gray-200 bg-surface shadow-elevated">
-            <button
-              type="button"
-              onClick={toggleArchived}
-              className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[12.5px] text-ink hover:bg-gray-50"
-            >
-              {archived ? (
-                <>
-                  <IconArchiveOff size={15} stroke={1.75} /> Restore Lead
-                </>
-              ) : (
-                <>
-                  <IconArchive size={15} stroke={1.75} /> Archive Lead
-                </>
-              )}
-            </button>
-            {/* Fix U: hard delete is admin-only — hide it entirely otherwise. */}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={openDeleteConfirm}
-                className="flex w-full cursor-pointer items-center gap-2 border-t border-gray-150 px-3 py-2 text-left text-[12.5px] text-danger hover:bg-danger-bg"
-              >
-                <IconTrash size={15} stroke={1.75} /> Delete Lead
-              </button>
+          <div
+            className={cn(
+              "absolute z-30 mt-1 w-[220px] overflow-hidden rounded-md border border-gray-200 bg-surface shadow-elevated",
+              openLeft ? "right-0" : "left-0"
+            )}
+          >
+            {archiveConfirm ? (
+              <div className="p-3">
+                <div className="mb-2 text-[12.5px] font-medium text-ink">
+                  Archive this lead?
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      stop(e);
+                      setArchiveConfirm(false);
+                    }}
+                    disabled={pending}
+                    className="flex-1 cursor-pointer rounded-md border border-gray-200 bg-white px-2 py-[6px] text-[12px] text-ink hover:border-petrol-500 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmArchive}
+                    disabled={pending}
+                    className="btn-primary flex-1 rounded-md px-2 py-[6px] text-[12px] font-medium"
+                  >
+                    {pending ? "Archiving" : "Confirm Archive"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onArchiveClick}
+                  className="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-left hover:bg-gray-50"
+                >
+                  {archived ? (
+                    <IconArchiveOff size={15} stroke={1.75} className="mt-[2px] shrink-0 text-gray-500" />
+                  ) : (
+                    <IconArchive size={15} stroke={1.75} className="mt-[2px] shrink-0 text-gray-500" />
+                  )}
+                  <span className="min-w-0">
+                    <span className="block text-[12.5px] text-ink">
+                      {archived ? "Restore" : "Archive"}
+                    </span>
+                    <span className="block text-[11px] leading-snug text-gray-400">
+                      {archived
+                        ? "Move back to active views"
+                        : "Hide from active views, recoverable"}
+                    </span>
+                  </span>
+                </button>
+                {/* Fix U: hard delete is admin-only — hide it entirely otherwise. */}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={openDeleteConfirm}
+                    className="flex w-full cursor-pointer items-start gap-2 border-t border-gray-150 px-3 py-2 text-left hover:bg-danger-bg"
+                  >
+                    <IconTrash size={15} stroke={1.75} className="mt-[2px] shrink-0 text-danger" />
+                    <span className="min-w-0">
+                      <span className="block text-[12.5px] font-medium text-danger">
+                        Delete Permanently
+                      </span>
+                      <span className="block text-[11px] leading-snug text-gray-400">
+                        Cannot be undone
+                      </span>
+                    </span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
