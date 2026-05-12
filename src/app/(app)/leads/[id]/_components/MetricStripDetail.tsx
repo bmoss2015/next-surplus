@@ -1,7 +1,10 @@
+"use client";
+
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { formatCurrency, daysSince, ownerStatusOf, toTitleCase } from "@/lib/leads/format";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
 import { cn } from "@/lib/cn";
+import { useConfirmedSurplus } from "./ConfirmedSurplusContext";
 
 function ownerSummary(lead: LeadDetailWithCounts): string {
   const owners = lead.owners ?? [];
@@ -94,6 +97,7 @@ function Cell({
 export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
   const days = daysSince(lead.sale_date);
   const ownerStatusKey = ownerStatusOf(lead);
+  const { confirmedSurplus } = useConfirmedSurplus();
 
   return (
     <div className="grid grid-cols-6 overflow-hidden rounded-lg border border-gray-200 bg-surface">
@@ -107,10 +111,10 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
         <Cell
           label="Confirmed Surplus"
           variant="highlight"
-          sub={lead.confirmed_surplus != null ? "Verified By County" : "Not Yet Confirmed"}
+          sub={confirmedSurplus != null ? "Verified By County" : "Not Yet Confirmed"}
         >
-          {lead.confirmed_surplus != null ? (
-            formatCurrency(lead.confirmed_surplus)
+          {confirmedSurplus != null ? (
+            formatCurrency(confirmedSurplus)
           ) : (
             <span className="text-[13px] text-gray-400 font-normal">—</span>
           )}

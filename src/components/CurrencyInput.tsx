@@ -33,6 +33,7 @@ export function CurrencyInput({
   placeholder,
   disabled,
   align = "left",
+  autoFocus,
 }: {
   value: number | null | undefined;
   onCommit: (n: number | null) => void;
@@ -42,6 +43,7 @@ export function CurrencyInput({
   placeholder?: string;
   disabled?: boolean;
   align?: "left" | "right";
+  autoFocus?: boolean;
 }) {
   const [text, setText] = useState(value != null ? formatTyped(String(value)) : "");
   useEffect(() => {
@@ -63,6 +65,8 @@ export function CurrencyInput({
         value={text}
         disabled={disabled}
         placeholder={placeholder}
+        autoFocus={autoFocus}
+        onFocus={autoFocus ? (e) => e.currentTarget.select() : undefined}
         onChange={(e) => setText(formatTyped(e.target.value))}
         onBlur={() => onCommit(parseValue(text))}
         onKeyDown={(e) => {

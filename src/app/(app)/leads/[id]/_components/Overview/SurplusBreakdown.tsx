@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { IconPlus, IconMinus } from "@tabler/icons-react";
+import { IconPlus, IconMinus, IconPencil } from "@tabler/icons-react";
 import {
   updateLeadField,
   addLien,
@@ -11,6 +11,7 @@ import {
 import type { LienRow } from "@/lib/leads/fetch-detail";
 import { formatCurrency } from "@/lib/leads/format";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { useConfirmedSurplus } from "../ConfirmedSurplusContext";
 
 function fmt(value: number | null | undefined): string {
   return formatCurrency(value);
@@ -28,7 +29,6 @@ export function SurplusBreakdown({
   courtCosts,
   liens: initialLiens,
   estimatedSurplus,
-  confirmedSurplus,
   recoveryFeePercent,
   attorneyCost,
 }: {
@@ -39,7 +39,6 @@ export function SurplusBreakdown({
   courtCosts: number | null;
   liens: LienRow[];
   estimatedSurplus: number | null;
-  confirmedSurplus: number | null;
   recoveryFeePercent: number;
   attorneyCost: number;
 }) {
@@ -50,7 +49,8 @@ export function SurplusBreakdown({
     court_costs: courtCosts,
   });
   const [liens, setLiens] = useState<LocalLien[]>(initialLiens);
-  const [confirmed, setConfirmed] = useState<number | null>(confirmedSurplus);
+  const { confirmedSurplus: confirmed, setConfirmedSurplus: setConfirmed } =
+    useConfirmedSurplus();
   const [, startTransition] = useTransition();
 
   const liensTotal = liens.reduce((sum, l) => sum + (l.amount ?? 0), 0);
@@ -215,29 +215,12 @@ export function SurplusBreakdown({
             Surplus And Fees
           </div>
           <Row label="Estimated Surplus" value={fmt(liveSurplus)} strong />
-          <div className="grid grid-cols-[150px_1fr] items-center text-[12.5px] leading-[1.85]">
-            <span className="text-gray-500">Confirmed Surplus</span>
-            <div className="flex items-center gap-2">
-              <CurrencyInput
-                value={confirmed}
-                onCommit={commitConfirmed}
-                prefix="$"
-                align="left"
-                placeholder="Not Yet Confirmed"
-                className="w-[150px]"
-              />
-              {confirmed == null && (
-                <span className="text-[11px] text-gray-400">Not Yet Confirmed</span>
-              )}
-            </div>
-          </div>
+          <ConfirmedSurplusRow value={confirmed} onCommit={commitConfirmed} />
           <Row label="Total Liens" value={fmt(liensTotal)} />
-          <div className="grid grid-cols-[150px_1fr] items-center text-[12.5px] leading-[1.85]">
-            <span className="text-gray-500">Recovery Fee</span>
-            <span className="text-gray-500">
-              {recoveryFeePercent}% · {fmt(liveFeeAmount)}
-            </span>
-          </div>
+          <Row
+            label="Recovery Fee"
+            value={`${recoveryFeePercent}% · ${fmt(liveFeeAmount)}`}
+          />
           <Row label="Attorney Cost" value={fmt(attorneyCost)} />
         </div>
       </div>
@@ -292,6 +275,53 @@ function Row({
     <div className="grid grid-cols-[150px_1fr] text-[12.5px] leading-[1.85]">
       <span className="text-gray-500">{label}</span>
       <span className={strong ? "font-medium text-ink" : "text-ink"}>{value}</span>
+    </div>
+  );
+}
+
+// Fix Z: the only manually entered value in this column. Click it to edit;
+// blur or Enter saves; shows "Not Yet Confirmed" only while empty.
+function ConfirmedSurplusRow({
+  value,
+  onCommit,
+}: {
+  value: number | null;
+  onCommit: (n: number | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <div className="grid grid-cols-[150px_1fr] items-center text-[12.5px] leading-[1.85]">
+      <span className="text-gray-500">Confirmed Surplus</span>
+      {editing ? (
+        <CurrencyInput
+          value={value}
+          onCommit={(n) => {
+            onCommit(n);
+            setEditing(false);
+          }}
+          prefix="$"
+          align="left"
+          placeholder="Not Yet Confirmed"
+          autoFocus
+          className="w-[160px]"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          title="Edit confirmed surplus"
+          className="group -ml-1.5 inline-flex w-fit cursor-text items-center gap-1.5 rounded-md px-1.5 py-[2px] hover:bg-gray-100"
+        >
+          <span className={value != null ? "font-medium text-ink" : "italic text-gray-400"}>
+            {value != null ? fmt(value) : "Not Yet Confirmed"}
+          </span>
+          <IconPencil
+            size={12}
+            stroke={1.75}
+            className="text-gray-400 opacity-0 transition-opacity group-hover:opacity-100"
+          />
+        </button>
+      )}
     </div>
   );
 }

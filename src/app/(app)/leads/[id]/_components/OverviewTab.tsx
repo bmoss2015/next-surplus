@@ -18,7 +18,6 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
         courtCosts={lead.court_costs}
         liens={lead.liens}
         estimatedSurplus={lead.estimated_surplus}
-        confirmedSurplus={lead.confirmed_surplus}
         recoveryFeePercent={lead.recovery_fee_percent}
         attorneyCost={lead.attorney_cost}
       />

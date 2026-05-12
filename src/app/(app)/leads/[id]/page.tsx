@@ -21,6 +21,7 @@ import { DiscussionTab } from "./_components/DiscussionTab";
 import { ActivityTab } from "./_components/ActivityTab";
 import { LeadEditDrawer } from "./_components/LeadEditDrawer";
 import { RecoveryFeeField } from "./_components/RecoveryFeeField";
+import { ConfirmedSurplusProvider } from "./_components/ConfirmedSurplusContext";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function LeadDetailPage({
   if (!lead) notFound();
 
   return (
+    <ConfirmedSurplusProvider initial={lead.confirmed_surplus}>
     <div className="px-7 py-6">
       <LeadDetailHeader lead={lead} />
 
@@ -120,5 +122,6 @@ export default async function LeadDetailPage({
         </div>
       </div>
     </div>
+    </ConfirmedSurplusProvider>
   );
 }
