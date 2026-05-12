@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 
 const TABS = [
   { key: "overview", label: "Overview" },
+  { key: "property", label: "Property Info" },
   { key: "contacts", label: "Contacts" },
   { key: "research", label: "Research" },
   { key: "documents", label: "Documents" },

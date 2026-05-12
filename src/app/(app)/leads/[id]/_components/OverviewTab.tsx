@@ -9,7 +9,6 @@ export function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
       <SurplusBreakdown
         leadId={lead.id}
         closingBid={lead.closing_bid}
-        openingBid={lead.opening_bid}
         outstandingDebt={lead.outstanding_debt}
         courtCosts={lead.court_costs}
         liens={lead.liens}

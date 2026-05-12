@@ -62,6 +62,7 @@ export type LeadDetail = LeadRow & {
   source_surplus: number | null;
   lost_reason: string | null;
   lead_source: string | null;
+  data_source: string | null;
   attorney_id: string | null;
   assigned_to: string | null;
   needs_action_note: string | null;
@@ -95,7 +96,7 @@ export async function fetchLeadDetail(
        recovery_fee_percent, attorney_cost, case_number, parcel_number,
        redemption_ends, redemption_period_months, filing_deadline,
        recovery_type, needs_action_flag, needs_action_note,
-       below_floor, archived, lost_reason, lead_source, attorney_id, assigned_to, dnc,
+       below_floor, archived, lost_reason, lead_source, data_source, attorney_id, assigned_to, dnc,
        court_records, custom_data, imported_at,
        research_notes, research_overall_findings, viability,
        owners(full_name, is_primary, status),

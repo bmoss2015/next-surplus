@@ -13,6 +13,7 @@ import { RecentActivityCard } from "./_components/RecentActivityCard";
 import { LostBanner } from "./_components/LostBanner";
 import { TabBar, type TabKey } from "./_components/TabBar";
 import { OverviewTab } from "./_components/OverviewTab";
+import { PropertyInfoTab } from "./_components/PropertyInfoTab";
 import { ContactsTab } from "./_components/ContactsTab";
 import { ResearchTab } from "./_components/ResearchTab";
 import { DocumentsTab } from "./_components/DocumentsTab";
@@ -27,6 +28,7 @@ export const dynamic = "force-dynamic";
 
 const VALID_TABS: TabKey[] = [
   "overview",
+  "property",
   "contacts",
   "research",
   "documents",
@@ -82,6 +84,7 @@ export default async function LeadDetailPage({
         <div className="grid grid-cols-[1fr_280px] gap-[18px]">
           <div className="min-w-0">
             {activeTab === "overview" && <OverviewTab lead={lead} />}
+            {activeTab === "property" && <PropertyInfoTab lead={lead} />}
             {activeTab === "contacts" && <ContactsTab leadId={lead.id} />}
             {activeTab === "research" && <ResearchTab lead={lead} />}
             {activeTab === "documents" && <DocumentsTab leadId={lead.id} />}

@@ -317,6 +317,8 @@ export async function updateLeadField<K extends string>(
     sale_date: true,
     case_number: true,
     recovery_type: true,
+    parcel_number: true,
+    data_source: true,
   };
   if (!ALLOWED[field]) {
     return { ok: false, error: `Field "${field}" is not editable here` };

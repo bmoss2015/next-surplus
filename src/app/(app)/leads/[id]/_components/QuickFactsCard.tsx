@@ -83,6 +83,11 @@ export function QuickFactsCard({ lead }: { lead: LeadDetailWithCounts }) {
           value={lead.lead_source ?? "—"}
           muted={!lead.lead_source}
         />
+        <Row
+          label="Data Source"
+          value={lead.data_source ?? "Not Set"}
+          muted={!lead.data_source}
+        />
         <Row label="Imported" value={fmtDateTime(lead.imported_at)} />
         <Row
           label="Attorney"

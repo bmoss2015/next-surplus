@@ -2,12 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { IconPlus, IconMinus } from "@tabler/icons-react";
-import {
-  updateLeadField,
-  addLien,
-  updateLien,
-  removeLien,
-} from "../../_actions";
+import { updateLeadField, addLien, updateLien, removeLien } from "../../_actions";
 import type { LienRow } from "@/lib/leads/fetch-detail";
 import { formatCurrency } from "@/lib/leads/format";
 import { CurrencyInput } from "@/components/CurrencyInput";
@@ -18,8 +13,6 @@ function fmt(value: number | null | undefined): string {
   return formatCurrency(value);
 }
 
-type FinKey = "closing_bid" | "opening_bid" | "outstanding_debt" | "court_costs";
-
 type LocalLien = LienRow & { _tempId?: string };
 
 // Fix EEEE2: the surplus area is two cards — Card 1 ("Confirmed Surplus" when a
@@ -28,10 +21,12 @@ type LocalLien = LienRow & { _tempId?: string };
 // source surplus exists) and Card 2, the dark-petrol "Est. Net Surplus" hero
 // (surplus − recovery fee − attorney cost). Card 1 is clickable to enter/edit
 // the confirmed surplus inline. There is no standalone Source Surplus row.
+// Fix FFFF2: the sale-financial inputs (closing bid, opening bid, debt, court
+// costs) live on the Property Info tab now — this card just consumes their
+// values to compute the calculated surplus.
 export function SurplusBreakdown({
   leadId,
   closingBid,
-  openingBid,
   outstandingDebt,
   courtCosts,
   liens: initialLiens,
@@ -42,7 +37,6 @@ export function SurplusBreakdown({
 }: {
   leadId: string;
   closingBid: number | null;
-  openingBid: number | null;
   outstandingDebt: number | null;
   courtCosts: number | null;
   liens: LienRow[];
@@ -51,12 +45,6 @@ export function SurplusBreakdown({
   recoveryFeePercent: number;
   attorneyCost: number;
 }) {
-  const [fin, setFin] = useState<Record<FinKey, number | null>>({
-    closing_bid: closingBid,
-    opening_bid: openingBid,
-    outstanding_debt: outstandingDebt,
-    court_costs: courtCosts,
-  });
   const [liens, setLiens] = useState<LocalLien[]>(initialLiens);
   const { confirmedSurplus: confirmed, setConfirmedSurplus: setConfirmed } =
     useConfirmedSurplus();
@@ -67,22 +55,14 @@ export function SurplusBreakdown({
   // Calculated surplus = closing bid − outstanding debt − court costs − liens
   // (null when there's no closing bid yet).
   const calculatedSurplus =
-    fin.closing_bid != null
-      ? fin.closing_bid - (fin.outstanding_debt ?? 0) - (fin.court_costs ?? 0) - liensTotal
+    closingBid != null
+      ? closingBid - (outstandingDebt ?? 0) - (courtCosts ?? 0) - liensTotal
       : null;
 
   const hasConfirmed = confirmed != null && confirmed !== 0;
   const surplusForMath = hasConfirmed ? (confirmed as number) : calculatedSurplus ?? 0;
   const feeAmount = surplusForMath * (recoveryFeePercent / 100);
   const netSurplus = surplusForMath - attorneyCost - feeAmount;
-
-  function commitFin(key: FinKey, n: number | null) {
-    if (fin[key] === n) return;
-    setFin((prev) => ({ ...prev, [key]: n }));
-    startTransition(async () => {
-      await updateLeadField(leadId, key, n);
-    });
-  }
 
   function commitConfirmed(n: number | null) {
     if (confirmed === n) return;
@@ -143,29 +123,7 @@ export function SurplusBreakdown({
 
       <div className="grid grid-cols-2 gap-6">
         <div>
-          <SectionSubheader>Sale Financials</SectionSubheader>
-          <MoneyRow
-            label="Closing Bid"
-            value={fin.closing_bid}
-            onCommit={(n) => commitFin("closing_bid", n)}
-          />
-          <MoneyRow
-            label="Opening Bid"
-            value={fin.opening_bid}
-            onCommit={(n) => commitFin("opening_bid", n)}
-          />
-          <MoneyRow
-            label="Outstanding Debt"
-            value={fin.outstanding_debt}
-            onCommit={(n) => commitFin("outstanding_debt", n)}
-          />
-          <MoneyRow
-            label="Court Costs And Fees"
-            value={fin.court_costs}
-            onCommit={(n) => commitFin("court_costs", n)}
-          />
-
-          <SectionSubheader className="mt-5">Liens</SectionSubheader>
+          <SectionSubheader>Liens</SectionSubheader>
           {liens.length === 0 ? (
             <div className="text-[13px] text-gray-400">No Liens On File.</div>
           ) : (
@@ -249,30 +207,6 @@ export function SurplusBreakdown({
 // value 14px / 500 / #0f1729 — both clearly outranked by the SectionSubheader.
 const FIELD_LABEL = "text-[13px] font-normal text-[#64748b]";
 const FIELD_VALUE = "text-[14px] font-medium text-[#0f1729]";
-
-function MoneyRow({
-  label,
-  value,
-  onCommit,
-}: {
-  label: string;
-  value: number | null;
-  onCommit: (n: number | null) => void;
-}) {
-  return (
-    <div className="grid grid-cols-[150px_1fr] items-center leading-[1.85]">
-      <span className={FIELD_LABEL}>{label}</span>
-      <CurrencyInput
-        value={value}
-        onCommit={onCommit}
-        prefix="$"
-        align="left"
-        placeholder="0"
-        className="w-[150px]"
-      />
-    </div>
-  );
-}
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
