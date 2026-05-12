@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { IconPlus, IconMinus, IconPencil } from "@tabler/icons-react";
+import { IconPlus, IconMinus } from "@tabler/icons-react";
 import {
   updateLeadField,
   addLien,
@@ -13,7 +13,6 @@ import { formatCurrency } from "@/lib/leads/format";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { useConfirmedSurplus } from "../ConfirmedSurplusContext";
 import { SectionSubheader } from "../SectionSubheader";
-import { surplusBasisLabel, type SurplusBasis } from "@/lib/leads/active-surplus";
 
 function fmt(value: number | null | undefined): string {
   return formatCurrency(value);
@@ -23,6 +22,12 @@ type FinKey = "closing_bid" | "opening_bid" | "outstanding_debt" | "court_costs"
 
 type LocalLien = LienRow & { _tempId?: string };
 
+// Fix EEEE2: the surplus area is two cards — Card 1 ("Confirmed Surplus" when a
+// confirmed value is set, otherwise "Calculated Surplus" = bid − debt − costs −
+// liens, with a single muted "Source: $X · <lead source>" reference line when a
+// source surplus exists) and Card 2, the dark-petrol "Est. Net Surplus" hero
+// (surplus − recovery fee − attorney cost). Card 1 is clickable to enter/edit
+// the confirmed surplus inline. There is no standalone Source Surplus row.
 export function SurplusBreakdown({
   leadId,
   closingBid,
@@ -30,8 +35,8 @@ export function SurplusBreakdown({
   outstandingDebt,
   courtCosts,
   liens: initialLiens,
-  estimatedSurplus,
   sourceSurplus,
+  leadSource,
   recoveryFeePercent,
   attorneyCost,
 }: {
@@ -41,8 +46,8 @@ export function SurplusBreakdown({
   outstandingDebt: number | null;
   courtCosts: number | null;
   liens: LienRow[];
-  estimatedSurplus: number | null;
   sourceSurplus: number | null;
+  leadSource: string | null;
   recoveryFeePercent: number;
   attorneyCost: number;
 }) {
@@ -59,31 +64,17 @@ export function SurplusBreakdown({
 
   const liensTotal = liens.reduce((sum, l) => sum + (l.amount ?? 0), 0);
 
-  // Optimistic estimated surplus = closing bid - outstanding debt - court costs
-  // - sum(liens). DB regenerates the authoritative value on revalidate.
-  const liveEstimated = (() => {
-    const cb = fin.closing_bid;
-    if (cb == null) return null;
-    const od = fin.outstanding_debt ?? 0;
-    const cc = fin.court_costs ?? 0;
-    return cb - od - cc - liensTotal;
-  })();
-  const liveSurplus = liveEstimated ?? estimatedSurplus;
+  // Calculated surplus = closing bid − outstanding debt − court costs − liens
+  // (null when there's no closing bid yet).
+  const calculatedSurplus =
+    fin.closing_bid != null
+      ? fin.closing_bid - (fin.outstanding_debt ?? 0) - (fin.court_costs ?? 0) - liensTotal
+      : null;
 
-  // Fix SS / Fix LLL: the active surplus the money math runs on —
-  // confirmed (non-zero) > estimated (when a closing bid exists) > source > 0.
-  const { value: activeSurplusValue, basis } = ((): {
-    value: number;
-    basis: SurplusBasis;
-  } => {
-    if (confirmed != null && confirmed !== 0) return { value: confirmed, basis: "confirmed" };
-    if (fin.closing_bid != null) return { value: liveEstimated ?? 0, basis: "estimated" };
-    if (sourceSurplus != null) return { value: sourceSurplus, basis: "source" };
-    return { value: 0, basis: "none" };
-  })();
-  const liveFeeAmount = activeSurplusValue * (recoveryFeePercent / 100);
-  // Fix ZZZZ: Est. Net Surplus = active surplus − attorney cost − recovery fee $.
-  const liveNetPayout = activeSurplusValue - attorneyCost - liveFeeAmount;
+  const hasConfirmed = confirmed != null && confirmed !== 0;
+  const surplusForMath = hasConfirmed ? (confirmed as number) : calculatedSurplus ?? 0;
+  const feeAmount = surplusForMath * (recoveryFeePercent / 100);
+  const netSurplus = surplusForMath - attorneyCost - feeAmount;
 
   function commitFin(key: FinKey, n: number | null) {
     if (fin[key] === n) return;
@@ -148,9 +139,7 @@ export function SurplusBreakdown({
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <h3 className="section-subheader">
-        Surplus Breakdown
-      </h3>
+      <h3 className="section-subheader">Surplus Breakdown</h3>
 
       <div className="grid grid-cols-2 gap-6">
         <div>
@@ -177,9 +166,6 @@ export function SurplusBreakdown({
           />
 
           <SectionSubheader className="mt-5">Liens</SectionSubheader>
-          {/* Fix LL: the Add Lien button belongs to the lien content — it sits
-              directly below the list (or below "No Liens On File"), left
-              aligned, not floating in the section header. */}
           {liens.length === 0 ? (
             <div className="text-[13px] text-gray-400">No Liens On File.</div>
           ) : (
@@ -224,42 +210,36 @@ export function SurplusBreakdown({
         </div>
 
         <div>
-          <SectionSubheader>Surplus And Fees</SectionSubheader>
-          <Row label="Estimated Surplus" value={fmt(liveSurplus)} />
-          {sourceSurplus != null && (
-            <div className="grid grid-cols-[150px_1fr] leading-[1.85]">
-              <span className={FIELD_LABEL}>Source Surplus</span>
-              <span>
-                <span className={FIELD_VALUE}>{fmt(sourceSurplus)}</span>
-                <span className="ml-1.5 text-[10.5px] text-gray-400">
-                  · As Reported By Lead Source
-                </span>
-              </span>
-            </div>
-          )}
-          <ConfirmedSurplusRow value={confirmed} onCommit={commitConfirmed} />
+          <SectionSubheader>Fees</SectionSubheader>
           <Row label="Total Liens" value={fmt(liensTotal)} />
           <Row
             label="Recovery Fee"
-            value={`${recoveryFeePercent}% · ${fmt(liveFeeAmount)}`}
+            value={`${recoveryFeePercent}% · ${fmt(feeAmount)}`}
           />
           <Row label="Attorney Cost" value={fmt(attorneyCost)} />
         </div>
       </div>
 
-      {/* Hero Net Payout */}
-      <div className="mt-4 grid grid-cols-[150px_1fr] items-center rounded border-l-[3px] border-petrol-500 bg-gradient-to-r from-petrol-50 to-petrol-100 px-3 py-2">
-        <span className="text-[13px] font-medium text-petrol-700">
-          Est. Net Surplus
-        </span>
-        <span>
-          <span className="block text-[18px] font-medium tracking-tight text-petrol-500">
-            {fmt(liveNetPayout)}
-          </span>
-          <span className="block text-[10.5px] text-petrol-700">
-            {surplusBasisLabel(basis)}
-          </span>
-        </span>
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <SurplusCard
+          hasConfirmed={hasConfirmed}
+          confirmed={confirmed}
+          calculated={calculatedSurplus}
+          sourceSurplus={sourceSurplus}
+          leadSource={leadSource}
+          onCommitConfirmed={commitConfirmed}
+        />
+        <div className="rounded-[10px] bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-4 py-3 text-white">
+          <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-white/70">
+            Est. Net Surplus
+          </div>
+          <div className="mt-1 text-[20px] font-semibold tracking-tight">
+            {fmt(netSurplus)}
+          </div>
+          <div className="mt-0.5 text-[10.5px] text-white/65">
+            {hasConfirmed ? "Based On Confirmed Surplus" : "Based On Calculated Surplus"}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -303,52 +283,72 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-// Fix Z: the only manually entered value in this column. Click it to edit;
-// blur or Enter saves; shows "Not Yet Confirmed" only while empty.
-function ConfirmedSurplusRow({
-  value,
-  onCommit,
+// Fix EEEE2: Card 1. Click the value to enter/edit the confirmed surplus
+// (CurrencyInput commits on blur / Enter, reverts on Escape).
+function SurplusCard({
+  hasConfirmed,
+  confirmed,
+  calculated,
+  sourceSurplus,
+  leadSource,
+  onCommitConfirmed,
 }: {
-  value: number | null;
-  onCommit: (n: number | null) => void;
+  hasConfirmed: boolean;
+  confirmed: number | null;
+  calculated: number | null;
+  sourceSurplus: number | null;
+  leadSource: string | null;
+  onCommitConfirmed: (n: number | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const title = hasConfirmed ? "Confirmed Surplus" : "Calculated Surplus";
+  const value = hasConfirmed ? confirmed : calculated;
+  const subtext = hasConfirmed
+    ? "Manually Verified"
+    : "Closing Bid − Debt − Costs − Liens";
+
   return (
-    <div className="grid grid-cols-[150px_1fr] items-center leading-[1.85]">
-      <span className={FIELD_LABEL}>Confirmed Surplus</span>
+    <div className="rounded-[10px] border border-gray-200 bg-[#f8fafc] px-4 py-3">
+      <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">
+        {title}
+      </div>
       {editing ? (
         <CurrencyInput
-          value={value}
+          value={confirmed}
           onCommit={(n) => {
-            onCommit(n);
+            onCommitConfirmed(n);
             setEditing(false);
           }}
           prefix="$"
           align="left"
           placeholder="Not Yet Confirmed"
           autoFocus
-          className="w-[160px]"
+          className="mt-1 w-[170px]"
         />
       ) : (
         <button
           type="button"
           onClick={() => setEditing(true)}
-          title="Edit confirmed surplus"
-          className="group -ml-1.5 inline-flex w-fit cursor-text items-center gap-1.5 rounded-md px-1.5 py-[2px] hover:bg-gray-100"
+          title="Click To Enter Or Edit Confirmed Surplus"
+          className="mt-1 block w-fit cursor-text text-left"
         >
           <span
             className={
-              value != null ? FIELD_VALUE : "text-[14px] italic text-gray-400"
+              value != null
+                ? "text-[20px] font-semibold tracking-tight text-ink"
+                : "text-[18px] italic text-gray-400"
             }
           >
             {value != null ? fmt(value) : "Not Yet Confirmed"}
           </span>
-          <IconPencil
-            size={12}
-            stroke={1.75}
-            className="text-gray-400 opacity-0 transition-opacity group-hover:opacity-100"
-          />
         </button>
+      )}
+      <div className="mt-0.5 text-[10.5px] text-gray-400">{subtext}</div>
+      {sourceSurplus != null && (
+        <div className="mt-1.5 text-[10.5px] text-gray-400">
+          Source: {fmt(sourceSurplus)}
+          {leadSource ? ` · ${leadSource}` : ""}
+        </div>
       )}
     </div>
   );
