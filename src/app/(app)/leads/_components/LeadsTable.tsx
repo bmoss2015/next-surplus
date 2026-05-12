@@ -58,7 +58,12 @@ export function LeadsTable({
               <SortHeader column="estimated_surplus" label="Surplus" align="right" />
             </th>
             <th className="px-4 py-3 text-right font-medium">
-              <SortHeader column="days_since_sale" label="Days" align="right" />
+              <SortHeader
+                column="days_since_sale"
+                label="Days"
+                align="right"
+                title="Days since property sale date"
+              />
             </th>
             <th className="px-4 py-3 text-left font-medium">
               <span className="text-[11px] tracking-[0.4px] text-gray-500">
@@ -135,9 +140,14 @@ export function LeadsTable({
                       <span className="inline-block rounded bg-danger-bg px-2 py-[2px] text-[11px] font-medium text-danger">
                         Needs Action
                       </span>
-                    ) : !lead.has_litigator ? (
+                    ) : lead.has_litigator ? null : lead.stage === "new_leads" &&
+                      !lead.has_activity ? (
+                      <span className="inline-block rounded bg-[#e0f2f7] px-2 py-[2px] text-[11px] font-medium text-[#0a3d4a]">
+                        New
+                      </span>
+                    ) : (
                       <span className="text-[11px] text-gray-400">—</span>
-                    ) : null}
+                    )}
                     {lead.has_litigator && <LitigatorBadge />}
                   </div>
                 </td>

@@ -11,11 +11,13 @@ export function SortHeader({
   label,
   align = "left",
   className,
+  title,
 }: {
   column: SortColumn;
   label: string;
   align?: "left" | "right";
   className?: string;
+  title?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -53,6 +55,7 @@ export function SortHeader({
     <button
       type="button"
       onClick={toggle}
+      title={title}
       className={cn(
         "group flex w-full items-center gap-1 text-[11px] tracking-[0.4px] text-gray-500 hover:text-ink",
         align === "right" && "justify-end",

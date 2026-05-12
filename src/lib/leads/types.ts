@@ -99,6 +99,10 @@ export type LeadRow = {
   // Fix G: true when any contact or relative on this lead carries a
   // litigator-risk phone. Populated by the list / kanban / daily-work fetchers.
   has_litigator?: boolean;
+  // Fix O: true when this lead has had at least one activity beyond the
+  // auto-logged "lead created" record. Populated by the Leads-table fetcher;
+  // used to show a "New" pill in the Status column for untouched new leads.
+  has_activity?: boolean;
 };
 
 export type SortColumn =

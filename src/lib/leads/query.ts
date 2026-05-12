@@ -42,6 +42,24 @@ export async function withLitigatorFlags<T extends LeadRow>(
   return leads.map((l) => ({ ...l, has_litigator: set.has(l.id) }));
 }
 
+// Fix O: which of these leads have been worked at all — i.e. carry any activity
+// row other than the auto-logged "lead_created" record. Used to decide whether
+// an untouched New Leads lead should show a "New" pill in the Status column.
+export async function workedLeadIdSet(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  leadIds: string[]
+): Promise<Set<string>> {
+  const set = new Set<string>();
+  if (leadIds.length === 0) return set;
+  const { data } = await sb
+    .from("activities")
+    .select("lead_id")
+    .in("lead_id", leadIds)
+    .neq("activity_type", "lead_created");
+  for (const r of data ?? []) set.add(r.lead_id as string);
+  return set;
+}
+
 export type LeadsFilter = {
   q?: string;
   state?: string;
@@ -155,7 +173,16 @@ export async function fetchLeads(query: LeadsQuery): Promise<{
     });
   }
 
-  leads = await withLitigatorFlags(sb, leads);
+  const ids = leads.map((l) => l.id);
+  const [litigatorSet, workedSet] = await Promise.all([
+    litigatorLeadIdSet(sb, ids),
+    workedLeadIdSet(sb, ids),
+  ]);
+  leads = leads.map((l) => ({
+    ...l,
+    has_litigator: litigatorSet.has(l.id),
+    has_activity: workedSet.has(l.id),
+  }));
 
   return { leads, total: count ?? 0 };
 }

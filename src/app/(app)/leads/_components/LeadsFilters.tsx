@@ -103,8 +103,10 @@ export function LeadsFilters({ states }: { states: string[] }) {
 
   const selectClass =
     "rounded-md border border-white/20 bg-white/10 px-2.5 py-[6px] text-xs text-white outline-none transition-colors hover:bg-white/15 focus:border-petrol-300 focus:bg-white/15 cursor-pointer [&>option]:bg-petrol-700 [&>option]:text-white";
+  // Plain text inputs styled to match the search bar — no number spinners,
+  // light gray border, white background, teal border on focus.
   const numberClass =
-    "w-20 rounded-md border border-white/20 bg-white/10 px-2.5 py-[6px] text-xs text-white outline-none transition-colors placeholder:text-white/40 hover:bg-white/15 focus:border-petrol-300 focus:bg-white/15";
+    "w-20 rounded-md border border-[#e2e8f0] bg-white px-2.5 py-[6px] text-xs text-ink outline-none transition-colors placeholder:text-[#94a3b8] focus:border-[#0d6c7d]";
 
   return (
     <div
@@ -175,7 +177,8 @@ export function LeadsFilters({ states }: { states: string[] }) {
             Surplus
           </span>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             placeholder="Min"
             className={numberClass}
             defaultValue={params.get("surplus_min") ?? ""}
@@ -183,7 +186,8 @@ export function LeadsFilters({ states }: { states: string[] }) {
           />
           <span className="text-white/40">–</span>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             placeholder="Max"
             className={numberClass}
             defaultValue={params.get("surplus_max") ?? ""}
