@@ -305,12 +305,14 @@ export const PORTAL_FIELDS: PortalField[] = [
   },
   {
     key: "surplus_amount",
-    label: "Surplus Amount",
+    label: "Source Surplus",
     required: false,
     aliases: [
       "surplus",
       "surplusamount",
       "surplusfunds",
+      "sourcesurplus",
+      "excess",
       "excessfunds",
       "excessproceeds",
       "overage",
@@ -652,7 +654,7 @@ export type IncomingLead = {
   parcel_number: string | null;
   closing_bid: number | null;
   opening_bid: number | null;
-  confirmed_surplus: number | null;
+  source_surplus: number | null;
   lead_source: string | null; // per-row override from a mapped column; usually null
   owner_full_name: string | null;
   owner_age: number | null;

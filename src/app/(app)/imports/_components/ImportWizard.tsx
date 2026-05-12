@@ -995,7 +995,7 @@ export function ImportWizard() {
         parcel_number: get(raw, "parcel_number") || null,
         closing_bid: parseMoney(get(raw, "closing_bid")),
         opening_bid: parseMoney(get(raw, "opening_bid")),
-        confirmed_surplus: parseMoney(get(raw, "surplus_amount")),
+        source_surplus: parseMoney(get(raw, "surplus_amount")),
         lead_source: get(raw, "lead_source") || null,
         owner_full_name: ownerName || null,
         owner_age: parseAge(get(raw, "owner_age")),

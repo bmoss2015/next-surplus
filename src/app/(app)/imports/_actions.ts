@@ -160,6 +160,7 @@ const LEAD_WRITABLE_FIELDS = [
   "parcel_number",
   "closing_bid",
   "opening_bid",
+  "source_surplus",
   "lead_source",
   "recovery_type",
 ] as const;
@@ -181,8 +182,9 @@ function leadFieldsFromRow(
     parcel_number: row.parcel_number ?? null,
     closing_bid: row.closing_bid ?? null,
     opening_bid: row.opening_bid ?? null,
-    // Fix 101: confirmed_surplus is never auto-populated from imports —
-    // it is set only by manual entry on the lead detail page.
+    // Fix LLL: the figure the lead source reported, kept distinct from the
+    // computed estimate and the county-confirmed surplus.
+    source_surplus: row.source_surplus ?? null,
     lead_source: rowSource,
     recovery_type: recoveryType,
   };
