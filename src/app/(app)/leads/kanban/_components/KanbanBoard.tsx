@@ -9,7 +9,7 @@ import {
   type LeadRow,
 } from "@/lib/leads/types";
 import { advanceStage } from "@/app/(app)/leads/[id]/_actions";
-import { formatCurrency, primaryOwner } from "@/lib/leads/format";
+import { formatCurrency, primaryOwner, toTitleCase } from "@/lib/leads/format";
 import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
 import { LeadActionsMenu } from "@/app/(app)/leads/[id]/_components/LeadActionsMenu";
@@ -223,41 +223,29 @@ function KanbanCard({
   onDragEnd: () => void;
   onRemoved: () => void;
 }) {
+  // Fix BBBB2: "Charleston, SC" — county (title-cased) + state, below the owner.
+  const locationLine = [lead.county ? toTitleCase(lead.county) : null, lead.state]
+    .filter(Boolean)
+    .join(", ");
+  const hasTags = lead.has_litigator || lead.needs_action_flag || lead.below_floor;
+
   return (
     // Fix U: the ⋯ menu sits OUTSIDE the <a> so its clicks never trigger card
-    // navigation or the card drag. Fix TTTT: all card tags live on a single
-    // top row — tags left-aligned (Litigator, below-floor), status badge
-    // (Needs Action) right-aligned on the same row, no wrapping. The ⋯ button
-    // keeps a fixed footprint so the row height is consistent on every card
-    // regardless of which tags are present.
+    // navigation or the card drag. Fix BBBB2: it lives at the top-right corner
+    // (hover-reveal, not a tag); every actual tag pill lives in the bottom row.
     <div
       className={cn(
         "group relative rounded-md border border-gray-200 bg-surface shadow-card transition-opacity",
         isDragging && "opacity-40"
       )}
     >
-      <div className="flex h-[24px] items-center justify-between gap-2 px-[11px] pt-[6px]">
-        <div className="flex min-w-0 items-center gap-1.5">
-          {lead.has_litigator && (
-            <span className="rounded-[10px] border border-[#fca5a5] bg-[#fef2f2] px-2 py-[2px] text-[10px] font-medium leading-none text-[#991b1b]">
-              Litigator
-            </span>
-          )}
-          {lead.below_floor && <BelowFloorIcon size={13} />}
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <LeadActionsMenu
-            leadId={lead.id}
-            archived={lead.archived}
-            onDone={onRemoved}
-            triggerClassName="opacity-0 transition-opacity group-hover:opacity-100"
-          />
-          {lead.needs_action_flag && (
-            <span className="rounded-[10px] bg-[#e0f2f7] px-2 py-[2px] text-[10px] font-medium leading-none text-[#0a3d4a]">
-              Needs Action
-            </span>
-          )}
-        </div>
+      <div className="absolute right-1.5 top-1.5 z-10">
+        <LeadActionsMenu
+          leadId={lead.id}
+          archived={lead.archived}
+          onDone={onRemoved}
+          triggerClassName="opacity-0 transition-opacity group-hover:opacity-100"
+        />
       </div>
 
       <a
@@ -268,15 +256,20 @@ function KanbanCard({
         onClick={(e) => {
           if (isDragging) e.preventDefault();
         }}
-        className="block cursor-grab px-[11px] pb-[10px] pt-[6px] active:cursor-grabbing"
+        className="block cursor-grab px-[11px] pb-[10px] pt-[10px] active:cursor-grabbing"
       >
         <div className="min-w-0">
-          <div className="truncate text-[12px] font-medium text-ink">
+          <div className="truncate pr-6 text-[12px] font-medium text-ink">
             {lead.address}
           </div>
           <div className="mt-[2px] truncate text-[11px] text-gray-500">
             {primaryOwner(lead)}
           </div>
+          {locationLine && (
+            <div className="mt-[1px] truncate text-[10.5px] text-gray-400">
+              {locationLine}
+            </div>
+          )}
           <div className="mt-[7px] whitespace-nowrap text-[11px]">
             <span className="text-gray-400">Total Surplus: </span>
             <span className="font-medium text-ink">
@@ -289,8 +282,28 @@ function KanbanCard({
               {formatCurrency(activeNetPayout(lead))}
             </span>
           </div>
+          {hasTags && (
+            <div className="mt-[9px] flex flex-wrap items-center gap-1.5">
+              {lead.below_floor && <BelowFloorIcon size={13} />}
+              {lead.has_litigator && (
+                <span className={cn(KANBAN_TAG_PILL, "border-[#fca5a5] bg-[#fef2f2] text-[#991b1b]")}>
+                  Litigator
+                </span>
+              )}
+              {lead.needs_action_flag && (
+                <span className={cn(KANBAN_TAG_PILL, "border-petrol-200 bg-[#e0f2f7] text-[#0a3d4a]")}>
+                  Needs Action
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </a>
     </div>
   );
 }
+
+// Fix BBBB2: one tag-pill shape (radius / padding / font size / border weight)
+// shared by every kanban tag; only the colors differ per tag type.
+const KANBAN_TAG_PILL =
+  "rounded-md border px-2 py-[2px] text-[10px] font-medium leading-none";
