@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   IconExternalLink,
   IconChevronDown,
@@ -20,11 +21,12 @@ import type {
 } from "@/lib/leads/fetch-research";
 import { cn } from "@/lib/cn";
 
-// Fix JJJJ: Research tab. A lead carries its own snapshot of one or more
-// checklists (each rendered as a collapsible section, steps laid out 3 per
-// row). Steps belong to the lead — editing a Settings template never rewrites
-// them. Each step is a single Done checkbox plus a findings field; Overall
-// Findings is mirrored into the Notes feed when saved.
+// Fix JJJJ + Fix UUUU: Research tab. A lead carries its own snapshot of one or
+// more checklists. Each checklist is a collapsible section (heavier header with
+// a divider above its steps); steps are a full-width vertical stack of cards —
+// checkbox left, title/description/findings stacked in the body, completed rows
+// strikethrough + greyed. Overall Findings gets its own card with a Save
+// button; "Add From Template" pulls a checklist in from Settings.
 
 export function ResearchTabClient({
   leadId,
@@ -66,9 +68,7 @@ export function ResearchTabClient({
         i === tIdx
           ? {
               ...t,
-              steps: t.steps.map((s, j) =>
-                j === sIdx ? { ...s, ...patch } : s
-              ),
+              steps: t.steps.map((s, j) => (j === sIdx ? { ...s, ...patch } : s)),
             }
           : t
       )
@@ -115,51 +115,63 @@ export function ResearchTabClient({
     });
   }
 
+  const overallDirty = overall !== savedOverall;
+
+  const addButton = (
+    <div className="relative" ref={addRef}>
+      <button
+        type="button"
+        onClick={() => setAddOpen((o) => !o)}
+        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-petrol-500 px-3 py-[6px] text-xs font-medium text-petrol-500 hover:bg-petrol-50"
+      >
+        <IconPlus size={13} stroke={1.75} />
+        Add From Template
+      </button>
+      {addOpen && (
+        <div className="absolute right-0 z-30 mt-1 max-h-72 w-[280px] overflow-y-auto rounded-md border border-gray-200 bg-white shadow-elevated">
+          {availableTemplates.length === 0 ? (
+            <div className="px-3 py-3 text-[12px] text-gray-500">
+              No research templates exist yet.{" "}
+              <Link
+                href="/settings"
+                className="font-medium text-petrol-500 hover:text-petrol-700"
+              >
+                Create one in Settings →
+              </Link>
+            </div>
+          ) : (
+            availableTemplates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => addTemplate(t.id)}
+                className="block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] text-ink hover:bg-[#e0f2f7]"
+              >
+                {t.name}
+                {(t.state || t.saleType) && (
+                  <span className="ml-1 text-[11px] text-gray-400">
+                    {[t.state, t.saleType].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
           Research
         </h3>
-        <div className="relative" ref={addRef}>
-          <button
-            type="button"
-            onClick={() => setAddOpen((o) => !o)}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-petrol-500 px-2.5 py-[5px] text-[11.5px] font-medium text-petrol-500 hover:bg-petrol-50"
-          >
-            <IconPlus size={13} stroke={1.75} />
-            Add From Template
-          </button>
-          {addOpen && (
-            <div className="absolute right-0 z-30 mt-1 max-h-72 w-[260px] overflow-y-auto rounded-md border border-gray-200 bg-white shadow-elevated">
-              {availableTemplates.length === 0 ? (
-                <div className="px-3 py-2 text-[12px] text-gray-500">
-                  No research templates in Settings yet.
-                </div>
-              ) : (
-                availableTemplates.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => addTemplate(t.id)}
-                    className="block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] text-ink hover:bg-[#e0f2f7]"
-                  >
-                    {t.name}
-                    {(t.state || t.saleType) && (
-                      <span className="ml-1 text-[11px] text-gray-400">
-                        {[t.state, t.saleType].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
+        {addButton}
       </div>
 
       {templates.length === 0 ? (
-        <div className="rounded-md border border-dashed border-gray-200 bg-[#f8fafc] px-4 py-6 text-center">
+        <div className="rounded-xl border border-dashed border-gray-200 bg-[#f8fafc] px-4 py-7 text-center">
           <div className="text-[12.5px] text-gray-500">
             No research checklist on this lead yet.
           </div>
@@ -179,19 +191,22 @@ export function ResearchTabClient({
             return (
               <div
                 key={t.id}
-                className="rounded-md border border-gray-200 bg-[#f8fafc]"
+                className="overflow-hidden rounded-xl border border-gray-200 bg-[#f8fafc]"
               >
                 <button
                   type="button"
                   onClick={() => toggleCollapsed(tIdx, t.id)}
-                  className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left"
+                  className={cn(
+                    "flex w-full cursor-pointer items-center gap-2 px-3 py-[10px] text-left",
+                    !t.collapsed && "border-b border-gray-200"
+                  )}
                 >
                   {t.collapsed ? (
-                    <IconChevronRight size={14} stroke={2} className="text-gray-500" />
+                    <IconChevronRight size={14} stroke={2.25} className="text-gray-500" />
                   ) : (
-                    <IconChevronDown size={14} stroke={2} className="text-gray-500" />
+                    <IconChevronDown size={14} stroke={2.25} className="text-gray-500" />
                   )}
-                  <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#0a3d4a]">
+                  <span className="text-[12.5px] font-extrabold uppercase tracking-[0.07em] text-[#0a3d4a]">
                     {t.name}
                   </span>
                   <span className="text-[11px] font-medium text-gray-400">
@@ -199,57 +214,62 @@ export function ResearchTabClient({
                   </span>
                 </button>
                 {!t.collapsed && (
-                  <div className="grid grid-cols-1 gap-3 px-3 pb-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="space-y-3 p-3">
                     {t.steps.map((step, sIdx) => (
                       <div
                         key={sIdx}
                         className={cn(
-                          "flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3 transition-opacity",
-                          step.done && "opacity-60"
+                          "flex gap-3 rounded-xl border p-3 transition-colors",
+                          step.done
+                            ? "border-gray-200 bg-[#f1f5f9]"
+                            : "border-gray-200 bg-white"
                         )}
                       >
-                        <label className="flex cursor-pointer items-start gap-2">
-                          <input
-                            type="checkbox"
-                            checked={step.done}
-                            onChange={() => toggleDone(tIdx, sIdx, t.id)}
-                            className="mt-[2px] h-[14px] w-[14px] shrink-0 cursor-pointer"
-                          />
-                          <span
-                            className={cn(
-                              "text-[13px] font-medium leading-snug text-ink",
-                              step.done && "line-through"
-                            )}
-                          >
-                            {step.name}
-                          </span>
-                        </label>
-                        {step.instructions && (
-                          <div className="text-[11.5px] leading-snug text-gray-500">
-                            {step.instructions}
-                          </div>
-                        )}
-                        {step.url && (
-                          <a
-                            href={step.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex cursor-pointer items-center gap-1 break-all text-[11.5px] text-petrol-500 underline hover:text-petrol-700"
-                          >
-                            {step.url}
-                            <IconExternalLink size={12} stroke={1.75} className="shrink-0" />
-                          </a>
-                        )}
-                        <textarea
-                          value={step.findings ?? ""}
-                          onChange={(e) =>
-                            updateStep(tIdx, sIdx, { findings: e.target.value })
-                          }
-                          onBlur={() => commitStepFindings(tIdx, sIdx, t.id)}
-                          rows={3}
-                          placeholder="Findings For This Step"
-                          className="w-full resize-y rounded-md border border-gray-200 bg-surface px-2.5 py-[7px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                        <input
+                          type="checkbox"
+                          checked={step.done}
+                          onChange={() => toggleDone(tIdx, sIdx, t.id)}
+                          className="mt-[3px] h-[14px] w-[14px] shrink-0 cursor-pointer"
+                          aria-label={step.done ? "Mark not done" : "Mark done"}
                         />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-baseline gap-x-2">
+                            <span
+                              className={cn(
+                                "text-[13px] font-medium leading-snug text-ink",
+                                step.done && "text-gray-400 line-through"
+                              )}
+                            >
+                              {step.name}
+                            </span>
+                            {step.url && (
+                              <a
+                                href={step.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex cursor-pointer items-center gap-1 break-all text-[11.5px] text-petrol-500 underline hover:text-petrol-700"
+                              >
+                                {step.url}
+                                <IconExternalLink size={11} stroke={1.75} className="shrink-0" />
+                              </a>
+                            )}
+                          </div>
+                          {step.instructions && (
+                            <div className="mt-[2px] text-[11.5px] leading-snug text-gray-500">
+                              {step.instructions}
+                            </div>
+                          )}
+                          <textarea
+                            value={step.findings ?? ""}
+                            onChange={(e) =>
+                              updateStep(tIdx, sIdx, { findings: e.target.value })
+                            }
+                            onBlur={() => commitStepFindings(tIdx, sIdx, t.id)}
+                            rows={2}
+                            placeholder="Findings For This Step"
+                            className="mt-2 w-full resize-y rounded-md border border-gray-200 bg-surface px-2.5 py-[7px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -260,10 +280,20 @@ export function ResearchTabClient({
         </div>
       )}
 
-      <div className="mt-5">
-        <label className="mb-1 block text-[10px] font-medium tracking-[0.5px] text-gray-500">
-          Overall Findings
-        </label>
+      <div className="mt-5 rounded-xl border border-gray-200 bg-[#f8fafc] p-4">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
+            Overall Findings
+          </span>
+          <button
+            type="button"
+            onClick={commitOverall}
+            disabled={!overallDirty}
+            className="btn-primary cursor-pointer rounded-md px-3 py-[5px] text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Save Findings
+          </button>
+        </div>
         <textarea
           value={overall}
           onChange={(e) => setOverall(e.target.value)}
