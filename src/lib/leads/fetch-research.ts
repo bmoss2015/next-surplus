@@ -1,30 +1,69 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
-export type ResearchStep = {
+// Fix JJJJ: a lead carries its own copy of one or more research checklists.
+// Each step is { name, url, instructions, done, findings } in display order.
+// Editing a Settings template never touches checklists already on a lead.
+
+export type LeadResearchStep = {
   name: string;
-  url?: string | null;
-  instructions?: string | null;
+  url: string | null;
+  instructions: string | null;
+  done: boolean;
+  findings: string | null;
 };
 
-export type ResearchTemplate = {
+export type LeadResearchTemplate = {
+  id: string; // lead_research_templates.id
+  sourceTemplateId: string | null;
+  name: string;
+  collapsed: boolean;
+  steps: LeadResearchStep[];
+};
+
+export type AvailableTemplate = {
+  id: string;
+  name: string;
+  state: string | null;
+  saleType: string | null;
+};
+
+export type ResearchData = {
+  templates: LeadResearchTemplate[];
+  availableTemplates: AvailableTemplate[];
+  overallFindings: string | null;
+};
+
+type RawTemplateRow = {
   id: string;
   name: string;
   state: string | null;
   sale_type: string | null;
-  steps: ResearchStep[];
+  steps: unknown;
+  created_at: string;
 };
 
-export type ResearchStepProgress = {
-  status: string;
-  findings: string | null;
-};
+function normalizeSteps(steps: unknown): LeadResearchStep[] {
+  if (!Array.isArray(steps)) return [];
+  return (steps as Array<Record<string, unknown>>).map((s) => ({
+    name: String(s.name ?? ""),
+    url: (s.url as string | null) ?? null,
+    instructions: (s.instructions as string | null) ?? null,
+    done: s.done === true,
+    findings: (s.findings as string | null) ?? null,
+  }));
+}
 
-export type ResearchData = {
-  template: ResearchTemplate | null;
-  progressByIndex: Record<number, ResearchStepProgress>;
-  overallFindings: string | null;
-};
+function freshStepsFromTemplate(steps: unknown): LeadResearchStep[] {
+  if (!Array.isArray(steps)) return [];
+  return (steps as Array<Record<string, unknown>>).map((s) => ({
+    name: String(s.name ?? ""),
+    url: (s.url as string | null) ?? null,
+    instructions: (s.instructions as string | null) ?? null,
+    done: false,
+    findings: null,
+  }));
+}
 
 export async function fetchResearch(
   leadId: string,
@@ -35,78 +74,76 @@ export async function fetchResearch(
 
   const { data: leadRow } = await sb
     .from("leads")
-    .select("research_overall_findings")
+    .select("research_overall_findings, research_initialized")
     .eq("id", leadId)
     .maybeSingle();
   const overallFindings =
     (leadRow?.research_overall_findings as string | null) ?? null;
+  const initialized = leadRow?.research_initialized === true;
 
-  // RLS already scopes to the org; pull candidates that match this lead's
-  // state/sale_type (or are universal) and prefer the most specific.
-  const { data: templates } = await sb
+  // All org templates — used both for the "Add From Template" picker and for
+  // the one-time snapshot when the Research tab is first opened.
+  const { data: allTemplatesRaw } = await sb
     .from("research_templates")
     .select("id, name, state, sale_type, steps, created_at")
     .order("created_at", { ascending: true });
+  const allTemplates = (allTemplatesRaw ?? []) as RawTemplateRow[];
 
-  const candidates = ((templates ?? []) as Array<{
-    id: string;
-    name: string;
-    state: string | null;
-    sale_type: string | null;
-    steps: unknown;
-    created_at: string;
-  }>).filter(
-    (t) =>
-      (t.state == null || t.state === state) &&
-      (t.sale_type == null || t.sale_type === saleType)
-  );
-
-  function specificity(t: { state: string | null; sale_type: string | null }) {
-    return (t.state ? 2 : 0) + (t.sale_type ? 1 : 0);
-  }
-  candidates.sort((a, b) => {
-    const d = specificity(b) - specificity(a);
-    if (d !== 0) return d;
-    return a.created_at.localeCompare(b.created_at);
-  });
-
-  const chosen = candidates[0] ?? null;
-  let template: ResearchTemplate | null = null;
-  if (chosen) {
-    const steps = Array.isArray(chosen.steps)
-      ? (chosen.steps as Array<Record<string, unknown>>).map((s) => ({
-          name: String(s.name ?? ""),
-          url: (s.url as string | null) ?? null,
-          instructions: (s.instructions as string | null) ?? null,
+  // First open for this lead: snapshot every template that matches the lead's
+  // state / sale type (or is universal). Brand new leads start from the current
+  // templates; older leads keep whatever was already migrated onto them.
+  if (!initialized) {
+    const matching = allTemplates.filter(
+      (t) =>
+        (t.state == null || t.state === state) &&
+        (t.sale_type == null || t.sale_type === saleType)
+    );
+    if (matching.length > 0) {
+      await sb.from("lead_research_templates").insert(
+        matching.map((t, idx) => ({
+          lead_id: leadId,
+          source_template_id: t.id,
+          name: t.name,
+          position: idx,
+          steps: freshStepsFromTemplate(t.steps),
         }))
-      : [];
-    template = {
-      id: chosen.id,
-      name: chosen.name,
-      state: chosen.state,
-      sale_type: chosen.sale_type,
-      steps,
-    };
-  }
-
-  const progressByIndex: Record<number, ResearchStepProgress> = {};
-  if (template) {
-    const { data: progressRows } = await sb
-      .from("research_step_progress")
-      .select("step_index, status, findings")
-      .eq("lead_id", leadId)
-      .eq("template_id", template.id);
-    for (const row of (progressRows ?? []) as Array<{
-      step_index: number;
-      status: string;
-      findings: string | null;
-    }>) {
-      progressByIndex[row.step_index] = {
-        status: row.status,
-        findings: row.findings,
-      };
+      );
     }
+    await sb
+      .from("leads")
+      .update({ research_initialized: true })
+      .eq("id", leadId);
   }
 
-  return { template, progressByIndex, overallFindings };
+  const { data: lrtRows } = await sb
+    .from("lead_research_templates")
+    .select("id, source_template_id, name, collapsed, steps, position, created_at")
+    .eq("lead_id", leadId)
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  const templates: LeadResearchTemplate[] = (
+    (lrtRows ?? []) as Array<{
+      id: string;
+      source_template_id: string | null;
+      name: string;
+      collapsed: boolean | null;
+      steps: unknown;
+    }>
+  ).map((r) => ({
+    id: r.id,
+    sourceTemplateId: r.source_template_id,
+    name: r.name,
+    collapsed: r.collapsed === true,
+    steps: normalizeSteps(r.steps),
+  }));
+
+  const availableTemplates: AvailableTemplate[] = allTemplates.map((t) => ({
+    id: t.id,
+    name: t.name,
+    state: t.state,
+    saleType: t.sale_type,
+  }));
+
+  return { templates, availableTemplates, overallFindings };
 }

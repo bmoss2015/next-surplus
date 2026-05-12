@@ -7,8 +7,8 @@ export async function ResearchTab({ lead }: { lead: LeadDetailWithCounts }) {
   return (
     <ResearchTabClient
       leadId={lead.id}
-      template={data.template}
-      progressByIndex={data.progressByIndex}
+      templates={data.templates}
+      availableTemplates={data.availableTemplates}
       overallFindings={data.overallFindings}
     />
   );

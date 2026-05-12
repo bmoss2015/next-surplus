@@ -1002,7 +1002,11 @@ export async function removeLien(
   return { ok: true };
 }
 
-// -- Research (per-step progress + overall findings) -------------------------
+// -- Research (per-lead checklists + overall findings) -----------------------
+// Fix JJJJ: a lead carries its own snapshot of one or more research checklists
+// in lead_research_templates.steps (jsonb array of
+// { name, url, instructions, done, findings }). Settings template edits never
+// touch a lead that already has checklists.
 
 async function logResearchUpdate(
   sb: Awaited<ReturnType<typeof createClient>>,
@@ -1017,54 +1021,143 @@ async function logResearchUpdate(
   });
 }
 
-export async function setResearchStepStatus(
-  leadId: string,
-  templateId: string,
-  stepIndex: number,
-  status: string,
-  stepName: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const VALID = ["Not Started", "In Progress", "Done", "Blocked"];
-  if (!VALID.includes(status)) return { ok: false, error: "Invalid status" };
-  const sb = await createClient();
-  const { error } = await sb
-    .from("research_step_progress")
-    .upsert(
-      {
-        lead_id: leadId,
-        template_id: templateId,
-        step_index: stepIndex,
-        status,
-      },
-      { onConflict: "lead_id,template_id,step_index" }
-    );
+type RawJsonStep = {
+  name?: unknown;
+  url?: unknown;
+  instructions?: unknown;
+  done?: unknown;
+  findings?: unknown;
+};
+
+async function loadLeadResearchTemplate(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  lrtId: string
+): Promise<
+  | { ok: true; lead_id: string; name: string; steps: RawJsonStep[] }
+  | { ok: false; error: string }
+> {
+  const { data, error } = await sb
+    .from("lead_research_templates")
+    .select("lead_id, name, steps")
+    .eq("id", lrtId)
+    .maybeSingle();
   if (error) return { ok: false, error: error.message };
-  await logResearchUpdate(sb, leadId, `${stepName} marked ${status}`);
-  revalidatePath(`/leads/${leadId}`);
+  if (!data) return { ok: false, error: "Checklist not found" };
+  return {
+    ok: true,
+    lead_id: data.lead_id as string,
+    name: data.name as string,
+    steps: Array.isArray(data.steps) ? (data.steps as RawJsonStep[]) : [],
+  };
+}
+
+export async function setLeadResearchStepDone(
+  leadResearchTemplateId: string,
+  stepIndex: number,
+  done: boolean
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const loaded = await loadLeadResearchTemplate(sb, leadResearchTemplateId);
+  if (!loaded.ok) return loaded;
+  const steps = [...loaded.steps];
+  if (!steps[stepIndex]) return { ok: false, error: "Invalid step" };
+  steps[stepIndex] = { ...steps[stepIndex], done };
+  const { error } = await sb
+    .from("lead_research_templates")
+    .update({ steps })
+    .eq("id", leadResearchTemplateId);
+  if (error) return { ok: false, error: error.message };
+  const stepName = String(steps[stepIndex].name ?? "Step");
+  await logResearchUpdate(
+    sb,
+    loaded.lead_id,
+    `${stepName} marked ${done ? "Done" : "Not Done"}`
+  );
+  revalidatePath(`/leads/${loaded.lead_id}`);
   return { ok: true };
 }
 
-export async function saveResearchStepFindings(
-  leadId: string,
-  templateId: string,
+export async function saveLeadResearchStepFindings(
+  leadResearchTemplateId: string,
   stepIndex: number,
-  findings: string,
-  stepName: string
+  findings: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const loaded = await loadLeadResearchTemplate(sb, leadResearchTemplateId);
+  if (!loaded.ok) return loaded;
+  const steps = [...loaded.steps];
+  if (!steps[stepIndex]) return { ok: false, error: "Invalid step" };
+  steps[stepIndex] = { ...steps[stepIndex], findings: findings.trim() || null };
+  const { error } = await sb
+    .from("lead_research_templates")
+    .update({ steps })
+    .eq("id", leadResearchTemplateId);
+  if (error) return { ok: false, error: error.message };
+  const stepName = String(steps[stepIndex].name ?? "Step");
+  await logResearchUpdate(sb, loaded.lead_id, `${stepName} findings updated`);
+  revalidatePath(`/leads/${loaded.lead_id}`);
+  return { ok: true };
+}
+
+export async function setLeadResearchTemplateCollapsed(
+  leadResearchTemplateId: string,
+  collapsed: boolean
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const sb = await createClient();
   const { error } = await sb
-    .from("research_step_progress")
-    .upsert(
-      {
-        lead_id: leadId,
-        template_id: templateId,
-        step_index: stepIndex,
-        findings: findings.trim() || null,
-      },
-      { onConflict: "lead_id,template_id,step_index" }
-    );
+    .from("lead_research_templates")
+    .update({ collapsed })
+    .eq("id", leadResearchTemplateId);
   if (error) return { ok: false, error: error.message };
-  await logResearchUpdate(sb, leadId, `${stepName} findings updated`);
+  return { ok: true };
+}
+
+export async function addResearchTemplateToLead(
+  leadId: string,
+  templateId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { data: tpl, error: e1 } = await sb
+    .from("research_templates")
+    .select("id, name, steps")
+    .eq("id", templateId)
+    .maybeSingle();
+  if (e1) return { ok: false, error: e1.message };
+  if (!tpl) return { ok: false, error: "Template not found" };
+
+  const { data: last } = await sb
+    .from("lead_research_templates")
+    .select("position")
+    .eq("lead_id", leadId)
+    .order("position", { ascending: false })
+    .limit(1);
+  const nextPos =
+    last && last.length > 0 ? ((last[0].position as number) ?? 0) + 1 : 0;
+
+  const steps = (Array.isArray(tpl.steps) ? (tpl.steps as RawJsonStep[]) : []).map(
+    (s) => ({
+      name: String(s.name ?? ""),
+      url: (s.url as string | null) ?? null,
+      instructions: (s.instructions as string | null) ?? null,
+      done: false,
+      findings: null,
+    })
+  );
+
+  const { error } = await sb.from("lead_research_templates").insert({
+    lead_id: leadId,
+    source_template_id: tpl.id,
+    name: tpl.name,
+    position: nextPos,
+    steps,
+  });
+  if (error) return { ok: false, error: error.message };
+  // Adding a template manually also counts as initializing the tab.
+  await sb
+    .from("leads")
+    .update({ research_initialized: true })
+    .eq("id", leadId);
+  await logResearchUpdate(sb, leadId, `Added research checklist "${tpl.name}"`);
   revalidatePath(`/leads/${leadId}`);
   return { ok: true };
 }
@@ -1074,12 +1167,23 @@ export async function saveOverallFindings(
   findings: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const sb = await createClient();
+  const trimmed = findings.trim();
   const { error } = await sb
     .from("leads")
-    .update({ research_overall_findings: findings.trim() || null })
+    .update({ research_overall_findings: trimmed || null })
     .eq("id", leadId);
   if (error) return { ok: false, error: error.message };
   await logResearchUpdate(sb, leadId, "Overall findings updated");
+  // Fix JJJJ: surface the full findings text in the Notes feed (attributed to
+  // whoever saved it, timestamped by the activity row's created_at).
+  if (trimmed) {
+    await sb.from("activities").insert({
+      lead_id: leadId,
+      activity_type: "note",
+      payload: { body: trimmed, kind: "note", source: "research_findings" },
+      user_id: await currentUserId(),
+    });
+  }
   revalidatePath(`/leads/${leadId}`);
   return { ok: true };
 }
