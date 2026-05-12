@@ -489,8 +489,11 @@ export async function importLeads(
     })
     .eq("id", importRow.id);
 
+  // Fix P / Fix 8: revalidate every Leads view so the new rows — and any new
+  // states in the state filter — appear right away (the table moved to
+  // /leads/table; Kanban is now /leads).
   revalidatePath("/imports");
-  revalidatePath("/leads");
+  revalidatePath("/leads", "layout");
   return {
     ok: true,
     importId: importRow.id as string,
@@ -605,6 +608,6 @@ export async function revertImport(
   await sb.from("imports").update({ status: "cancelled" }).eq("id", importId);
 
   revalidatePath("/imports");
-  revalidatePath("/leads");
+  revalidatePath("/leads", "layout");
   return { ok: true, removed: removableIds.length, edited: editedCount };
 }

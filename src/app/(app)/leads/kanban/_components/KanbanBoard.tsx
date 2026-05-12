@@ -108,7 +108,9 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="overflow-x-auto pb-3">
+    // Fix P: always show the horizontal scrollbar so every stage column is
+    // reachable — overflow-x-scroll, never auto.
+    <div className="overflow-x-scroll pb-3">
       <div className="flex w-max gap-[10px]">
         {STAGES.map((stage) => {
           const leads = grouped[stage];
@@ -184,6 +186,15 @@ function KanbanCard({
           <div className="mt-[2px] truncate text-[11px] text-gray-500">
             {primaryOwner(lead)}
           </div>
+          {/* Fix P: restore the status pill on Kanban cards — shown only when
+              the lead carries a status flag. */}
+          {lead.needs_action_flag && (
+            <div className="mt-[5px]">
+              <span className="inline-block rounded bg-danger-bg px-2 py-[2px] text-[10px] font-medium text-danger">
+                Needs Action
+              </span>
+            </div>
+          )}
           {lead.has_litigator && (
             <div className="mt-[5px]">
               <LitigatorBadge />

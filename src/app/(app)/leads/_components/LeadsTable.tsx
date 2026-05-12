@@ -1,12 +1,7 @@
 import Link from "next/link";
 import type { LeadRow } from "@/lib/leads/types";
 import { StagePill } from "@/components/StagePill";
-import {
-  formatCurrency,
-  daysSince,
-  primaryOwner,
-  ownerStatusOf,
-} from "@/lib/leads/format";
+import { formatCurrency, primaryOwner, ownerStatusOf } from "@/lib/leads/format";
 import { OWNER_STATUS_LABELS, SALE_TYPE_LABELS } from "@/lib/leads/types";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
 import { LitigatorBadge } from "@/components/LitigatorBadge";
@@ -57,14 +52,6 @@ export function LeadsTable({
             <th className="px-4 py-3 text-right font-medium">
               <SortHeader column="estimated_surplus" label="Surplus" align="right" />
             </th>
-            <th className="px-4 py-3 text-right font-medium">
-              <SortHeader
-                column="days_since_sale"
-                label="Days"
-                align="right"
-                title="Days since property sale date"
-              />
-            </th>
             <th className="px-4 py-3 text-left font-medium">
               <span className="text-[11px] tracking-[0.4px] text-gray-500">
                 Status
@@ -74,7 +61,6 @@ export function LeadsTable({
         </thead>
         <tbody>
           {leads.map((lead) => {
-            const days = daysSince(lead.sale_date);
             const ownerName = primaryOwner(lead);
             const ownerStatus = ownerStatusOf(lead);
             return (
@@ -126,9 +112,6 @@ export function LeadsTable({
                       Est. Net Surplus {formatCurrency(lead.estimated_net_payout)}
                     </div>
                   )}
-                </td>
-                <td className="px-4 py-[10px] text-right text-gray-500">
-                  {days != null ? days : "—"}
                 </td>
                 <td className="px-4 py-[10px]">
                   <div className="flex flex-wrap items-center gap-1">

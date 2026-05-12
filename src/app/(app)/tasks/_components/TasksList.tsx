@@ -17,7 +17,7 @@ import {
   bulkDeleteTasks,
 } from "../_actions";
 import type { TaskRow } from "@/lib/tasks/fetch";
-import { AddTaskDrawer } from "./AddTaskDrawer";
+import { AddTaskModal } from "./AddTaskModal";
 import { EditTaskDrawer } from "./EditTaskDrawer";
 import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
@@ -72,14 +72,19 @@ function buildSections(tasks: TaskRow[]): Section[] {
     else b.later.push(t);
   }
 
-  return [
-    {
+  const sections: Section[] = [];
+  // Fix P: only show the Overdue section (header + list) when something is
+  // actually overdue — no empty-state row.
+  if (b.overdue.length > 0) {
+    sections.push({
       key: "overdue",
       label: "Overdue",
       empty: "Nothing Overdue",
       tasks: b.overdue,
       warn: true,
-    },
+    });
+  }
+  sections.push(
     { key: "today", label: "Today", empty: "Nothing Due Today", tasks: b.today },
     {
       key: "week",
@@ -98,15 +103,10 @@ function buildSections(tasks: TaskRow[]): Section[] {
       label: "No Due Date",
       empty: "No Tasks Without A Due Date",
       tasks: b.none,
-    },
-  ];
+    }
+  );
+  return sections;
 }
-
-const PRIORITY_DOT = {
-  high: "bg-danger",
-  medium: "bg-warn",
-  low: "bg-gray-300",
-} as const;
 
 function fmtDue(date: string | null, time: string | null): string {
   if (!date) return "";
@@ -282,6 +282,11 @@ export function TasksList({
       )}
 
       <div className="space-y-5">
+        {showOverdueOnly && sections.length === 0 && (
+          <div className="rounded-lg border border-gray-200 bg-surface px-4 py-6 text-center text-[12px] text-gray-500 shadow-card">
+            Nothing Overdue.
+          </div>
+        )}
         {sections.map((section) => (
           <div key={section.key}>
             <div
@@ -373,7 +378,7 @@ export function TasksList({
         )}
       </div>
 
-      <AddTaskDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <AddTaskModal open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <EditTaskDrawer
         task={editing}
         onClose={() => setEditing(null)}
@@ -479,13 +484,6 @@ function TaskRowDisplay({
           </div>
         )}
       </div>
-      <span
-        className={cn(
-          "h-[6px] w-[6px] rounded-full",
-          PRIORITY_DOT[task.priority]
-        )}
-        title={`${task.priority} priority`}
-      />
       <button
         type="button"
         onClick={(e) => {

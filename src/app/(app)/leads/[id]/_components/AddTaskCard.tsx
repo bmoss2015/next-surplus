@@ -4,18 +4,12 @@ import { useState, useTransition } from "react";
 import { IconPlus, IconX } from "@tabler/icons-react";
 import { createTask } from "@/app/(app)/tasks/_actions";
 
-const PRIORITIES: Array<{ value: "high" | "medium" | "low"; label: string }> = [
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
-];
-
 export function AddTaskCard({ leadId }: { leadId: string }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState<"high" | "medium" | "low">("medium");
+  const [dueTime, setDueTime] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -24,7 +18,7 @@ export function AddTaskCard({ leadId }: { leadId: string }) {
     setTitle("");
     setDescription("");
     setDueDate("");
-    setPriority("medium");
+    setDueTime("");
     setError(null);
   }
 
@@ -40,8 +34,7 @@ export function AddTaskCard({ leadId }: { leadId: string }) {
         title: t,
         description: description.trim() || null,
         due_date: dueDate || null,
-        due_time: null,
-        priority,
+        due_time: dueTime || null,
         lead_id: leadId,
         notes: null,
       });
@@ -55,6 +48,9 @@ export function AddTaskCard({ leadId }: { leadId: string }) {
       }
     });
   }
+
+  const pickerClass =
+    "w-full cursor-pointer rounded-md border border-[#e2e8f0] bg-white px-2 py-[6px] text-[12px] text-ink outline-none focus:border-[#0d6c7d]";
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
@@ -129,26 +125,19 @@ export function AddTaskCard({ leadId }: { leadId: string }) {
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12px] text-ink outline-none focus:border-petrol-500"
+                className={pickerClass}
               />
             </div>
             <div>
               <label className="mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500">
-                Priority
+                Time
               </label>
-              <select
-                value={priority}
-                onChange={(e) =>
-                  setPriority(e.target.value as "high" | "medium" | "low")
-                }
-                className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12px] text-ink outline-none focus:border-petrol-500"
-              >
-                {PRIORITIES.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className={pickerClass}
+              />
             </div>
           </div>
           {error && (

@@ -4,15 +4,20 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/current-user";
 
+// Fix P: priority was removed from tasks. The `tasks.priority` column still
+// exists, so a constant ("medium") is written to keep it populated, but the UI
+// no longer collects or shows it. `priority` is accepted but optional.
 type CreateTaskInput = {
   title: string;
   description?: string | null;
   due_date: string | null;
   due_time: string | null;
-  priority: "high" | "medium" | "low";
+  priority?: "high" | "medium" | "low";
   lead_id: string | null;
   notes: string | null;
 };
+
+const DEFAULT_TASK_PRIORITY = "medium" as const;
 
 export async function createTask(
   input: CreateTaskInput
@@ -28,7 +33,7 @@ export async function createTask(
       description: (input.description ?? "").trim(),
       due_date: input.due_date,
       due_time: input.due_time,
-      priority: input.priority,
+      priority: input.priority ?? DEFAULT_TASK_PRIORITY,
       source: "manual",
       lead_id: input.lead_id,
       notes: input.notes,
@@ -42,7 +47,7 @@ export async function createTask(
     await sb.from("activities").insert({
       lead_id: input.lead_id,
       activity_type: "task_created",
-      payload: { title, priority: input.priority },
+      payload: { title },
     });
     revalidatePath(`/leads/${input.lead_id}`);
   }
@@ -65,7 +70,7 @@ export async function updateTask(
     description?: string | null;
     due_date: string | null;
     due_time: string | null;
-    priority: "high" | "medium" | "low";
+    priority?: "high" | "medium" | "low";
     lead_id: string | null;
     notes: string | null;
   }
@@ -81,7 +86,7 @@ export async function updateTask(
       description: (input.description ?? "").trim(),
       due_date: input.due_date,
       due_time: input.due_time,
-      priority: input.priority,
+      priority: input.priority ?? DEFAULT_TASK_PRIORITY,
       lead_id: input.lead_id,
       notes: input.notes,
     })

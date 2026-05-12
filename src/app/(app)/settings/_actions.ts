@@ -27,6 +27,9 @@ export async function inviteMember(
   if (cleanName.length === 0) {
     return { ok: false, error: "First and last name are required" };
   }
+  // Only "admin" and "member" are valid roles — anything else (including a
+  // missing/garbled value) falls back to "member". Admin is never granted
+  // unless it was explicitly selected.
   const safeRole: "admin" | "member" = role === "admin" ? "admin" : "member";
 
   // inviteUserByEmail sends the invite email and stamps the org + role + full
@@ -34,11 +37,28 @@ export async function inviteMember(
   // that into a profile row, so the invitee lands in the right org with their
   // name already set.
   const admin = createServiceClient();
-  const { error } = await admin.auth.admin.inviteUserByEmail(cleanEmail, {
+  const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(cleanEmail, {
     data: { org_id: profile.orgId, role: safeRole, full_name: cleanName },
     redirectTo: `${SITE_URL}/accept-invite`,
   });
   if (error) return { ok: false, error: error.message };
+
+  // Fix P / Fix 9: don't rely solely on the auth trigger — write the chosen
+  // role straight onto the profile (service client, bypasses RLS) so the role
+  // pill in the Team section always reflects what was selected at invite time.
+  const invitedId = invited?.user?.id;
+  if (invitedId) {
+    await admin.from("profiles").upsert(
+      {
+        id: invitedId,
+        org_id: profile.orgId,
+        role: safeRole,
+        full_name: cleanName,
+        email: cleanEmail,
+      },
+      { onConflict: "id" }
+    );
+  }
   revalidatePath("/settings");
   return { ok: true };
 }

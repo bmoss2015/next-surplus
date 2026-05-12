@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 
+// Fix P: Kanban is the default Leads view (served at /leads); the table lives
+// at /leads/table.
 const TABS = [
   { label: "Daily Work", href: "/leads/daily" },
-  { label: "Kanban", href: "/leads/kanban" },
-  { label: "Table", href: "/leads" },
+  { label: "Kanban", href: "/leads" },
+  { label: "Table", href: "/leads/table" },
 ] as const;
 
 export function ViewToggle({ active }: { active: "daily" | "kanban" | "table" }) {

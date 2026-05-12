@@ -46,6 +46,7 @@ import {
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { formatAddress, formatCity } from "@/lib/imports/format-address";
+import { US_STATE_NAMES } from "@/lib/leads/types";
 
 type Step =
   | "upload"
@@ -55,6 +56,31 @@ type Step =
   | "preview";
 
 const DISMISS_VALUE = "__dismiss__";
+
+// Fix P: a CSV row that failed validation on the preview step. `rowNumber` is
+// the 1-based position in the file (header row excluded).
+type PreviewInvalidRow = {
+  rowNumber: number;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  missing: string[];
+};
+
+// Fix 8 / Fix P: normalize a state value to a 2-letter code so the same state
+// always groups together (and shows up in the Leads state filter). Full names
+// like "Maryland" map to "MD"; 2-letter codes pass through; anything else
+// keeps its first two characters as a last resort.
+const STATE_NAME_TO_CODE = new Map(
+  Object.entries(US_STATE_NAMES).map(([code, name]) => [name.toUpperCase(), code])
+);
+function normalizeStateCode(raw: string): string {
+  const v = (raw ?? "").trim().toUpperCase();
+  if (!v) return "";
+  if (v.length === 2) return v;
+  return STATE_NAME_TO_CODE.get(v) ?? v.slice(0, 2);
+}
 
 // Fix E / Fix H: column-mapping lists are chunked so the user never faces a
 // wall of 100+ rows. Recognized columns (step 1) page at 15; unrecognized
@@ -618,6 +644,9 @@ export function ImportWizard() {
   const [dupResolution, setDupResolution] = useState<Record<number, DuplicateResolution>>(
     {}
   );
+  // Fix P: rows that fail validation on the preview step. Import is blocked
+  // while any of these exist — the user must fix the source or drop the row.
+  const [invalidRows, setInvalidRows] = useState<PreviewInvalidRow[]>([]);
 
   useEffect(() => {
     fetchLeadSources()
@@ -640,6 +669,7 @@ export function ImportWizard() {
     setDupMatches([]);
     setNormalized([]);
     setDupResolution({});
+    setInvalidRows([]);
     setShowOtherInput(false);
     setOtherSourceName("");
   }
@@ -837,15 +867,21 @@ export function ImportWizard() {
     };
 
     const rows: IncomingLead[] = [];
-    let missingRequired = 0;
+    const invalid: PreviewInvalidRow[] = [];
+    let rowNumber = 0;
     for (const raw of rawRows) {
+      rowNumber += 1;
       const address = get(raw, "address");
       const city = get(raw, "city");
-      const stateRaw = get(raw, "state").toUpperCase();
-      const state = stateRaw.length > 2 ? stateRaw.slice(0, 2) : stateRaw;
+      const state = normalizeStateCode(get(raw, "state"));
       const zip = get(raw, "zip");
       if (!address || !city || !state || !zip) {
-        missingRequired += 1;
+        const missing: string[] = [];
+        if (!address) missing.push("Address");
+        if (!city) missing.push("City");
+        if (!state) missing.push("State");
+        if (!zip) missing.push("Zip");
+        invalid.push({ rowNumber, address, city, state, zip, missing });
         continue;
       }
 
@@ -958,17 +994,16 @@ export function ImportWizard() {
       });
     }
 
-    if (rows.length === 0) {
-      setError(
-        missingRequired > 0
-          ? `Every Row Is Missing One Of The Required Fields (Address, City, State, Zip).`
-          : `No Rows Found In The File.`
-      );
+    if (rows.length === 0 && invalid.length === 0) {
+      setError(`No Rows Found In The File.`);
       return;
     }
 
     startTransition(async () => {
-      const dupResult = await checkDuplicates(rows.map((r) => ({ address: r.address, zip: r.zip })));
+      const dupResult =
+        rows.length > 0
+          ? await checkDuplicates(rows.map((r) => ({ address: r.address, zip: r.zip })))
+          : { matches: [] as Array<string | null> };
       setDupMatches(dupResult.matches);
       // Default every detected duplicate to "Update Blank Fields Only".
       const initialRes: Record<number, DuplicateResolution> = {};
@@ -977,12 +1012,8 @@ export function ImportWizard() {
       });
       setDupResolution(initialRes);
       setNormalized(rows);
+      setInvalidRows(invalid);
       if (source && source !== leadSource) setLeadSource(source);
-      if (missingRequired > 0) {
-        setError(
-          `${missingRequired} ${missingRequired === 1 ? "Row Was" : "Rows Were"} Skipped For Missing Required Values.`
-        );
-      }
       setStep("preview");
     });
   }
@@ -1012,6 +1043,11 @@ export function ImportWizard() {
 
   function runImport() {
     if (!file) return;
+    // Fix P: never run an import while any row failed validation.
+    if (invalidRows.length > 0) {
+      setError("Some Rows Have Errors. Fix Or Remove The Highlighted Rows First.");
+      return;
+    }
     setError(null);
     const decisions: ImportRowDecision[] = [];
     normalized.forEach((_, i) => {
@@ -1033,7 +1069,11 @@ export function ImportWizard() {
       if (persistMode === "save") {
         await saveSourceMapping(source, mapping, dismissed);
       }
-      router.push("/leads");
+      // Fix P: land on the Leads table (now at /leads/table) and force a fresh
+      // server render so the new rows — and any new states in the filter —
+      // show up immediately.
+      router.push("/leads/table");
+      router.refresh();
     });
   }
 
@@ -1436,16 +1476,31 @@ export function ImportWizard() {
   const importableCount = summary.newRows + summary.updatedBlank + summary.replaced;
   const RES_OPTIONS: DuplicateResolution[] = ["skip", "update_blank", "replace_all"];
 
+  const hasRowErrors = invalidRows.length > 0;
+
   return (
     <Shell step={step}>
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h2 className="m-0 text-[14px] font-medium text-ink">Preview And Confirm</h2>
           <div className="mt-[2px] text-[11.5px] text-gray-500">
-            {totalRows} Rows Ready · {dupCount} Duplicates Detected · Lead Source: {sourceName}
+            {totalRows} Rows Ready · {dupCount} Duplicates Detected
+            {hasRowErrors && ` · ${invalidRows.length} Need Fixing`} · Lead Source:{" "}
+            {sourceName}
           </div>
         </div>
       </div>
+
+      {hasRowErrors && (
+        <div className="mb-3 flex items-start gap-1.5 rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
+          <IconAlertTriangle size={14} stroke={2} className="mt-[1px] shrink-0" />
+          <span>
+            {invalidRows.length} {invalidRows.length === 1 ? "Row Is" : "Rows Are"} Missing
+            Required Values And Are Highlighted Below. Fix Them In Your File — Or Remove
+            Them — And Re Upload. The Import Cannot Run Until Every Row Is Valid.
+          </span>
+        </div>
+      )}
 
       <div className="max-h-[420px] overflow-auto rounded-md border border-gray-200">
         <table className="w-full text-[12px]">
@@ -1462,6 +1517,25 @@ export function ImportWizard() {
             </tr>
           </thead>
           <tbody>
+            {invalidRows.map((bad) => (
+              <tr key={`bad-${bad.rowNumber}`} className="border-t border-danger-border bg-danger-bg">
+                <td className="px-3 py-[6px]">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-danger">
+                    <IconAlertTriangle size={11} />
+                    Row {bad.rowNumber} Error
+                  </span>
+                </td>
+                <td className="px-3 py-[6px] text-ink">{bad.address || "—"}</td>
+                <td className="px-3 py-[6px] text-gray-600">{bad.city || "—"}</td>
+                <td className="px-3 py-[6px] text-gray-600">{bad.state || "—"}</td>
+                <td className="px-3 py-[6px] text-gray-600">{bad.zip || "—"}</td>
+                <td className="px-3 py-[6px] text-gray-400">—</td>
+                <td className="px-3 py-[6px] text-gray-400">—</td>
+                <td className="px-3 py-[6px] text-[11px] font-medium text-danger">
+                  Missing {bad.missing.join(", ")}
+                </td>
+              </tr>
+            ))}
             {normalized.slice(0, 200).map((row, idx) => {
               const matchId = dupMatches[idx] ?? null;
               const res = dupResolution[idx] ?? DEFAULT_DUPLICATE_RESOLUTION;
@@ -1584,12 +1658,14 @@ export function ImportWizard() {
           <button
             type="button"
             onClick={runImport}
-            disabled={pending || importableCount === 0}
+            disabled={pending || importableCount === 0 || hasRowErrors}
             className="btn-primary cursor-pointer rounded-md px-3 py-2 text-xs font-medium disabled:opacity-50"
           >
             {pending
               ? "Importing"
-              : `Import ${importableCount} ${importableCount === 1 ? "Lead" : "Leads"}`}
+              : hasRowErrors
+                ? "Fix Highlighted Rows First"
+                : `Import ${importableCount} ${importableCount === 1 ? "Lead" : "Leads"}`}
           </button>
         </div>
       </div>
@@ -1677,7 +1753,6 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
             <th className="px-4 py-2 text-right font-medium text-gray-500">Total</th>
             <th className="px-4 py-2 text-right font-medium text-gray-500">Imported</th>
             <th className="px-4 py-2 text-right font-medium text-gray-500">Skipped</th>
-            <th className="px-4 py-2 text-right font-medium text-gray-500">Errors</th>
             <th className="px-4 py-2 text-left font-medium text-gray-500">Status</th>
             <th className="px-4 py-2 text-right font-medium text-gray-500">Actions</th>
           </tr>
@@ -1702,7 +1777,6 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
                 <td className="px-4 py-[10px] text-right text-warn-strong">
                   {row.skipped_count}
                 </td>
-                <td className="px-4 py-[10px] text-right text-danger">{row.error_count}</td>
                 <td className="px-4 py-[10px] capitalize text-gray-500">{row.status}</td>
                 <td className="px-4 py-[10px] text-right">
                   {canRevert ? (
