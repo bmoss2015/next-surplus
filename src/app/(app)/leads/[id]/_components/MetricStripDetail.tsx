@@ -130,7 +130,8 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
   const surplusSub = hasConfirmed ? "Manually Verified" : "Not Yet Confirmed";
   const surplusForMath = hasConfirmed ? (confirmedSurplus as number) : calculatedSurplus ?? 0;
   const recoveryFeeAmount = surplusForMath * (lead.recovery_fee_percent / 100);
-  const netPayout = surplusForMath - lead.attorney_cost - recoveryFeeAmount;
+  // Fix EEEEE: Est. Net Payout = recovery fee $ − attorney cost.
+  const netPayout = recoveryFeeAmount - lead.attorney_cost;
   const payoutSub = hasConfirmed
     ? "Based On Confirmed Surplus"
     : lead.closing_bid != null

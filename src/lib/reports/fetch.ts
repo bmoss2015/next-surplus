@@ -13,6 +13,7 @@ export type ReportData = {
     count: number;
     totalRecovered: number;
     totalFees: number;
+    totalNetPayout: number;
     avgDaysImportToWon: number;
   };
   lostBreakdown: Array<{ reason: string; count: number; pct: number }>;
@@ -146,6 +147,16 @@ export async function fetchReports(): Promise<ReportData> {
         (((l.estimated_surplus as number) ?? 0) *
           ((l.recovery_fee_percent as number) ?? 0)) /
           100,
+      0
+    ),
+    // Fix EEEEE: Est. Net Payout = (surplus × recovery fee %) − attorney cost.
+    totalNetPayout: won.reduce(
+      (acc, l) =>
+        acc +
+        ((((l.estimated_surplus as number) ?? 0) *
+          ((l.recovery_fee_percent as number) ?? 0)) /
+          100 -
+          ((l.attorney_cost as number) ?? 0)),
       0
     ),
     avgDaysImportToWon:

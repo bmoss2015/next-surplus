@@ -55,7 +55,8 @@ export function SurplusBreakdown({
     ? (confirmedSurplus as number)
     : calculatedSurplus ?? 0;
   const feeAmount = surplusForMath * (recoveryFeePercent / 100);
-  const netPayout = surplusForMath - feeAmount - attorneyCostVal;
+  // Fix EEEEE: Est. Net Payout = recovery fee $ − attorney cost.
+  const netPayout = feeAmount - attorneyCostVal;
 
   function commitAttorneyCost(n: number) {
     if (n === attorneyCostVal) return;

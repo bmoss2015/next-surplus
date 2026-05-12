@@ -156,6 +156,10 @@ export default async function ReportsPage() {
               value={fmtBig(data.wonSummary.totalFees)}
             />
             <Stat
+              label="Est. Net Payout"
+              value={fmtBig(data.wonSummary.totalNetPayout)}
+            />
+            <Stat
               label="Avg Days Import → Won"
               value={`${data.wonSummary.avgDaysImportToWon} days`}
             />
