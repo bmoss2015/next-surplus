@@ -74,8 +74,30 @@ export async function setMemberRole(
   }
   const safeRole: "admin" | "member" = role === "admin" ? "admin" : "member";
   const sb = await createClient();
+
+  // Capture the prior role for the audit entry, then write the change.
+  const { data: prior } = await sb
+    .from("profiles")
+    .select("role, full_name, email")
+    .eq("id", userId)
+    .maybeSingle();
+  const fromRole = (prior?.role as string | null) ?? null;
+
   const { error } = await sb.from("profiles").update({ role: safeRole }).eq("id", userId);
   if (error) return { ok: false, error: error.message };
+
+  // Fix JJ: audit sensitive permission changes (org_id defaults to auth_org_id()).
+  await sb.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "team_role_changed",
+    payload: {
+      target_user_id: userId,
+      target_name: (prior?.full_name as string | null) ?? (prior?.email as string | null) ?? null,
+      from_role: fromRole,
+      to_role: safeRole,
+    },
+  });
+
   revalidatePath("/settings");
   return { ok: true };
 }

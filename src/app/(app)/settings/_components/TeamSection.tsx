@@ -22,6 +22,9 @@ export function TeamSection({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
+  // Fix JJ: a role dropdown change is staged here (userId -> pending value) and
+  // only written to the DB when the inline Save button is clicked.
+  const [editedRoles, setEditedRoles] = useState<Record<string, "admin" | "member">>({});
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null
@@ -63,12 +66,39 @@ export function TeamSection({
     });
   }
 
-  function changeRole(userId: string, next: "admin" | "member") {
+  function onSelectRole(
+    userId: string,
+    originalRole: string,
+    value: "admin" | "member"
+  ) {
+    setEditedRoles((prev) => {
+      const nextMap = { ...prev };
+      if (value === originalRole) delete nextMap[userId];
+      else nextMap[userId] = value;
+      return nextMap;
+    });
+  }
+
+  function clearEditedRole(userId: string) {
+    setEditedRoles((prev) => {
+      const nextMap = { ...prev };
+      delete nextMap[userId];
+      return nextMap;
+    });
+  }
+
+  function saveRole(userId: string) {
+    const next = editedRoles[userId];
+    if (!next) return;
     setMsg(null);
     startTransition(async () => {
       const res = await setMemberRole(userId, next);
-      if (res.ok) router.refresh();
-      else setMsg({ kind: "err", text: res.error });
+      if (res.ok) {
+        clearEditedRole(userId);
+        router.refresh();
+      } else {
+        setMsg({ kind: "err", text: res.error });
+      }
     });
   }
 
@@ -108,6 +138,9 @@ export function TeamSection({
       <div className="grid grid-cols-3 gap-3">
         {initial.map((m) => {
           const isSelf = m.id === currentUserId;
+          const editedRole = editedRoles[m.id];
+          const roleDirty = editedRole !== undefined;
+          const roleValue = editedRole ?? m.role;
           const initialLetter = (m.full_name || m.email || "?")
             .trim()
             .charAt(0)
@@ -135,30 +168,52 @@ export function TeamSection({
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 {isSelf ? (
                   <span className="rounded-full bg-petrol-50 px-2 py-[2px] text-[10.5px] font-medium text-petrol-700">
                     {m.role === "admin" ? "Admin" : "Member"}
                   </span>
                 ) : (
-                  <select
-                    value={m.role}
-                    disabled={pending}
-                    onChange={(e) =>
-                      changeRole(m.id, e.target.value as "admin" | "member")
-                    }
-                    className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none focus:border-petrol-500 disabled:opacity-60"
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="member">Member</option>
-                  </select>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <select
+                      value={roleValue}
+                      disabled={pending}
+                      onChange={(e) =>
+                        onSelectRole(m.id, m.role, e.target.value as "admin" | "member")
+                      }
+                      className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none focus:border-petrol-500 disabled:opacity-60"
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="member">Member</option>
+                    </select>
+                    {roleDirty && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => saveRole(m.id)}
+                          disabled={pending}
+                          className="btn-primary shrink-0 cursor-pointer rounded-md px-2 py-[3px] text-[11px] font-medium disabled:opacity-50"
+                        >
+                          {pending ? "Saving" : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => clearEditedRole(m.id)}
+                          disabled={pending}
+                          className="shrink-0 cursor-pointer text-[11px] text-gray-500 hover:text-ink disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                  </div>
                 )}
-                {!isSelf && (
+                {!isSelf && !roleDirty && (
                   <button
                     type="button"
                     onClick={() => removeMember(m.id)}
                     disabled={pending}
-                    className="cursor-pointer text-[11px] text-gray-400 hover:text-danger disabled:opacity-50"
+                    className="shrink-0 cursor-pointer text-[11px] text-gray-400 hover:text-danger disabled:opacity-50"
                   >
                     Remove
                   </button>
