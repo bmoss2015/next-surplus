@@ -230,7 +230,7 @@ function KanbanCard({
   // neutral "+N more" pill. The lead detail page still shows them all.
   const tags: Array<{ key: string; label: string; cls: string }> = [];
   if (lead.below_floor)
-    tags.push({ key: "below_floor", label: "Below Floor", cls: "border-warn-border bg-warn-bg text-warn-strong" });
+    tags.push({ key: "below_floor", label: "Below Minimum", cls: "border-warn-border bg-warn-bg text-warn-strong" });
   if (lead.has_litigator)
     tags.push({ key: "litigator", label: "Litigator", cls: "border-[#fca5a5] bg-[#fef2f2] text-[#991b1b]" });
   if (lead.needs_action_flag)

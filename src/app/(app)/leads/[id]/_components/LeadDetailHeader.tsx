@@ -54,7 +54,7 @@ export function LeadDetailHeader({
               )}
               {lead.below_floor && lead.stage !== "lost" && (
                 <span className="rounded-[5px] border border-warn-border bg-warn-bg px-[10px] py-1 text-[11px] font-medium text-warn-strong">
-                  Below Floor
+                  Below Minimum
                 </span>
               )}
               {lead.needs_action_flag && lead.stage !== "lost" && (

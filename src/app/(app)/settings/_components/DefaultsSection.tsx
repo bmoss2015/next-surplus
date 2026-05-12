@@ -61,8 +61,8 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
           />
         </Row>
         <Row
-          label="Surplus Floor"
-          hint="Below-floor warning threshold. Soft warning only — leads can still be pursued below this."
+          label="Minimum Threshold"
+          hint="Leads with a surplus under this amount are tagged Below Minimum. Soft warning only — they can still be pursued."
         >
           <CurrencyInput
             value={initial.surplus_floor}
