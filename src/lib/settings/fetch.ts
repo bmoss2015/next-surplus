@@ -49,6 +49,20 @@ export async function fetchAppSettings(): Promise<AppSettings> {
   };
 }
 
+// Fix R: Pipeline Rules — the "Needs Action" inactivity threshold (in days).
+// Returns null when blank/disabled (no row, JSON null, or a non-positive value).
+export async function fetchNeedsActionThreshold(): Promise<number | null> {
+  const sb = await createClient();
+  const { data } = await sb
+    .from("app_settings")
+    .select("value")
+    .eq("key", "needs_action_days_threshold")
+    .maybeSingle();
+  if (!data) return null;
+  const n = Number(data.value);
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : null;
+}
+
 export type AttorneyRow = {
   id: string;
   name: string;

@@ -42,6 +42,19 @@ export async function fetchDailyWork(): Promise<{
 
   if (error) throw error;
   const leads = (data ?? []) as LeadRow[];
+
+  // Fix R: Pipeline Rules — the configurable inactivity threshold. When unset
+  // (no row / JSON null / non-positive), there is NO automatic time-based
+  // flagging; only manually flagged leads land in Needs Action. When set to N
+  // days, leads idle longer than that in the ACTION_STAGES are also surfaced.
+  const { data: thresholdSetting } = await sb
+    .from("app_settings")
+    .select("value")
+    .eq("key", "needs_action_days_threshold")
+    .maybeSingle();
+  const rawThreshold = Number(thresholdSetting?.value);
+  const needsActionDays =
+    Number.isFinite(rawThreshold) && rawThreshold >= 1 ? Math.floor(rawThreshold) : null;
   const leadIds = leads.map((l) => l.id);
   const safeIds = leadIds.length ? leadIds : ["00000000-0000-0000-0000-000000000000"];
 
@@ -105,12 +118,17 @@ export async function fetchDailyWork(): Promise<{
 
   for (const lead of enriched) {
     const staleHours = hoursSinceLastActivity(lead);
+    // ACTION_STAGES excludes the "new" stage, so New Leads are never auto-flagged.
     const inActionStage = (ACTION_STAGES as readonly string[]).includes(lead.stage);
 
     if (lead.needs_action_flag) {
       needsAction.push({ ...lead, reason: "Flagged" });
-    } else if (inActionStage && staleHours > 24) {
-      const days = Math.max(1, Math.floor(staleHours / 24));
+    } else if (
+      needsActionDays != null &&
+      inActionStage &&
+      staleHours > needsActionDays * 24
+    ) {
+      const days = Math.max(needsActionDays, Math.floor(staleHours / 24));
       needsAction.push({
         ...lead,
         reason: days === 1 ? "Idle Over A Day" : `Idle ${days} Days`,

@@ -252,7 +252,6 @@ export async function importLeads(
       total_rows: rows.length,
       imported_count: 0,
       skipped_count: 0,
-      error_count: 0,
       status: "processing",
       user_id: null,
     })
@@ -264,7 +263,6 @@ export async function importLeads(
   let skipped = 0;
   let updatedBlank = 0;
   let replaced = 0;
-  let errors = 0;
   const importRowsLog: Array<Record<string, unknown>> = [];
 
   const decisionByIndex = new Map<number, ImportRowDecision>();
@@ -392,7 +390,6 @@ export async function importLeads(
         .single();
 
       if (leadErr) {
-        errors += 1;
         importRowsLog.push({
           import_id: importRow.id,
           raw_row: row,
@@ -445,7 +442,6 @@ export async function importLeads(
     }
 
     if (updateErr) {
-      errors += 1;
       importRowsLog.push({
         import_id: importRow.id,
         raw_row: row,
@@ -484,7 +480,6 @@ export async function importLeads(
     .update({
       imported_count: imported,
       skipped_count: skipped,
-      error_count: errors,
       status: "completed",
     })
     .eq("id", importRow.id);
@@ -513,7 +508,7 @@ export async function fetchImportHistory(): Promise<ImportHistoryRow[]> {
   const { data, error } = await sb
     .from("imports")
     .select(
-      "id, filename, uploaded_at, total_rows, imported_count, skipped_count, error_count, status"
+      "id, filename, uploaded_at, total_rows, imported_count, skipped_count, status"
     )
     .order("uploaded_at", { ascending: false })
     .limit(50);

@@ -670,7 +670,8 @@ export type ImportHistoryRow = {
   total_rows: number;
   imported_count: number;
   skipped_count: number;
-  error_count: number;
+  // Fix R: error counts are no longer tracked or shown — invalid rows are
+  // blocked on the preview step before an import ever runs.
   status: string;
 };
 

@@ -6,11 +6,13 @@ import {
   fetchTemplates,
   fetchResearchTemplates,
   fetchOrgMembers,
+  fetchNeedsActionThreshold,
 } from "@/lib/settings/fetch";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { DefaultsSection } from "./_components/DefaultsSection";
 import { AttorneysSection } from "./_components/AttorneysSection";
 import { LostReasonsSection } from "./_components/LostReasonsSection";
+import { PipelineRulesSection } from "./_components/PipelineRulesSection";
 import { TemplatesSection } from "./_components/TemplatesSection";
 import { SmsTemplatesSection } from "./_components/SmsTemplatesSection";
 import { ResearchTemplatesSection } from "./_components/ResearchTemplatesSection";
@@ -22,15 +24,23 @@ export default async function SettingsPage() {
   const profile = await getCurrentProfile();
   if (!profile?.isAdmin) redirect("/");
 
-  const [defaults, attorneys, lostReasons, templates, researchTemplates, members] =
-    await Promise.all([
-      fetchAppSettings(),
-      fetchAttorneys(),
-      fetchLostReasonsAdmin(),
-      fetchTemplates(),
-      fetchResearchTemplates(),
-      fetchOrgMembers(),
-    ]);
+  const [
+    defaults,
+    attorneys,
+    lostReasons,
+    templates,
+    researchTemplates,
+    members,
+    needsActionThreshold,
+  ] = await Promise.all([
+    fetchAppSettings(),
+    fetchAttorneys(),
+    fetchLostReasonsAdmin(),
+    fetchTemplates(),
+    fetchResearchTemplates(),
+    fetchOrgMembers(),
+    fetchNeedsActionThreshold(),
+  ]);
 
   return (
     <div className="px-7 py-6">
@@ -47,6 +57,9 @@ export default async function SettingsPage() {
       <div className="grid grid-cols-2 gap-[18px]">
         <div className="col-span-2">
           <TeamSection initial={members} currentUserId={profile.id} />
+        </div>
+        <div className="col-span-2">
+          <PipelineRulesSection initial={needsActionThreshold} />
         </div>
         <DefaultsSection initial={defaults} />
         <LostReasonsSection initial={lostReasons} />

@@ -101,6 +101,43 @@ export async function updateAppSetting(
   return { ok: true };
 }
 
+// -- Pipeline rules (Fix R) --------------------------------------------------
+
+// Save (or clear) the "Needs Action" inactivity threshold. A positive integer
+// enables automatic flagging after that many days of no activity; null / blank
+// / anything non-positive disables it (the row is removed — absent reads the
+// same as disabled).
+export async function setNeedsActionThreshold(
+  days: number | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  if (days != null && Number.isFinite(days) && days >= 1) {
+    const value = Math.floor(days);
+    const { error } = await sb
+      .from("app_settings")
+      .upsert(
+        {
+          key: "needs_action_days_threshold",
+          value,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "org_id,key" }
+      );
+    if (error) return { ok: false, error: error.message };
+  } else {
+    const { error } = await sb
+      .from("app_settings")
+      .delete()
+      .eq("key", "needs_action_days_threshold");
+    if (error) return { ok: false, error: error.message };
+  }
+  revalidatePath("/settings");
+  revalidatePath("/leads");
+  return { ok: true };
+}
+
 // -- Attorneys ---------------------------------------------------------------
 
 export async function upsertAttorney(input: {

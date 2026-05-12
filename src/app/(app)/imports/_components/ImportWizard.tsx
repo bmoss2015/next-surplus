@@ -644,9 +644,15 @@ export function ImportWizard() {
   const [dupResolution, setDupResolution] = useState<Record<number, DuplicateResolution>>(
     {}
   );
-  // Fix P: rows that fail validation on the preview step. Import is blocked
-  // while any of these exist — the user must fix the source or drop the row.
+  // Fix P / Fix R: rows that fail validation on the preview step. Import is
+  // blocked while any of these exist — the user must fix the source or remove
+  // the offending rows here before importing. Only the valid rows ever import.
   const [invalidRows, setInvalidRows] = useState<PreviewInvalidRow[]>([]);
+  // Fix R: set after a successful import — drives the centered success popup.
+  const [successResult, setSuccessResult] = useState<{
+    imported: number;
+    skipped: number;
+  } | null>(null);
 
   useEffect(() => {
     fetchLeadSources()
@@ -670,8 +676,15 @@ export function ImportWizard() {
     setNormalized([]);
     setDupResolution({});
     setInvalidRows([]);
+    setSuccessResult(null);
     setShowOtherInput(false);
     setOtherSourceName("");
+  }
+
+  // Fix R: drop a single invalid row from the preview so the rest can import.
+  function removeInvalidRow(rowNumber: number) {
+    setInvalidRows((prev) => prev.filter((r) => r.rowNumber !== rowNumber));
+    setError(null);
   }
 
   // -----------------------------------------------------------------------
@@ -1069,11 +1082,11 @@ export function ImportWizard() {
       if (persistMode === "save") {
         await saveSourceMapping(source, mapping, dismissed);
       }
-      // Fix P: land on the Leads table (now at /leads/table) and force a fresh
-      // server render so the new rows — and any new states in the filter —
-      // show up immediately.
-      router.push("/leads/table");
+      // Fix R: refresh so the Import History below picks up the new row, then
+      // show the centered success popup. Navigation only happens if the user
+      // clicks "View Imported Leads" in that popup.
       router.refresh();
+      setSuccessResult({ imported: result.imported, skipped: result.skipped });
     });
   }
 
@@ -1479,6 +1492,7 @@ export function ImportWizard() {
   const hasRowErrors = invalidRows.length > 0;
 
   return (
+    <>
     <Shell step={step}>
       <div className="mb-4 flex items-start justify-between">
         <div>
@@ -1496,8 +1510,9 @@ export function ImportWizard() {
           <IconAlertTriangle size={14} stroke={2} className="mt-[1px] shrink-0" />
           <span>
             {invalidRows.length} {invalidRows.length === 1 ? "Row Is" : "Rows Are"} Missing
-            Required Values And Are Highlighted Below. Fix Them In Your File — Or Remove
-            Them — And Re Upload. The Import Cannot Run Until Every Row Is Valid.
+            Required Values And {invalidRows.length === 1 ? "Is" : "Are"} Highlighted Below.
+            Remove {invalidRows.length === 1 ? "It" : "Them"} Here, Or Fix Your Source File.
+            The Import Cannot Run Until Every Row Is Valid.
           </span>
         </div>
       )}
@@ -1518,11 +1533,11 @@ export function ImportWizard() {
           </thead>
           <tbody>
             {invalidRows.map((bad) => (
-              <tr key={`bad-${bad.rowNumber}`} className="border-t border-danger-border bg-danger-bg">
-                <td className="px-3 py-[6px]">
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-danger">
+              <tr key={`bad-${bad.rowNumber}`} className="border-t border-gray-150 bg-petrol-50">
+                <td className="border-l-4 border-l-petrol-500 px-3 py-[6px]">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-petrol-700">
                     <IconAlertTriangle size={11} />
-                    Row {bad.rowNumber} Error
+                    Row {bad.rowNumber}
                   </span>
                 </td>
                 <td className="px-3 py-[6px] text-ink">{bad.address || "—"}</td>
@@ -1531,8 +1546,21 @@ export function ImportWizard() {
                 <td className="px-3 py-[6px] text-gray-600">{bad.zip || "—"}</td>
                 <td className="px-3 py-[6px] text-gray-400">—</td>
                 <td className="px-3 py-[6px] text-gray-400">—</td>
-                <td className="px-3 py-[6px] text-[11px] font-medium text-danger">
-                  Missing {bad.missing.join(", ")}
+                <td className="px-3 py-[6px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-medium text-petrol-700">
+                      Missing {bad.missing.join(", ")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeInvalidRow(bad.rowNumber)}
+                      aria-label={`Remove Row ${bad.rowNumber}`}
+                      className="inline-flex shrink-0 cursor-pointer items-center gap-0.5 rounded-md border border-gray-200 bg-surface px-1.5 py-[2px] text-[10px] text-gray-600 hover:border-petrol-500"
+                    >
+                      <IconX size={10} stroke={2} />
+                      Remove
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -1664,12 +1692,103 @@ export function ImportWizard() {
             {pending
               ? "Importing"
               : hasRowErrors
-                ? "Fix Highlighted Rows First"
-                : `Import ${importableCount} ${importableCount === 1 ? "Lead" : "Leads"}`}
+                ? "Fix Errors To Import"
+                : importableCount === 0
+                  ? "No Rows To Import"
+                  : `Import ${importableCount} ${importableCount === 1 ? "Lead" : "Leads"}`}
           </button>
         </div>
       </div>
     </Shell>
+    {successResult && (
+      <ImportSuccessModal
+        imported={successResult.imported}
+        skipped={successResult.skipped}
+        onViewLeads={() => router.push("/leads")}
+        onImportAnother={() => {
+          setSuccessResult(null);
+          resetAll();
+        }}
+        onClose={() => setSuccessResult(null)}
+      />
+    )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Fix R: centered success popup shown after an import completes.
+// ---------------------------------------------------------------------------
+
+function ImportSuccessModal({
+  imported,
+  skipped,
+  onViewLeads,
+  onImportAnother,
+  onClose,
+}: {
+  imported: number;
+  skipped: number;
+  onViewLeads: () => void;
+  onImportAnother: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
+      <div className="relative w-full max-w-[420px] rounded-lg bg-surface p-6 text-center shadow-elevated">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-3 top-3 cursor-pointer text-gray-400 hover:text-ink"
+        >
+          <IconX size={16} stroke={1.75} />
+        </button>
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-petrol-100">
+          <IconCheck size={26} stroke={2.5} className="text-petrol-500" />
+        </div>
+        <h2 className="m-0 mt-4 text-[18px] font-medium tracking-tight text-ink">
+          Import Complete
+        </h2>
+        <div className="mt-1 text-[13px] text-gray-600">
+          {imported} {imported === 1 ? "Lead" : "Leads"} Imported Successfully
+        </div>
+        {skipped > 0 && (
+          <div className="mt-[2px] text-[13px] text-gray-500">
+            {skipped} {skipped === 1 ? "Row" : "Rows"} Skipped
+          </div>
+        )}
+        <div className="mt-5 flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={onViewLeads}
+            className="btn-primary cursor-pointer rounded-md px-4 py-2 text-xs font-medium"
+          >
+            View Imported Leads
+          </button>
+          <button
+            type="button"
+            onClick={onImportAnother}
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-4 py-2 text-xs font-medium text-ink hover:border-petrol-500"
+          >
+            Import Another File
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1687,6 +1806,23 @@ function formatTimestamp(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+// Fix R: human-friendly import status labels. A finished import reads "Success";
+// a reverted one reads "Cancelled".
+function statusLabel(status: string): string {
+  switch (status) {
+    case "completed":
+      return "Success";
+    case "cancelled":
+      return "Cancelled";
+    case "processing":
+      return "Processing";
+    case "failed":
+      return "Failed";
+    default:
+      return status.charAt(0).toUpperCase() + status.slice(1);
+  }
 }
 
 export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] }) {
@@ -1777,7 +1913,7 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
                 <td className="px-4 py-[10px] text-right text-warn-strong">
                   {row.skipped_count}
                 </td>
-                <td className="px-4 py-[10px] capitalize text-gray-500">{row.status}</td>
+                <td className="px-4 py-[10px] text-gray-500">{statusLabel(row.status)}</td>
                 <td className="px-4 py-[10px] text-right">
                   {canRevert ? (
                     <button
