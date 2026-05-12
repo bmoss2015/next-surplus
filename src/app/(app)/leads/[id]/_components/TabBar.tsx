@@ -28,7 +28,9 @@ export function TabBar({ active }: { active: TabKey }) {
     else sp.set("tab", key);
     const qs = sp.toString();
     startTransition(() => {
-      router.push(qs ? `${pathname}?${qs}` : pathname);
+      // Fix UU: keep the scroll position — never jump to the top of the page
+      // when switching tabs.
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     });
   }
 
