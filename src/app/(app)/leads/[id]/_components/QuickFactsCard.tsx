@@ -1,6 +1,5 @@
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { SectionSubheader } from "./SectionSubheader";
-import { InlineTextField } from "./InlineTextField";
 
 // Fix 90: how a recovery type reads on screen. Proper Case, no dashes.
 function recoveryTypeLabel(value: string | null | undefined): string {
@@ -62,16 +61,12 @@ export function QuickFactsCard({ lead }: { lead: LeadDetailWithCounts }) {
       <div className="space-y-0">
         <Row label="Sale Date" value={fmtDate(lead.sale_date)} />
         <Row label="Recovery Type" value={recoveryTypeLabel(lead.recovery_type)} />
+        {/* Fix GGGGG: Case Number — read-only plain text here; edit it on the
+            Property Info tab. Never currency-formatted. */}
         <Row
           label="Case Number"
-          value={
-            <InlineTextField
-              leadId={lead.id}
-              field="case_number"
-              initial={lead.case_number}
-              placeholder="Not Set"
-            />
-          }
+          value={lead.case_number ?? "Not Set"}
+          muted={!lead.case_number}
         />
         <Row
           label="Parcel Number"
