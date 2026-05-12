@@ -29,29 +29,46 @@ export default async function LeadsTablePage({
     if (typeof value === "string") exportParams.set(key, value);
   }
   const exportHref = `/leads/export?${exportParams.toString()}`;
+  const isArchived = query.archived === true;
 
   return (
     <div className="px-7 py-6">
+      {/* Fix EEE Patch: archived view gets a distinct heading and a back link;
+          the Daily Work / Kanban / Table switcher is hidden here. */}
+      {isArchived && (
+        <Link
+          href="/leads/table"
+          className="mb-3 inline-flex items-center gap-1 text-[12px] text-gray-500 hover:text-petrol-500"
+        >
+          ← Active Leads
+        </Link>
+      )}
       <div className="mb-[22px] flex items-start justify-between gap-4">
         <div>
           <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-            Leads
+            {isArchived ? "Archived Leads" : "Leads"}
           </h1>
           <div className="mt-1 text-[13px] text-gray-500">
             {total === 0
-              ? "No leads match the current filters"
-              : `${total} ${total === 1 ? "lead" : "leads"} matching filters`}
+              ? isArchived
+                ? "No archived leads"
+                : "No leads match the current filters"
+              : `${total} ${total === 1 ? "lead" : "leads"}${
+                  isArchived ? " archived" : " matching filters"
+                }`}
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/leads/table?archived=1"
-            className="text-[12px] text-gray-400 underline-offset-[3px] hover:text-petrol-500"
-          >
-            Archived
-          </Link>
-          <ViewToggle active="table" />
-        </div>
+        {!isArchived && (
+          <div className="flex items-center gap-4">
+            <Link
+              href="/leads/table?archived=1"
+              className="text-[12px] text-gray-400 underline-offset-[3px] hover:text-petrol-500"
+            >
+              Archived
+            </Link>
+            <ViewToggle active="table" />
+          </div>
+        )}
       </div>
 
       <LeadsFilters states={states} />
