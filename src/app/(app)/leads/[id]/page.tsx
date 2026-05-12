@@ -11,6 +11,7 @@ import { QuickFactsCard } from "./_components/QuickFactsCard";
 import { LeadTasksCard } from "./_components/LeadTasksCard";
 import { RecentActivityCard } from "./_components/RecentActivityCard";
 import { LostBanner } from "./_components/LostBanner";
+import { NeedsReviewBanner } from "./_components/NeedsReviewBanner";
 import { TabBar, type TabKey } from "./_components/TabBar";
 import { OverviewTab } from "./_components/OverviewTab";
 import { ContactsTab } from "./_components/ContactsTab";
@@ -62,6 +63,10 @@ export default async function LeadDetailPage({
       <LeadDetailHeader lead={lead} />
 
       {lead.stage === "lost" && <LostBanner reason={lead.lost_reason} />}
+
+      {lead.needs_action_flag && lead.stage !== "lost" && (
+        <NeedsReviewBanner leadId={lead.id} note={lead.needs_action_note} />
+      )}
 
       <div className="rounded-[10px] border border-gray-200 bg-surface px-6 py-5 shadow-card">
         <StageProgressStrip leadId={lead.id} currentStage={lead.stage} />

@@ -114,7 +114,8 @@ export async function pauseForReview(
   return { ok: true };
 }
 
-// Clears the needs_action flag (used when a Reviewed lead is decided on).
+// Clears the needs_action flag (used when a Reviewed lead is decided on, or via
+// the Fix RRRR banner on the lead detail page) and logs an activity entry.
 export async function clearReviewFlag(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -124,6 +125,13 @@ export async function clearReviewFlag(
     .update({ needs_action_flag: false, needs_action_note: null })
     .eq("id", leadId);
   if (error) return { ok: false, error: error.message };
+
+  await sb.from("activities").insert({
+    lead_id: leadId,
+    activity_type: "note",
+    payload: { kind: "review_cleared", text: "Cleared the Needs Review flag" },
+    user_id: await currentUserId(),
+  });
 
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/leads");
