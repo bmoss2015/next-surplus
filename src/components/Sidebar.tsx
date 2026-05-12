@@ -66,9 +66,12 @@ export function Sidebar({
               <Link
                 href={item.href}
                 className={cn(
-                  "mb-[2px] block rounded-md px-3 py-2 text-[13px] outline-none transition-colors focus-visible:outline-none",
+                  // Fix OOOO: clean active highlight — solid mid-petrol fill,
+                  // full nav-item width, rounded corners, white text. No glow,
+                  // outline, ring, or border artifact.
+                  "mb-[2px] block w-full rounded-md border-0 px-3 py-2 text-[13px] outline-none ring-0 transition-colors focus:outline-none focus-visible:outline-none",
                   isActive
-                    ? "bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] font-medium text-white"
+                    ? "bg-[#0d6c7d] font-medium text-white"
                     : "bg-transparent text-white/70 hover:bg-white/10"
                 )}
               >
