@@ -86,17 +86,29 @@ export function SurplusBreakdown({
 
       <hr className="my-5 border-[#d1d5db]" />
 
-      {/* POTENTIAL SURPLUS */}
-      <div className={cn(hasConfirmed && "opacity-55")}>
+      {/* POTENTIAL SURPLUS — quietly de-emphasised once a Confirmed value
+          exists (recoloured, never struck through). */}
+      <div>
         <div className="flex items-baseline justify-between gap-4">
-          <span className="text-sm font-semibold uppercase tracking-wide text-[#0d6c7d]">
+          <span
+            className={cn(
+              "uppercase tracking-wide",
+              hasConfirmed
+                ? "text-xs font-normal text-[#9ca3af]"
+                : "text-sm font-semibold text-[#0d6c7d]"
+            )}
+          >
             Potential Surplus
           </span>
-          <span className="text-2xl font-bold text-[#0a3d4a]">
+          <span
+            className={cn(
+              hasConfirmed ? "text-base font-normal text-[#9ca3af]" : "text-2xl font-bold text-[#0a3d4a]"
+            )}
+          >
             {potentialSurplus == null ? "—" : formatCurrency(potentialSurplus)}
           </span>
         </div>
-        <div className="mt-1 text-xs text-[#6b7280]">
+        <div className={cn("mt-1 text-xs", hasConfirmed ? "text-[#9ca3af]" : "text-[#6b7280]")}>
           {potentialSourceLabel(sourceSurplus, leadSource, computedSurplus != null)}
         </div>
       </div>
@@ -148,7 +160,7 @@ export function SurplusBreakdown({
         <span className="text-base font-bold uppercase tracking-wide text-[#0a3d4a]">
           Est. Net Payout
         </span>
-        <span className="text-3xl font-bold text-[#0a3d4a]">{formatCurrency(netPayout)}</span>
+        <span className="text-2xl font-bold text-[#0a3d4a]">{formatCurrency(netPayout)}</span>
       </div>
       <div className="mt-1 text-xs text-[#6b7280]">
         Based on {hasConfirmed ? "Confirmed Surplus" : "Potential Surplus"}
