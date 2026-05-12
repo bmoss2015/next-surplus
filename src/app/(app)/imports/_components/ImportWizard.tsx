@@ -36,9 +36,11 @@ import {
   RELATIVE_EMAIL_COUNT,
   parsePhoneType,
   parseDncLitigator,
-  normalizePhone,
+  normalizePhoneStrict,
   parseImportDate,
   stripCaseNumber,
+  padZip,
+  stripCountySuffix,
   type IncomingLead,
   type ImportRelative,
   type ImportPhone,
@@ -135,14 +137,29 @@ function parseMoney(raw: string): number | null {
 }
 
 function parseSaleType(raw: string): ImportSaleType {
-  const v = raw.trim().toUpperCase();
-  if (v.startsWith("M")) return "MTG";
-  if (v.startsWith("T")) return "TAX";
+  const v = raw.trim().toLowerCase();
+  if (!v) return "unknown";
+  // Any value mentioning "tax" -> TAX; "mortgage" / "deed of trust" -> MTG.
+  // (Also accept the bare codes a previously-exported file may already carry.)
+  if (v === "tax" || v.includes("tax")) return "TAX";
+  if (v === "mtg" || v.includes("mortgage") || v.includes("deed of trust")) return "MTG";
+  // The sale_type column is an enum (TAX | MTG | unknown), so an unrecognized
+  // value can't be stored verbatim — record it as "unknown" and log the value.
+  console.warn(`[import] Unrecognized sale type: ${raw}`);
   return "unknown";
 }
 
+// "SMITH, JOHN" -> "JOHN SMITH" (Last, First -> First Last); otherwise just
+// collapse internal whitespace. Proper Case is applied separately by the caller.
 function splitFullName(name: string): string {
-  return name.trim().replace(/\s+/g, " ");
+  const v = name.trim().replace(/\s+/g, " ");
+  if (v.includes(",")) {
+    const idx = v.indexOf(",");
+    const last = v.slice(0, idx).trim();
+    const first = v.slice(idx + 1).trim();
+    return [first, last].filter(Boolean).join(" ");
+  }
+  return v;
 }
 function combineName(first: string, last: string): string {
   return [first.trim(), last.trim()].filter(Boolean).join(" ");
@@ -695,10 +712,20 @@ export function ImportWizard() {
   // blocked while any of these exist — the user must fix the source or remove
   // the offending rows here before importing. Only the valid rows ever import.
   const [invalidRows, setInvalidRows] = useState<PreviewInvalidRow[]>([]);
+  // IMPORT SUMMARY: contact rows dropped during preview normalization, by reason.
+  const [contactSkipStats, setContactSkipStats] = useState<{
+    invalidPhone: number;
+    invalidEmail: number;
+    duplicate: number;
+  }>({ invalidPhone: 0, invalidEmail: 0, duplicate: 0 });
   // Fix R: set after a successful import — drives the centered success popup.
   const [successResult, setSuccessResult] = useState<{
     imported: number;
     skipped: number;
+    dedupeReview: number;
+    contactsWritten: number;
+    contactsSkipped: { invalidPhone: number; invalidEmail: number; duplicate: number };
+    notImportedColumns: string[];
   } | null>(null);
 
   useEffect(() => {
@@ -723,6 +750,7 @@ export function ImportWizard() {
     setNormalized([]);
     setDupResolution({});
     setInvalidRows([]);
+    setContactSkipStats({ invalidPhone: 0, invalidEmail: 0, duplicate: 0 });
     setSuccessResult(null);
     setShowOtherInput(false);
     setOtherSourceName("");
@@ -746,6 +774,10 @@ export function ImportWizard() {
     Papa.parse<Record<string, string>>(f, {
       header: true,
       skipEmptyLines: true,
+      // BOM + whitespace: drop a UTF-8 BOM from the first header and trim every
+      // header name and cell value before any mapping or transform sees them.
+      transformHeader: (h) => (h.charCodeAt(0) === 0xFEFF ? h.slice(1) : h).trim(),
+      transform: (v) => (typeof v === "string" ? v.trim() : v),
       complete: (results) => {
         if (results.errors.length > 0) {
           setError(`Parse Error: ${results.errors[0].message}`);
@@ -940,13 +972,15 @@ export function ImportWizard() {
 
     const rows: IncomingLead[] = [];
     const invalid: PreviewInvalidRow[] = [];
+    // IMPORT SUMMARY: contact rows dropped during normalization, by reason.
+    const contactSkips = { invalidPhone: 0, invalidEmail: 0, duplicate: 0 };
     let rowNumber = 0;
     for (const raw of rawRows) {
       rowNumber += 1;
       const address = get(raw, "address");
       const city = get(raw, "city");
       const state = normalizeStateCode(get(raw, "state"));
-      const zip = get(raw, "zip");
+      const zip = padZip(get(raw, "zip"));
       if (!address || !city || !state || !zip) {
         const missing: string[] = [];
         if (!address) missing.push("Address");
@@ -965,9 +999,21 @@ export function ImportWizard() {
       );
 
       const phones: ImportPhone[] = [];
+      const seenPhones = new Set<string>();
       for (let pm = 1; pm <= 5; pm++) {
-        const pv = normalizePhone(get(raw, `phone_${pm}`));
-        if (!pv) continue;
+        const rawPhone = get(raw, `phone_${pm}`);
+        if (!rawPhone) continue;
+        const pv = normalizePhoneStrict(rawPhone);
+        if (!pv) {
+          console.warn(`[import] Invalid phone: ${rawPhone}`);
+          contactSkips.invalidPhone += 1;
+          continue;
+        }
+        if (seenPhones.has(pv)) {
+          contactSkips.duplicate += 1;
+          continue;
+        }
+        seenPhones.add(pv);
         const { is_dnc, is_litigator } = parseDncLitigator(get(raw, `phone_${pm}_dnc`));
         phones.push({
           value: pv,
@@ -976,15 +1022,23 @@ export function ImportWizard() {
           is_litigator,
         });
       }
-      const emails = [
-        get(raw, "email"),
-        get(raw, "email_2"),
-        get(raw, "email_3"),
-        get(raw, "email_4"),
-        get(raw, "email_5"),
-      ]
-        .map((e) => e.trim())
-        .filter(Boolean);
+      const emails: string[] = [];
+      const seenEmails = new Set<string>();
+      for (const ek of ["email", "email_2", "email_3", "email_4", "email_5"]) {
+        const ev = get(raw, ek).toLowerCase();
+        if (!ev) continue;
+        if (!ev.includes("@")) {
+          console.warn(`[import] Invalid email: ${ev}`);
+          contactSkips.invalidEmail += 1;
+          continue;
+        }
+        if (seenEmails.has(ev)) {
+          contactSkips.duplicate += 1;
+          continue;
+        }
+        seenEmails.add(ev);
+        emails.push(ev);
+      }
       const mailingAddresses = [get(raw, "mailing_address_1"), get(raw, "mailing_address_2")]
         .map((m) => m.trim())
         .filter(Boolean);
@@ -997,7 +1051,7 @@ export function ImportWizard() {
       const ownerMailingStreet = get(raw, "owner_mailing_street");
       const ownerMailingCity = get(raw, "owner_mailing_city");
       const ownerMailingState = get(raw, "owner_mailing_state").toUpperCase();
-      const ownerMailingZip = get(raw, "owner_mailing_zip");
+      const ownerMailingZip = padZip(get(raw, "owner_mailing_zip"));
       const ownerMailingTail = [
         ownerMailingCity,
         [ownerMailingState, ownerMailingZip].filter(Boolean).join(" "),
@@ -1025,9 +1079,21 @@ export function ImportWizard() {
         const rRelationship = get(raw, rk("possible_type")) || null;
         const rAge = parseAge(get(raw, rk("age")));
         const rPhones: ImportPhone[] = [];
+        const rSeenPhones = new Set<string>();
         for (let pm = 1; pm <= RELATIVE_PHONE_COUNT; pm++) {
-          const pv = normalizePhone(get(raw, rk(`phone_${pm}`)));
-          if (!pv) continue;
+          const rawPhone = get(raw, rk(`phone_${pm}`));
+          if (!rawPhone) continue;
+          const pv = normalizePhoneStrict(rawPhone);
+          if (!pv) {
+            console.warn(`[import] Invalid phone: ${rawPhone}`);
+            contactSkips.invalidPhone += 1;
+            continue;
+          }
+          if (rSeenPhones.has(pv)) {
+            contactSkips.duplicate += 1;
+            continue;
+          }
+          rSeenPhones.add(pv);
           const { is_dnc, is_litigator } = parseDncLitigator(get(raw, rk(`phone_${pm}_dnc`)));
           rPhones.push({
             value: pv,
@@ -1037,9 +1103,21 @@ export function ImportWizard() {
           });
         }
         const rEmails: string[] = [];
+        const rSeenEmails = new Set<string>();
         for (let em = 1; em <= RELATIVE_EMAIL_COUNT; em++) {
-          const ev = get(raw, rk(`email_${em}`)).trim();
-          if (ev) rEmails.push(ev);
+          const ev = get(raw, rk(`email_${em}`)).toLowerCase();
+          if (!ev) continue;
+          if (!ev.includes("@")) {
+            console.warn(`[import] Invalid email: ${ev}`);
+            contactSkips.invalidEmail += 1;
+            continue;
+          }
+          if (rSeenEmails.has(ev)) {
+            contactSkips.duplicate += 1;
+            continue;
+          }
+          rSeenEmails.add(ev);
+          rEmails.push(ev);
         }
         if (rName || rPhones.length > 0 || rEmails.length > 0) {
           relatives.push({
@@ -1058,19 +1136,31 @@ export function ImportWizard() {
         !ownerDeceased &&
         ["n", "no", "false", "0"].includes(deceasedRaw.trim().toLowerCase());
 
+      const rawSaleDate = get(raw, "sale_date");
+      const saleDate = parseImportDate(rawSaleDate);
+      if (!saleDate && rawSaleDate) console.warn(`[import] Unparseable date: ${rawSaleDate}`);
+
+      const rawSurplus = get(raw, "surplus_amount");
+      let sourceSurplus = parseMoney(rawSurplus);
+      if (sourceSurplus != null && sourceSurplus <= 0) {
+        console.warn(`[import] Invalid surplus: ${rawSurplus}`);
+        sourceSurplus = null;
+      }
+
       rows.push({
         address: formatAddress(address),
         city: formatCity(city),
         state,
         zip,
-        county: toTitleCase(get(raw, "county")) || null,
+        county: toTitleCase(stripCountySuffix(get(raw, "county"))) || null,
         sale_type: useMapping["sale_type"] ? parseSaleType(get(raw, "sale_type")) : "unknown",
-        sale_date: parseImportDate(get(raw, "sale_date")),
+        sale_date: saleDate,
         case_number: stripCaseNumber(get(raw, "case_number")) || null,
         parcel_number: get(raw, "parcel_number") || null,
         closing_bid: parseMoney(get(raw, "closing_bid")),
         opening_bid: parseMoney(get(raw, "opening_bid")),
-        source_surplus: parseMoney(get(raw, "surplus_amount")),
+        attorney_cost: useMapping["attorney_cost"] ? parseMoney(get(raw, "attorney_cost")) : null,
+        source_surplus: sourceSurplus,
         lead_source: get(raw, "lead_source") || null,
         owner_full_name: ownerName || null,
         owner_age: parseAge(get(raw, "owner_age")),
@@ -1087,6 +1177,8 @@ export function ImportWizard() {
       setError(`No Rows Found In The File.`);
       return;
     }
+
+    setContactSkipStats({ ...contactSkips });
 
     startTransition(async () => {
       const dupResult =
@@ -1167,7 +1259,14 @@ export function ImportWizard() {
       }
       // Fix MMMM: show the success popup with the real insert count from this
       // session, then refresh so the Import History below picks up the new row.
-      setSuccessResult({ imported: result.imported, skipped: result.skipped });
+      setSuccessResult({
+        imported: result.imported,
+        skipped: result.skipped,
+        dedupeReview: dupMatches.filter(Boolean).length,
+        contactsWritten: result.contactsWritten,
+        contactsSkipped: contactSkipStats,
+        notImportedColumns: headers.filter((h) => !recognized.has(h)),
+      });
       router.refresh();
     });
   }
@@ -1806,8 +1905,7 @@ export function ImportWizard() {
     </Shell>
     {successResult && (
       <ImportSuccessModal
-        imported={successResult.imported}
-        skipped={successResult.skipped}
+        result={successResult}
         onImportAnother={() => {
           setSuccessResult(null);
           resetAll();
@@ -1824,13 +1922,18 @@ export function ImportWizard() {
 // ---------------------------------------------------------------------------
 
 function ImportSuccessModal({
-  imported,
-  skipped,
+  result,
   onImportAnother,
   onClose,
 }: {
-  imported: number;
-  skipped: number;
+  result: {
+    imported: number;
+    skipped: number;
+    dedupeReview: number;
+    contactsWritten: number;
+    contactsSkipped: { invalidPhone: number; invalidEmail: number; duplicate: number };
+    notImportedColumns: string[];
+  };
   onImportAnother: () => void;
   onClose: () => void;
 }) {
@@ -1846,10 +1949,34 @@ function ImportSuccessModal({
     };
   }, [onClose]);
 
+  const cs = result.contactsSkipped;
+  const contactsSkippedTotal = cs.invalidPhone + cs.invalidEmail + cs.duplicate;
+
+  // IMPORT SUMMARY: one labelled line per metric.
+  const lines: { label: string; value: string }[] = [
+    { label: "Leads imported", value: String(result.imported) },
+    {
+      label: "Leads skipped",
+      value:
+        result.skipped === 0
+          ? "0"
+          : `${result.skipped} (user choice or duplicate match)`,
+    },
+    { label: "Leads flagged for dedupe review", value: String(result.dedupeReview) },
+    { label: "Contact rows written", value: String(result.contactsWritten) },
+    {
+      label: "Contact rows skipped",
+      value:
+        contactsSkippedTotal === 0
+          ? "0"
+          : `${contactsSkippedTotal} (invalid phone: ${cs.invalidPhone}, invalid email: ${cs.invalidEmail}, duplicate: ${cs.duplicate})`,
+    },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <div className="relative w-full max-w-[420px] rounded-lg bg-surface p-6 text-center shadow-elevated">
+      <div className="relative w-full max-w-[440px] rounded-lg bg-surface p-6 text-center shadow-elevated">
         <button
           type="button"
           onClick={onClose}
@@ -1864,12 +1991,18 @@ function ImportSuccessModal({
         <h2 className="m-0 mt-4 text-[18px] font-medium tracking-tight text-ink">
           Import Complete
         </h2>
-        <div className="mt-1 text-[13px] text-gray-600">
-          {imported} {imported === 1 ? "Lead" : "Leads"} Imported Successfully
-        </div>
-        {skipped > 0 && (
-          <div className="mt-[2px] text-[13px] text-gray-500">
-            {skipped} {skipped === 1 ? "Row" : "Rows"} Skipped
+        <dl className="mt-4 space-y-1 text-left text-[12.5px]">
+          {lines.map((l) => (
+            <div key={l.label} className="flex items-baseline justify-between gap-3">
+              <dt className="text-gray-600">{l.label}</dt>
+              <dd className="m-0 font-medium text-ink">{l.value}</dd>
+            </div>
+          ))}
+        </dl>
+        {result.notImportedColumns.length > 0 && (
+          <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-left text-[11.5px] text-gray-600">
+            These columns were not recognized and were not imported:{" "}
+            <span className="text-ink">{result.notImportedColumns.join(", ")}</span>
           </div>
         )}
         <div className="mt-5 flex items-center justify-center">

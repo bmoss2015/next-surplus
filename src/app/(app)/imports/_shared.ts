@@ -59,6 +59,7 @@ export type PortalFieldKey =
   | "owner_full_name"
   | "closing_bid"
   | "opening_bid"
+  | "attorney_cost"
   | "sale_date"
   | "sale_type"
   | "case_number"
@@ -123,7 +124,9 @@ export function parsePhoneType(raw: string): string | null {
   if (!v) return null;
   if (v.startsWith("m") || v.includes("cell") || v.includes("wireless") || v.includes("mobile"))
     return "Mobile";
-  if (v.startsWith("r") || v.includes("land") || v.includes("home") || v.includes("residential"))
+  // GAP 2: "Landline" is its own stored value — distinct from "Residential".
+  if (v.includes("land")) return "Landline";
+  if (v.startsWith("r") || v.includes("home") || v.includes("residential"))
     return "Residential";
   return "Other";
 }
@@ -142,13 +145,38 @@ export function parseDncLitigator(raw: string): { is_dnc: boolean; is_litigator:
 }
 
 // Strip everything but digits from a phone string — accepts "(240) 506-7777",
-// "555-222-6666", "6668889999", etc. Returns "" when nothing's left.
+// "555-222-6666", "6668889999", "240.506.7777", "12405067777", etc. A leading
+// US country code "1" on an 11-digit result is dropped. Returns "" when nothing
+// numeric is left.
 export function normalizePhone(raw: string): string {
-  return (raw ?? "").replace(/\D/g, "");
+  const digits = (raw ?? "").replace(/\D/g, "");
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
 }
 
-// Parse a CSV date cell ("01/15/2024", "1/2/24", "2024-01-15", ...) to an ISO
-// "YYYY-MM-DD" string. Returns null when the value isn't a recognizable date.
+// GAP 1: like normalizePhone, but only returns the number when it is a valid
+// 10-digit US phone. Anything else (too short, too long, junk) returns null —
+// the caller skips that phone contact row and logs "Invalid phone: …".
+export function normalizePhoneStrict(raw: string): string | null {
+  const digits = normalizePhone(raw);
+  return digits.length === 10 ? digits : null;
+}
+
+// Three-letter-prefix month index ("january"/"jan"/"JANUARY" -> 1, ...).
+const MONTH_INDEX: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+function monthFromName(name: string): number | null {
+  return MONTH_INDEX[name.slice(0, 3).toLowerCase()] ?? null;
+}
+function expandYear(yr: string): string {
+  return yr.length === 2 ? (Number(yr) >= 70 ? "19" : "20") + yr : yr;
+}
+
+// Parse a CSV date cell to an ISO "YYYY-MM-DD" string. Accepts: "2024-01-15",
+// "01/15/2024", "1/2/24", "M-D-YYYY", "15-Jan-2024" / "15 Jan 2024", and
+// "January 15, 2024" / "Jan 15 2024". Returns null when nothing parses (the
+// caller imports the lead with sale_date = null and logs "Unparseable date: …").
 export function parseImportDate(raw: string): string | null {
   const v = (raw ?? "").trim();
   if (!v) return null;
@@ -161,11 +189,32 @@ export function parseImportDate(raw: string): string | null {
   // M/D/YYYY or M-D-YYYY (also 2-digit year).
   const mdy = v.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
   if (mdy) {
-    let [, mo, da, yr] = mdy;
-    if (yr.length === 2) yr = (Number(yr) >= 70 ? "19" : "20") + yr;
+    const mo = mdy[1];
+    const da = mdy[2];
+    const yr = expandYear(mdy[3]);
     const n = (s: string) => Number(s);
     if (n(mo) >= 1 && n(mo) <= 12 && n(da) >= 1 && n(da) <= 31) {
       return `${yr}-${mo.padStart(2, "0")}-${da.padStart(2, "0")}`;
+    }
+  }
+  // "15-Jan-2024" / "15 Jan 2024" / "15-January-2024".
+  const dMonY = v.match(/^(\d{1,2})[\s\-/]+([A-Za-z]{3,})[\s\-/]+(\d{2,4})$/);
+  if (dMonY) {
+    const da = dMonY[1];
+    const mo = monthFromName(dMonY[2]);
+    const yr = expandYear(dMonY[3]);
+    if (mo && Number(da) >= 1 && Number(da) <= 31) {
+      return `${yr}-${String(mo).padStart(2, "0")}-${da.padStart(2, "0")}`;
+    }
+  }
+  // "January 15, 2024" / "Jan 15 2024" / "January 15th 2024".
+  const monDY = v.match(/^([A-Za-z]{3,})[\s.]+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{2,4})$/);
+  if (monDY) {
+    const mo = monthFromName(monDY[1]);
+    const da = monDY[2];
+    const yr = expandYear(monDY[3]);
+    if (mo && Number(da) >= 1 && Number(da) <= 31) {
+      return `${yr}-${String(mo).padStart(2, "0")}-${da.padStart(2, "0")}`;
     }
   }
   const parsed = new Date(v);
@@ -173,6 +222,20 @@ export function parseImportDate(raw: string): string | null {
     return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
   }
   return null;
+}
+
+// ZIP CODE: stored as text; pad with leading zeros to 5 chars when shorter
+// (a New England "8901" becomes "08901"). Longer values / ZIP+4 pass through.
+export function padZip(raw: string): string {
+  const v = (raw ?? "").trim();
+  return /^\d{1,4}$/.test(v) ? v.padStart(5, "0") : v;
+}
+
+// COUNTY: drop a trailing " County" / " Co." / " Co" before storing, e.g.
+// "Charleston County" -> "Charleston", "CHARLESTON CO" -> "CHARLESTON". Case is
+// fixed up separately (Proper Case) by the caller.
+export function stripCountySuffix(raw: string): string {
+  return (raw ?? "").replace(/[\s,]+(county|co\.?)\s*$/i, "").trim();
 }
 
 // Fix JJJJJ PART 5: case numbers in some feeds arrive like "$123,456.00" — strip
@@ -295,6 +358,15 @@ export const PORTAL_FIELDS: PortalField[] = [
     aliases: ["openingbid", "minimumbid", "minbid", "startingbid", "upsetbid"],
   },
   {
+    // GAP 5: leads.attorney_cost already exists (numeric, NOT NULL default
+    // 2500.00) — expose it as a mappable column. When unmapped, the import
+    // leaves the column to its default rather than writing NULL.
+    key: "attorney_cost",
+    label: "Attorney Cost",
+    required: false,
+    aliases: ["attorneyfee", "attorneycost", "legalfee", "attorneyfees", "legalfees"],
+  },
+  {
     key: "sale_date",
     label: "Sale Date",
     required: false,
@@ -305,6 +377,7 @@ export const PORTAL_FIELDS: PortalField[] = [
       "solddate",
       "auctiondate",
       "foreclosuredate",
+      "dateofforeclosure",
       "soldon",
       "salesdate",
     ],
@@ -699,6 +772,7 @@ export type IncomingLead = {
   parcel_number: string | null;
   closing_bid: number | null;
   opening_bid: number | null;
+  attorney_cost: number | null; // null when the column wasn't mapped (keep DB default)
   source_surplus: number | null;
   lead_source: string | null; // per-row override from a mapped column; usually null
   owner_full_name: string | null;

@@ -160,6 +160,7 @@ const LEAD_WRITABLE_FIELDS = [
   "parcel_number",
   "closing_bid",
   "opening_bid",
+  "attorney_cost",
   "source_surplus",
   "lead_source",
   "recovery_type",
@@ -170,7 +171,7 @@ function leadFieldsFromRow(
   rowSource: string | null,
   recoveryType: string | null
 ): Record<string, unknown> {
-  return {
+  const fields: Record<string, unknown> = {
     address: formatAddress(row.address),
     city: formatCity(row.city),
     state: row.state,
@@ -188,6 +189,10 @@ function leadFieldsFromRow(
     lead_source: rowSource,
     recovery_type: recoveryType,
   };
+  // leads.attorney_cost is NOT NULL with a default — only write it when the CSV
+  // actually carried a value, otherwise leave the column (and its default) alone.
+  if (row.attorney_cost != null) fields.attorney_cost = row.attorney_cost;
+  return fields;
 }
 
 function isBlank(v: unknown): boolean {
@@ -244,6 +249,7 @@ export async function importLeads(
       skipped: number;
       updatedBlank: number;
       replaced: number;
+      contactsWritten: number;
     }
   | { ok: false; error: string }
 > {
@@ -284,6 +290,8 @@ export async function importLeads(
   let skipped = 0;
   let updatedBlank = 0;
   let replaced = 0;
+  // IMPORT SUMMARY: count of `contacts` rows actually written across all leads.
+  let contactsWritten = 0;
   // Fix S: track per-row failures so we can log them and refuse to report a
   // bogus "success" when nothing actually landed in the database.
   let errors = 0;
@@ -294,7 +302,8 @@ export async function importLeads(
   for (const d of decisions) decisionByIndex.set(d.index, d);
 
   // Helper: write the owner + contact rows for a freshly created/updated lead.
-  async function writeContactsForLead(leadId: string, row: IncomingLead) {
+  // Returns the number of `contacts` rows actually inserted (0 on skip/error).
+  async function writeContactsForLead(leadId: string, row: IncomingLead): Promise<number> {
     const ownerName = (row.owner_full_name ?? "").trim();
     const phones = (row.phones ?? []).filter((p) => p.value.trim());
     const emails = (row.emails ?? []).map((e) => e.trim()).filter(Boolean);
@@ -310,7 +319,7 @@ export async function importLeads(
       !row.owner_deceased &&
       row.owner_age == null
     ) {
-      return;
+      return 0;
     }
 
     const { data: ownerRow, error: ownerErr } = await sb
@@ -333,7 +342,7 @@ export async function importLeads(
       console.error(
         `[importLeads] owner insert failed for lead ${leadId}: ${ownerErr?.message ?? "no row returned"}`
       );
-      return;
+      return 0;
     }
 
     // Fix 93: every mapped phone / email / mailing-address column becomes its
@@ -378,14 +387,40 @@ export async function importLeads(
     mailingAddresses.forEach((value) => {
       contactRows.push(contactRow("mailing_address", value, false));
     });
+    let written = 0;
     if (contactRows.length > 0) {
       const { error: contactsErr } = await sb.from("contacts").insert(contactRows);
       if (contactsErr) {
         console.error(
           `[importLeads] contacts insert failed for lead ${leadId}: ${contactsErr.message}`
         );
+      } else {
+        written = contactRows.length;
       }
     }
+
+    // GAP / edge case: a lead whose every phone contact is flagged DNC (and that
+    // has at least one phone) is itself a do-not-call lead. Re-check across ALL
+    // of the lead's phone contacts (this import may be appending to one that
+    // already had phones) and only flip leads.dnc on — never off.
+    if (written > 0 && phones.length > 0) {
+      const { data: phoneContacts } = await sb
+        .from("contacts")
+        .select("is_dnc")
+        .eq("lead_id", leadId)
+        .eq("channel", "phone");
+      if (
+        phoneContacts &&
+        phoneContacts.length > 0 &&
+        phoneContacts.every((c) => c.is_dnc === true)
+      ) {
+        await sb
+          .from("leads")
+          .update({ dnc: true, dnc_logged_at: new Date().toISOString() })
+          .eq("id", leadId);
+      }
+    }
+    return written;
   }
 
   // Helper: write the relatives parsed off a CSV row. The relatives table now
@@ -466,7 +501,7 @@ export async function importLeads(
         action_taken: "imported",
         lead_id: leadRow.id,
       });
-      await writeContactsForLead(leadRow.id as string, row);
+      contactsWritten += await writeContactsForLead(leadRow.id as string, row);
       await writeRelativesForLead(leadRow.id as string, row);
       continue;
     }
@@ -532,7 +567,7 @@ export async function importLeads(
 
     // Contacts are additive — append the row's contact rows to the existing
     // lead rather than overwriting.
-    await writeContactsForLead(leadId, row);
+    contactsWritten += await writeContactsForLead(leadId, row);
     await writeRelativesForLead(leadId, row);
   }
 
@@ -586,6 +621,7 @@ export async function importLeads(
     skipped,
     updatedBlank,
     replaced,
+    contactsWritten,
   };
 }
 
