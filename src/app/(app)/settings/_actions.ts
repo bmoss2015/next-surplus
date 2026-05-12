@@ -11,6 +11,23 @@ const SITE_URL =
 
 // -- Team / invites ----------------------------------------------------------
 
+// Look up an existing auth user by email. There's no admin "get by email", so we
+// page through listUsers — team rosters are tiny, this is one request in practice.
+async function findAuthUserByEmail(
+  admin: ReturnType<typeof createServiceClient>,
+  email: string
+) {
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 100 });
+    if (error) return null;
+    const users = data?.users ?? [];
+    const match = users.find((u) => (u.email ?? "").toLowerCase() === email);
+    if (match) return match;
+    if (users.length < 100) return null;
+  }
+  return null;
+}
+
 export async function inviteMember(
   email: string,
   role: "admin" | "member",
@@ -40,6 +57,35 @@ export async function inviteMember(
   // the invitee lands in the right org with their name already set) — it just
   // hands us the token instead of mailing it.
   const admin = createServiceClient();
+
+  // generateLink refuses an email that still has an auth user — which is exactly
+  // what's left behind when someone is removed (legacy removeMember only
+  // deactivated the profile) or after a stray manual deletion. Clear out any such
+  // stale account first so the address can be re-invited; refuse only if the
+  // email genuinely belongs to an active member.
+  const existing = await findAuthUserByEmail(admin, cleanEmail);
+  if (existing) {
+    const { data: existingProfile } = await admin
+      .from("profiles")
+      .select("org_id, deactivated")
+      .eq("id", existing.id)
+      .maybeSingle();
+    const ownedByThisOrg = !existingProfile || existingProfile.org_id === profile.orgId;
+    if (existingProfile && existingProfile.deactivated === false) {
+      return {
+        ok: false,
+        error: ownedByThisOrg
+          ? "That person is already on your team."
+          : "That email address is already in use.",
+      };
+    }
+    if (!ownedByThisOrg) {
+      return { ok: false, error: "That email address is already in use." };
+    }
+    const { error: cleanupErr } = await admin.auth.admin.deleteUser(existing.id);
+    if (cleanupErr) return { ok: false, error: cleanupErr.message };
+  }
+
   const { data: invited, error } = await admin.auth.admin.generateLink({
     type: "invite",
     email: cleanEmail,
@@ -142,8 +188,12 @@ export async function setMemberRole(
   return { ok: true };
 }
 
-// Fix GGG: remove a team member — deactivates them (admin-only, never yourself)
-// and records it in the audit log. The team list filters out deactivated rows.
+// Fix GGG / Fix OOOOO: remove a team member (admin-only, never yourself) and
+// record it in the audit log. We delete the auth user — the profile row cascades
+// away — so the email address is freed and the person can be invited again later.
+// (Previously this only set profiles.deactivated, which left the auth user behind
+// and made every re-invite fail with "already been registered".) The audit entry
+// keeps a snapshot of their name; FKs that pointed at the user are set null.
 export async function removeMember(
   userId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -158,10 +208,8 @@ export async function removeMember(
     .eq("id", userId)
     .maybeSingle();
 
-  const { error } = await sb
-    .from("profiles")
-    .update({ deactivated: true })
-    .eq("id", userId);
+  const admin = createServiceClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) return { ok: false, error: error.message };
 
   await sb.from("audit_log").insert({
