@@ -1082,11 +1082,10 @@ export function ImportWizard() {
       if (persistMode === "save") {
         await saveSourceMapping(source, mapping, dismissed);
       }
-      // Fix R: refresh so the Import History below picks up the new row, then
-      // show the centered success popup. Navigation only happens if the user
-      // clicks "View Imported Leads" in that popup.
-      router.refresh();
+      // Fix MMMM: show the success popup with the real insert count from this
+      // session, then refresh so the Import History below picks up the new row.
       setSuccessResult({ imported: result.imported, skipped: result.skipped });
+      router.refresh();
     });
   }
 
@@ -1704,7 +1703,6 @@ export function ImportWizard() {
       <ImportSuccessModal
         imported={successResult.imported}
         skipped={successResult.skipped}
-        onViewLeads={() => router.push("/leads")}
         onImportAnother={() => {
           setSuccessResult(null);
           resetAll();
@@ -1723,13 +1721,11 @@ export function ImportWizard() {
 function ImportSuccessModal({
   imported,
   skipped,
-  onViewLeads,
   onImportAnother,
   onClose,
 }: {
   imported: number;
   skipped: number;
-  onViewLeads: () => void;
   onImportAnother: () => void;
   onClose: () => void;
 }) {
@@ -1771,18 +1767,11 @@ function ImportSuccessModal({
             {skipped} {skipped === 1 ? "Row" : "Rows"} Skipped
           </div>
         )}
-        <div className="mt-5 flex items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={onViewLeads}
-            className="btn-primary cursor-pointer rounded-md px-4 py-2 text-xs font-medium"
-          >
-            View Imported Leads
-          </button>
+        <div className="mt-5 flex items-center justify-center">
           <button
             type="button"
             onClick={onImportAnother}
-            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-4 py-2 text-xs font-medium text-ink hover:border-petrol-500"
+            className="btn-primary cursor-pointer rounded-md px-3 py-2 text-xs font-medium"
           >
             Import Another File
           </button>
