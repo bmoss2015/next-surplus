@@ -161,17 +161,10 @@ export function SurplusBreakdown({
             onCommit={(n) => commitFin("court_costs", n)}
           />
 
-          <div className="mt-5 mb-3 flex items-center justify-between">
-            <SectionSubheader className="mb-0">Liens</SectionSubheader>
-            <button
-              type="button"
-              onClick={onAddLien}
-              className="inline-flex cursor-pointer items-center gap-1 rounded border border-petrol-500 px-2 py-[2px] text-[11px] font-medium text-petrol-500 hover:bg-petrol-50"
-            >
-              <IconPlus size={12} stroke={2} />
-              Add Lien
-            </button>
-          </div>
+          <SectionSubheader className="mt-5">Liens</SectionSubheader>
+          {/* Fix LL: the Add Lien button belongs to the lien content — it sits
+              directly below the list (or below "No Liens On File"), left
+              aligned, not floating in the section header. */}
           {liens.length === 0 ? (
             <div className="text-[13px] text-gray-400">No Liens On File.</div>
           ) : (
@@ -205,6 +198,14 @@ export function SurplusBreakdown({
               ))}
             </div>
           )}
+          <button
+            type="button"
+            onClick={onAddLien}
+            className="mt-2 inline-flex cursor-pointer items-center gap-1 rounded border border-petrol-500 px-2 py-[3px] text-[11px] font-medium text-petrol-500 hover:bg-petrol-50"
+          >
+            <IconPlus size={12} stroke={2} />
+            Add Lien
+          </button>
         </div>
 
         <div>
