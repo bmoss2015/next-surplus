@@ -109,25 +109,20 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
   const recoveryFeeAmount = active * (lead.recovery_fee_percent / 100);
   const netPayout = active - lead.attorney_cost - recoveryFeeAmount;
 
-  return (
-    <div className="grid grid-cols-6 overflow-hidden rounded-lg border border-gray-200 bg-surface">
-      <div className="border-r border-gray-200">
-        <Cell label="Estimated Surplus" sub="Estimated, Based On Available Data">
-          {formatCurrency(lead.estimated_surplus)}
-        </Cell>
-      </div>
+  // Fix HHHH2: one surplus card — confirmed when set, otherwise the auto-
+  // computed (closing bid − debt − costs − liens) value.
+  const hasConfirmed = confirmedSurplus != null && confirmedSurplus !== 0;
+  const surplusTitle = hasConfirmed ? "Confirmed Surplus" : "Calculated Surplus";
+  const surplusValue = hasConfirmed ? confirmedSurplus : lead.estimated_surplus;
+  const surplusSub = hasConfirmed
+    ? "Verified By County"
+    : "Closing Bid − Debt − Costs − Liens";
 
+  return (
+    <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-gray-200 bg-surface">
       <div className="border-r border-petrol-200">
-        <Cell
-          label="Confirmed Surplus"
-          variant="highlight"
-          sub={confirmedSurplus != null ? "Verified By County" : "Not Yet Confirmed"}
-        >
-          {confirmedSurplus != null ? (
-            formatCurrency(confirmedSurplus)
-          ) : (
-            <span className="text-[13px] text-gray-400 font-normal">—</span>
-          )}
+        <Cell label={surplusTitle} variant="highlight" sub={surplusSub}>
+          {formatCurrency(surplusValue)}
         </Cell>
       </div>
 
