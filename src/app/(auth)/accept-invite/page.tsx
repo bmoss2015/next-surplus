@@ -7,8 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function AcceptInvitePage() {
   const router = useRouter();
-  // Instantiating the browser client also processes the invite tokens that
-  // Supabase appended to the URL hash and establishes the session.
   const supabase = useMemo(() => createClient(), []);
   const [status, setStatus] = useState<"checking" | "ready" | "invalid">(
     "checking"
@@ -21,15 +19,40 @@ export default function AcceptInvitePage() {
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      if (data.session) {
-        setEmail(data.session.user.email ?? null);
-        setStatus("ready");
-      } else {
-        setStatus("invalid");
-      }
-    });
+    const params = new URLSearchParams(window.location.search);
+    const tokenHash = params.get("token_hash");
+    const type = params.get("type");
+
+    if (tokenHash && type === "invite") {
+      // Exchange the single-use invite token for a session belonging to the
+      // invited user — this overrides any session already in the browser, so
+      // the page reflects the invitee and not whoever sent the invite.
+      supabase.auth
+        .verifyOtp({ type: "invite", token_hash: tokenHash })
+        .then(({ data, error: verifyErr }) => {
+          if (cancelled) return;
+          if (verifyErr || !data.user) {
+            setStatus("invalid");
+            return;
+          }
+          setEmail(data.user.email ?? null);
+          setStatus("ready");
+          // Drop the spent token from the URL so a refresh doesn't retry it.
+          window.history.replaceState(null, "", "/accept-invite");
+        });
+    } else {
+      // No token in the URL (e.g. a refresh after it was consumed) — fall back
+      // to the session verifyOtp just established.
+      supabase.auth.getSession().then(({ data }) => {
+        if (cancelled) return;
+        if (data.session) {
+          setEmail(data.session.user.email ?? null);
+          setStatus("ready");
+        } else {
+          setStatus("invalid");
+        }
+      });
+    }
     return () => {
       cancelled = true;
     };

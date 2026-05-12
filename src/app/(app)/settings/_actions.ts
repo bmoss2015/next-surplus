@@ -38,8 +38,7 @@ export async function inviteMember(
   // still creates the user record and stamps the org + role + full name into the
   // metadata (the on_auth_user_created trigger turns that into a profile row, so
   // the invitee lands in the right org with their name already set) — it just
-  // hands us the confirmation URL instead of mailing it. We then deliver that
-  // link ourselves via the Resend API.
+  // hands us the token instead of mailing it.
   const admin = createServiceClient();
   const { data: invited, error } = await admin.auth.admin.generateLink({
     type: "invite",
@@ -51,10 +50,16 @@ export async function inviteMember(
   });
   if (error) return { ok: false, error: error.message };
 
-  const inviteUrl = invited?.properties?.action_link;
-  if (!inviteUrl) {
+  // Build the link to our own page carrying the single-use token hash, not
+  // Supabase's verify URL. The accept-invite page calls verifyOtp() with this
+  // hash, which establishes a session for the *invited* user (the action_link's
+  // implicit-flow hash is ignored by the PKCE browser client, which is why the
+  // page used to show whoever was already signed in).
+  const tokenHash = invited?.properties?.hashed_token;
+  if (!tokenHash) {
     return { ok: false, error: "Could not generate the invite link" };
   }
+  const inviteUrl = `${SITE_URL}/accept-invite?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
 
   const resend = new Resend(process.env.RESEND_API_KEY);
   const { error: emailError } = await resend.emails.send({
