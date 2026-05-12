@@ -159,11 +159,18 @@ export function TeamSection({
                   {initialLetter}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium text-ink">
-                    {m.full_name || "Pending"}
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium text-ink">
+                      {m.full_name || m.email || "—"}
+                    </span>
                     {isSelf && (
-                      <span className="ml-1.5 text-[10px] font-normal text-gray-400">
+                      <span className="shrink-0 text-[10px] font-normal text-gray-400">
                         (You)
+                      </span>
+                    )}
+                    {m.pending && !isSelf && (
+                      <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-[1px] text-[10px] font-medium text-amber-700">
+                        Pending
                       </span>
                     )}
                   </div>

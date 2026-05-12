@@ -1,11 +1,16 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export type OrgMemberRow = {
   id: string;
   full_name: string;
   email: string | null;
   role: "admin" | "member";
+  // True until the invitee accepts — i.e. their auth user has no confirmed
+  // email / sign-in yet. (When the admin lookup is unavailable we can't tell, so
+  // it falls back to false rather than flagging everyone.)
+  pending: boolean;
 };
 
 export async function fetchOrgMembers(): Promise<OrgMemberRow[]> {
@@ -16,12 +21,43 @@ export async function fetchOrgMembers(): Promise<OrgMemberRow[]> {
     .eq("deactivated", false)
     .order("full_name", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map((r) => ({
-    id: r.id as string,
-    full_name: (r.full_name as string | null) ?? "",
-    email: (r.email as string | null) ?? null,
-    role: r.role === "admin" ? "admin" : "member",
-  }));
+  const profiles = data ?? [];
+
+  // Work out who has actually accepted their invite. There's no admin "get by
+  // id" batch call, so page through listUsers (team rosters are tiny — one call
+  // in practice) and collect the ids whose email is confirmed or who have signed
+  // in. confirmed === null means we couldn't determine it.
+  let confirmed: Set<string> | null = null;
+  try {
+    const admin = createServiceClient();
+    const set = new Set<string>();
+    for (let page = 1; page <= 20; page++) {
+      const { data: list, error: listErr } = await admin.auth.admin.listUsers({
+        page,
+        perPage: 100,
+      });
+      if (listErr) throw listErr;
+      const users = list?.users ?? [];
+      for (const u of users) {
+        if (u.email_confirmed_at || u.last_sign_in_at) set.add(u.id);
+      }
+      if (users.length < 100) break;
+    }
+    confirmed = set;
+  } catch {
+    confirmed = null;
+  }
+
+  return profiles.map((r) => {
+    const id = r.id as string;
+    return {
+      id,
+      full_name: (r.full_name as string | null) ?? "",
+      email: (r.email as string | null) ?? null,
+      role: r.role === "admin" ? "admin" : "member",
+      pending: confirmed ? !confirmed.has(id) : false,
+    };
+  });
 }
 
 export type AppSettings = {
