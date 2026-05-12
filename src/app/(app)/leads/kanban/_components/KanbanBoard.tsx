@@ -225,7 +225,9 @@ function KanbanCard({
 }) {
   return (
     // Fix U: the ⋯ menu sits OUTSIDE the <a> so its clicks never trigger card
-    // navigation or the card drag.
+    // navigation or the card drag. Fix EE: the status pill, ⋯ menu and
+    // below-floor warning all live in a single absolutely-positioned top-right
+    // overlay, so card content beneath flows normally and is never pushed down.
     <div
       className={cn(
         "group relative rounded-md border border-gray-200 bg-surface shadow-card transition-opacity",
@@ -242,55 +244,53 @@ function KanbanCard({
         }}
         className="block cursor-grab px-[11px] py-[10px] active:cursor-grabbing"
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="truncate pr-5 text-[12px] font-medium text-ink">
-              {lead.address}
-            </div>
-            <div className="mt-[2px] truncate text-[11px] text-gray-500">
-              {primaryOwner(lead)}
-            </div>
-            {/* Fix P / Fix V: status pill on Kanban cards — an action prompt,
-                not an error state, so it uses the btn-primary teal gradient. */}
-            {lead.needs_action_flag && (
-              <div className="mt-[5px]">
-                <span className="btn-primary inline-block rounded px-2 py-[2px] text-[10px] font-medium text-white">
-                  Needs Action
-                </span>
-              </div>
+        <div className="min-w-0">
+          <div
+            className={cn(
+              "truncate text-[12px] font-medium text-ink",
+              lead.needs_action_flag ? "pr-[84px]" : "pr-5"
             )}
-            {lead.has_litigator && (
-              <div className="mt-[5px]">
-                <LitigatorBadge />
-              </div>
-            )}
-            <div className="mt-[7px] whitespace-nowrap text-[11px]">
-              <span className="text-gray-400">Total Surplus: </span>
-              <span className="font-medium text-ink">
-                {formatCurrency(lead.estimated_surplus)}
-              </span>
-            </div>
-            <div className="mt-[1px] whitespace-nowrap text-[10px]">
-              <span className="text-gray-400">Est. Net Surplus: </span>
-              <span className="text-gray-400">
-                {formatCurrency(lead.estimated_net_payout)}
-              </span>
-            </div>
+          >
+            {lead.address}
           </div>
-          {lead.below_floor && (
-            <div className="shrink-0 pt-[1px]">
-              <BelowFloorIcon size={13} />
+          <div className="mt-[2px] truncate text-[11px] text-gray-500">
+            {primaryOwner(lead)}
+          </div>
+          {lead.has_litigator && (
+            <div className="mt-[5px]">
+              <LitigatorBadge />
             </div>
           )}
+          <div className="mt-[7px] whitespace-nowrap text-[11px]">
+            <span className="text-gray-400">Total Surplus: </span>
+            <span className="font-medium text-ink">
+              {formatCurrency(lead.estimated_surplus)}
+            </span>
+          </div>
+          <div className="mt-[1px] whitespace-nowrap text-[10px]">
+            <span className="text-gray-400">Est. Net Surplus: </span>
+            <span className="text-gray-400">
+              {formatCurrency(lead.estimated_net_payout)}
+            </span>
+          </div>
         </div>
       </a>
-      <div className="absolute right-[7px] top-[7px]">
+
+      {/* Top-right overlay: below-floor warning, ⋯ menu (on hover), and the
+          status pill anchored at top: 8px / right: 8px. */}
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
+        {lead.below_floor && <BelowFloorIcon size={13} />}
         <LeadActionsMenu
           leadId={lead.id}
           archived={lead.archived}
           onDone={onRemoved}
           triggerClassName="opacity-0 transition-opacity group-hover:opacity-100"
         />
+        {lead.needs_action_flag && (
+          <span className="rounded-[10px] bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-2 py-[2px] text-[11px] font-medium leading-none text-white">
+            Needs Action
+          </span>
+        )}
       </div>
     </div>
   );
