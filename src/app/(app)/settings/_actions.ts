@@ -102,6 +102,41 @@ export async function setMemberRole(
   return { ok: true };
 }
 
+// Fix GGG: remove a team member — deactivates them (admin-only, never yourself)
+// and records it in the audit log. The team list filters out deactivated rows.
+export async function removeMember(
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin) return { ok: false, error: "Only admins can remove members" };
+  if (userId === profile.id) return { ok: false, error: "You cannot remove yourself." };
+
+  const sb = await createClient();
+  const { data: prior } = await sb
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const { error } = await sb
+    .from("profiles")
+    .update({ deactivated: true })
+    .eq("id", userId);
+  if (error) return { ok: false, error: error.message };
+
+  await sb.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "team_member_removed",
+    payload: {
+      target_user_id: userId,
+      target_name: (prior?.full_name as string | null) ?? (prior?.email as string | null) ?? null,
+    },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 // -- App settings ------------------------------------------------------------
 
 export async function updateAppSetting(

@@ -13,6 +13,7 @@ export async function fetchOrgMembers(): Promise<OrgMemberRow[]> {
   const { data, error } = await sb
     .from("profiles")
     .select("id, full_name, email, role")
+    .eq("deactivated", false)
     .order("full_name", { ascending: true });
   if (error) throw error;
   return (data ?? []).map((r) => ({
