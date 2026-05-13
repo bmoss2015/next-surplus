@@ -1365,18 +1365,26 @@ export function ImportWizard() {
         />
       )}
       {!usingFileSource && (
-        <label
-          className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-gray-600"
-          title="Forces the selected source on every row, ignoring any value in the file"
-        >
-          <input
-            type="checkbox"
-            checked={forceAllRows}
-            onChange={(e) => setForceAllRows(e.target.checked)}
-            className="cursor-pointer"
-          />
-          Apply To All Rows
-        </label>
+        // Fix PPPP3 PART 1: spell out the behaviour so the user doesn't have
+        // to infer it from the checkbox name — the subtext under the label
+        // explains what happens when the box is left unchecked.
+        <div className="flex flex-col gap-0.5">
+          <label
+            className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-gray-600"
+            title="Forces the selected source on every row, ignoring any value in the file"
+          >
+            <input
+              type="checkbox"
+              checked={forceAllRows}
+              onChange={(e) => setForceAllRows(e.target.checked)}
+              className="cursor-pointer"
+            />
+            Apply this source to all rows in the CSV
+          </label>
+          <div className="pl-[22px] text-xs text-[#6b7280]">
+            If unchecked, rows with their own source value will use that instead.
+          </div>
+        </div>
       )}
     </div>
   );
@@ -2133,9 +2141,25 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
     );
   }
 
+  // Fix PPPP3 PART 2: explicit column widths via <colgroup> + table-fixed so
+  // each th and the matching td below it share the same flex basis instead
+  // of being recomputed from content per row. Filename takes the remaining
+  // space; everything else is sized to its content. Actions is text-right
+  // and its cell content stacks right-aligned (items-end) so the Revert
+  // button + any inline success/error message line up against the same
+  // right edge as the "Actions" header text.
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-card">
-      <table className="w-full text-[12.5px]">
+      <table className="w-full table-fixed text-[12.5px]">
+        <colgroup>
+          <col />
+          <col className="w-[180px]" />
+          <col className="w-[80px]" />
+          <col className="w-[96px]" />
+          <col className="w-[88px]" />
+          <col className="w-[110px]" />
+          <col className="w-[140px]" />
+        </colgroup>
         <thead className="bg-gray-50">
           <tr>
             <th className="px-4 py-2 text-left font-medium text-gray-500">Filename</th>
@@ -2156,8 +2180,8 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
             const isBusy = pending && busyId === row.id;
             return (
               <tr key={row.id} className="border-t border-gray-150">
-                <td className="px-4 py-[10px] text-ink">{row.filename}</td>
-                <td className="px-4 py-[10px] text-gray-500">
+                <td className="truncate px-4 py-[10px] text-left text-ink">{row.filename}</td>
+                <td className="px-4 py-[10px] text-left text-gray-500">
                   {formatTimestamp(row.uploaded_at)}
                 </td>
                 <td className="px-4 py-[10px] text-right text-ink">{row.total_rows}</td>
@@ -2167,30 +2191,32 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
                 <td className="px-4 py-[10px] text-right text-warn-strong">
                   {row.skipped_count}
                 </td>
-                <td className="px-4 py-[10px] text-gray-500">{statusLabel(row.status)}</td>
+                <td className="px-4 py-[10px] text-left text-gray-500">{statusLabel(row.status)}</td>
                 <td className="px-4 py-[10px] text-right">
-                  {canRevert ? (
-                    <button
-                      type="button"
-                      onClick={() => onRevert(row)}
-                      disabled={isBusy}
-                      className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-[5px] text-[11px] text-ink hover:border-petrol-500 disabled:opacity-50"
-                    >
-                      {isBusy ? "Reverting" : "Revert"}
-                    </button>
-                  ) : (
-                    <span className="text-[11px] text-gray-400">—</span>
-                  )}
-                  {message?.id === row.id && (
-                    <div
-                      className={cn(
-                        "mt-1 text-[11px]",
-                        message.ok ? "text-success-strong" : "text-danger"
-                      )}
-                    >
-                      {message.text}
-                    </div>
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {canRevert ? (
+                      <button
+                        type="button"
+                        onClick={() => onRevert(row)}
+                        disabled={isBusy}
+                        className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-[5px] text-[11px] text-ink hover:border-petrol-500 disabled:opacity-50"
+                      >
+                        {isBusy ? "Reverting" : "Revert"}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-gray-400">—</span>
+                    )}
+                    {message?.id === row.id && (
+                      <div
+                        className={cn(
+                          "text-[11px]",
+                          message.ok ? "text-success-strong" : "text-danger"
+                        )}
+                      >
+                        {message.text}
+                      </div>
+                    )}
+                  </div>
                 </td>
               </tr>
             );
