@@ -4,10 +4,18 @@
 
 export type RecoveryType = "judicial" | "non_judicial" | "unknown";
 
-export const RECOVERY_TYPE_LABELS: Record<"judicial" | "non_judicial", string> = {
-  judicial: "Judicial",
-  non_judicial: "Non Judicial",
-};
+// Fix JJJJ3 PART 1: single display-layer formatter for recovery_type. The raw
+// stored value can take several historical shapes ("non_judicial" enum,
+// "Nonjudicial" / "Non Judicial" / "non judicial" free-text); collapse all of
+// them to the canonical hyphenated "Non-Judicial" on render. Never call this
+// before writing to the DB — storage values are not changed by this.
+export function formatRecoveryType(value: string | null | undefined): string {
+  if (!value) return "Unknown";
+  const normalized = value.toLowerCase().replace(/[\s_-]+/g, "");
+  if (normalized === "judicial") return "Judicial";
+  if (normalized === "nonjudicial") return "Non-Judicial";
+  return "Unknown";
+}
 
 // Mortgage-foreclosure process by state (the common classification).
 const MORTGAGE_BY_STATE: Record<string, "judicial" | "non_judicial"> = {

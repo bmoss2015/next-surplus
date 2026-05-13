@@ -3,6 +3,7 @@
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { formatCurrency, daysSince, ownerStatusOf, toTitleCase } from "@/lib/leads/format";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
+import { formatRecoveryType } from "@/lib/leads/recovery-type";
 import { cn } from "@/lib/cn";
 import { useConfirmedSurplus } from "./ConfirmedSurplusContext";
 
@@ -24,8 +25,9 @@ function ownerSummary(lead: LeadDetailWithCounts): string {
 function saleProcessLabel(lead: LeadDetailWithCounts): string {
   const saleType = lead.sale_type === "TAX" ? "Tax Sale" : "Mortgage Foreclosure";
   if (!lead.recovery_type) return saleType;
-  const judicial = lead.recovery_type === "judicial" ? "Judicial" : "Nonjudicial";
-  return `${saleType} · ${judicial}`;
+  // Fix JJJJ3 PART 1: route the recovery_type through the shared display
+  // formatter so "non_judicial" reads as the canonical "Non-Judicial".
+  return `${saleType} · ${formatRecoveryType(lead.recovery_type)}`;
 }
 
 function formatSaleDate(date: string | null): string {

@@ -8,7 +8,7 @@ import { addLeadSource } from "../../../imports/_actions";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { formatCurrency, formatCurrencyOrDash, toTitleCase } from "@/lib/leads/format";
 import { US_STATE_NAMES } from "@/lib/leads/types";
-import { RECOVERY_TYPE_LABELS } from "@/lib/leads/recovery-type";
+import { formatRecoveryType } from "@/lib/leads/recovery-type";
 import { cn } from "@/lib/cn";
 import { INLINE_INPUT_CLASS } from "@/lib/inline-field";
 import { SectionSubheader } from "./SectionSubheader";
@@ -190,11 +190,9 @@ function InlineStateField({
 
 // Fix KKKKK / ZZZZ2 PART 2: Recovery Type defaults from the state (re-applied on
 // every state change) but is also directly editable so the user can override —
-// click to pick Judicial / Non Judicial / Unknown. Controlled by the parent.
-function recoveryTypeLabel(v: string | null): string {
-  if (v === "judicial" || v === "non_judicial") return RECOVERY_TYPE_LABELS[v];
-  return "Unknown";
-}
+// click to pick Judicial / Non-Judicial / Unknown. Controlled by the parent.
+// Fix JJJJ3 PART 1: display strings routed through formatRecoveryType so the
+// canonical "Non-Judicial" spelling appears here too.
 function InlineRecoveryTypeField({
   value,
   onCommit,
@@ -223,15 +221,15 @@ function InlineRecoveryTypeField({
         }}
         className={cn(INLINE_INPUT_CLASS, "w-[200px] cursor-pointer")}
       >
-        <option value="judicial">{RECOVERY_TYPE_LABELS.judicial}</option>
-        <option value="non_judicial">{RECOVERY_TYPE_LABELS.non_judicial}</option>
+        <option value="judicial">{formatRecoveryType("judicial")}</option>
+        <option value="non_judicial">{formatRecoveryType("non_judicial")}</option>
         <option value="unknown">Unknown</option>
       </select>
     );
   }
   return (
     <button type="button" onClick={() => setEditing(true)} title="Click To Edit" className={DISPLAY_SET}>
-      {recoveryTypeLabel(current)}
+      {formatRecoveryType(current)}
     </button>
   );
 }

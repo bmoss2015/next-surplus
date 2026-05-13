@@ -27,9 +27,10 @@ const SALE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "unknown", label: "Unknown" },
 ];
 // DB enum (migration 0072): ('judicial', 'non_judicial', 'unknown').
+// Fix JJJJ3 PART 1: display label uses the canonical hyphenated "Non-Judicial".
 const RECOVERY_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "judicial", label: "Judicial" },
-  { value: "non_judicial", label: "Non Judicial" },
+  { value: "non_judicial", label: "Non-Judicial" },
   { value: "unknown", label: "Unknown" },
 ];
 

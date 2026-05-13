@@ -1,17 +1,6 @@
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
+import { formatRecoveryType } from "@/lib/leads/recovery-type";
 import { SectionSubheader } from "./SectionSubheader";
-
-// Fix 90: how a recovery type reads on screen. Proper Case, no dashes.
-function recoveryTypeLabel(value: string | null | undefined): string {
-  switch (value) {
-    case "non_judicial":
-      return "Non Judicial";
-    case "judicial":
-      return "Judicial";
-    default:
-      return "Unknown";
-  }
-}
 
 function fmtDate(d: string | null): string {
   if (!d) return "—";
@@ -22,30 +11,28 @@ function fmtDate(d: string | null): string {
   });
 }
 
-function fmtDateTime(d: string | null): string {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
+// Fix JJJJ3 PART 2: one row per fact, label left, value right. The value is
+// always a single line — overflow gets truncated with an ellipsis and the full
+// text is exposed on hover via the title attribute. min-w-0 on the value cell
+// is what actually enables the truncation inside the flex parent.
 function Row({
   label,
   value,
   muted,
 }: {
   label: string;
-  value: React.ReactNode;
+  value: string;
   muted?: boolean;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2 leading-[1.9]">
-      <span className="shrink-0 text-[13px] font-medium text-[#64748b]">{label}</span>
+      <span className="shrink-0 text-xs text-[#6b7280]">{label}</span>
       <span
+        title={value}
         className={
-          muted ? "text-[13px] italic text-gray-400" : "text-[13px] font-medium text-[#0f1729]"
+          (muted
+            ? "text-sm italic text-gray-400"
+            : "text-sm font-medium text-[#111827]") + " min-w-0 truncate text-right"
         }
       >
         {value}
@@ -54,40 +41,27 @@ function Row({
   );
 }
 
+// Fix JJJJ3 PART 2: Quick Facts shows only the four highest-signal facts —
+// Sale Date, Recovery Type, Lead Source, Attorney. Case Number, Parcel Number,
+// Data Source, and Import Date moved off this panel (they still live on the
+// Property Info tab).
 export function QuickFactsCard({ lead }: { lead: LeadDetailWithCounts }) {
+  const attorneyName = lead.attorney?.name ?? "";
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
       <SectionSubheader>Quick Facts</SectionSubheader>
       <div className="space-y-0">
         <Row label="Sale Date" value={fmtDate(lead.sale_date)} />
-        <Row label="Recovery Type" value={recoveryTypeLabel(lead.recovery_type)} />
-        {/* Fix GGGGG: Case Number — read-only plain text here; edit it on the
-            Property Info tab. Never currency-formatted. */}
-        <Row
-          label="Case Number"
-          value={lead.case_number ?? "Not Set"}
-          muted={!lead.case_number}
-        />
-        <Row
-          label="Parcel Number"
-          value={lead.parcel_number ?? "Not Set"}
-          muted={!lead.parcel_number}
-        />
+        <Row label="Recovery Type" value={formatRecoveryType(lead.recovery_type)} />
         <Row
           label="Lead Source"
           value={lead.lead_source ?? "—"}
           muted={!lead.lead_source}
         />
         <Row
-          label="Data Source"
-          value={lead.data_source ?? "Not Set"}
-          muted={!lead.data_source}
-        />
-        <Row label="Imported" value={fmtDateTime(lead.imported_at)} />
-        <Row
           label="Attorney"
-          value={lead.attorney?.name ?? "Not Assigned"}
-          muted={!lead.attorney?.name}
+          value={attorneyName || "Not Assigned"}
+          muted={!attorneyName}
         />
       </div>
     </div>
