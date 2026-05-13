@@ -351,9 +351,18 @@ export async function importLeads(
   // The return value reports written contact rows AND any per-field errors;
   // the caller surfaces those in the import summary so the user can act on
   // them instead of discovering missing data later.
+  // Fix BBBB4: `updateExistingOwner` gates the in-place UPDATE of the
+  // primary owner row. true only for `insert` (no existing owner anyway) and
+  // `replace_all` (the user explicitly said "blind overwrite"). On
+  // `replace_selected` and `update_blank` we leave the existing owner row
+  // alone — owner full_name isn't a selectable field on the replace screen,
+  // and update_blank's contract is "fill blanks, don't overwrite". Without
+  // this gate, a CSV column drift that puts e.g. "Y" in owner_full_name
+  // silently overwrites the existing owner on every duplicate.
   async function writeContactsForLead(
     leadId: string,
-    row: IncomingLead
+    row: IncomingLead,
+    updateExistingOwner: boolean
   ): Promise<{ written: number; errors: string[] }> {
     const ownerName = (row.owner_full_name ?? "").trim();
     const phones = (row.phones ?? []).filter((p) => p.value.trim());
@@ -400,13 +409,16 @@ export async function importLeads(
 
     let ownerId: string;
     if (existingOwner) {
-      const { error: updErr } = await sb
-        .from("owners")
-        .update(ownerPayload)
-        .eq("id", existingOwner.id as string);
-      if (updErr) {
-        errors.push(`owner update failed (${updErr.message})`);
-        return { written, errors };
+      // Fix BBBB4: only blind-overwrite existing owner on insert / replace_all.
+      if (updateExistingOwner) {
+        const { error: updErr } = await sb
+          .from("owners")
+          .update(ownerPayload)
+          .eq("id", existingOwner.id as string);
+        if (updErr) {
+          errors.push(`owner update failed (${updErr.message})`);
+          return { written, errors };
+        }
       }
       ownerId = existingOwner.id as string;
     } else {
@@ -586,9 +598,13 @@ export async function importLeads(
   // phone and email slots deduped by normalized digits / lowercased trim);
   // unmatched relatives are INSERTed. Prevents the duplicate explosion that
   // repeated replace imports of the same lead would otherwise produce.
+  // Fix BBBB4: `updateExistingRelatives` mirrors the owner flag — true only on
+  // `insert` / `replace_all`. On `replace_selected` / `update_blank` we insert
+  // brand-new relatives but never overwrite an existing relative's fields.
   async function writeRelativesForLead(
     leadId: string,
-    row: IncomingLead
+    row: IncomingLead,
+    updateExistingRelatives: boolean
   ): Promise<{ errors: string[] }> {
     const errors: string[] = [];
     const incoming = (row.relatives ?? []).filter(
@@ -610,6 +626,11 @@ export async function importLeads(
     for (const rel of incoming) {
       const name = (rel.full_name ?? "Unknown").trim();
       const match = byName.get(name.toLowerCase());
+      // Fix BBBB4: existing relative matched by name — only merge in place
+      // when the action allows it. Otherwise leave the row alone.
+      if (match && !updateExistingRelatives) {
+        continue;
+      }
       if (match) {
         // Merge into the existing relative row. Build the merged phone slots
         // by indexing existing slots by their normalized number, then
@@ -760,9 +781,11 @@ export async function importLeads(
         lead_id: leadRow.id,
       });
       {
-        const cw = await writeContactsForLead(leadRow.id as string, row);
+        // Fix BBBB4: insert action — there's no prior owner/relative row, so
+        // "update existing" is moot. Pass true for symmetry with replace_all.
+        const cw = await writeContactsForLead(leadRow.id as string, row, true);
         contactsWritten += cw.written;
-        const rw = await writeRelativesForLead(leadRow.id as string, row);
+        const rw = await writeRelativesForLead(leadRow.id as string, row, true);
         const rowErrors = [...cw.errors, ...rw.errors];
         if (rowErrors.length > 0) {
           warnings.push(
@@ -877,10 +900,17 @@ export async function importLeads(
     // normalized value before deciding insert-vs-update. Errors don't
     // silently disappear: they accumulate on `warnings` for the import
     // summary.
+    // Fix BBBB4: only `replace_all` (blind overwrite) is allowed to UPDATE
+    // an existing owner row in place. `replace_selected` (owner not
+    // selectable on that screen) and `update_blank` (fill-blanks contract)
+    // attach contacts to whatever owner already exists but never overwrite
+    // owner full_name / status / age / is_deceased. Same gating applies to
+    // matched relatives.
     {
-      const cw = await writeContactsForLead(leadId, row);
+      const updateExisting = decision.action === "replace_all";
+      const cw = await writeContactsForLead(leadId, row, updateExisting);
       contactsWritten += cw.written;
-      const rw = await writeRelativesForLead(leadId, row);
+      const rw = await writeRelativesForLead(leadId, row, updateExisting);
       const rowErrors = [...cw.errors, ...rw.errors];
       if (rowErrors.length > 0) {
         warnings.push(
