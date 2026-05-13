@@ -162,7 +162,7 @@ export async function postComment(input: {
             ? `${addr}, ${cityState}`
             : addr
           : (leadRow?.lead_id as string | null) ?? input.leadId;
-      const link = `/leads/${input.leadId}?tab=discussion#comment-${commentId}`;
+      const link = `/leads/${input.leadId}?tab=notes#comment-${commentId}`;
       for (const recipientId of recipients) {
         const m = memberById.get(recipientId);
         if (!m?.email) continue;

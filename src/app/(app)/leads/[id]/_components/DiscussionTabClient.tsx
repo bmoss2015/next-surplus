@@ -277,14 +277,14 @@ export function DiscussionTabClient({
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-4">
         <h3 className="section-subheader">
-          Discussion
+          Notes
         </h3>
       </div>
 
       {/* Feed (oldest at top, newest at bottom) */}
       {comments.length === 0 ? (
         <div className="mb-4 rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-[12px] text-gray-500">
-          No Comments Yet. Start The Discussion Below.
+          No Notes Yet. Add The First One Below.
         </div>
       ) : (
         <div className="mb-4 space-y-3">
@@ -328,7 +328,7 @@ export function DiscussionTabClient({
             setTimeout(() => setPickerOpen(false), 150);
           }}
           rows={3}
-          placeholder="Write A Comment. Type @ To Mention A Teammate. Cmd Enter To Post."
+          placeholder="Add A Note. Type @ To Mention A Teammate. Cmd Enter To Save."
           className="w-full resize-y rounded-md border border-gray-200 bg-surface px-3 py-2 text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
         />
 
@@ -378,7 +378,7 @@ export function DiscussionTabClient({
             className="btn-primary inline-flex cursor-pointer items-center gap-[6px] rounded-md px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
           >
             <IconSend size={13} stroke={2} />
-            {isPending ? "Posting…" : "Post"}
+            {isPending ? "Saving…" : "Add Note"}
           </button>
         </div>
       </div>

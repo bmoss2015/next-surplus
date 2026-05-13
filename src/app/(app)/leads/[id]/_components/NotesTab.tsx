@@ -1,21 +1,22 @@
-import { fetchNotes } from "@/lib/leads/fetch-tab-data";
+import {
+  listDiscussionComments,
+  listTeamMembers,
+} from "../_discussion-actions";
 import { getCurrentProfile } from "@/lib/auth/current-user";
-import { firstNameFrom } from "@/lib/leads/activity-format";
-import { NotesTabClient } from "./NotesTabClient";
+import { DiscussionTabClient } from "./DiscussionTabClient";
 
 export async function NotesTab({ leadId }: { leadId: string }) {
-  const [notes, profile] = await Promise.all([
-    fetchNotes(leadId),
+  const [comments, members, profile] = await Promise.all([
+    listDiscussionComments(leadId),
+    listTeamMembers(),
     getCurrentProfile(),
   ]);
   return (
-    <NotesTabClient
+    <DiscussionTabClient
       leadId={leadId}
-      initialNotes={notes}
+      initialComments={comments}
+      teamMembers={members}
       currentUserId={profile?.id ?? null}
-      currentUserFirstName={
-        profile ? firstNameFrom(profile.fullName, profile.email) : null
-      }
     />
   );
 }

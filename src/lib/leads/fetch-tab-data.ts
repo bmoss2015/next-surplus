@@ -46,32 +46,33 @@ export async function fetchDocuments(leadId: string): Promise<DocumentRow[]> {
 }
 
 export async function fetchNotes(leadId: string): Promise<NoteActivityRow[]> {
+  // Notes are now backed by discussion_comments (which carries @mentions +
+  // notifications). The OverviewTab "Recent Notes" card calls this fetcher,
+  // so we adapt the comment shape into the legacy NoteActivityRow payload.
   const sb = await createClient();
   const { data, error } = await sb
-    .from("activities")
-    .select("id, activity_type, payload, created_at, user_id")
+    .from("discussion_comments")
+    .select("id, body, created_at, author_id")
     .eq("lead_id", leadId)
-    .eq("activity_type", "note")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  // "Pause for review" entries are also activity_type='note' but carry
-  // payload.kind='review_pause' — they belong in the Activity log, not Notes.
-  const raw = ((data ?? []) as Array<{
+  const raw = (data ?? []) as Array<{
     id: string;
-    activity_type: string;
-    payload: Record<string, unknown>;
+    body: string;
     created_at: string;
-    user_id: string | null;
-  }>).filter(
-    (row) => (row.payload as { kind?: string } | null)?.kind !== "review_pause"
-  );
+    author_id: string | null;
+  }>;
   const names = await resolveActorNames(
     sb,
-    raw.map((r) => r.user_id)
+    raw.map((r) => r.author_id)
   );
   return raw.map((r) => ({
-    ...r,
-    actor_first_name: r.user_id ? (names.get(r.user_id) ?? null) : null,
+    id: r.id,
+    activity_type: "note",
+    payload: { body: r.body, kind: "note" },
+    created_at: r.created_at,
+    user_id: r.author_id,
+    actor_first_name: r.author_id ? (names.get(r.author_id) ?? null) : null,
   }));
 }
 

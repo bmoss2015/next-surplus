@@ -21,7 +21,6 @@ import { ResearchTab } from "./_components/ResearchTab";
 import { DocumentsTab } from "./_components/DocumentsTab";
 import { NotesTab } from "./_components/NotesTab";
 import { LeadTasksTab } from "./_components/LeadTasksTab";
-import { DiscussionTab } from "./_components/DiscussionTab";
 import { ActivityTab } from "./_components/ActivityTab";
 import { RecoveryFeeField } from "./_components/RecoveryFeeField";
 import { ConfirmedSurplusProvider } from "./_components/ConfirmedSurplusContext";
@@ -36,7 +35,6 @@ const VALID_TABS: TabKey[] = [
   "documents",
   "notes",
   "tasks",
-  "discussion",
   "activity",
 ];
 
@@ -50,9 +48,12 @@ export default async function LeadDetailPage({
   const { id } = await params;
   const sp = await searchParams;
   const rawTab = typeof sp.tab === "string" ? sp.tab : undefined;
+  // Notify-mention links and the bell historically pointed at ?tab=discussion;
+  // the Notes tab took that experience over, so any legacy URL lands on Notes.
+  const normalizedTab = rawTab === "discussion" ? "notes" : rawTab;
   const activeTab: TabKey =
-    rawTab && VALID_TABS.includes(rawTab as TabKey)
-      ? (rawTab as TabKey)
+    normalizedTab && VALID_TABS.includes(normalizedTab as TabKey)
+      ? (normalizedTab as TabKey)
       : "overview";
 
   const sb = await createClient();
@@ -98,7 +99,6 @@ export default async function LeadDetailPage({
             {activeTab === "documents" && <DocumentsTab leadId={lead.id} />}
             {activeTab === "notes" && <NotesTab leadId={lead.id} />}
             {activeTab === "tasks" && <LeadTasksTab leadId={lead.id} />}
-            {activeTab === "discussion" && <DiscussionTab leadId={lead.id} />}
             {activeTab === "activity" && <ActivityTab leadId={lead.id} />}
           </div>
 

@@ -131,7 +131,7 @@ export function NotificationBell() {
     }
     if (n.lead_id) {
       const anchor = n.comment_id ? `#comment-${n.comment_id}` : "";
-      router.push(`/leads/${n.lead_id}?tab=discussion${anchor}`);
+      router.push(`/leads/${n.lead_id}?tab=notes${anchor}`);
     }
   }
 

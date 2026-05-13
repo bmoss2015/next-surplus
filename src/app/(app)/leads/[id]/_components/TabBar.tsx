@@ -12,7 +12,6 @@ const TABS = [
   { key: "documents", label: "Documents" },
   { key: "notes", label: "Notes" },
   { key: "tasks", label: "Tasks" },
-  { key: "discussion", label: "Discussion" },
   { key: "activity", label: "Activity" },
 ] as const;
 
