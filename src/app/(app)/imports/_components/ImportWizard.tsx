@@ -1085,8 +1085,17 @@ export function ImportWizard() {
       const ownerFull = get(raw, "owner_full_name");
       const ownerFirst = get(raw, "owner_first_name");
       const ownerLast = get(raw, "owner_last_name");
+      // Fix DDDD4: prefer owner_first_name + owner_last_name over the
+      // owner_full_name column whenever either of the parts is present. The
+      // CSV's "full name" column is the one most likely to suffer column
+      // drift (a single letter, the wrong row's value, etc.) — if the user
+      // mapped the parts, those are authoritative and the concatenation is
+      // what the owners table should see. Only fall back to owner_full_name
+      // when the parts weren't mapped at all.
       let ownerName: string;
-      if (ownerFull) {
+      if (ownerFirst || ownerLast) {
+        ownerName = properCaseName(combineName(ownerFirst, ownerLast));
+      } else if (ownerFull) {
         // Strip a trailing Jr/Sr/II–IV/Esq, reorder "Last, First", Proper Case,
         // then re-attach the suffix.
         const { name: ownerCore, suffix: ownerSuffix } = splitNameSuffix(ownerFull);
@@ -1094,7 +1103,7 @@ export function ImportWizard() {
           .filter(Boolean)
           .join(" ");
       } else {
-        ownerName = properCaseName(combineName(ownerFirst, ownerLast));
+        ownerName = "";
       }
 
       const phones: ImportPhone[] = [];
