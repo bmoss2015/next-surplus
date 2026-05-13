@@ -2049,6 +2049,18 @@ export function ImportWizard() {
   const dupCount = dupMatches.filter(Boolean).length;
   const sourceName = leadSourceLabel;
   const importableCount = summary.newRows + summary.updatedBlank + summary.replaced;
+  // Fix EEEE4: detect the single resolution every duplicate currently
+  // shares (or null when mixed / no duplicates). Drives the Apply-To-All
+  // button highlight and the dynamic Import-button label.
+  const uniformResolution: DuplicateResolution | null = (() => {
+    if (dupCount === 0) return null;
+    const seen = new Set<DuplicateResolution>();
+    dupMatches.forEach((m, i) => {
+      if (!m) return;
+      seen.add(dupResolution[i] ?? DEFAULT_DUPLICATE_RESOLUTION);
+    });
+    return seen.size === 1 ? Array.from(seen)[0] : null;
+  })();
   // Fix WWWW3: split replace into two options — blind "Replace All Fields"
   // and selective "Replace Selected Fields" (the latter detours through the
   // field-selection screen).
@@ -2199,24 +2211,36 @@ export function ImportWizard() {
       {dupCount > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px] text-gray-600">
           <span className="text-gray-500">Apply To All Duplicates:</span>
-          {RES_OPTIONS.map((o) => (
-            <button
-              key={o}
-              type="button"
-              onClick={() =>
-                setDupResolution((prev) => {
-                  const next = { ...prev };
-                  dupMatches.forEach((m, i) => {
-                    if (m) next[i] = o;
-                  });
-                  return next;
-                })
-              }
-              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-[4px] hover:border-petrol-500"
-            >
-              {duplicateResolutionLabel(o)}
-            </button>
-          ))}
+          {RES_OPTIONS.map((o) => {
+            // Fix EEEE4: highlight the button when every duplicate currently
+            // resolves to that option (i.e. the user clicked it and hasn't
+            // diverged any individual row's dropdown yet). "Mixed" → no
+            // button highlighted.
+            const isActive = uniformResolution === o;
+            return (
+              <button
+                key={o}
+                type="button"
+                onClick={() =>
+                  setDupResolution((prev) => {
+                    const next = { ...prev };
+                    dupMatches.forEach((m, i) => {
+                      if (m) next[i] = o;
+                    });
+                    return next;
+                  })
+                }
+                className={cn(
+                  "cursor-pointer rounded-md border px-2.5 py-[4px]",
+                  isActive
+                    ? "border-petrol-500 bg-petrol-50 font-medium text-petrol-700"
+                    : "border-gray-200 bg-surface hover:border-petrol-500"
+                )}
+              >
+                {duplicateResolutionLabel(o)}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -2265,7 +2289,11 @@ export function ImportWizard() {
                 ? "Fix Errors To Import"
                 : importableCount === 0
                   ? "No Rows To Import"
-                  : `Import ${importableCount} ${importableCount === 1 ? "Lead" : "Leads"}`}
+                  : uniformResolution === "replace_selected"
+                    ? "Choose Fields To Replace"
+                    : uniformResolution === "replace_all"
+                      ? "Replace All Fields"
+                      : `Import ${importableCount} ${importableCount === 1 ? "Lead" : "Leads"}`}
           </button>
         </div>
       </div>
