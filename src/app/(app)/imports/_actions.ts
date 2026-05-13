@@ -781,11 +781,17 @@ export async function importLeads(
     let patch: Record<string, unknown>;
 
     if (decision.action === "replace_all") {
-      // Fix VVVV3: only write the fields the user explicitly confirmed on the
-      // "Select Fields to Replace" screen. Anything not in selectedFields is
-      // dropped from the patch — never written, never blanked. attorney_cost
-      // (not in SELECTABLE_REPLACE_FIELDS) is therefore never touched on a
-      // replace either, which matches the screen's behaviour.
+      // Fix WWWW3: "Replace All Fields" is the blind path — overwrite every
+      // importable field on the existing lead with the CSV row's value.
+      // attorney_cost is included here when the CSV carried it (matches the
+      // pre-VVVV3 behaviour of replace_all).
+      patch = { ...fields };
+    } else if (decision.action === "replace_selected") {
+      // Fix WWWW3: "Replace Selected Fields" — only write the fields the
+      // user explicitly confirmed on the field-selection screen. Anything
+      // not in selectedFields is dropped from the patch — never written,
+      // never blanked. attorney_cost (not in SELECTABLE_REPLACE_FIELDS) is
+      // therefore never touched on a selected-replace either.
       const selected = new Set<SelectableReplaceField>(decision.selectedFields);
       patch = {};
       for (const f of SELECTABLE_REPLACE_FIELDS) {
@@ -835,14 +841,17 @@ export async function importLeads(
       continue;
     }
 
-    if (decision.action === "replace_all") replaced += 1;
+    // Fix WWWW3: both replace flavours count as a "replace" and write the
+    // same activity body — only update_blank gets the blank-fill wording.
+    const isReplace =
+      decision.action === "replace_all" || decision.action === "replace_selected";
+    if (isReplace) replaced += 1;
     else updatedBlank += 1;
 
     importRowsLog.push({
       import_id: importRow.id,
       raw_row: row,
-      action_taken:
-        decision.action === "replace_all" ? "updated_replace" : "updated_blank",
+      action_taken: isReplace ? "updated_replace" : "updated_blank",
       lead_id: leadId,
       dedupe_match_id: leadId,
     });
@@ -856,10 +865,9 @@ export async function importLeads(
       lead_id: leadId,
       activity_type: "lead_updated",
       payload: {
-        body:
-          decision.action === "replace_all"
-            ? "Lead data replaced via import"
-            : "Lead updated via import — blank fields filled",
+        body: isReplace
+          ? "Lead data replaced via import"
+          : "Lead updated via import — blank fields filled",
       },
       user_id: actorId,
     });

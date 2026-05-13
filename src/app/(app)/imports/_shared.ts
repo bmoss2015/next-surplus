@@ -8,10 +8,16 @@
 export type ImportSaleType = "TAX" | "MTG" | "unknown";
 
 // Fix 95: how a detected duplicate row should be resolved on import.
-//  - skip:          do not import the row at all
-//  - update_blank:  only write into fields that are null/empty on the lead
-//  - replace_all:   overwrite every importable field on the lead
-export type DuplicateResolution = "skip" | "update_blank" | "replace_all";
+//  - skip:              do not import the row at all
+//  - update_blank:      only write into fields that are null/empty on the lead
+//  - replace_all:       overwrite every importable field on the lead (blind)
+//  - replace_selected:  open the field-selection screen first; only the
+//                       fields the user confirms get overwritten (Fix WWWW3)
+export type DuplicateResolution =
+  | "skip"
+  | "update_blank"
+  | "replace_all"
+  | "replace_selected";
 
 export const DEFAULT_DUPLICATE_RESOLUTION: DuplicateResolution = "update_blank";
 
@@ -22,7 +28,9 @@ export function duplicateResolutionLabel(r: DuplicateResolution): string {
     case "update_blank":
       return "Update Blank Fields Only";
     case "replace_all":
-      return "Replace All";
+      return "Replace All Fields";
+    case "replace_selected":
+      return "Replace Selected Fields";
   }
 }
 
@@ -30,16 +38,21 @@ export function duplicateResolutionLabel(r: DuplicateResolution): string {
 // "insert"; rows matched to an existing lead get one of the duplicate
 // resolutions plus the existing lead id. Lives here (not in the "use server"
 // _actions module) so it can be a plain type export.
-// Fix VVVV3: replace_all now carries the explicit list of fields the user
-// confirmed should be overwritten on the existing lead. The patch built in
-// importLeads is filtered to that list, so unchecked fields are never
-// written.
+// Fix WWWW3: there are now two replace flavours. "replace_all" is the blind
+// path — overwrite every importable field with the CSV value, no review
+// screen. "replace_selected" carries the explicit list of fields the user
+// confirmed on the "Select Fields to Replace" screen; the patch is filtered
+// to those fields so anything unchecked is left alone.
 export type ImportRowDecision =
   | { index: number; action: "insert" }
-  | { index: number; action: "skip" | "update_blank"; existingLeadId: string }
   | {
       index: number;
-      action: "replace_all";
+      action: "skip" | "update_blank" | "replace_all";
+      existingLeadId: string;
+    }
+  | {
+      index: number;
+      action: "replace_selected";
       existingLeadId: string;
       selectedFields: SelectableReplaceField[];
     };

@@ -1314,30 +1314,31 @@ export function ImportWizard() {
       }
       const res = dupResolution[i] ?? DEFAULT_DUPLICATE_RESOLUTION;
       if (res === "skip") skipped += 1;
-      else if (res === "replace_all") replaced += 1;
+      // Fix WWWW3: both replace_all (blind) and replace_selected count as
+      // "replaced" for the preview summary.
+      else if (res === "replace_all" || res === "replace_selected") replaced += 1;
       else updatedBlank += 1;
     });
     return { newRows, skipped, updatedBlank, replaced };
   }, [normalized, dupMatches, dupResolution]);
 
-  // Fix VVVV3: build the list of CSV row indices the user resolved to
-  // "replace_all" — used to gate the field-selection screen and to
-  // assemble final decisions later.
+  // Fix WWWW3: only "Replace Selected Fields" rows route through the field-
+  // selection screen. Blind "Replace All Fields" rows go straight to import.
   function getReplaceRows(): Array<{ index: number; existingLeadId: string }> {
     const out: Array<{ index: number; existingLeadId: string }> = [];
     normalized.forEach((_, i) => {
       const matchId = dupMatches[i] ?? null;
       if (!matchId) return;
       const res = dupResolution[i] ?? DEFAULT_DUPLICATE_RESOLUTION;
-      if (res === "replace_all") out.push({ index: i, existingLeadId: matchId });
+      if (res === "replace_selected") out.push({ index: i, existingLeadId: matchId });
     });
     return out;
   }
 
-  // Fix VVVV3: assemble the final ImportRowDecision list. For replace_all
-  // rows, look up the user's per-row field selection (built on the
-  // replace_select screen). For inserts / skip / update_blank the decision
-  // is unchanged from before.
+  // Fix WWWW3: assemble the final ImportRowDecision list. replace_all becomes
+  // a blind decision (no selectedFields). replace_selected carries the user's
+  // confirmed field set from the field-selection screen. Other actions
+  // (insert / skip / update_blank) are unchanged.
   function buildDecisions(
     selections: Map<number, Set<SelectableReplaceField>>
   ): ImportRowDecision[] {
@@ -1349,15 +1350,18 @@ export function ImportWizard() {
         return;
       }
       const res = dupResolution[i] ?? DEFAULT_DUPLICATE_RESOLUTION;
-      if (res === "replace_all") {
+      if (res === "replace_selected") {
         const picked = selections.get(i) ?? new Set<SelectableReplaceField>();
         out.push({
           index: i,
-          action: "replace_all",
+          action: "replace_selected",
           existingLeadId: matchId,
           selectedFields: Array.from(picked),
         });
+      } else if (res === "replace_all") {
+        out.push({ index: i, action: "replace_all", existingLeadId: matchId });
       } else {
+        // skip | update_blank
         out.push({ index: i, action: res, existingLeadId: matchId });
       }
     });
@@ -2032,7 +2036,15 @@ export function ImportWizard() {
   const dupCount = dupMatches.filter(Boolean).length;
   const sourceName = leadSourceLabel;
   const importableCount = summary.newRows + summary.updatedBlank + summary.replaced;
-  const RES_OPTIONS: DuplicateResolution[] = ["skip", "update_blank", "replace_all"];
+  // Fix WWWW3: split replace into two options — blind "Replace All Fields"
+  // and selective "Replace Selected Fields" (the latter detours through the
+  // field-selection screen).
+  const RES_OPTIONS: DuplicateResolution[] = [
+    "skip",
+    "update_blank",
+    "replace_all",
+    "replace_selected",
+  ];
 
   const hasRowErrors = invalidRows.length > 0;
 
