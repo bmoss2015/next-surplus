@@ -22,11 +22,15 @@ export function formatCurrencyOrDash(value: number | null | undefined): string {
 
 // Fix 28 — title-case a free-text place name (county, city) at read time,
 // regardless of how it was stored ("YORK" / "york county" -> "York County").
+// Fix KKKK3 PART 3: the negative lookbehind on (?<!['′’]) keeps the letter
+// after a straight or curly apostrophe from being recapitalized — "george's"
+// stays "George's", not "George'S", so possessive county names like
+// "Prince George's" / "St. Mary's" / "Queen Anne's" render correctly.
 export function toTitleCase(value: string | null | undefined): string {
   if (!value) return "";
   return value
     .toLowerCase()
-    .replace(/\b[a-z]/g, (c) => c.toUpperCase())
+    .replace(/(?<!['′’])\b[a-z]/g, (c) => c.toUpperCase())
     .replace(/\bMc([a-z])/g, (_, c: string) => "Mc" + c.toUpperCase());
 }
 

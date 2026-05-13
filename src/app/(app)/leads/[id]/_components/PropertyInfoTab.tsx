@@ -447,36 +447,32 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-// Fix IIII3: compact inline label/value row — label sits left at fixed width,
-// value sits immediately after. Replaces the older stacked layout for the bulk
-// of Property Info fields so more information fits without scrolling.
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+// Fix IIII3 / KKKK3: compact inline label/value row — label sits left at fixed
+// 160px width, value sits immediately after. Every left-column field uses this
+// (KKKK3 PART 1 / PART 2: Property Address, County, Parcel Number, Case Number,
+// each of City / State / ZIP on its own row, plus the Sale section rows).
+// Property Address passes wrap so a long address can break onto a second line
+// while the label stays inline on the first line.
+function Field({
+  label,
+  children,
+  wrap,
+}: {
+  label: string;
+  children: React.ReactNode;
+  wrap?: boolean;
+}) {
   return (
     <div className="mb-2 flex items-baseline gap-2">
       <div className="w-[160px] shrink-0 text-xs text-[#6b7280]">{label}</div>
-      <div className="text-sm font-medium text-[#111827]">{children}</div>
-    </div>
-  );
-}
-
-// Fix IIII3: stacked label-above-value row, used where the value needs the full
-// column width (Property Address — long addresses would wrap awkwardly inline).
-function StackedField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-2">
-      <div className="text-xs text-[#6b7280]">{label}</div>
-      <div className="mt-0.5 text-sm font-medium text-[#111827]">{children}</div>
-    </div>
-  );
-}
-
-// Fix IIII3: a label/value pair that sits inline with other pairs on the same
-// row (City / State / ZIP all share one line).
-function InlineMini({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <span className="text-xs text-[#6b7280]">{label}</span>
-      <span className="text-sm font-medium text-[#111827]">{children}</span>
+      <div
+        className={cn(
+          "text-sm font-medium text-[#111827]",
+          wrap && "min-w-0 flex-1 [&_button]:whitespace-normal [&_button]:break-words [&_button]:text-left"
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -662,20 +658,18 @@ export function PropertyInfoTab({
       <div className="mt-4 grid grid-cols-2 items-start gap-x-10 gap-y-8">
         {/* Row 1, left */}
         <Section title="Property">
-          <StackedField label="Property Address">
+          <Field label="Property Address" wrap>
             <InlineTextField leadId={id} field="address" initial={lead.address} placeholder={NOT_SET} />
-          </StackedField>
-          <div className="mb-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <InlineMini label="City">
-              <InlineTextField leadId={id} field="city" initial={lead.city} placeholder={NOT_SET} />
-            </InlineMini>
-            <InlineMini label="State">
-              <InlineStateField initial={lead.state} onCommit={handleStateChange} />
-            </InlineMini>
-            <InlineMini label="ZIP">
-              <InlineTextField leadId={id} field="zip" initial={lead.zip} placeholder={NOT_SET} />
-            </InlineMini>
-          </div>
+          </Field>
+          <Field label="City">
+            <InlineTextField leadId={id} field="city" initial={lead.city} placeholder={NOT_SET} />
+          </Field>
+          <Field label="State">
+            <InlineStateField initial={lead.state} onCommit={handleStateChange} />
+          </Field>
+          <Field label="ZIP">
+            <InlineTextField leadId={id} field="zip" initial={lead.zip} placeholder={NOT_SET} />
+          </Field>
           <Field label="County">
             <InlineTextField leadId={id} field="county" initial={lead.county} placeholder={NOT_SET} displayFormat={toTitleCase} />
           </Field>

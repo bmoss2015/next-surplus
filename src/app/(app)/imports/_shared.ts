@@ -231,8 +231,14 @@ export function padZip(raw: string): string {
 // COUNTY: drop a trailing " County" / " Co." / " Co" before storing, e.g.
 // "Charleston County" -> "Charleston", "CHARLESTON CO" -> "CHARLESTON". Case is
 // fixed up separately (Proper Case) by the caller.
+// Fix KKKK3 PART 3: the negative lookbehind on (?<!['′’]) blocks the regex
+// from chewing past a straight or curly apostrophe — so a degenerate input
+// like "Smith' County" stays "Smith'", and the suffix-strip never extends
+// across the possessive marker. For normal cases ("Prince George's County" →
+// "Prince George's") the trailing letter is already preserved because " County"
+// is the only thing being matched; this lookbehind hardens the edge case.
 export function stripCountySuffix(raw: string): string {
-  return (raw ?? "").replace(/[\s,]+(county|co\.?)\s*$/i, "").trim();
+  return (raw ?? "").replace(/(?<!['′’])[\s,]+(county|co\.?)\s*$/i, "").trim();
 }
 
 // Fix JJJJJ PART 5: case numbers in some feeds arrive like "$123,456.00" — strip
