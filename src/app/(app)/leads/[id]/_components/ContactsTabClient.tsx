@@ -29,8 +29,13 @@ type PhoneMetaPatch = {
   is_dnc?: boolean;
   is_litigator?: boolean;
 };
+// Fix TTTT4: imports now write the canonical "Landline" stored value
+// directly (parsePhoneType collapses "Residential" / "Landline" inputs to
+// "Landline"); legacy rows that were stored as "Residential" still need to
+// render as Landline. Recognize both so neither falls through to "Type".
 function phoneTypeShort(t: string | null): string {
   if (t === "Mobile") return "Mobile";
+  if (t === "Landline") return "Landline";
   if (t === "Residential") return "Landline";
   if (t === "Other") return "Other";
   return "Type";
@@ -655,7 +660,11 @@ function ContactLine({
             </button>
             {editingType && (
               <div className="absolute left-0 top-full z-20 mt-1 w-[100px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-elevated">
-                {(["Mobile", "Residential", "Other"] as const).map((t) => (
+                {/* Fix TTTT4: "Landline" is the canonical stored value going
+                    forward; "Residential" stays as a legacy alias so old rows
+                    still resolve in phoneTypeShort. New manual picks write
+                    "Landline". */}
+                {(["Mobile", "Landline", "Residential", "Other"] as const).map((t) => (
                   <button
                     key={t}
                     type="button"

@@ -35,9 +35,13 @@ const PHONE_SLOTS = [
 
 const EMAIL_SLOTS = ["email", "email_2", "email_3", "email_4", "email_5"] as const;
 
-const PHONE_TYPE_CYCLE: (string | null)[] = [null, "Mobile", "Residential", "Other"];
+// Fix TTTT4: cycle through Landline as a first-class option; keep
+// "Residential" recognized by the display function so legacy rows still
+// render as Landline rather than the "Type" placeholder.
+const PHONE_TYPE_CYCLE: (string | null)[] = [null, "Mobile", "Landline", "Residential", "Other"];
 function phoneTypeShort(t: string | null): string {
   if (t === "Mobile") return "Mobile";
+  if (t === "Landline") return "Landline";
   if (t === "Residential") return "Landline";
   if (t === "Other") return "Other";
   return "Type";
