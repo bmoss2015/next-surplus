@@ -2015,16 +2015,16 @@ function ImportSuccessModal({
           Import Complete
         </h2>
         <div className="mb-1 text-3xl font-bold text-[#0a3d4a]">
-          {result.imported} {result.imported === 1 ? "lead imported" : "leads imported"}
+          {result.imported} {result.imported === 1 ? "Lead Imported" : "Leads Imported"}
         </div>
         {result.skipped > 0 && (
           <div className="mb-1 text-sm text-[#6b7280]">
-            {result.skipped} {result.skipped === 1 ? "lead skipped" : "leads skipped"}
+            {result.skipped} {result.skipped === 1 ? "Lead Skipped" : "Leads Skipped"}
           </div>
         )}
         {result.dedupeReview > 0 && (
           <div className="mb-1 text-sm text-[#6b7280]">
-            {result.dedupeReview} flagged for dedupe review
+            {result.dedupeReview} Flagged For Dedupe Review
           </div>
         )}
         {/* Fix NNNN3 PART 5: per-lead contact-write warnings — never silent. */}
