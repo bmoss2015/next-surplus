@@ -2266,7 +2266,6 @@ export function ImportWizard() {
     </Shell>
     {successResult && (
       <ImportSuccessModal
-        result={successResult}
         onImportAnother={() => {
           setSuccessResult(null);
           resetAll();
@@ -2287,16 +2286,9 @@ export function ImportWizard() {
 // single "Import Another File" button. The detailed per-import breakdown lives
 // on the Import History row below, not here.
 function ImportSuccessModal({
-  result,
   onImportAnother,
   onClose,
 }: {
-  result: {
-    imported: number;
-    skipped: number;
-    dedupeReview: number;
-    warnings?: string[];
-  };
   onImportAnother: () => void;
   onClose: () => void;
 }) {
@@ -2312,6 +2304,9 @@ function ImportSuccessModal({
     };
   }, [onClose]);
 
+  // Fix YYYY3: one message for every scenario (new / update / selective
+  // replace). No imported/skipped/dedupe counts and no warnings list — just
+  // checkmark + "Import Completed" + Import Another File.
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
@@ -2327,30 +2322,9 @@ function ImportSuccessModal({
         <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#e8f4f6]">
           <IconCheck size={24} stroke={2.5} className="text-[#0d6c7d]" />
         </div>
-        <h2 className="m-0 mb-2 text-lg font-semibold text-[#0a3d4a]">
-          Import Complete
+        <h2 className="m-0 mb-6 text-lg font-semibold text-[#0a3d4a]">
+          Import Completed
         </h2>
-        {/* Fix UUUU3: main count only — no skipped / dedupe-review subtext.
-            Sized at text-lg so it sits below the "Import Complete" heading
-            instead of dominating it. */}
-        <div className="mb-1 text-lg font-bold text-[#0a3d4a]">
-          {result.imported} {result.imported === 1 ? "Lead Imported" : "Leads Imported"}
-        </div>
-        {/* Fix NNNN3 PART 5: per-lead contact-write warnings — never silent. */}
-        {result.warnings && result.warnings.length > 0 && (
-          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-left">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-800">
-              {result.warnings.length}{" "}
-              {result.warnings.length === 1 ? "Warning" : "Warnings"}
-            </div>
-            <ul className="max-h-32 list-disc overflow-y-auto pl-5 text-xs text-amber-900">
-              {result.warnings.map((w, i) => (
-                <li key={i}>{w}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className="mb-6 mt-6 border-t border-[#e5e7eb]" />
         <button
           type="button"
           onClick={onImportAnother}
