@@ -16,6 +16,10 @@ function fmtDate(d: string | null): string {
 // label and value, single-line. min-w-0 on the value cell + truncate gives the
 // ellipsis treatment when content overflows the sidebar width; the title attr
 // exposes the full value on hover.
+// Muted fallbacks ("Not Assigned", "—") are always short and must never be
+// cut off, so they opt out of truncation (whitespace-nowrap + shrink-0) and
+// the value cell takes its intrinsic width instead of being allowed to
+// shrink-and-ellipsize.
 function Row({
   label,
   value,
@@ -31,10 +35,9 @@ function Row({
       <span
         title={value}
         className={
-          (muted
-            ? "text-[11px] italic text-[#9ca3af]"
-            : "text-[11px] font-medium text-[#111827]") +
-          " min-w-0 truncate text-right"
+          muted
+            ? "shrink-0 whitespace-nowrap text-right text-[11px] italic text-[#9ca3af]"
+            : "min-w-0 truncate text-right text-[11px] font-medium text-[#111827]"
         }
       >
         {value}
