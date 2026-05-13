@@ -74,12 +74,12 @@ function fmtDate(d: string | null): string {
 
 // Fix GGGG3 PART 4: an unset Property Info field reads as a dash, not "Not Set".
 const NOT_SET = "—";
-// Fix RRRR3: Property Info values render at 15px to pop against the muted
-// 13px labels. The inline editor buttons carry their own size so the bump
-// has to live here (the outer Field wrapper's font-size is overridden by the
-// button's explicit class).
-const DISPLAY_SET = "cursor-text rounded-[3px] px-0.5 text-[15px] font-medium text-[#0f1729] hover:bg-petrol-50";
-const DISPLAY_UNSET = "cursor-text rounded-[3px] px-0.5 text-[15px] italic text-gray-400 hover:bg-petrol-50";
+// Fix SSSS3: Property Info values use the same text-sm font-normal as
+// read-only fields elsewhere in the app. The inline editor buttons carry
+// their own size so the change has to live on these constants (the outer
+// Field wrapper's font-size is overridden by the button's explicit class).
+const DISPLAY_SET = "cursor-text rounded-[3px] px-0.5 text-sm font-normal text-[#0f1729] hover:bg-petrol-50";
+const DISPLAY_UNSET = "cursor-text rounded-[3px] px-0.5 text-sm italic text-gray-400 hover:bg-petrol-50";
 
 function InlineSelectField({
   leadId,
@@ -468,10 +468,10 @@ function Field({
 }) {
   return (
     <div className="mb-2 flex items-baseline gap-2">
-      <div className="w-[160px] shrink-0 text-[13px] text-[#6b7280]">{label}</div>
+      <div className="w-[160px] shrink-0 text-xs font-normal text-[#6b7280]">{label}</div>
       <div
         className={cn(
-          "text-[15px] font-medium text-[#111827]",
+          "text-sm font-normal text-[#111827]",
           wrap && "min-w-0 flex-1 [&_button]:whitespace-normal [&_button]:break-words [&_button]:text-left"
         )}
       >
@@ -497,9 +497,9 @@ function InlineRowWithCaption({
 }) {
   return (
     <div className="mb-2 flex items-start gap-2">
-      <div className="w-[160px] shrink-0 pt-0.5 text-[13px] text-[#6b7280]">{label}</div>
+      <div className="w-[160px] shrink-0 pt-0.5 text-xs font-normal text-[#6b7280]">{label}</div>
       <div>
-        <div className="text-[15px] font-medium text-[#111827]">{children}</div>
+        <div className="text-sm font-normal text-[#111827]">{children}</div>
         {caption ? (
           <div className={cn("mt-0.5 text-xs", captionClass ?? "text-[#6b7280]")}>{caption}</div>
         ) : null}
@@ -742,22 +742,10 @@ export function PropertyInfoTab({
               }}
             />
           </Field>
-          <Field label="Data Source">
-            <InlineListField
-              initial={lead.data_source}
-              options={dataSourceOptions}
-              width="w-[220px]"
-              onSave={(v) => {
-                void updateLeadField(id, "data_source", v);
-              }}
-              onAddNew={async (name) => {
-                const res = await addDataSource(name);
-                return res.ok ? res.name : null;
-              }}
-            />
-          </Field>
+          {/* Fix SSSS3: Data Source row removed — OOOO3 deleted the
+              underlying column, the row is dead UI. */}
           <Field label="Import Date">
-            <span className="text-[15px] font-medium text-[#111827]">{importedAtLabel}</span>
+            <span className="text-sm font-normal text-[#111827]">{importedAtLabel}</span>
           </Field>
         </Section>
 

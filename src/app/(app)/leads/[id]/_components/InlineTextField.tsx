@@ -84,13 +84,13 @@ export function InlineTextField({
       type="button"
       onClick={startEdit}
       title="Click To Edit"
-      // Fix RRRR3: Property Info values render at 15px to lift them off the
-      // 13px labels. InlineTextField is only consumed by Property Info today,
-      // so the bump is safe; other lead tabs don't import this component.
+      // Fix SSSS3: Property Info values match the rest of the app's
+      // read-only fields — text-sm, font-normal. InlineTextField is only
+      // consumed by Property Info today, so the change stays scoped.
       className={
         display
-          ? "cursor-text rounded-[3px] px-0.5 text-[15px] font-medium text-[#0f1729] hover:bg-petrol-50"
-          : "cursor-text rounded-[3px] px-0.5 text-[15px] italic text-gray-400 hover:bg-petrol-50"
+          ? "cursor-text rounded-[3px] px-0.5 text-sm font-normal text-[#0f1729] hover:bg-petrol-50"
+          : "cursor-text rounded-[3px] px-0.5 text-sm italic text-gray-400 hover:bg-petrol-50"
       }
     >
       {display || placeholder}
