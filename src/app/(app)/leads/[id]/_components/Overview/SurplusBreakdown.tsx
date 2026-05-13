@@ -29,9 +29,9 @@ function potentialSourceLabel(
   computedAvailable: boolean
 ): string {
   if (sourceSurplus != null) {
-    return leadSource ? `Estimated — Per ${leadSource}` : "Estimated — Manually Entered";
+    return leadSource ? `Estimated from ${leadSource} Data` : "Estimated — Manually Entered";
   }
-  if (computedAvailable) return "Estimated — Calculated from Sale Data";
+  if (computedAvailable) return "Calculated from Sale Data";
   return "No Surplus On File Yet";
 }
 
@@ -89,7 +89,7 @@ export function SurplusBreakdown({
       {/* POTENTIAL SURPLUS — quietly de-emphasised once a Confirmed value
           exists (recoloured, never struck through). */}
       <div>
-        <div className="flex items-baseline justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <span
             className={cn(
               "uppercase tracking-wide",
@@ -102,7 +102,7 @@ export function SurplusBreakdown({
           </span>
           <span
             className={cn(
-              hasConfirmed ? "text-base font-normal text-[#9ca3af]" : "text-2xl font-bold text-[#0a3d4a]"
+              hasConfirmed ? "text-base font-normal text-[#9ca3af]" : "text-xl font-bold text-[#0a3d4a]"
             )}
           >
             {potentialSurplus == null ? "—" : formatCurrency(potentialSurplus)}
@@ -115,7 +115,7 @@ export function SurplusBreakdown({
 
       {/* CONFIRMED SURPLUS */}
       <div className="mt-5">
-        <div className="flex items-baseline justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <span
             className={cn(
               "text-sm uppercase tracking-wide",
@@ -125,7 +125,7 @@ export function SurplusBreakdown({
             Confirmed Surplus
           </span>
           {hasConfirmed && (
-            <span className="text-2xl font-bold text-[#0a3d4a]">{formatCurrency(confirmedSurplus)}</span>
+            <span className="text-xl font-bold text-[#0a3d4a]">{formatCurrency(confirmedSurplus)}</span>
           )}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -156,14 +156,14 @@ export function SurplusBreakdown({
       <hr className="my-5 border-t-2 border-[#0d6c7d]" />
 
       {/* EST. NET PAYOUT — the headline number */}
-      <div className="flex items-baseline justify-between gap-4">
-        <span className="text-base font-bold uppercase tracking-wide text-[#0a3d4a]">
-          Est. Net Payout
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-base font-bold tracking-wide text-[#0a3d4a]">
+          Estimated Net Payout
         </span>
-        <span className="text-2xl font-bold text-[#0a3d4a]">{formatCurrency(netPayout)}</span>
+        <span className="text-xl font-bold text-[#0a3d4a]">{formatCurrency(netPayout)}</span>
       </div>
       <div className="mt-1 text-xs text-[#6b7280]">
-        Based on {hasConfirmed ? "Confirmed Surplus" : "Potential Surplus"}
+        Calculated Based On {hasConfirmed ? "Confirmed Surplus" : "Potential Surplus"}
       </div>
     </div>
   );

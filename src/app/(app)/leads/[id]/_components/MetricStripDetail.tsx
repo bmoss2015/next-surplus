@@ -123,16 +123,16 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
   // the confirmed surplus the instant it's set.
   const netPayout = recoveryFeeAmount - lead.attorney_cost;
   const payoutSub = hasConfirmed
-    ? "Based On Confirmed Surplus"
+    ? "Calculated Based On Confirmed Surplus"
     : hasSource
-      ? `Based On ${lead.lead_source ? lead.lead_source : "Source"} Surplus`
+      ? `Calculated Based On ${lead.lead_source ? lead.lead_source : "Source"} Surplus`
       : computedSurplus != null
-        ? "Based On Calculated Surplus"
+        ? "Calculated Based On Calculated Surplus"
         : "No Surplus On File Yet";
   const surplusSourceLine = hasSource
-    ? `Per ${lead.lead_source ?? "Lead Source"}`
+    ? `Estimated from ${lead.lead_source ?? "Lead Source"} Data`
     : computedSurplus != null
-      ? "Calculated"
+      ? "Calculated from Sale Data"
       : "No Surplus On File Yet";
 
   return (
@@ -151,7 +151,7 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
             </>
           ) : (
             <>
-              <div className="mb-1 text-[11px] tracking-[0.4px] text-gray-500">Est. Surplus</div>
+              <div className="mb-1 text-[11px] tracking-[0.4px] text-gray-500">Estimated Surplus</div>
               <div className="text-[18px] font-medium tracking-tight text-ink">
                 {formatCurrency(potentialSurplus)}
               </div>
@@ -162,7 +162,7 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
       </div>
 
       <div className="border-r border-petrol-700">
-        <Cell label="Est. Net Payout" variant="payout" sub={payoutSub}>
+        <Cell label="Estimated Net Payout" variant="payout" sub={payoutSub}>
           {formatCurrency(netPayout)}
         </Cell>
       </div>
@@ -170,7 +170,7 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
       <div className="border-r border-gray-200">
         <Cell
           label="Owner Status"
-          sub={`${OWNER_STATUS_LABELS[ownerStatusKey as OwnerStatus] ?? "Unknown"} Primary`}
+          sub={OWNER_STATUS_LABELS[ownerStatusKey as OwnerStatus] ?? "Unknown"}
         >
           <span className="text-[14px] font-medium text-ink">{ownerSummary(lead)}</span>
         </Cell>
@@ -179,7 +179,11 @@ export function MetricStripDetail({ lead }: { lead: LeadDetailWithCounts }) {
       <div className="border-r border-gray-200">
         <Cell
           label="Sale Process"
-          sub={lead.county ? `${toTitleCase(lead.county)} County` : ""}
+          sub={
+            lead.county
+              ? `${toTitleCase(lead.county)} County${lead.state ? `, ${lead.state}` : ""}`
+              : lead.state ?? ""
+          }
         >
           <span className="text-[14px] font-medium text-ink">{saleProcessLabel(lead)}</span>
         </Cell>
