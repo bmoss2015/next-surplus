@@ -9,7 +9,7 @@ import {
   type ChangeEvent,
   type KeyboardEvent,
 } from "react";
-import { IconSend, IconAt } from "@tabler/icons-react";
+import { IconSend, IconAt, IconSearch, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { postComment } from "../_discussion-actions";
 import type {
@@ -112,6 +112,13 @@ export function DiscussionTabClient({
   const atPosRef = useRef<number | null>(null);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const feedEndRef = useRef<HTMLDivElement | null>(null);
+  const feedScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Keyword search state. The search box filters comments by body; hovering a
+  // result scrolls the main feed (a scroll container, not the page) to the
+  // matching note and briefly rings it.
+  const [searchQuery, setSearchQuery] = useState("");
+  const highlightTimerRef = useRef<number | null>(null);
 
   const membersById = useMemo(
     () => new Map(teamMembers.map((m) => [m.id, m])),
@@ -125,6 +132,49 @@ export function DiscussionTabClient({
       : teamMembers;
     return list.slice(0, 6);
   }, [teamMembers, pickerQuery]);
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length === 0) return [];
+    return comments.filter((c) => c.body.toLowerCase().includes(q)).slice(0, 8);
+  }, [comments, searchQuery]);
+
+  function jumpToComment(commentId: string) {
+    const el = document.getElementById(`comment-${commentId}`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.add("ring-2", "ring-petrol-300");
+    if (highlightTimerRef.current !== null) {
+      window.clearTimeout(highlightTimerRef.current);
+    }
+    highlightTimerRef.current = window.setTimeout(() => {
+      el.classList.remove("ring-2", "ring-petrol-300");
+      highlightTimerRef.current = null;
+    }, 1800);
+  }
+
+  // Returns the body sliced to a short window around the first match, with
+  // the matching span marked so the dropdown can render it bolded.
+  function snippetFor(body: string, q: string) {
+    const lowered = body.toLowerCase();
+    const idx = lowered.indexOf(q.toLowerCase());
+    if (idx < 0 || q.length === 0) {
+      return [{ text: body.slice(0, 80), match: false }];
+    }
+    const radius = 30;
+    const start = Math.max(0, idx - radius);
+    const end = Math.min(body.length, idx + q.length + radius);
+    const lead = start > 0 ? "…" : "";
+    const trail = end < body.length ? "…" : "";
+    const before = body.slice(start, idx);
+    const hit = body.slice(idx, idx + q.length);
+    const after = body.slice(idx + q.length, end);
+    return [
+      { text: `${lead}${before}`, match: false },
+      { text: hit, match: true },
+      { text: `${after}${trail}`, match: false },
+    ];
+  }
 
   // Auto scroll to newest on mount and when a comment is added.
   useEffect(() => {
@@ -275,19 +325,93 @@ export function DiscussionTabClient({
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <h3 className="section-subheader">
           Notes
         </h3>
+        <div className="relative w-64">
+          <IconSearch
+            size={13}
+            stroke={1.75}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search Notes"
+            className="w-full rounded-md border border-gray-200 bg-surface py-[6px] pl-7 pr-7 text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+          />
+          {searchQuery.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 cursor-pointer rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-ink"
+            >
+              <IconX size={12} stroke={1.75} />
+            </button>
+          )}
+
+          {searchQuery.trim().length > 0 && (
+            <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-md border border-gray-200 bg-surface shadow-card">
+              {searchResults.length === 0 ? (
+                <div className="px-3 py-3 text-[12px] text-gray-500">
+                  No Matches.
+                </div>
+              ) : (
+                searchResults.map((c) => {
+                  const pieces = snippetFor(c.body, searchQuery.trim());
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseEnter={() => jumpToComment(c.id)}
+                      onFocus={() => jumpToComment(c.id)}
+                      onClick={() => jumpToComment(c.id)}
+                      className="flex w-full cursor-pointer flex-col gap-0.5 border-b border-gray-100 px-3 py-2 text-left last:border-b-0 hover:bg-gray-50"
+                    >
+                      <span className="flex items-center gap-1.5 text-[10.5px] text-gray-500">
+                        <span className="font-medium text-ink">
+                          {c.author_first_name ?? "System"}
+                        </span>
+                        · {formatTimestamp(c.created_at)}
+                      </span>
+                      <span className="line-clamp-2 text-[12px] text-ink">
+                        {pieces.map((p, i) =>
+                          p.match ? (
+                            <mark
+                              key={i}
+                              className="rounded bg-petrol-100 px-[2px] text-petrol-700"
+                            >
+                              {p.text}
+                            </mark>
+                          ) : (
+                            <span key={i}>{p.text}</span>
+                          )
+                        )}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Feed (oldest at top, newest at bottom) */}
+      {/* Feed (oldest at top, newest at bottom) — scrollable so a long thread
+          doesn't drag the page. Hover-jump from the search results scrolls
+          this container, not the window. */}
       {comments.length === 0 ? (
         <div className="mb-4 rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-[12px] text-gray-500">
           No Notes Yet. Add The First One Below.
         </div>
       ) : (
-        <div className="mb-4 space-y-3">
+        <div
+          ref={feedScrollRef}
+          className="mb-4 max-h-[420px] space-y-3 overflow-y-auto pr-1"
+        >
           {comments.map((c) => (
             <div
               key={c.id}
