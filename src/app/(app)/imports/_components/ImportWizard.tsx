@@ -781,15 +781,16 @@ export function ImportWizard() {
   );
   // Fix VVVV3: replace-select state — populated when the user hits Import on
   // the preview step and any row is set to "Replace existing data".
-  // replaceSelections: per-csv-row index → set of field keys the user wants
-  // to overwrite. Defaults to every field checked when the screen first
-  // opens; user can uncheck individual fields per duplicate.
+  // Fix AAAA4: one global Set of field keys. Whatever the user picks on the
+  // sample record applies to EVERY replace_selected row — there is no
+  // per-record override. Defaults to every field checked when the screen
+  // first opens.
   // existingValuesByLeadId: snapshot of the existing lead row(s) read once
   // from the server so the comparison UI can show "current vs CSV" without
   // re-querying as the user toggles checkboxes.
   const [replaceSelections, setReplaceSelections] = useState<
-    Map<number, Set<SelectableReplaceField>>
-  >(new Map());
+    Set<SelectableReplaceField>
+  >(new Set());
   const [existingValuesByLeadId, setExistingValuesByLeadId] = useState<
     Record<string, Record<string, unknown>>
   >({});
@@ -1339,10 +1340,13 @@ export function ImportWizard() {
   // a blind decision (no selectedFields). replace_selected carries the user's
   // confirmed field set from the field-selection screen. Other actions
   // (insert / skip / update_blank) are unchanged.
+  // Fix AAAA4: the same selected-field Set applies to every replace_selected
+  // row — no per-record overrides.
   function buildDecisions(
-    selections: Map<number, Set<SelectableReplaceField>>
+    selectedFields: Set<SelectableReplaceField>
   ): ImportRowDecision[] {
     const out: ImportRowDecision[] = [];
+    const pickedArray = Array.from(selectedFields);
     normalized.forEach((_, i) => {
       const matchId = dupMatches[i] ?? null;
       if (!matchId) {
@@ -1351,12 +1355,11 @@ export function ImportWizard() {
       }
       const res = dupResolution[i] ?? DEFAULT_DUPLICATE_RESOLUTION;
       if (res === "replace_selected") {
-        const picked = selections.get(i) ?? new Set<SelectableReplaceField>();
         out.push({
           index: i,
           action: "replace_selected",
           existingLeadId: matchId,
-          selectedFields: Array.from(picked),
+          selectedFields: pickedArray,
         });
       } else if (res === "replace_all") {
         out.push({ index: i, action: "replace_all", existingLeadId: matchId });
@@ -1429,18 +1432,15 @@ export function ImportWizard() {
       startTransition(async () => {
         const existing = await fetchLeadsForReplaceSelect(leadIds);
         setExistingValuesByLeadId(existing);
-        const initial = new Map<number, Set<SelectableReplaceField>>();
-        for (const r of replaceRows) {
-          initial.set(r.index, new Set<SelectableReplaceField>(SELECTABLE_REPLACE_FIELDS));
-        }
-        setReplaceSelections(initial);
+        // Fix AAAA4: one global Set, every field pre-checked.
+        setReplaceSelections(new Set<SelectableReplaceField>(SELECTABLE_REPLACE_FIELDS));
         setStep("replace_select");
       });
       return;
     }
 
     // No replace rows → straight to import.
-    submitImport(buildDecisions(new Map()));
+    submitImport(buildDecisions(new Set()));
   }
 
   function confirmReplaceSelect() {
@@ -1870,28 +1870,35 @@ export function ImportWizard() {
   }
 
   // ===================== REPLACE SELECT =====================
-  // Fix VVVV3: a per-replace-row field-selection screen. Only reachable when
-  // the user resolved at least one duplicate to "Replace existing data" on
-  // the dedupe step. Cancel returns to preview; Replace Selected calls
+  // Fix VVVV3: a field-selection screen. Only reachable when the user
+  // resolved at least one duplicate to "Replace existing data" on the dedupe
+  // step. Cancel returns to preview; Replace Selected calls
   // confirmReplaceSelect → submitImport with the filtered patch.
+  // Fix AAAA4: a SINGLE sample card with global checkboxes. Whatever the
+  // user picks here is applied to every replace_selected record — there is
+  // no per-record override. The sample shown is the first replace row's
+  // current vs CSV values; it's for context only, the checkbox state is
+  // global.
   if (step === "replace_select") {
     const rsRows = getReplaceRows();
-    const totalChecked = Array.from(replaceSelections.values()).reduce(
-      (acc, s) => acc + s.size,
-      0
-    );
-    const canConfirm = !pending && totalChecked > 0;
+    const sampleRow = rsRows[0];
+    const totalChecked = replaceSelections.size;
+    const canConfirm = !pending && totalChecked > 0 && !!sampleRow;
 
-    function toggleField(rowIndex: number, field: SelectableReplaceField) {
+    function toggleField(field: SelectableReplaceField) {
       setReplaceSelections((prev) => {
-        const next = new Map(prev);
-        const set = new Set(next.get(rowIndex) ?? new Set<SelectableReplaceField>());
-        if (set.has(field)) set.delete(field);
-        else set.add(field);
-        next.set(rowIndex, set);
+        const next = new Set(prev);
+        if (next.has(field)) next.delete(field);
+        else next.add(field);
         return next;
       });
     }
+
+    const sampleCsv = sampleRow ? normalized[sampleRow.index] : null;
+    const sampleExisting = sampleRow
+      ? (existingValuesByLeadId[sampleRow.existingLeadId] ?? {})
+      : {};
+    const recordCount = rsRows.length;
 
     return (
       <Shell step={step}>
@@ -1900,107 +1907,97 @@ export function ImportWizard() {
             Select Fields to Replace
           </h2>
           <div className="mt-[2px] text-[11.5px] text-gray-500">
-            Choose which fields to overwrite on the existing lead. Unchecked
-            fields will not be changed.
+            Choose which fields to overwrite. Your selection applies to all{" "}
+            {recordCount}{" "}
+            {recordCount === 1 ? "record being replaced" : "records being replaced"}.
+            Unchecked fields will not be changed on any record.
           </div>
         </div>
 
-        <div className="space-y-4">
-          {rsRows.map(({ index, existingLeadId }) => {
-            const csv = normalized[index];
-            const existing = existingValuesByLeadId[existingLeadId] ?? {};
-            const selected =
-              replaceSelections.get(index) ?? new Set<SelectableReplaceField>();
-            return (
-              <div
-                key={index}
-                className="overflow-hidden rounded-md border border-gray-200 bg-surface"
-              >
-                <div className="border-b border-gray-200 bg-gray-50 px-3 py-2">
-                  <div className="text-[12px] font-medium text-ink">
-                    {csv.address}
-                  </div>
-                  <div className="text-[11px] text-gray-500">
-                    {csv.city}, {csv.state} {csv.zip}
-                  </div>
-                </div>
-                <table className="w-full text-[11.5px]">
-                  <thead className="bg-gray-50/50 text-[10.5px] uppercase tracking-wider text-gray-500">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium">
-                        Current Value
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium">
-                        Replace
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium">
-                        CSV Value
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {SELECTABLE_REPLACE_FIELDS.map((field) => {
-                      const curRaw = (existing as Record<string, unknown>)[field];
-                      const csvRaw = (csv as unknown as Record<string, unknown>)[
-                        field
-                      ];
-                      const cur = fmtReplaceComparison(field, curRaw);
-                      const csvVal = fmtReplaceComparison(field, csvRaw);
-                      const noChange = cur === csvVal;
-                      return (
-                        <tr key={field} className="border-t border-gray-150">
-                          <td className="px-3 py-2 text-gray-600">{cur}</td>
-                          <td className="px-3 py-2">
-                            <label className="inline-flex cursor-pointer items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={selected.has(field)}
-                                onChange={() => toggleField(index, field)}
-                                className="cursor-pointer"
-                              />
-                              <span className="text-[11.5px] text-ink">
-                                {REPLACE_FIELD_LABELS[field]}
-                              </span>
-                              {noChange && (
-                                <span className="text-[10.5px] italic text-gray-400">
-                                  (No change)
-                                </span>
-                              )}
-                            </label>
-                          </td>
-                          <td className="px-3 py-2 text-gray-600">{csvVal}</td>
-                        </tr>
-                      );
-                    })}
-                    {/* Tax / Mortgage Payoff is in the spec's field list but
-                        the wizard doesn't import it today — display as a
-                        disabled row so the user sees the column exists. */}
-                    <tr className="border-t border-gray-150 opacity-60">
-                      <td className="px-3 py-2 text-gray-600">
-                        {fmtReplaceComparison(
-                          "outstanding_debt",
-                          (existing as Record<string, unknown>).outstanding_debt
-                        )}
-                      </td>
+        {sampleCsv && (
+          <div className="overflow-hidden rounded-md border border-gray-200 bg-surface">
+            <div className="border-b border-gray-200 bg-gray-50 px-3 py-2">
+              <div className="text-[10.5px] uppercase tracking-wider text-gray-500">
+                Sample Record
+              </div>
+              <div className="mt-[2px] text-[12px] font-medium text-ink">
+                {sampleCsv.address}
+              </div>
+              <div className="text-[11px] text-gray-500">
+                {sampleCsv.city}, {sampleCsv.state} {sampleCsv.zip}
+              </div>
+            </div>
+            <table className="w-full text-[11.5px]">
+              <thead className="bg-gray-50/50 text-[10.5px] uppercase tracking-wider text-gray-500">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">
+                    Current Value
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium">Replace</th>
+                  <th className="px-3 py-2 text-left font-medium">CSV Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SELECTABLE_REPLACE_FIELDS.map((field) => {
+                  const curRaw = (sampleExisting as Record<string, unknown>)[field];
+                  const csvRaw = (sampleCsv as unknown as Record<string, unknown>)[
+                    field
+                  ];
+                  const cur = fmtReplaceComparison(field, curRaw);
+                  const csvVal = fmtReplaceComparison(field, csvRaw);
+                  const noChange = cur === csvVal;
+                  return (
+                    <tr key={field} className="border-t border-gray-150">
+                      <td className="px-3 py-2 text-gray-600">{cur}</td>
                       <td className="px-3 py-2">
-                        <label className="inline-flex items-center gap-2">
-                          <input type="checkbox" disabled />
-                          <span className="text-[11.5px] text-gray-500">
-                            Tax / Mortgage Payoff
+                        <label className="inline-flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={replaceSelections.has(field)}
+                            onChange={() => toggleField(field)}
+                            className="cursor-pointer"
+                          />
+                          <span className="text-[11.5px] text-ink">
+                            {REPLACE_FIELD_LABELS[field]}
                           </span>
-                          <span className="text-[10.5px] italic text-gray-400">
-                            (Not in CSV)
-                          </span>
+                          {noChange && (
+                            <span className="text-[10.5px] italic text-gray-400">
+                              (No change in sample)
+                            </span>
+                          )}
                         </label>
                       </td>
-                      <td className="px-3 py-2 text-gray-400">—</td>
+                      <td className="px-3 py-2 text-gray-600">{csvVal}</td>
                     </tr>
-                  </tbody>
-                </table>
-              </div>
-            );
-          })}
-        </div>
+                  );
+                })}
+                {/* Tax / Mortgage Payoff is in the spec's field list but
+                    the wizard doesn't import it today — display as a
+                    disabled row so the user sees the column exists. */}
+                <tr className="border-t border-gray-150 opacity-60">
+                  <td className="px-3 py-2 text-gray-600">
+                    {fmtReplaceComparison(
+                      "outstanding_debt",
+                      (sampleExisting as Record<string, unknown>).outstanding_debt
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <label className="inline-flex items-center gap-2">
+                      <input type="checkbox" disabled />
+                      <span className="text-[11.5px] text-gray-500">
+                        Tax / Mortgage Payoff
+                      </span>
+                      <span className="text-[10.5px] italic text-gray-400">
+                        (Not in CSV)
+                      </span>
+                    </label>
+                  </td>
+                  <td className="px-3 py-2 text-gray-400">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {error && (
           <div className="mt-3 rounded-md border border-warn-border bg-warn-bg px-3 py-2 text-[12px] text-warn-strong">
