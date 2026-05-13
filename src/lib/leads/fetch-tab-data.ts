@@ -81,27 +81,51 @@ export async function fetchActivity(leadId: string): Promise<{
   leadSource: string | null;
 }> {
   const sb = await createClient();
-  const [{ data, error }, leadResult] = await Promise.all([
+  const [actsRes, commentsRes, leadResult] = await Promise.all([
     sb
       .from("activities")
       .select("id, activity_type, payload, created_at, user_id")
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false }),
+    sb
+      .from("discussion_comments")
+      .select("id, body, created_at, author_id")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false }),
     sb.from("leads").select("lead_source").eq("id", leadId).maybeSingle(),
   ]);
-  if (error) throw error;
-  const raw = (data ?? []) as Array<{
+  if (actsRes.error) throw actsRes.error;
+  if (commentsRes.error) throw commentsRes.error;
+
+  const acts = (actsRes.data ?? []) as Array<{
     id: string;
     activity_type: string;
     payload: Record<string, unknown>;
     created_at: string;
     user_id: string | null;
   }>;
+  const comments = (commentsRes.data ?? []) as Array<{
+    id: string;
+    body: string;
+    created_at: string;
+    author_id: string | null;
+  }>;
+  const merged = [
+    ...acts,
+    ...comments.map((c) => ({
+      id: c.id,
+      activity_type: "note",
+      payload: { body: c.body, kind: "note" } as Record<string, unknown>,
+      created_at: c.created_at,
+      user_id: c.author_id,
+    })),
+  ].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+
   const names = await resolveActorNames(
     sb,
-    raw.map((r) => r.user_id)
+    merged.map((r) => r.user_id)
   );
-  const rows: ActivityFullRow[] = raw.map((r) => ({
+  const rows: ActivityFullRow[] = merged.map((r) => ({
     ...r,
     actor_first_name: r.user_id ? (names.get(r.user_id) ?? null) : null,
   }));
