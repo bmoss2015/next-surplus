@@ -2014,19 +2014,12 @@ function ImportSuccessModal({
         <h2 className="m-0 mb-2 text-lg font-semibold text-[#0a3d4a]">
           Import Complete
         </h2>
-        <div className="mb-1 text-3xl font-bold text-[#0a3d4a]">
+        {/* Fix UUUU3: main count only — no skipped / dedupe-review subtext.
+            Sized at text-lg so it sits below the "Import Complete" heading
+            instead of dominating it. */}
+        <div className="mb-1 text-lg font-bold text-[#0a3d4a]">
           {result.imported} {result.imported === 1 ? "Lead Imported" : "Leads Imported"}
         </div>
-        {result.skipped > 0 && (
-          <div className="mb-1 text-sm text-[#6b7280]">
-            {result.skipped} {result.skipped === 1 ? "Lead Skipped" : "Leads Skipped"}
-          </div>
-        )}
-        {result.dedupeReview > 0 && (
-          <div className="mb-1 text-sm text-[#6b7280]">
-            {result.dedupeReview} Flagged For Dedupe Review
-          </div>
-        )}
         {/* Fix NNNN3 PART 5: per-lead contact-write warnings — never silent. */}
         {result.warnings && result.warnings.length > 0 && (
           <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-left">
