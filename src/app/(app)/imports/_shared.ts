@@ -121,16 +121,16 @@ export function normalizeHeader(header: string): string {
   return header.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-// Fix AAAA3 PART 7: a "Phone N: Type" column carries one of "Mobile" /
-// "Residential" / "Landline" / "Other Phone". Map each explicitly to its stored
-// value; a blank or unrecognized value is null (not "Other").
+// A "Phone N: Type" column carries one of "Mobile" / "Landline" /
+// "Residential" / "Other Phone". Matching is case-insensitive. "Residential"
+// folds into "Landline" — we treat the two as the same stored type. A blank
+// or unrecognized value is null (not "Other").
 export function parsePhoneType(raw: string): string | null {
   const v = (raw ?? "").trim().toLowerCase();
   if (!v) return null;
-  if (v === "mobile" || v === "cell" || v === "cell phone" || v === "wireless") return "Mobile";
-  if (v === "landline" || v === "land line") return "Landline";
-  if (v === "residential" || v === "home" || v === "home phone") return "Residential";
-  if (v === "other" || v === "other phone") return "Other";
+  if (v === "mobile") return "Mobile";
+  if (v === "landline" || v === "residential") return "Landline";
+  if (v === "other phone") return "Other";
   return null;
 }
 
