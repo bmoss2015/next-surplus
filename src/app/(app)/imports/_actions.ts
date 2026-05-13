@@ -819,6 +819,22 @@ export async function importLeads(
 
     // Duplicate resolution against an existing lead.
     const leadId = decision.existingLeadId;
+    // Fix FFFF4: snapshot the full lead row + the primary owner row before
+    // any UPDATE runs so revertImport can restore them. Captured here at the
+    // top of the duplicate-resolution path, used as importRowsLog.prior_state.
+    const [{ data: priorLeadRow }, { data: priorOwnerRow }] = await Promise.all([
+      sb.from("leads").select("*").eq("id", leadId).single(),
+      sb
+        .from("owners")
+        .select("*")
+        .eq("lead_id", leadId)
+        .eq("is_primary", true)
+        .maybeSingle(),
+    ]);
+    const priorState = {
+      lead: (priorLeadRow as Record<string, unknown> | null) ?? null,
+      owner: (priorOwnerRow as Record<string, unknown> | null) ?? null,
+    };
     let patch: Record<string, unknown>;
 
     if (decision.action === "replace_all") {
@@ -895,6 +911,9 @@ export async function importLeads(
       action_taken: isReplace ? "updated_replace" : "updated_blank",
       lead_id: leadId,
       dedupe_match_id: leadId,
+      // Fix FFFF4: stash the pre-update snapshot so revertImport can roll
+      // this row back to its prior state.
+      prior_state: priorState,
     });
 
     // Fix LLLL3 PART 3: record an explicit `lead_updated` activity for the
@@ -1040,46 +1059,114 @@ const REVERT_WINDOW_MS = 24 * 60 * 60 * 1000;
 // Tolerance: a lead row is created with imported_at ≈ updated_at ≈ now(). Treat
 // it as "edited after import" only if updated_at is meaningfully later.
 const EDIT_TOLERANCE_MS = 2000;
+// Fix FFFF4: for updated rows we don't have imported_at as an anchor (it
+// holds the lead's original insert time, long before this import). Compare
+// instead to the import's uploaded_at + a window big enough to cover a
+// realistic batch's runtime. Anything later than that is treated as a
+// post-import manual edit and skipped on restore.
+const UPDATE_EDIT_TOLERANCE_MS = 60 * 1000;
+
+type PriorState = {
+  lead: Record<string, unknown> | null;
+  owner: Record<string, unknown> | null;
+};
 
 async function classifyImportLeads(
   sb: Awaited<ReturnType<typeof createClient>>,
-  importId: string
-): Promise<{ removableIds: string[]; editedCount: number }> {
+  importId: string,
+  importUploadedAtIso: string
+): Promise<{
+  removableIds: string[];
+  restorableUpdates: Array<{ lead_id: string; prior_state: PriorState }>;
+  editedCount: number;
+}> {
   const { data: rows } = await sb
     .from("import_rows")
-    .select("lead_id")
+    .select("lead_id, action_taken, prior_state")
     .eq("import_id", importId)
-    .eq("action_taken", "imported")
     .not("lead_id", "is", null);
 
-  const leadIds = Array.from(
-    new Set((rows ?? []).map((r) => r.lead_id as string).filter(Boolean))
-  );
-  if (leadIds.length === 0) return { removableIds: [], editedCount: 0 };
+  const insertedIds: string[] = [];
+  const updatedRows: Array<{ lead_id: string; prior_state: PriorState }> = [];
+  for (const r of (rows ?? []) as Array<{
+    lead_id: string;
+    action_taken: string;
+    prior_state: PriorState | null;
+  }>) {
+    if (r.action_taken === "imported") {
+      insertedIds.push(r.lead_id);
+    } else if (
+      (r.action_taken === "updated_replace" ||
+        r.action_taken === "updated_blank") &&
+      r.prior_state
+    ) {
+      updatedRows.push({ lead_id: r.lead_id, prior_state: r.prior_state });
+    }
+  }
 
+  if (insertedIds.length === 0 && updatedRows.length === 0) {
+    return { removableIds: [], restorableUpdates: [], editedCount: 0 };
+  }
+
+  const allLeadIds = Array.from(
+    new Set([...insertedIds, ...updatedRows.map((u) => u.lead_id)])
+  );
   const { data: leads } = await sb
     .from("leads")
     .select("id, imported_at, updated_at")
-    .in("id", leadIds);
+    .in("id", allLeadIds);
+  const leadInfo = new Map<
+    string,
+    { imported_at: string; updated_at: string }
+  >();
+  for (const l of (leads ?? []) as Array<{
+    id: string;
+    imported_at: string;
+    updated_at: string;
+  }>) {
+    leadInfo.set(l.id, { imported_at: l.imported_at, updated_at: l.updated_at });
+  }
 
   const removableIds: string[] = [];
+  const restorableUpdates: Array<{
+    lead_id: string;
+    prior_state: PriorState;
+  }> = [];
   let editedCount = 0;
-  for (const l of leads ?? []) {
-    const importedAt = new Date(l.imported_at as string).getTime();
-    const updatedAt = new Date(l.updated_at as string).getTime();
+
+  // Inserted leads — delete unless edited after import.
+  for (const id of insertedIds) {
+    const info = leadInfo.get(id);
+    if (!info) continue;
+    const importedAt = new Date(info.imported_at).getTime();
+    const updatedAt = new Date(info.updated_at).getTime();
     if (updatedAt > importedAt + EDIT_TOLERANCE_MS) {
       editedCount += 1;
     } else {
-      removableIds.push(l.id as string);
+      removableIds.push(id);
     }
   }
-  return { removableIds, editedCount };
+
+  // Updated leads — restore from snapshot unless edited after this import.
+  const importAnchor = new Date(importUploadedAtIso).getTime();
+  for (const u of updatedRows) {
+    const info = leadInfo.get(u.lead_id);
+    if (!info) continue;
+    const updatedAt = new Date(info.updated_at).getTime();
+    if (updatedAt > importAnchor + UPDATE_EDIT_TOLERANCE_MS) {
+      editedCount += 1;
+    } else {
+      restorableUpdates.push(u);
+    }
+  }
+
+  return { removableIds, restorableUpdates, editedCount };
 }
 
 export async function previewRevertImport(
   importId: string
 ): Promise<
-  | { ok: true; removable: number; edited: number }
+  | { ok: true; removable: number; restorable: number; edited: number }
   | { ok: false; error: string }
 > {
   const sb = await createClient();
@@ -1092,14 +1179,20 @@ export async function previewRevertImport(
   if (Date.now() - new Date(imp.uploaded_at as string).getTime() > REVERT_WINDOW_MS) {
     return { ok: false, error: "Revert window expired" };
   }
-  const { removableIds, editedCount } = await classifyImportLeads(sb, importId);
-  return { ok: true, removable: removableIds.length, edited: editedCount };
+  const { removableIds, restorableUpdates, editedCount } =
+    await classifyImportLeads(sb, importId, imp.uploaded_at as string);
+  return {
+    ok: true,
+    removable: removableIds.length,
+    restorable: restorableUpdates.length,
+    edited: editedCount,
+  };
 }
 
 export async function revertImport(
   importId: string
 ): Promise<
-  | { ok: true; removed: number; edited: number }
+  | { ok: true; removed: number; restored: number; edited: number }
   | { ok: false; error: string }
 > {
   const sb = await createClient();
@@ -1113,22 +1206,67 @@ export async function revertImport(
     return { ok: false, error: "Revert window expired" };
   }
 
-  const { removableIds, editedCount } = await classifyImportLeads(sb, importId);
+  const { removableIds, restorableUpdates, editedCount } =
+    await classifyImportLeads(sb, importId, imp.uploaded_at as string);
+
+  // Revert is available to anyone within the 24h window — not just admins —
+  // but `leads` DELETE is admin-only under RLS. The ids here were derived
+  // entirely from RLS-scoped reads above (this import's rows, this org's
+  // leads), so deleting / updating exactly those via the service client stays
+  // scoped to the caller's org while letting non-admins undo a recent import.
+  const admin = createServiceClient();
 
   if (removableIds.length > 0) {
-    // Revert is available to anyone within the 24h window — not just admins —
-    // but `leads` DELETE is admin-only under RLS. The ids here were derived
-    // entirely from RLS-scoped reads above (this import's rows, this org's
-    // leads), so deleting exactly those via the service client stays scoped to
-    // the caller's org while letting non-admins undo a recent import.
-    const admin = createServiceClient();
-    const { error: delErr } = await admin.from("leads").delete().in("id", removableIds);
+    const { error: delErr } = await admin
+      .from("leads")
+      .delete()
+      .in("id", removableIds);
     if (delErr) return { ok: false, error: delErr.message };
+  }
+
+  // Fix FFFF4: restore each updated lead + its primary owner from the
+  // snapshot captured before the import ran. id / created_at / lead_id are
+  // dropped from the patch so we never try to overwrite an identity column.
+  let restoredCount = 0;
+  for (const u of restorableUpdates) {
+    const prior = u.prior_state;
+    if (prior.lead) {
+      const leadPatch: Record<string, unknown> = { ...prior.lead };
+      delete leadPatch.id;
+      delete leadPatch.created_at;
+      const { error: leadErr } = await admin
+        .from("leads")
+        .update(leadPatch)
+        .eq("id", u.lead_id);
+      if (leadErr) {
+        return { ok: false, error: `Restore failed: ${leadErr.message}` };
+      }
+    }
+    if (prior.owner && prior.owner.id) {
+      const ownerPatch: Record<string, unknown> = { ...prior.owner };
+      const ownerId = ownerPatch.id as string;
+      delete ownerPatch.id;
+      delete ownerPatch.created_at;
+      delete ownerPatch.lead_id;
+      const { error: ownerErr } = await admin
+        .from("owners")
+        .update(ownerPatch)
+        .eq("id", ownerId);
+      if (ownerErr) {
+        return { ok: false, error: `Owner restore failed: ${ownerErr.message}` };
+      }
+    }
+    restoredCount += 1;
   }
 
   await sb.from("imports").update({ status: "cancelled" }).eq("id", importId);
 
   revalidatePath("/imports");
   revalidatePath("/leads", "layout");
-  return { ok: true, removed: removableIds.length, edited: editedCount };
+  return {
+    ok: true,
+    removed: removableIds.length,
+    restored: restoredCount,
+    edited: editedCount,
+  };
 }

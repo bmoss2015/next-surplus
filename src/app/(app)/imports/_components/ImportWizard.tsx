@@ -2422,12 +2422,47 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
         setBusyId(null);
         return;
       }
+      // Fix FFFF4: revert preview now reports three numbers — leads to be
+      // removed (inserts), leads to be restored (updates / replacements),
+      // and leads edited after the import that we'll skip. If there's
+      // nothing to do, bail out instead of opening a confirm dialog.
+      if (preview.removable === 0 && preview.restorable === 0) {
+        setMessage({
+          id: row.id,
+          text:
+            preview.edited > 0
+              ? `Nothing to revert — ${preview.edited} ${
+                  preview.edited === 1 ? "lead was" : "leads were"
+                } edited after import.`
+              : "Nothing to revert from this import.",
+          ok: false,
+        });
+        setBusyId(null);
+        return;
+      }
+      const parts: string[] = [];
+      if (preview.removable > 0) {
+        parts.push(
+          `Remove ${preview.removable} ${
+            preview.removable === 1 ? "Lead" : "Leads"
+          }`
+        );
+      }
+      if (preview.restorable > 0) {
+        parts.push(
+          `Restore ${preview.restorable} ${
+            preview.restorable === 1 ? "Lead" : "Leads"
+          } To Pre-Import State`
+        );
+      }
+      const editedSuffix =
+        preview.edited > 0
+          ? ` ${preview.edited} ${
+              preview.edited === 1 ? "Lead Was" : "Leads Were"
+            } Edited After Import And Will Be Kept.`
+          : "";
       const confirmed = window.confirm(
-        `This Will Remove ${preview.removable} ${
-          preview.removable === 1 ? "Lead" : "Leads"
-        }. ${preview.edited} ${
-          preview.edited === 1 ? "Lead Was" : "Leads Were"
-        } Edited After Import And Will Not Be Removed.`
+        `This Will ${parts.join(" And ")}.${editedSuffix}`
       );
       if (!confirmed) {
         setBusyId(null);
@@ -2435,11 +2470,25 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
       }
       const result = await revertImport(row.id);
       if (result.ok) {
+        const resultParts: string[] = [];
+        if (result.removed > 0) {
+          resultParts.push(
+            `Removed ${result.removed} ${result.removed === 1 ? "Lead" : "Leads"}`
+          );
+        }
+        if (result.restored > 0) {
+          resultParts.push(
+            `Restored ${result.restored} ${result.restored === 1 ? "Lead" : "Leads"}`
+          );
+        }
         setMessage({
           id: row.id,
-          text: `Removed ${result.removed} ${result.removed === 1 ? "Lead" : "Leads"}${
-            result.edited > 0 ? `; Kept ${result.edited} Edited` : ""
-          }.`,
+          text:
+            (resultParts.length > 0
+              ? resultParts.join("; ")
+              : "Nothing reverted") +
+            (result.edited > 0 ? `; Kept ${result.edited} Edited` : "") +
+            ".",
           ok: true,
         });
         router.refresh();
@@ -2492,8 +2541,15 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
           {history.map((row) => {
             const withinWindow =
               Date.now() - new Date(row.uploaded_at).getTime() <= REVERT_WINDOW_MS;
+            // Fix FFFF4: Revert now also restores replaced/updated leads
+            // from snapshots. An import is potentially revertable whenever
+            // it touched anything (i.e. produced at least one non-skipped
+            // row) and is still within the 24h window. The server-side
+            // preview decides what's actually restorable/removable.
             const canRevert =
-              withinWindow && row.status !== "cancelled" && row.imported_count > 0;
+              withinWindow &&
+              row.status !== "cancelled" &&
+              row.total_rows - row.skipped_count > 0;
             const isBusy = pending && busyId === row.id;
             return (
               <tr key={row.id} className="border-t border-gray-150">
