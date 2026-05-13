@@ -495,13 +495,16 @@ function InlineRowWithCaption({
   caption?: string | null;
   captionClass?: string;
 }) {
+  // Caption renders inline to the right of the value on the same baseline,
+  // not below it — so "$20,000   Estimated — Per County Website" reads as
+  // one row.
   return (
-    <div className="mb-2 flex items-start gap-2">
-      <div className="w-[160px] shrink-0 pt-0.5 text-xs font-normal text-[#6b7280]">{label}</div>
-      <div>
+    <div className="mb-2 flex items-baseline gap-2">
+      <div className="w-[160px] shrink-0 text-xs font-normal text-[#6b7280]">{label}</div>
+      <div className="flex items-baseline gap-2">
         <div className="text-sm font-normal text-[#111827]">{children}</div>
         {caption ? (
-          <div className={cn("mt-0.5 text-xs", captionClass ?? "text-[#6b7280]")}>{caption}</div>
+          <span className={cn("text-xs", captionClass ?? "text-[#6b7280]")}>{caption}</span>
         ) : null}
       </div>
     </div>
@@ -698,7 +701,10 @@ export function PropertyInfoTab({
             caption={hasConfirmedSurplus ? "Manually Verified" : null}
             captionClass="text-[#9ca3af]"
           >
-            {confirmedLabel}
+            {/* px-0.5 matches the inline editor buttons' internal padding so
+                this plain string aligns horizontally with the button-rendered
+                values in the rest of the column. */}
+            <span className="px-0.5">{confirmedLabel}</span>
           </InlineRowWithCaption>
           {/* Fix GGGG3 PART 5: Recovery Type lives here (sale context) so the
               right column carries weight beside the left. */}
@@ -745,7 +751,9 @@ export function PropertyInfoTab({
           {/* Fix SSSS3: Data Source row removed — OOOO3 deleted the
               underlying column, the row is dead UI. */}
           <Field label="Import Date">
-            <span className="text-sm font-normal text-[#111827]">{importedAtLabel}</span>
+            {/* px-0.5 matches the inline editor buttons' internal padding so
+                this plain string aligns with the editable rows above. */}
+            <span className="px-0.5 text-sm font-normal text-[#111827]">{importedAtLabel}</span>
           </Field>
         </Section>
 
