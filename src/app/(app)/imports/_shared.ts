@@ -62,7 +62,14 @@ export type ImportRowDecision =
 // "outstanding_debt" (Tax / Mortgage Payoff) is shown on the comparison UI
 // for completeness but is not importable today — the wizard renders it
 // disabled and it cannot end up in selectedFields.
+// Fix CCCC4: `owner_full_name` lives on the `owners` table, not `leads`, but
+// it's exposed here as a selectable replace field so the user can opt into
+// overwriting an existing primary owner's name (which the import otherwise
+// leaves alone — see BBBB4). The CSV-side value is already concatenated from
+// owner_first_name + owner_last_name (or owner_full_name) in the wizard's
+// normalize step, so writing it back preserves the "First Last" form.
 export const SELECTABLE_REPLACE_FIELDS = [
+  "owner_full_name",
   "address",
   "city",
   "state",
@@ -81,6 +88,7 @@ export const SELECTABLE_REPLACE_FIELDS = [
 export type SelectableReplaceField = (typeof SELECTABLE_REPLACE_FIELDS)[number];
 
 export const REPLACE_FIELD_LABELS: Record<SelectableReplaceField, string> = {
+  owner_full_name: "Owner Name",
   address: "Property Address",
   city: "City",
   state: "State",

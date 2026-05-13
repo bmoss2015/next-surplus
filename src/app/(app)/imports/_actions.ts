@@ -19,9 +19,12 @@ import {
 
 // Fix VVVV3: the columns the field-selection screen reads off the existing
 // lead so the user can see "current vs CSV" before confirming the replace.
-const REPLACE_COMPARE_COLUMNS = [
+// Fix CCCC4: `owner_full_name` is a selectable replace field but it lives on
+// the `owners` table, so it's filtered out of the leads SELECT and merged in
+// from a parallel query below.
+const LEAD_REPLACE_COMPARE_COLUMNS = [
   "id",
-  ...SELECTABLE_REPLACE_FIELDS,
+  ...SELECTABLE_REPLACE_FIELDS.filter((f) => f !== "owner_full_name"),
   "outstanding_debt", // shown for context though it's not importable
 ].join(", ");
 
@@ -30,16 +33,32 @@ export async function fetchLeadsForReplaceSelect(
 ): Promise<Record<string, Record<string, unknown>>> {
   if (leadIds.length === 0) return {};
   const sb = await createClient();
-  const { data, error } = await sb
-    .from("leads")
-    .select(REPLACE_COMPARE_COLUMNS)
-    .in("id", leadIds);
-  if (error) return {};
-  const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
+  const [leadsRes, ownersRes] = await Promise.all([
+    sb.from("leads").select(LEAD_REPLACE_COMPARE_COLUMNS).in("id", leadIds),
+    sb
+      .from("owners")
+      .select("lead_id, full_name")
+      .in("lead_id", leadIds)
+      .eq("is_primary", true),
+  ]);
+  if (leadsRes.error) return {};
+  const ownerByLead = new Map<string, string | null>();
+  for (const o of (ownersRes.data ?? []) as Array<{
+    lead_id: string;
+    full_name: string | null;
+  }>) {
+    ownerByLead.set(o.lead_id, o.full_name);
+  }
+  const rows = (leadsRes.data ?? []) as unknown as Array<Record<string, unknown>>;
   const out: Record<string, Record<string, unknown>> = {};
   for (const row of rows) {
     const id = row.id as string | undefined;
-    if (id) out[id] = row;
+    if (id) {
+      out[id] = {
+        ...row,
+        owner_full_name: ownerByLead.get(id) ?? null,
+      };
+    }
   }
   return out;
 }
@@ -351,18 +370,24 @@ export async function importLeads(
   // The return value reports written contact rows AND any per-field errors;
   // the caller surfaces those in the import summary so the user can act on
   // them instead of discovering missing data later.
-  // Fix BBBB4: `updateExistingOwner` gates the in-place UPDATE of the
-  // primary owner row. true only for `insert` (no existing owner anyway) and
-  // `replace_all` (the user explicitly said "blind overwrite"). On
-  // `replace_selected` and `update_blank` we leave the existing owner row
-  // alone — owner full_name isn't a selectable field on the replace screen,
-  // and update_blank's contract is "fill blanks, don't overwrite". Without
-  // this gate, a CSV column drift that puts e.g. "Y" in owner_full_name
-  // silently overwrites the existing owner on every duplicate.
+  // Fix BBBB4 / CCCC4: `ownerUpdateMode` gates the in-place UPDATE of the
+  // primary owner row.
+  //   'full'      → overwrite full_name + status + is_deceased + age (used by
+  //                 `insert` and `replace_all`).
+  //   'name_only' → overwrite full_name only (used by `replace_selected` when
+  //                 the user explicitly checked the Owner Name field). Skipped
+  //                 entirely when the CSV had no incoming name, so a column
+  //                 drift can't blank out a real existing name.
+  //   'none'      → leave the existing owner row untouched (used by
+  //                 `replace_selected` without Owner Name checked, and by
+  //                 `update_blank` whose contract is "fill blanks, don't
+  //                 overwrite").
+  // Without this gate, a CSV column drift that puts e.g. "Y" in
+  // owner_full_name silently overwrites the existing owner on every duplicate.
   async function writeContactsForLead(
     leadId: string,
     row: IncomingLead,
-    updateExistingOwner: boolean
+    ownerUpdateMode: "full" | "name_only" | "none"
   ): Promise<{ written: number; errors: string[] }> {
     const ownerName = (row.owner_full_name ?? "").trim();
     const phones = (row.phones ?? []).filter((p) => p.value.trim());
@@ -409,11 +434,19 @@ export async function importLeads(
 
     let ownerId: string;
     if (existingOwner) {
-      // Fix BBBB4: only blind-overwrite existing owner on insert / replace_all.
-      if (updateExistingOwner) {
+      // Fix BBBB4 / CCCC4: apply the appropriate slice of ownerPayload.
+      let patch: Record<string, unknown> | null = null;
+      if (ownerUpdateMode === "full") {
+        patch = ownerPayload;
+      } else if (ownerUpdateMode === "name_only" && ownerName) {
+        // Only swap the name; leave status/is_deceased/age alone. Skip when
+        // CSV had no incoming name so a missing column doesn't blank the row.
+        patch = { full_name: ownerName };
+      }
+      if (patch) {
         const { error: updErr } = await sb
           .from("owners")
-          .update(ownerPayload)
+          .update(patch)
           .eq("id", existingOwner.id as string);
         if (updErr) {
           errors.push(`owner update failed (${updErr.message})`);
@@ -781,9 +814,9 @@ export async function importLeads(
         lead_id: leadRow.id,
       });
       {
-        // Fix BBBB4: insert action — there's no prior owner/relative row, so
-        // "update existing" is moot. Pass true for symmetry with replace_all.
-        const cw = await writeContactsForLead(leadRow.id as string, row, true);
+        // Fix BBBB4 / CCCC4: insert action — no prior owner/relative row, so
+        // "update existing" is moot. Pass 'full' / true for symmetry.
+        const cw = await writeContactsForLead(leadRow.id as string, row, "full");
         contactsWritten += cw.written;
         const rw = await writeRelativesForLead(leadRow.id as string, row, true);
         const rowErrors = [...cw.errors, ...rw.errors];
@@ -900,17 +933,26 @@ export async function importLeads(
     // normalized value before deciding insert-vs-update. Errors don't
     // silently disappear: they accumulate on `warnings` for the import
     // summary.
-    // Fix BBBB4: only `replace_all` (blind overwrite) is allowed to UPDATE
-    // an existing owner row in place. `replace_selected` (owner not
-    // selectable on that screen) and `update_blank` (fill-blanks contract)
-    // attach contacts to whatever owner already exists but never overwrite
-    // owner full_name / status / age / is_deceased. Same gating applies to
-    // matched relatives.
+    // Fix BBBB4 / CCCC4: owner-row UPDATE is gated by action + selectedFields.
+    //   replace_all                          → 'full'      (overwrite all owner cols)
+    //   replace_selected w/ owner_full_name  → 'name_only' (overwrite full_name only)
+    //   replace_selected w/o owner_full_name → 'none'
+    //   update_blank                         → 'none'      (fill-blanks contract)
+    // Relatives keep BBBB4's boolean: only overwrite matched rows on replace_all.
     {
-      const updateExisting = decision.action === "replace_all";
-      const cw = await writeContactsForLead(leadId, row, updateExisting);
+      let ownerUpdateMode: "full" | "name_only" | "none" = "none";
+      if (decision.action === "replace_all") {
+        ownerUpdateMode = "full";
+      } else if (
+        decision.action === "replace_selected" &&
+        decision.selectedFields.includes("owner_full_name")
+      ) {
+        ownerUpdateMode = "name_only";
+      }
+      const updateRelatives = decision.action === "replace_all";
+      const cw = await writeContactsForLead(leadId, row, ownerUpdateMode);
       contactsWritten += cw.written;
-      const rw = await writeRelativesForLead(leadId, row, updateExisting);
+      const rw = await writeRelativesForLead(leadId, row, updateRelatives);
       const rowErrors = [...cw.errors, ...rw.errors];
       if (rowErrors.length > 0) {
         warnings.push(
