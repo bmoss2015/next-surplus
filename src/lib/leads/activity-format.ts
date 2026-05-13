@@ -61,6 +61,15 @@ export function formatActivity(
         text: leadWasImported(opts?.leadSource) ? "Lead Imported" : "Lead Created",
         icon: "create",
       };
+    // Fix LLLL3 PART 3: when a duplicate import lands on an existing lead the
+    // wizard now logs a `lead_updated` row instead of dropping a misleading
+    // "Lead Imported" entry. The body text spells out which merge strategy ran
+    // ("blank fields filled" vs. "data replaced via import"); fall through to a
+    // generic label if a future caller writes the type with no body.
+    case "lead_updated": {
+      const body = (p.body as string | undefined)?.trim();
+      return { text: body || "Lead Updated", icon: "default" };
+    }
     case "stage_change": {
       const from = STAGE_LABELS[(p.from as Stage) ?? "new_leads"];
       const to = STAGE_LABELS[(p.to as Stage) ?? "new_leads"];

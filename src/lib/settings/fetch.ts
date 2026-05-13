@@ -81,7 +81,11 @@ export async function fetchAppSettings(): Promise<AppSettings> {
   return {
     default_recovery_fee_percent:
       Number(map.get("default_recovery_fee_percent")) || 30,
-    default_attorney_cost: Number(map.get("default_attorney_cost")) || 2500,
+    // Fix LLLL3 PART 2: the default attorney cost is $0 when the row is
+    // missing — matches the leads.attorney_cost column default (migration
+    // 0095). Users who want a non-zero default can set it on the Settings
+    // page; that stored value still wins when present.
+    default_attorney_cost: Number(map.get("default_attorney_cost")) || 0,
     surplus_floor: Number(map.get("surplus_floor")) || 35000,
   };
 }

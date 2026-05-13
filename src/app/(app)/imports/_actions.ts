@@ -569,6 +569,23 @@ export async function importLeads(
       dedupe_match_id: leadId,
     });
 
+    // Fix LLLL3 PART 3: record an explicit `lead_updated` activity for the
+    // merged-into lead so the lead's history page no longer reads "Lead
+    // Imported / today" (which would imply a brand-new record). Note: the
+    // patch deliberately never touches imported_at, so the original first-
+    // import timestamp survives unchanged regardless of merge strategy.
+    await sb.from("activities").insert({
+      lead_id: leadId,
+      activity_type: "lead_updated",
+      payload: {
+        body:
+          decision.action === "replace_all"
+            ? "Lead data replaced via import"
+            : "Lead updated via import — blank fields filled",
+      },
+      user_id: actorId,
+    });
+
     // Contacts are additive — append the row's contact rows to the existing
     // lead rather than overwriting.
     contactsWritten += await writeContactsForLead(leadId, row);
