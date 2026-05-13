@@ -23,11 +23,14 @@ function firstNameOf(fullName: string | null, email: string | null): string {
 }
 
 // Team members in the caller's org (used by the @mention picker).
+// Excludes deactivated profiles — a removed/inactive teammate must never
+// appear in the picker (and is treated as not-mentionable by postComment).
 export async function listTeamMembers(): Promise<TeamMemberOption[]> {
   const sb = await createClient();
   const { data, error } = await sb
     .from("profiles")
     .select("id, full_name, email")
+    .eq("deactivated", false)
     .order("full_name", { ascending: true });
   if (error || !data) return [];
   return data.map((r) => {
