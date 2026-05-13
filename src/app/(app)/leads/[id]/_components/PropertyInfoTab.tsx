@@ -434,25 +434,78 @@ function InlineListField({
   );
 }
 
-// Fix DDDD3: a titled section in the two-column grouped Property Info layout.
+// Fix DDDD3 / IIII3: a titled section in the two-column grouped Property Info
+// layout. Section headers share identical styling on both columns so the
+// underline spans the full column width and rows on the left and right line up
+// horizontally across the page (PROPERTY ↔ SURPLUS, SALE ↔ SOURCE).
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="mb-3 border-b border-petrol-200 pb-1 text-xs font-semibold uppercase tracking-widest text-[#0d6c7d]">
+      <h4 className="mb-3 border-b border-[#0d6c7d] pb-1 text-xs font-semibold uppercase tracking-widest text-[#0d6c7d]">
         {title}
       </h4>
-      <div className="space-y-4">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }
 
-// A label-over-value field cell. The value (an inline editor or a read-only
-// span) carries its own hover/edit affordance.
+// Fix IIII3: compact inline label/value row — label sits left at fixed width,
+// value sits immediately after. Replaces the older stacked layout for the bulk
+// of Property Info fields so more information fits without scrolling.
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="mb-2 flex items-baseline gap-2">
+      <div className="w-[160px] shrink-0 text-xs text-[#6b7280]">{label}</div>
+      <div className="text-sm font-medium text-[#111827]">{children}</div>
+    </div>
+  );
+}
+
+// Fix IIII3: stacked label-above-value row, used where the value needs the full
+// column width (Property Address — long addresses would wrap awkwardly inline).
+function StackedField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-2">
       <div className="text-xs text-[#6b7280]">{label}</div>
       <div className="mt-0.5 text-sm font-medium text-[#111827]">{children}</div>
+    </div>
+  );
+}
+
+// Fix IIII3: a label/value pair that sits inline with other pairs on the same
+// row (City / State / ZIP all share one line).
+function InlineMini({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-xs text-[#6b7280]">{label}</span>
+      <span className="text-sm font-medium text-[#111827]">{children}</span>
+    </div>
+  );
+}
+
+// Fix IIII3: an inline row whose value has a small caption underneath (used by
+// Potential Surplus / Confirmed Surplus where the source or verification note
+// belongs with the value, not the label).
+function InlineRowWithCaption({
+  label,
+  children,
+  caption,
+  captionClass,
+}: {
+  label: string;
+  children: React.ReactNode;
+  caption?: string | null;
+  captionClass?: string;
+}) {
+  return (
+    <div className="mb-2 flex items-start gap-2">
+      <div className="w-[160px] shrink-0 pt-0.5 text-xs text-[#6b7280]">{label}</div>
+      <div>
+        <div className="text-sm font-medium text-[#111827]">{children}</div>
+        {caption ? (
+          <div className={cn("mt-0.5 text-xs", captionClass ?? "text-[#6b7280]")}>{caption}</div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -604,118 +657,119 @@ export function PropertyInfoTab({
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-6 shadow-card">
       <SectionSubheader>Property Info</SectionSubheader>
-      <div className="mt-4 grid grid-cols-2 gap-x-10 gap-y-8">
-        {/* LEFT COLUMN */}
-        <div className="space-y-8">
-          <Section title="Property">
-            <Field label="Property Address">
-              <InlineTextField leadId={id} field="address" initial={lead.address} placeholder={NOT_SET} />
-            </Field>
-            <div className="grid grid-cols-3 gap-3">
-              <Field label="City">
-                <InlineTextField leadId={id} field="city" initial={lead.city} placeholder={NOT_SET} />
-              </Field>
-              <Field label="State">
-                <InlineStateField initial={lead.state} onCommit={handleStateChange} />
-              </Field>
-              <Field label="ZIP">
-                <InlineTextField leadId={id} field="zip" initial={lead.zip} placeholder={NOT_SET} />
-              </Field>
-            </div>
-            <Field label="County">
-              <InlineTextField leadId={id} field="county" initial={lead.county} placeholder={NOT_SET} displayFormat={toTitleCase} />
-            </Field>
-            <Field label="Parcel Number">
-              <InlineTextField leadId={id} field="parcel_number" initial={lead.parcel_number} placeholder={NOT_SET} />
-            </Field>
-            <Field label="Case Number">
-              <InlineTextField leadId={id} field="case_number" initial={lead.case_number} placeholder={NOT_SET} />
-            </Field>
-          </Section>
+      {/* Fix IIII3: a single 2-column grid (not two nested column stacks) so
+          align-items: start lines each section's header up with its peer on the
+          other side — PROPERTY ↔ SURPLUS on row 1, SALE ↔ SOURCE on row 2,
+          LIENS alone on row 3 right. Header underlines span the full column. */}
+      <div className="mt-4 grid grid-cols-2 items-start gap-x-10 gap-y-8">
+        {/* Row 1, left */}
+        <Section title="Property">
+          <StackedField label="Property Address">
+            <InlineTextField leadId={id} field="address" initial={lead.address} placeholder={NOT_SET} />
+          </StackedField>
+          <div className="mb-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <InlineMini label="City">
+              <InlineTextField leadId={id} field="city" initial={lead.city} placeholder={NOT_SET} />
+            </InlineMini>
+            <InlineMini label="State">
+              <InlineStateField initial={lead.state} onCommit={handleStateChange} />
+            </InlineMini>
+            <InlineMini label="ZIP">
+              <InlineTextField leadId={id} field="zip" initial={lead.zip} placeholder={NOT_SET} />
+            </InlineMini>
+          </div>
+          <Field label="County">
+            <InlineTextField leadId={id} field="county" initial={lead.county} placeholder={NOT_SET} displayFormat={toTitleCase} />
+          </Field>
+          <Field label="Parcel Number">
+            <InlineTextField leadId={id} field="parcel_number" initial={lead.parcel_number} placeholder={NOT_SET} />
+          </Field>
+          <Field label="Case Number">
+            <InlineTextField leadId={id} field="case_number" initial={lead.case_number} placeholder={NOT_SET} />
+          </Field>
+        </Section>
 
-          <Section title="Sale">
-            <Field label="Sale Type">
-              <InlineSelectField leadId={id} field="sale_type" initial={lead.sale_type} options={SALE_TYPE_OPTIONS} />
-            </Field>
-            <Field label="Sale Date">
-              <InlineDateField leadId={id} field="sale_date" initial={lead.sale_date} />
-            </Field>
-            <Field label="Closing Bid">
-              <InlineCurrencyField leadId={id} field="closing_bid" initial={lead.closing_bid} />
-            </Field>
-            <Field label="Opening Bid">
-              <InlineCurrencyField leadId={id} field="opening_bid" initial={lead.opening_bid} dashForZero />
-            </Field>
-            <Field label="Tax / Mortgage Payoff">
-              <InlineCurrencyField leadId={id} field="outstanding_debt" initial={lead.outstanding_debt} dashForZero />
-            </Field>
-          </Section>
-        </div>
+        {/* Row 1, right */}
+        <Section title="Surplus">
+          <InlineRowWithCaption
+            label="Potential Surplus"
+            caption={potentialSourceLabel(lead.source_surplus, lead.lead_source, lead.closing_bid != null)}
+          >
+            <InlineCurrencyField leadId={id} field="source_surplus" initial={lead.source_surplus} dashForZero />
+          </InlineRowWithCaption>
+          <InlineRowWithCaption
+            label="Confirmed Surplus"
+            caption={hasConfirmedSurplus ? "Manually Verified" : null}
+            captionClass="text-[#9ca3af]"
+          >
+            {confirmedLabel}
+          </InlineRowWithCaption>
+          {/* Fix GGGG3 PART 5: Recovery Type lives here (sale context) so the
+              right column carries weight beside the left. */}
+          <Field label="Recovery Type">
+            <InlineRecoveryTypeField value={recoveryType} onCommit={handleRecoveryTypeChange} />
+          </Field>
+        </Section>
 
-        {/* RIGHT COLUMN */}
-        <div className="space-y-8">
-          <Section title="Surplus">
-            <div>
-              <div className="text-xs text-[#6b7280]">Potential Surplus</div>
-              <div className="mt-0.5 text-sm font-medium text-[#111827]">
-                <InlineCurrencyField leadId={id} field="source_surplus" initial={lead.source_surplus} dashForZero />
-              </div>
-              <div className="mt-1 text-xs text-[#6b7280]">
-                {potentialSourceLabel(lead.source_surplus, lead.lead_source, lead.closing_bid != null)}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#6b7280]">Confirmed Surplus</div>
-              <div className="mt-0.5 text-sm font-medium text-[#111827]">{confirmedLabel}</div>
-              {hasConfirmedSurplus && (
-                <div className="mt-1 text-xs text-[#9ca3af]">Manually Verified</div>
-              )}
-            </div>
-            {/* Fix GGGG3 PART 5: Recovery Type lives here (sale context) so the
-                right column carries weight beside the left. */}
-            <Field label="Recovery Type">
-              <InlineRecoveryTypeField value={recoveryType} onCommit={handleRecoveryTypeChange} />
-            </Field>
-          </Section>
+        {/* Row 2, left */}
+        <Section title="Sale">
+          <Field label="Sale Type">
+            <InlineSelectField leadId={id} field="sale_type" initial={lead.sale_type} options={SALE_TYPE_OPTIONS} />
+          </Field>
+          <Field label="Sale Date">
+            <InlineDateField leadId={id} field="sale_date" initial={lead.sale_date} />
+          </Field>
+          <Field label="Closing Bid">
+            <InlineCurrencyField leadId={id} field="closing_bid" initial={lead.closing_bid} />
+          </Field>
+          <Field label="Opening Bid">
+            <InlineCurrencyField leadId={id} field="opening_bid" initial={lead.opening_bid} dashForZero />
+          </Field>
+          <Field label="Tax / Mortgage Payoff">
+            <InlineCurrencyField leadId={id} field="outstanding_debt" initial={lead.outstanding_debt} dashForZero />
+          </Field>
+        </Section>
 
-          <Section title="Source">
-            <Field label="Lead Source">
-              <InlineListField
-                initial={lead.lead_source}
-                options={leadSources}
-                width="w-[220px]"
-                onSave={(v) => {
-                  void updateLeadField(id, "lead_source", v);
-                }}
-                onAddNew={async (name) => {
-                  const res = await addLeadSource(name);
-                  return res.ok ? res.name : null;
-                }}
-              />
-            </Field>
-            <Field label="Data Source">
-              <InlineListField
-                initial={lead.data_source}
-                options={dataSourceOptions}
-                width="w-[220px]"
-                onSave={(v) => {
-                  void updateLeadField(id, "data_source", v);
-                }}
-                onAddNew={async (name) => {
-                  const res = await addDataSource(name);
-                  return res.ok ? res.name : null;
-                }}
-              />
-            </Field>
-            <Field label="Import Date">
-              <span className="text-sm font-medium text-[#111827]">{importedAtLabel}</span>
-            </Field>
-          </Section>
+        {/* Row 2, right */}
+        <Section title="Source">
+          <Field label="Lead Source">
+            <InlineListField
+              initial={lead.lead_source}
+              options={leadSources}
+              width="w-[220px]"
+              onSave={(v) => {
+                void updateLeadField(id, "lead_source", v);
+              }}
+              onAddNew={async (name) => {
+                const res = await addLeadSource(name);
+                return res.ok ? res.name : null;
+              }}
+            />
+          </Field>
+          <Field label="Data Source">
+            <InlineListField
+              initial={lead.data_source}
+              options={dataSourceOptions}
+              width="w-[220px]"
+              onSave={(v) => {
+                void updateLeadField(id, "data_source", v);
+              }}
+              onAddNew={async (name) => {
+                const res = await addDataSource(name);
+                return res.ok ? res.name : null;
+              }}
+            />
+          </Field>
+          <Field label="Import Date">
+            <span className="text-sm font-medium text-[#111827]">{importedAtLabel}</span>
+          </Field>
+        </Section>
 
-          <Section title="Liens">
-            <LiensSection leadId={id} initialLiens={lead.liens} />
-          </Section>
-        </div>
+        {/* Row 3, right (left cell empty so LIENS sits below SOURCE only) */}
+        <div aria-hidden />
+        <Section title="Liens">
+          <LiensSection leadId={id} initialLiens={lead.liens} />
+        </Section>
       </div>
     </div>
   );
