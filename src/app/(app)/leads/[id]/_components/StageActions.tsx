@@ -124,15 +124,6 @@ export function StageActions({
             <IconArrowRight size={14} stroke={2} />
             {nextStage ? `Next Stage: ${STAGE_LABELS[nextStage]}` : "No Next Stage"}
           </button>
-          <button
-            type="button"
-            onClick={openLost}
-            disabled={isTerminal || pending}
-            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-danger bg-surface px-3 py-2 text-[12.5px] font-medium text-danger hover:bg-danger-bg disabled:opacity-50"
-          >
-            <IconBan size={14} stroke={2} />
-            Mark Lost
-          </button>
           {needsReview ? (
             <button
               type="button"
@@ -154,6 +145,17 @@ export function StageActions({
               Needs Review
             </button>
           )}
+          {/* Mark Lost stays last in the panel — destructive action belongs
+              after Needs Review, not above it. */}
+          <button
+            type="button"
+            onClick={openLost}
+            disabled={isTerminal || pending}
+            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-danger bg-surface px-3 py-2 text-[12.5px] font-medium text-danger hover:bg-danger-bg disabled:opacity-50"
+          >
+            <IconBan size={14} stroke={2} />
+            Mark Lost
+          </button>
         </div>
         {/* A lost/won lead can be put back into its previous stage — kept
             low-key (text link, no big button). */}
