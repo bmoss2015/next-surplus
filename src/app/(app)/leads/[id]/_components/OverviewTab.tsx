@@ -19,6 +19,7 @@ import {
 } from "@/lib/leads/activity-format";
 import { createClient } from "@/lib/supabase/server";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
+import { formatPhone } from "@/lib/format/phone";
 import { SurplusBreakdown } from "./Overview/SurplusBreakdown";
 import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
@@ -49,12 +50,6 @@ const DOC_CATEGORY_LABELS: Record<string, string> = {
   settlement_statement: "Settlement Statement",
   other: "Other",
 };
-
-function formatPhone(raw: string): string {
-  const digits = (raw ?? "").replace(/\D/g, "").slice(0, 10);
-  if (digits.length !== 10) return raw;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-}
 
 function formatDocDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });

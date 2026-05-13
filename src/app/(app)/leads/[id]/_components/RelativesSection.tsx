@@ -5,7 +5,8 @@ import { IconPlus, IconTrash, IconUsersGroup } from "@tabler/icons-react";
 import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
-import { formatPhone, AgeEditField } from "./ContactsTabClient";
+import { AgeEditField } from "./ContactsTabClient";
+import { formatPhone } from "@/lib/format/phone";
 import { properCaseName } from "@/lib/format/proper-case-name";
 import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
@@ -219,7 +220,7 @@ export function RelativesSection({
             </select>
             <input
               value={draftPhone}
-              onChange={(e) => setDraftPhone(formatPhone(e.target.value))}
+              onChange={(e) => setDraftPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
               placeholder="(555) 555-5555"
               className="rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
             />
@@ -413,6 +414,9 @@ function PhoneSlot({
 }) {
   const stored = ((relative[slot.value] as string | null) ?? "").trim();
   const [val, setVal] = useState(stored);
+  // Show the formatted number while the field is idle; drop to raw digits the
+  // moment it's focused so the value stays clean to edit.
+  const [focused, setFocused] = useState(false);
   useEffect(() => {
     setVal(((relative[slot.value] as string | null) ?? "").trim());
   }, [relative, slot.value]);
@@ -431,9 +435,11 @@ function PhoneSlot({
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">
       <div className="flex items-center gap-1">
         <input
-          value={val}
-          onChange={(e) => setVal(formatPhone(e.target.value))}
+          value={focused ? val : formatPhone(val)}
+          onFocus={() => setFocused(true)}
+          onChange={(e) => setVal(e.target.value.replace(/\D/g, "").slice(0, 10))}
           onBlur={() => {
+            setFocused(false);
             const t = val.trim();
             if (t !== stored) onPatch({ [slot.value]: t || null } as RelativePatch);
           }}

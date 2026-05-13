@@ -16,6 +16,7 @@ import type { ContactRow, OwnerRowFull } from "@/lib/leads/fetch-detail";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
 import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
+import { formatPhone } from "@/lib/format/phone";
 import { SectionSubheader } from "./SectionSubheader";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -50,14 +51,6 @@ const CONTACT_STATUS_ORDER: ContactStatus[] = [
   "invalid",
   "dnc",
 ];
-
-export function formatPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 10);
-  if (digits.length === 0) return "";
-  if (digits.length < 4) return `(${digits}`;
-  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-}
 
 // Fix BBBBB PART 3: a tiny inline age editor used on owner *and* relative cards
 // — shows "Age N" (or "Add Age"); click to edit, commit on blur / Enter, revert
@@ -476,7 +469,7 @@ function OwnerCard({
               type="tel"
               autoFocus
               value={newPhone}
-              onChange={(e) => setNewPhone(formatPhone(e.target.value))}
+              onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
