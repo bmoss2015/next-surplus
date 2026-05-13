@@ -72,7 +72,8 @@ function fmtDate(d: string | null): string {
   });
 }
 
-const NOT_SET = "Not Set";
+// Fix GGGG3 PART 4: an unset Property Info field reads as a dash, not "Not Set".
+const NOT_SET = "—";
 const DISPLAY_SET = "cursor-text rounded-[3px] px-0.5 text-[13px] font-medium text-[#0f1729] hover:bg-petrol-50";
 const DISPLAY_UNSET = "cursor-text rounded-[3px] px-0.5 text-[13px] italic text-gray-400 hover:bg-petrol-50";
 
@@ -182,7 +183,7 @@ function InlineStateField({
   }
   return (
     <button type="button" onClick={() => setEditing(true)} title="Click To Edit" className={value ? DISPLAY_SET : DISPLAY_UNSET}>
-      {value ? `${value}${US_STATE_NAMES[value] ? ` — ${US_STATE_NAMES[value]}` : ""}` : NOT_SET}
+      {value || NOT_SET}
     </button>
   );
 }
@@ -450,7 +451,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-wide text-[#6b7280]">{label}</div>
+      <div className="text-xs text-[#6b7280]">{label}</div>
       <div className="mt-0.5 text-sm font-medium text-[#111827]">{children}</div>
     </div>
   );
@@ -595,10 +596,10 @@ export function PropertyInfoTab({
   const importedAtLabel = lead.imported_at
     ? fmtDate(lead.imported_at.slice(0, 10))
     : "—";
-  const confirmedLabel =
-    lead.confirmed_surplus != null && lead.confirmed_surplus !== 0
-      ? formatCurrency(lead.confirmed_surplus)
-      : "Not Confirmed";
+  const hasConfirmedSurplus = lead.confirmed_surplus != null && lead.confirmed_surplus !== 0;
+  const confirmedLabel = hasConfirmedSurplus
+    ? formatCurrency(lead.confirmed_surplus)
+    : "Not Confirmed";
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-6 shadow-card">
@@ -648,9 +649,6 @@ export function PropertyInfoTab({
             <Field label="Tax / Mortgage Payoff">
               <InlineCurrencyField leadId={id} field="outstanding_debt" initial={lead.outstanding_debt} dashForZero />
             </Field>
-            <Field label="Recovery Type">
-              <InlineRecoveryTypeField value={recoveryType} onCommit={handleRecoveryTypeChange} />
-            </Field>
           </Section>
         </div>
 
@@ -658,7 +656,7 @@ export function PropertyInfoTab({
         <div className="space-y-8">
           <Section title="Surplus">
             <div>
-              <div className="text-xs uppercase tracking-wide text-[#6b7280]">Potential Surplus</div>
+              <div className="text-xs text-[#6b7280]">Potential Surplus</div>
               <div className="mt-0.5 text-sm font-medium text-[#111827]">
                 <InlineCurrencyField leadId={id} field="source_surplus" initial={lead.source_surplus} dashForZero />
               </div>
@@ -667,10 +665,17 @@ export function PropertyInfoTab({
               </div>
             </div>
             <div>
-              <div className="text-xs uppercase tracking-wide text-[#6b7280]">Confirmed Surplus</div>
+              <div className="text-xs text-[#6b7280]">Confirmed Surplus</div>
               <div className="mt-0.5 text-sm font-medium text-[#111827]">{confirmedLabel}</div>
-              <div className="mt-1 text-xs text-[#9ca3af]">Edited from the Overview tab’s Confirm action.</div>
+              {hasConfirmedSurplus && (
+                <div className="mt-1 text-xs text-[#9ca3af]">Manually Verified</div>
+              )}
             </div>
+            {/* Fix GGGG3 PART 5: Recovery Type lives here (sale context) so the
+                right column carries weight beside the left. */}
+            <Field label="Recovery Type">
+              <InlineRecoveryTypeField value={recoveryType} onCommit={handleRecoveryTypeChange} />
+            </Field>
           </Section>
 
           <Section title="Source">
