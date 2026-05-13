@@ -1389,6 +1389,13 @@ export function ImportWizard() {
       }
       // Fix MMMM: show the success popup with the real insert count from this
       // session, then refresh so the Import History below picks up the new row.
+      // Fix XXXX3: the success modal is only rendered as a sibling of the
+      // preview step's <Shell>; when submitImport is invoked from the
+      // replace_select view (Replace Selected button), step is still
+      // "replace_select" and the modal never mounts, so a successful import
+      // looks like a no-op. Route back to preview here so the modal renders
+      // regardless of which step kicked off the import.
+      setStep("preview");
       setSuccessResult({
         imported: result.imported,
         skipped: result.skipped,
