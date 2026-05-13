@@ -7,6 +7,7 @@ import { getCurrentProfile } from "@/lib/auth/current-user";
 import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/imports/format-address";
 import {
   DEFAULT_LEAD_SOURCE,
+  normalizePhone,
   type IncomingLead,
   type ImportRelative,
   type ImportHistoryRow,
@@ -254,6 +255,9 @@ export async function importLeads(
       updatedBlank: number;
       replaced: number;
       contactsWritten: number;
+      // Fix NNNN3 PART 5: per-lead warnings — non-fatal contact/relative
+      // write failures that the user should see in the import summary.
+      warnings: string[];
     }
   | { ok: false; error: string }
 > {
@@ -296,6 +300,9 @@ export async function importLeads(
   let replaced = 0;
   // IMPORT SUMMARY: count of `contacts` rows actually written across all leads.
   let contactsWritten = 0;
+  // Fix NNNN3 PART 5: collected per-row warnings so the wizard can show the
+  // user a list of leads whose contact / relative writes failed.
+  const warnings: string[] = [];
   // Fix S: track per-row failures so we can log them and refuse to report a
   // bogus "success" when nothing actually landed in the database.
   let errors = 0;
@@ -305,15 +312,29 @@ export async function importLeads(
   const decisionByIndex = new Map<number, ImportRowDecision>();
   for (const d of decisions) decisionByIndex.set(d.index, d);
 
-  // Helper: write the owner + contact rows for a freshly created/updated lead.
-  // Returns the number of `contacts` rows actually inserted (0 on skip/error).
-  async function writeContactsForLead(leadId: string, row: IncomingLead): Promise<number> {
+  // Fix NNNN3: write the owner + contact rows for a freshly created OR
+  // existing lead, merging into whatever's already on the lead instead of
+  // unconditionally inserting. The previous insert-only path tripped on the
+  // partial unique index `owners_one_primary_per_lead` whenever an existing
+  // lead already had a primary owner, then swallowed the unique-violation —
+  // so every replace import silently failed to update owner/contact data.
+  //
+  // The return value reports written contact rows AND any per-field errors;
+  // the caller surfaces those in the import summary so the user can act on
+  // them instead of discovering missing data later.
+  async function writeContactsForLead(
+    leadId: string,
+    row: IncomingLead
+  ): Promise<{ written: number; errors: string[] }> {
     const ownerName = (row.owner_full_name ?? "").trim();
     const phones = (row.phones ?? []).filter((p) => p.value.trim());
     const emails = (row.emails ?? []).map((e) => e.trim()).filter(Boolean);
     const mailingAddresses = (row.mailing_addresses ?? [])
       .map((m) => m.trim())
       .filter(Boolean);
+
+    const errors: string[] = [];
+    let written = 0;
 
     if (
       !ownerName &&
@@ -323,125 +344,329 @@ export async function importLeads(
       !row.owner_deceased &&
       row.owner_age == null
     ) {
-      return 0;
+      return { written, errors };
     }
 
-    const { data: ownerRow, error: ownerErr } = await sb
+    // PART 1: resolve the primary owner. If one already exists for this lead
+    // (the common case on replace_all/update_blank), UPDATE it in place; only
+    // INSERT when none exists. Avoids tripping the partial unique index that
+    // permits exactly one primary owner per lead.
+    const ownerPayload = {
+      full_name: ownerName || "Unknown Owner",
+      status: row.owner_deceased
+        ? "deceased"
+        : row.owner_living
+          ? "living"
+          : "unknown",
+      is_deceased: row.owner_deceased,
+      age: row.owner_age ?? null,
+    };
+
+    const { data: existingOwner } = await sb
       .from("owners")
-      .insert({
-        lead_id: leadId,
-        full_name: ownerName || "Unknown Owner",
-        is_primary: true,
-        // The DB trigger forces status='deceased' when is_deceased is true, but
-        // set it here too so the value is right regardless of trigger state.
-        status: row.owner_deceased ? "deceased" : row.owner_living ? "living" : "unknown",
-        is_deceased: row.owner_deceased,
-        age: row.owner_age ?? null,
-      })
       .select("id")
-      .single();
-    // Fix S: a failed owner insert never rolls back the lead row (separate
-    // statement) — but log it so the cause is visible during debugging.
-    if (ownerErr || !ownerRow) {
-      console.error(
-        `[importLeads] owner insert failed for lead ${leadId}: ${ownerErr?.message ?? "no row returned"}`
-      );
-      return 0;
+      .eq("lead_id", leadId)
+      .eq("is_primary", true)
+      .maybeSingle();
+
+    let ownerId: string;
+    if (existingOwner) {
+      const { error: updErr } = await sb
+        .from("owners")
+        .update(ownerPayload)
+        .eq("id", existingOwner.id as string);
+      if (updErr) {
+        errors.push(`owner update failed (${updErr.message})`);
+        return { written, errors };
+      }
+      ownerId = existingOwner.id as string;
+    } else {
+      const { data: ownerRow, error: ownerErr } = await sb
+        .from("owners")
+        .insert({ lead_id: leadId, is_primary: true, ...ownerPayload })
+        .select("id")
+        .single();
+      if (ownerErr || !ownerRow) {
+        errors.push(
+          `owner insert failed (${ownerErr?.message ?? "no row returned"})`
+        );
+        return { written, errors };
+      }
+      ownerId = ownerRow.id as string;
     }
 
-    // Fix 93: every mapped phone / email / mailing-address column becomes its
-    // own contacts row — nothing overwrites a single shared value. Each phone
-    // carries its Excess Elite line type + DNC / litigator classification.
-    //
-    // Fix PPPP2 Verification: every row carries the SAME set of keys. A
-    // Supabase/PostgREST bulk insert with heterogeneous objects fills any key
-    // missing from a given object with NULL — not the column default — so an
-    // email or mailing-address row that omitted phone_type / is_dnc /
-    // is_litigator was writing NULL into the NOT NULL `contacts.is_dnc` /
-    // `is_litigator` columns and failing the whole insert (no phones, no
-    // emails, no mailing address landed). phone_type stays null and the two
-    // flags default to false for non-phone channels.
-    const contactRow = (
-      channel: "phone" | "email" | "mailing_address",
-      value: string,
-      isPrimary: boolean,
-      phone?: { phone_type: string | null; is_dnc: boolean; is_litigator: boolean }
-    ) => ({
-      owner_id: ownerRow.id,
-      lead_id: leadId,
-      channel,
-      value: value.trim(),
-      status: "untested",
-      is_primary: isPrimary,
-      phone_type: phone?.phone_type ?? null,
-      is_dnc: phone?.is_dnc ?? false,
-      is_litigator: phone?.is_litigator ?? false,
-    });
-    const contactRows: Array<Record<string, unknown>> = [];
-    phones.forEach((p, idx) => {
-      contactRows.push(contactRow("phone", p.value, idx === 0, p));
-    });
-    emails.forEach((value, idx) => {
-      contactRows.push(contactRow("email", value, idx === 0 && phones.length === 0));
-    });
-    // Fix AAAAA PART 6: each mailing address (including the one composed from the
-    // Mailing Street / City / State / ZIP columns) is written as a contacts row
-    // with channel='mailing_address' and owner_id set, so it shows up under the
-    // owner on the Contacts tab and in the Mailing Addresses section.
-    mailingAddresses.forEach((value) => {
-      contactRows.push(contactRow("mailing_address", value, false));
-    });
-    let written = 0;
-    if (contactRows.length > 0) {
-      const { error: contactsErr } = await sb.from("contacts").insert(contactRows);
-      if (contactsErr) {
-        console.error(
-          `[importLeads] contacts insert failed for lead ${leadId}: ${contactsErr.message}`
-        );
-      } else {
-        written = contactRows.length;
+    // PART 2: merge contacts. Fetch every existing contact for this owner up
+    // front so we can dedupe phone (by 10-digit normalized), email
+    // (lowercased trim), and mailing_address (lowercased trim) without an
+    // extra round-trip per row.
+    const { data: existingContacts } = await sb
+      .from("contacts")
+      .select("id, channel, value")
+      .eq("lead_id", leadId)
+      .eq("owner_id", ownerId);
+
+    const phoneIndex = new Map<string, string>();
+    const emailIndex = new Map<string, string>();
+    const mailingIndex = new Map<string, string>();
+    for (const c of existingContacts ?? []) {
+      const channel = c.channel as string;
+      const value = (c.value as string) ?? "";
+      if (channel === "phone") {
+        const norm = normalizePhone(value);
+        if (norm) phoneIndex.set(norm, c.id as string);
+      } else if (channel === "email") {
+        const norm = value.toLowerCase().trim();
+        if (norm) emailIndex.set(norm, c.id as string);
+      } else if (channel === "mailing_address") {
+        const norm = value.trim().toLowerCase();
+        if (norm) mailingIndex.set(norm, c.id as string);
       }
     }
 
-    // GAP / edge case: a lead whose every phone contact is flagged DNC (and that
-    // has at least one phone) is itself a do-not-call lead. Re-check across ALL
-    // of the lead's phone contacts (this import may be appending to one that
-    // already had phones) and only flip leads.dnc on — never off.
-    if (written > 0 && phones.length > 0) {
-      const { data: phoneContacts } = await sb
+    // Phones — dedupe by 10-digit normalized number. Update flags
+    // (is_dnc/is_litigator/phone_type) on match, insert otherwise. The first
+    // incoming phone takes is_primary when no phone exists for this owner.
+    for (let i = 0; i < phones.length; i++) {
+      const p = phones[i];
+      const norm = normalizePhone(p.value);
+      const existingId = norm ? phoneIndex.get(norm) : undefined;
+      if (existingId) {
+        const { error } = await sb
+          .from("contacts")
+          .update({
+            is_dnc: p.is_dnc,
+            is_litigator: p.is_litigator,
+            phone_type: p.phone_type ?? null,
+          })
+          .eq("id", existingId);
+        if (error) {
+          errors.push(
+            `phone update failed for "${p.value.trim()}" (${error.message})`
+          );
+        } else {
+          written += 1;
+        }
+      } else {
+        const ownerHasPhone = phoneIndex.size > 0;
+        const { error } = await sb.from("contacts").insert({
+          owner_id: ownerId,
+          lead_id: leadId,
+          channel: "phone",
+          value: p.value.trim(),
+          status: "untested",
+          is_primary: i === 0 && !ownerHasPhone,
+          phone_type: p.phone_type ?? null,
+          is_dnc: p.is_dnc,
+          is_litigator: p.is_litigator,
+        });
+        if (error) {
+          errors.push(
+            `phone insert failed for "${p.value.trim()}" (${error.message})`
+          );
+        } else {
+          written += 1;
+          if (norm) phoneIndex.set(norm, "");
+        }
+      }
+    }
+
+    // Emails — dedupe by lowercased trim. No update needed when present
+    // (email rows carry no flags); insert when missing.
+    for (let i = 0; i < emails.length; i++) {
+      const value = emails[i];
+      const norm = value.toLowerCase().trim();
+      if (emailIndex.has(norm)) continue;
+      const ownerHasContact = phoneIndex.size > 0 || emailIndex.size > 0;
+      const { error } = await sb.from("contacts").insert({
+        owner_id: ownerId,
+        lead_id: leadId,
+        channel: "email",
+        value,
+        status: "untested",
+        is_primary: i === 0 && phones.length === 0 && !ownerHasContact,
+        phone_type: null,
+        is_dnc: false,
+        is_litigator: false,
+      });
+      if (error) {
+        errors.push(`email insert failed for "${value}" (${error.message})`);
+      } else {
+        written += 1;
+        emailIndex.set(norm, "");
+      }
+    }
+
+    // Mailing addresses — dedupe by lowercased trim so repeated imports of
+    // the same lead don't accumulate identical mailing rows. Mailing has no
+    // mergeable flags, so an existing match is a no-op.
+    for (const value of mailingAddresses) {
+      const norm = value.toLowerCase().trim();
+      if (mailingIndex.has(norm)) continue;
+      const { error } = await sb.from("contacts").insert({
+        owner_id: ownerId,
+        lead_id: leadId,
+        channel: "mailing_address",
+        value,
+        status: "untested",
+        is_primary: false,
+        phone_type: null,
+        is_dnc: false,
+        is_litigator: false,
+      });
+      if (error) {
+        errors.push(
+          `mailing address insert failed for "${value}" (${error.message})`
+        );
+      } else {
+        written += 1;
+        mailingIndex.set(norm, "");
+      }
+    }
+
+    // PART 4: DNC flag re-check — runs whenever this row brought any phone
+    // data, regardless of whether the writes above were inserts or updates
+    // (the previous gate on `written > 0` skipped the check after a replace
+    // import where every phone matched an existing contact). Only flips the
+    // flag on, never off.
+    if (phones.length > 0) {
+      const { data: allPhones } = await sb
         .from("contacts")
         .select("is_dnc")
         .eq("lead_id", leadId)
         .eq("channel", "phone");
       if (
-        phoneContacts &&
-        phoneContacts.length > 0 &&
-        phoneContacts.every((c) => c.is_dnc === true)
+        allPhones &&
+        allPhones.length > 0 &&
+        allPhones.every((c) => c.is_dnc === true)
       ) {
-        await sb
+        const { error } = await sb
           .from("leads")
           .update({ dnc: true, dnc_logged_at: new Date().toISOString() })
           .eq("id", leadId);
+        if (error) {
+          errors.push(`dnc flag update failed (${error.message})`);
+        }
       }
     }
-    return written;
+    return { written, errors };
   }
 
-  // Helper: write the relatives parsed off a CSV row. The relatives table now
-  // carries up to 5 discrete phones (each with type / DNC / litigator) and 5
-  // emails, so the parsed values map straight onto those columns.
-  async function writeRelativesForLead(leadId: string, row: IncomingLead) {
-    const relatives = (row.relatives ?? []).filter(
+  // Fix NNNN3 PART 3: merge incoming relatives into the lead's existing
+  // relatives instead of blindly appending. Existing relatives matched by
+  // case-insensitive full_name get UPDATEd (age/relationship overwritten;
+  // phone and email slots deduped by normalized digits / lowercased trim);
+  // unmatched relatives are INSERTed. Prevents the duplicate explosion that
+  // repeated replace imports of the same lead would otherwise produce.
+  async function writeRelativesForLead(
+    leadId: string,
+    row: IncomingLead
+  ): Promise<{ errors: string[] }> {
+    const errors: string[] = [];
+    const incoming = (row.relatives ?? []).filter(
       (r) => r.full_name || r.phones.length > 0 || r.emails.length > 0
     );
-    if (relatives.length === 0) return;
-    const relativeRows = relatives.map((r) => relativeRowFromImport(leadId, r));
-    const { error: relativesErr } = await sb.from("relatives").insert(relativeRows);
-    if (relativesErr) {
-      console.error(
-        `[importLeads] relatives insert failed for lead ${leadId}: ${relativesErr.message}`
-      );
+    if (incoming.length === 0) return { errors };
+
+    const { data: existing } = await sb
+      .from("relatives")
+      .select("*")
+      .eq("lead_id", leadId);
+
+    const byName = new Map<string, Record<string, unknown>>();
+    for (const r of (existing ?? []) as Array<Record<string, unknown>>) {
+      const key = ((r.full_name as string | null) ?? "").trim().toLowerCase();
+      if (key) byName.set(key, r);
     }
+
+    for (const rel of incoming) {
+      const name = (rel.full_name ?? "Unknown").trim();
+      const match = byName.get(name.toLowerCase());
+      if (match) {
+        // Merge into the existing relative row. Build the merged phone slots
+        // by indexing existing slots by their normalized number, then
+        // overlaying incoming phones (replace flags if the number was already
+        // present, occupy the next slot otherwise). Cap at the slot count.
+        type Slot = {
+          value: string;
+          type: string | null;
+          is_dnc: boolean;
+          is_litigator: boolean;
+        };
+        const phoneSlotMap = new Map<string, Slot>();
+        for (const base of RELATIVE_PHONE_COLUMNS) {
+          const raw = (match[base] as string | null) ?? "";
+          const norm = normalizePhone(raw);
+          if (norm && !phoneSlotMap.has(norm)) {
+            phoneSlotMap.set(norm, {
+              value: raw,
+              type: (match[`${base}_type`] as string | null) ?? null,
+              is_dnc: Boolean(match[`${base}_is_dnc`]),
+              is_litigator: Boolean(match[`${base}_is_litigator`]),
+            });
+          }
+        }
+        for (const p of rel.phones) {
+          const norm = normalizePhone(p.value);
+          if (!norm) continue;
+          phoneSlotMap.set(norm, {
+            value: p.value.trim(),
+            type: p.phone_type ?? null,
+            is_dnc: p.is_dnc,
+            is_litigator: p.is_litigator,
+          });
+        }
+        const slots = Array.from(phoneSlotMap.values()).slice(
+          0,
+          RELATIVE_PHONE_COLUMNS.length
+        );
+
+        const emailMap = new Map<string, string>();
+        for (const base of RELATIVE_EMAIL_COLUMNS) {
+          const raw = ((match[base] as string | null) ?? "").trim();
+          const norm = raw.toLowerCase();
+          if (norm && !emailMap.has(norm)) emailMap.set(norm, raw);
+        }
+        for (const e of rel.emails) {
+          const norm = e.toLowerCase().trim();
+          if (!norm) continue;
+          if (!emailMap.has(norm)) emailMap.set(norm, e);
+        }
+        const emailList = Array.from(emailMap.values()).slice(
+          0,
+          RELATIVE_EMAIL_COLUMNS.length
+        );
+
+        const mergedPayload: Record<string, unknown> = {
+          relationship: rel.relationship ?? (match.relationship as string | null) ?? null,
+          age: rel.age ?? (match.age as number | null) ?? null,
+        };
+        RELATIVE_PHONE_COLUMNS.forEach((base, idx) => {
+          const s = slots[idx];
+          mergedPayload[base] = s ? s.value : null;
+          mergedPayload[`${base}_type`] = s ? s.type : null;
+          mergedPayload[`${base}_is_dnc`] = s ? s.is_dnc : false;
+          mergedPayload[`${base}_is_litigator`] = s ? s.is_litigator : false;
+        });
+        RELATIVE_EMAIL_COLUMNS.forEach((base, idx) => {
+          mergedPayload[base] = emailList[idx] ?? null;
+        });
+
+        const { error } = await sb
+          .from("relatives")
+          .update(mergedPayload)
+          .eq("id", match.id as string);
+        if (error) {
+          errors.push(`relative update failed for "${name}" (${error.message})`);
+        }
+      } else {
+        const newRow = relativeRowFromImport(leadId, rel);
+        const { error } = await sb.from("relatives").insert(newRow);
+        if (error) {
+          errors.push(`relative insert failed for "${name}" (${error.message})`);
+        }
+      }
+    }
+    return { errors };
   }
 
   for (let i = 0; i < rows.length; i++) {
@@ -505,8 +730,20 @@ export async function importLeads(
         action_taken: "imported",
         lead_id: leadRow.id,
       });
-      contactsWritten += await writeContactsForLead(leadRow.id as string, row);
-      await writeRelativesForLead(leadRow.id as string, row);
+      {
+        const cw = await writeContactsForLead(leadRow.id as string, row);
+        contactsWritten += cw.written;
+        const rw = await writeRelativesForLead(leadRow.id as string, row);
+        const rowErrors = [...cw.errors, ...rw.errors];
+        if (rowErrors.length > 0) {
+          warnings.push(
+            `Lead ${row.address} imported but some contact data could not be written — check activity log`
+          );
+          for (const e of rowErrors) {
+            console.error(`[importLeads] ${row.address}: ${e}`);
+          }
+        }
+      }
       continue;
     }
 
@@ -586,10 +823,25 @@ export async function importLeads(
       user_id: actorId,
     });
 
-    // Contacts are additive — append the row's contact rows to the existing
-    // lead rather than overwriting.
-    contactsWritten += await writeContactsForLead(leadId, row);
-    await writeRelativesForLead(leadId, row);
+    // Fix NNNN3: contacts are merged (not appended) — owner row is upserted
+    // by leads.is_primary, and each phone/email/mailing dedupes by its
+    // normalized value before deciding insert-vs-update. Errors don't
+    // silently disappear: they accumulate on `warnings` for the import
+    // summary.
+    {
+      const cw = await writeContactsForLead(leadId, row);
+      contactsWritten += cw.written;
+      const rw = await writeRelativesForLead(leadId, row);
+      const rowErrors = [...cw.errors, ...rw.errors];
+      if (rowErrors.length > 0) {
+        warnings.push(
+          `Lead ${row.address} imported but some contact data could not be written — check activity log`
+        );
+        for (const e of rowErrors) {
+          console.error(`[importLeads] ${row.address}: ${e}`);
+        }
+      }
+    }
   }
 
   if (importRowsLog.length > 0) {
@@ -643,6 +895,7 @@ export async function importLeads(
     updatedBlank,
     replaced,
     contactsWritten,
+    warnings,
   };
 }
 

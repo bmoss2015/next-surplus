@@ -749,6 +749,9 @@ export function ImportWizard() {
     contactsWritten: number;
     contactsSkipped: { invalidPhone: number; invalidEmail: number; duplicate: number };
     notImportedColumns: string[];
+    // Fix NNNN3 PART 5: per-lead warnings for non-fatal contact/relative
+    // write failures — surfaced in the Import Complete modal.
+    warnings: string[];
   } | null>(null);
 
   useEffect(() => {
@@ -1299,6 +1302,7 @@ export function ImportWizard() {
         contactsWritten: result.contactsWritten,
         contactsSkipped: contactSkipStats,
         notImportedColumns: headers.filter((h) => !recognized.has(h)),
+        warnings: result.warnings ?? [],
       });
       router.refresh();
     });
@@ -1963,7 +1967,12 @@ function ImportSuccessModal({
   onImportAnother,
   onClose,
 }: {
-  result: { imported: number; skipped: number; dedupeReview: number };
+  result: {
+    imported: number;
+    skipped: number;
+    dedupeReview: number;
+    warnings?: string[];
+  };
   onImportAnother: () => void;
   onClose: () => void;
 }) {
@@ -2008,6 +2017,20 @@ function ImportSuccessModal({
         {result.dedupeReview > 0 && (
           <div className="mb-1 text-sm text-[#6b7280]">
             {result.dedupeReview} flagged for dedupe review
+          </div>
+        )}
+        {/* Fix NNNN3 PART 5: per-lead contact-write warnings — never silent. */}
+        {result.warnings && result.warnings.length > 0 && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-left">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-800">
+              {result.warnings.length}{" "}
+              {result.warnings.length === 1 ? "Warning" : "Warnings"}
+            </div>
+            <ul className="max-h-32 list-disc overflow-y-auto pl-5 text-xs text-amber-900">
+              {result.warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
           </div>
         )}
         <div className="mb-6 mt-6 border-t border-[#e5e7eb]" />
