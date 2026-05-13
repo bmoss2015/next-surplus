@@ -8,12 +8,41 @@ import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/impor
 import {
   DEFAULT_LEAD_SOURCE,
   normalizePhone,
+  SELECTABLE_REPLACE_FIELDS,
   type IncomingLead,
   type ImportRelative,
   type ImportHistoryRow,
   type SavedSourceMapping,
   type ImportRowDecision,
+  type SelectableReplaceField,
 } from "./_shared";
+
+// Fix VVVV3: the columns the field-selection screen reads off the existing
+// lead so the user can see "current vs CSV" before confirming the replace.
+const REPLACE_COMPARE_COLUMNS = [
+  "id",
+  ...SELECTABLE_REPLACE_FIELDS,
+  "outstanding_debt", // shown for context though it's not importable
+].join(", ");
+
+export async function fetchLeadsForReplaceSelect(
+  leadIds: string[]
+): Promise<Record<string, Record<string, unknown>>> {
+  if (leadIds.length === 0) return {};
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("leads")
+    .select(REPLACE_COMPARE_COLUMNS)
+    .in("id", leadIds);
+  if (error) return {};
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const row of rows) {
+    const id = row.id as string | undefined;
+    if (id) out[id] = row;
+  }
+  return out;
+}
 
 // Fix 94: build the fuzzy dedupe key for a row — normalized address + zip.
 function dedupeKey(address: string, zip: string): string {
@@ -752,7 +781,19 @@ export async function importLeads(
     let patch: Record<string, unknown>;
 
     if (decision.action === "replace_all") {
-      patch = { ...fields };
+      // Fix VVVV3: only write the fields the user explicitly confirmed on the
+      // "Select Fields to Replace" screen. Anything not in selectedFields is
+      // dropped from the patch — never written, never blanked. attorney_cost
+      // (not in SELECTABLE_REPLACE_FIELDS) is therefore never touched on a
+      // replace either, which matches the screen's behaviour.
+      const selected = new Set<SelectableReplaceField>(decision.selectedFields);
+      patch = {};
+      for (const f of SELECTABLE_REPLACE_FIELDS) {
+        if (!selected.has(f)) continue;
+        if (f in fields) {
+          patch[f] = (fields as Record<string, unknown>)[f];
+        }
+      }
     } else {
       // update_blank: only fill columns that are currently null/empty.
       const { data: current } = await sb

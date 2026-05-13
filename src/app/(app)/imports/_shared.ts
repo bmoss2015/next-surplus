@@ -30,9 +30,59 @@ export function duplicateResolutionLabel(r: DuplicateResolution): string {
 // "insert"; rows matched to an existing lead get one of the duplicate
 // resolutions plus the existing lead id. Lives here (not in the "use server"
 // _actions module) so it can be a plain type export.
+// Fix VVVV3: replace_all now carries the explicit list of fields the user
+// confirmed should be overwritten on the existing lead. The patch built in
+// importLeads is filtered to that list, so unchecked fields are never
+// written.
 export type ImportRowDecision =
   | { index: number; action: "insert" }
-  | { index: number; action: DuplicateResolution; existingLeadId: string };
+  | { index: number; action: "skip" | "update_blank"; existingLeadId: string }
+  | {
+      index: number;
+      action: "replace_all";
+      existingLeadId: string;
+      selectedFields: SelectableReplaceField[];
+    };
+
+// Fix VVVV3: the fields the user can choose to overwrite on a replace import.
+// Ordered the way they render on the "Select Fields to Replace" screen.
+// "outstanding_debt" (Tax / Mortgage Payoff) is shown on the comparison UI
+// for completeness but is not importable today — the wizard renders it
+// disabled and it cannot end up in selectedFields.
+export const SELECTABLE_REPLACE_FIELDS = [
+  "address",
+  "city",
+  "state",
+  "zip",
+  "county",
+  "parcel_number",
+  "case_number",
+  "sale_type",
+  "sale_date",
+  "closing_bid",
+  "opening_bid",
+  "recovery_type",
+  "lead_source",
+  "source_surplus",
+] as const;
+export type SelectableReplaceField = (typeof SELECTABLE_REPLACE_FIELDS)[number];
+
+export const REPLACE_FIELD_LABELS: Record<SelectableReplaceField, string> = {
+  address: "Property Address",
+  city: "City",
+  state: "State",
+  zip: "ZIP",
+  county: "County",
+  parcel_number: "Parcel Number",
+  case_number: "Case Number",
+  sale_type: "Sale Type",
+  sale_date: "Sale Date",
+  closing_bid: "Closing Bid",
+  opening_bid: "Opening Bid",
+  recovery_type: "Recovery Type",
+  lead_source: "Lead Source",
+  source_surplus: "Potential Surplus",
+};
 
 // The literal "Other" option appended to the lead-source dropdown — picking it
 // reveals a free-text input for a brand-new source name (Fix 6).

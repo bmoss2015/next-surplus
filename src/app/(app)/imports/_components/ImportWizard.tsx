@@ -20,6 +20,7 @@ import {
   saveSourceMapping,
   previewRevertImport,
   revertImport,
+  fetchLeadsForReplaceSelect,
   type ImportSourceMode,
 } from "../_actions";
 import {
@@ -49,7 +50,12 @@ import {
   type ImportHistoryRow,
   type DuplicateResolution,
   type ImportRowDecision,
+  SELECTABLE_REPLACE_FIELDS,
+  REPLACE_FIELD_LABELS,
+  type SelectableReplaceField,
 } from "../_shared";
+import { formatCurrencyOrDash } from "@/lib/leads/format";
+import { formatRecoveryType } from "@/lib/leads/recovery-type";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { formatAddress, formatCity } from "@/lib/imports/format-address";
@@ -61,7 +67,10 @@ type Step =
   | "map" // Page 1: confirm the auto-mapped columns
   | "unrecognized" // Page 2: review the columns we could not auto-map
   | "change_prompt" // optional: "Update Saved Mapping For X?"
-  | "preview";
+  | "preview"
+  // Fix VVVV3: a per-replace-row field selection screen, shown only when the
+  // dedupe step has at least one row resolved to "Replace existing data".
+  | "replace_select";
 
 const DISMISS_VALUE = "__dismiss__";
 
@@ -243,8 +252,47 @@ const PROGRESS_STEPS: { key: Step | "map_group"; label: string }[] = [
 
 function progressIndex(step: Step): number {
   if (step === "upload") return 0;
-  if (step === "preview") return 2;
+  if (step === "preview" || step === "replace_select") return 2;
   return 1; // map / unrecognized / change_prompt all live in "Map Columns"
+}
+
+// Fix VVVV3: format a comparison value for the "Select Fields to Replace"
+// screen. Both the existing-lead row (from the DB) and the parsed CSV row
+// (IncomingLead) feed into this — the shapes line up for every field except
+// currency (DB returns numeric, IncomingLead is already number-or-null).
+function fmtReplaceComparison(field: string, value: unknown): string {
+  if (value == null || value === "") return "—";
+  switch (field) {
+    case "closing_bid":
+    case "opening_bid":
+    case "outstanding_debt":
+    case "source_surplus": {
+      const n =
+        typeof value === "string" ? parseFloat(value) : (value as number);
+      return Number.isFinite(n) ? formatCurrencyOrDash(n) : "—";
+    }
+    case "recovery_type":
+      return formatRecoveryType(value as string | null);
+    case "sale_type": {
+      const sv = String(value).toUpperCase();
+      if (sv === "TAX") return "Tax Sale";
+      if (sv === "MTG") return "Mortgage Foreclosure";
+      return "Unknown";
+    }
+    case "sale_date": {
+      // YYYY-MM-DD or full ISO — pull off the date portion for display.
+      const s = String(value).slice(0, 10);
+      const d = new Date(s + "T00:00:00");
+      if (Number.isNaN(d.getTime())) return s;
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+    default:
+      return String(value);
+  }
 }
 
 // Shared shell — progress bar always at the top, then framed content (Fix 92).
@@ -731,6 +779,20 @@ export function ImportWizard() {
   const [dupResolution, setDupResolution] = useState<Record<number, DuplicateResolution>>(
     {}
   );
+  // Fix VVVV3: replace-select state — populated when the user hits Import on
+  // the preview step and any row is set to "Replace existing data".
+  // replaceSelections: per-csv-row index → set of field keys the user wants
+  // to overwrite. Defaults to every field checked when the screen first
+  // opens; user can uncheck individual fields per duplicate.
+  // existingValuesByLeadId: snapshot of the existing lead row(s) read once
+  // from the server so the comparison UI can show "current vs CSV" without
+  // re-querying as the user toggles checkboxes.
+  const [replaceSelections, setReplaceSelections] = useState<
+    Map<number, Set<SelectableReplaceField>>
+  >(new Map());
+  const [existingValuesByLeadId, setExistingValuesByLeadId] = useState<
+    Record<string, Record<string, unknown>>
+  >({});
   // Fix P / Fix R: rows that fail validation on the preview step. Import is
   // blocked while any of these exist — the user must fix the source or remove
   // the offending rows here before importing. Only the valid rows ever import.
@@ -1258,24 +1320,52 @@ export function ImportWizard() {
     return { newRows, skipped, updatedBlank, replaced };
   }, [normalized, dupMatches, dupResolution]);
 
-  function runImport() {
-    if (!file) return;
-    // Fix P: never run an import while any row failed validation.
-    if (invalidRows.length > 0) {
-      setError("Some Rows Have Errors. Fix Or Remove The Highlighted Rows First.");
-      return;
-    }
-    setError(null);
-    const decisions: ImportRowDecision[] = [];
+  // Fix VVVV3: build the list of CSV row indices the user resolved to
+  // "replace_all" — used to gate the field-selection screen and to
+  // assemble final decisions later.
+  function getReplaceRows(): Array<{ index: number; existingLeadId: string }> {
+    const out: Array<{ index: number; existingLeadId: string }> = [];
+    normalized.forEach((_, i) => {
+      const matchId = dupMatches[i] ?? null;
+      if (!matchId) return;
+      const res = dupResolution[i] ?? DEFAULT_DUPLICATE_RESOLUTION;
+      if (res === "replace_all") out.push({ index: i, existingLeadId: matchId });
+    });
+    return out;
+  }
+
+  // Fix VVVV3: assemble the final ImportRowDecision list. For replace_all
+  // rows, look up the user's per-row field selection (built on the
+  // replace_select screen). For inserts / skip / update_blank the decision
+  // is unchanged from before.
+  function buildDecisions(
+    selections: Map<number, Set<SelectableReplaceField>>
+  ): ImportRowDecision[] {
+    const out: ImportRowDecision[] = [];
     normalized.forEach((_, i) => {
       const matchId = dupMatches[i] ?? null;
       if (!matchId) {
-        decisions.push({ index: i, action: "insert" });
+        out.push({ index: i, action: "insert" });
         return;
       }
       const res = dupResolution[i] ?? DEFAULT_DUPLICATE_RESOLUTION;
-      decisions.push({ index: i, action: res, existingLeadId: matchId });
+      if (res === "replace_all") {
+        const picked = selections.get(i) ?? new Set<SelectableReplaceField>();
+        out.push({
+          index: i,
+          action: "replace_all",
+          existingLeadId: matchId,
+          selectedFields: Array.from(picked),
+        });
+      } else {
+        out.push({ index: i, action: res, existingLeadId: matchId });
+      }
     });
+    return out;
+  }
+
+  function submitImport(decisions: ImportRowDecision[]) {
+    if (!file) return;
     const cfg =
       sourceConfig ?? { mode: "file" as ImportSourceMode, source: null, mappingKey: USE_FILE_SOURCE };
     startTransition(async () => {
@@ -1306,6 +1396,44 @@ export function ImportWizard() {
       });
       router.refresh();
     });
+  }
+
+  function runImport() {
+    if (!file) return;
+    // Fix P: never run an import while any row failed validation.
+    if (invalidRows.length > 0) {
+      setError("Some Rows Have Errors. Fix Or Remove The Highlighted Rows First.");
+      return;
+    }
+    setError(null);
+
+    // Fix VVVV3: if any duplicate row is resolved to "Replace existing data",
+    // detour through the field-selection screen first. Fetch the current
+    // values for every targeted lead in one round-trip and pre-check every
+    // selectable field — the user can uncheck whatever they don't want
+    // overwritten before confirming.
+    const replaceRows = getReplaceRows();
+    if (replaceRows.length > 0) {
+      const leadIds = replaceRows.map((r) => r.existingLeadId);
+      startTransition(async () => {
+        const existing = await fetchLeadsForReplaceSelect(leadIds);
+        setExistingValuesByLeadId(existing);
+        const initial = new Map<number, Set<SelectableReplaceField>>();
+        for (const r of replaceRows) {
+          initial.set(r.index, new Set<SelectableReplaceField>(SELECTABLE_REPLACE_FIELDS));
+        }
+        setReplaceSelections(initial);
+        setStep("replace_select");
+      });
+      return;
+    }
+
+    // No replace rows → straight to import.
+    submitImport(buildDecisions(new Map()));
+  }
+
+  function confirmReplaceSelect() {
+    submitImport(buildDecisions(replaceSelections));
   }
 
   // -----------------------------------------------------------------------
@@ -1724,6 +1852,175 @@ export function ImportWizard() {
             className="btn-primary cursor-pointer rounded-md px-3 py-2 text-xs font-medium disabled:opacity-50"
           >
             Update Default
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ===================== REPLACE SELECT =====================
+  // Fix VVVV3: a per-replace-row field-selection screen. Only reachable when
+  // the user resolved at least one duplicate to "Replace existing data" on
+  // the dedupe step. Cancel returns to preview; Replace Selected calls
+  // confirmReplaceSelect → submitImport with the filtered patch.
+  if (step === "replace_select") {
+    const rsRows = getReplaceRows();
+    const totalChecked = Array.from(replaceSelections.values()).reduce(
+      (acc, s) => acc + s.size,
+      0
+    );
+    const canConfirm = !pending && totalChecked > 0;
+
+    function toggleField(rowIndex: number, field: SelectableReplaceField) {
+      setReplaceSelections((prev) => {
+        const next = new Map(prev);
+        const set = new Set(next.get(rowIndex) ?? new Set<SelectableReplaceField>());
+        if (set.has(field)) set.delete(field);
+        else set.add(field);
+        next.set(rowIndex, set);
+        return next;
+      });
+    }
+
+    return (
+      <Shell step={step}>
+        <div className="mb-4">
+          <h2 className="m-0 text-[14px] font-medium text-ink">
+            Select Fields to Replace
+          </h2>
+          <div className="mt-[2px] text-[11.5px] text-gray-500">
+            Choose which fields to overwrite on the existing lead. Unchecked
+            fields will not be changed.
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {rsRows.map(({ index, existingLeadId }) => {
+            const csv = normalized[index];
+            const existing = existingValuesByLeadId[existingLeadId] ?? {};
+            const selected =
+              replaceSelections.get(index) ?? new Set<SelectableReplaceField>();
+            return (
+              <div
+                key={index}
+                className="overflow-hidden rounded-md border border-gray-200 bg-surface"
+              >
+                <div className="border-b border-gray-200 bg-gray-50 px-3 py-2">
+                  <div className="text-[12px] font-medium text-ink">
+                    {csv.address}
+                  </div>
+                  <div className="text-[11px] text-gray-500">
+                    {csv.city}, {csv.state} {csv.zip}
+                  </div>
+                </div>
+                <table className="w-full text-[11.5px]">
+                  <thead className="bg-gray-50/50 text-[10.5px] uppercase tracking-wider text-gray-500">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium">
+                        Current Value
+                      </th>
+                      <th className="px-3 py-2 text-left font-medium">
+                        Replace
+                      </th>
+                      <th className="px-3 py-2 text-left font-medium">
+                        CSV Value
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SELECTABLE_REPLACE_FIELDS.map((field) => {
+                      const curRaw = (existing as Record<string, unknown>)[field];
+                      const csvRaw = (csv as unknown as Record<string, unknown>)[
+                        field
+                      ];
+                      const cur = fmtReplaceComparison(field, curRaw);
+                      const csvVal = fmtReplaceComparison(field, csvRaw);
+                      const noChange = cur === csvVal;
+                      return (
+                        <tr key={field} className="border-t border-gray-150">
+                          <td className="px-3 py-2 text-gray-600">{cur}</td>
+                          <td className="px-3 py-2">
+                            <label className="inline-flex cursor-pointer items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={selected.has(field)}
+                                onChange={() => toggleField(index, field)}
+                                className="cursor-pointer"
+                              />
+                              <span className="text-[11.5px] text-ink">
+                                {REPLACE_FIELD_LABELS[field]}
+                              </span>
+                              {noChange && (
+                                <span className="text-[10.5px] italic text-gray-400">
+                                  (No change)
+                                </span>
+                              )}
+                            </label>
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">{csvVal}</td>
+                        </tr>
+                      );
+                    })}
+                    {/* Tax / Mortgage Payoff is in the spec's field list but
+                        the wizard doesn't import it today — display as a
+                        disabled row so the user sees the column exists. */}
+                    <tr className="border-t border-gray-150 opacity-60">
+                      <td className="px-3 py-2 text-gray-600">
+                        {fmtReplaceComparison(
+                          "outstanding_debt",
+                          (existing as Record<string, unknown>).outstanding_debt
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <label className="inline-flex items-center gap-2">
+                          <input type="checkbox" disabled />
+                          <span className="text-[11.5px] text-gray-500">
+                            Tax / Mortgage Payoff
+                          </span>
+                          <span className="text-[10.5px] italic text-gray-400">
+                            (Not in CSV)
+                          </span>
+                        </label>
+                      </td>
+                      <td className="px-3 py-2 text-gray-400">—</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+        </div>
+
+        {error && (
+          <div className="mt-3 rounded-md border border-warn-border bg-warn-bg px-3 py-2 text-[12px] text-warn-strong">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setStep("preview");
+            }}
+            disabled={pending}
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-2 text-xs text-ink hover:border-petrol-500 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirmReplaceSelect}
+            disabled={!canConfirm}
+            title={
+              !canConfirm && totalChecked === 0
+                ? "Select at least one field to replace"
+                : undefined
+            }
+            className="btn-primary cursor-pointer rounded-md px-3 py-2 text-xs font-medium disabled:opacity-50"
+          >
+            {pending ? "Importing" : "Replace Selected"}
           </button>
         </div>
       </Shell>
