@@ -10,10 +10,13 @@ const AUTH_FLOW_PATHS = ["/reset", "/accept-invite"];
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow Next internals + static assets
+  // Allow Next internals + static assets + the OAuth/recovery callback (which
+  // must run unauthenticated — it's what establishes the session in the first
+  // place, off a token in the URL).
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/") ||
+    pathname.startsWith("/auth/callback") ||
     pathname.includes("/favicon")
   ) {
     return NextResponse.next();

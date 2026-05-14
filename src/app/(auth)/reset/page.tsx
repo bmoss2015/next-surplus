@@ -1,16 +1,42 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { updatePassword } from "../_actions";
+import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPage() {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+  const [status, setStatus] = useState<"checking" | "ready" | "invalid">(
+    "checking"
+  );
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "invalid_link") {
+      setStatus("invalid");
+      return;
+    }
+
+    // The /auth/callback route has already exchanged the recovery code for a
+    // session before redirecting here, so the only question is whether a session
+    // actually exists. If not, the link was bad or expired.
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      setStatus(data.user ? "ready" : "invalid");
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,18 +50,42 @@ export default function ResetPage() {
       return;
     }
     startTransition(async () => {
-      const result = await updatePassword(password);
-      if (result.ok) {
-        router.push("/");
-        router.refresh();
-      } else {
-        setError(result.error);
+      const { error: updateErr } = await supabase.auth.updateUser({ password });
+      if (updateErr) {
+        setError(updateErr.message);
+        return;
       }
+      router.push("/");
+      router.refresh();
     });
   }
 
   const inputClass =
     "w-full rounded-md border border-gray-200 bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-petrol-500";
+
+  if (status === "checking") {
+    return <p className="text-[13px] text-gray-500">Verifying Reset Link…</p>;
+  }
+
+  if (status === "invalid") {
+    return (
+      <div className="space-y-3">
+        <h1 className="m-0 text-[16px] font-medium tracking-tight text-ink">
+          Reset Link Invalid Or Expired
+        </h1>
+        <p className="text-[12px] text-gray-500">
+          This password reset link is no longer valid. Request a new one and try
+          again.
+        </p>
+        <Link
+          href="/forgot"
+          className="text-[12px] text-petrol-500 hover:text-petrol-700"
+        >
+          Request New Reset Link
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={submit} className="space-y-4">

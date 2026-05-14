@@ -27,17 +27,12 @@ export async function requestPasswordReset(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const sb = await createClient();
   const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: `${SITE_URL}/reset`,
+    // The callback route does the PKCE exchange server-side (the code_verifier
+    // cookie was set by the server client when this action fired — the browser
+    // client can't read it, so the exchange must happen on the server too).
+    // After exchange, the user lands on /reset with a real session in cookies.
+    redirectTo: `${SITE_URL}/auth/callback?next=/reset`,
   });
-  if (error) return { ok: false, error: error.message };
-  return { ok: true };
-}
-
-export async function updatePassword(
-  newPassword: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const sb = await createClient();
-  const { error } = await sb.auth.updateUser({ password: newPassword });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
