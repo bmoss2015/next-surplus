@@ -868,8 +868,13 @@ export function ImportWizard() {
       transformHeader: (h) => (h.charCodeAt(0) === 0xFEFF ? h.slice(1) : h).trim(),
       transform: (v) => (typeof v === "string" ? v.trim() : v),
       complete: (results) => {
-        if (results.errors.length > 0) {
-          setError(`Parse Error: ${results.errors[0].message}`);
+        // FieldMismatch (TooFewFields / TooManyFields) is a width-warning, not a
+        // parse failure — Papa fills missing cells with "" and ignores extras.
+        // Every source has a different column count, so we accept any shape and
+        // only surface genuinely fatal errors (bad quoting, delimiter trouble).
+        const fatal = results.errors.filter((e) => e.type !== "FieldMismatch");
+        if (fatal.length > 0) {
+          setError(`Parse Error: ${fatal[0].message}`);
           return;
         }
         // Drop blank columns entirely — anything whose normalized header is "" is
