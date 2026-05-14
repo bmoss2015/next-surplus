@@ -126,12 +126,14 @@ export function DiscussionTabClient({
   );
 
   const filteredMembers = useMemo(() => {
+    // You can't @mention yourself — drop the current user before searching.
+    const mentionable = teamMembers.filter((m) => m.id !== currentUserId);
     const q = pickerQuery.trim().toLowerCase();
     const list = q
-      ? teamMembers.filter((m) => m.fullName.toLowerCase().includes(q))
-      : teamMembers;
+      ? mentionable.filter((m) => m.fullName.toLowerCase().includes(q))
+      : mentionable;
     return list.slice(0, 6);
-  }, [teamMembers, pickerQuery]);
+  }, [teamMembers, pickerQuery, currentUserId]);
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -478,9 +480,6 @@ export function DiscussionTabClient({
                   {avatarInitial(m.firstName)}
                 </span>
                 <span className="truncate">{m.fullName}</span>
-                {m.id === currentUserId && (
-                  <span className="ml-auto text-[10px] text-gray-400">You</span>
-                )}
               </button>
             ))}
           </div>
