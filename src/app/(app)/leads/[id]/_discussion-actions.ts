@@ -149,20 +149,19 @@ export async function postComment(input: {
     try {
       const { data: leadRow } = await sb
         .from("leads")
-        .select("lead_id, address, city, state")
+        .select("lead_id, owners(full_name, is_primary)")
         .eq("id", input.leadId)
         .maybeSingle();
-      const addr = (leadRow?.address as string | null)?.trim();
-      const cityState = [leadRow?.city, leadRow?.state]
-        .filter(Boolean)
-        .join(", ");
-      const leadAddress =
-        addr && addr.length > 0
-          ? cityState
-            ? `${addr}, ${cityState}`
-            : addr
-          : (leadRow?.lead_id as string | null) ?? input.leadId;
+      const ownerList =
+        (leadRow?.owners as Array<{ full_name: string | null; is_primary: boolean | null }> | null) ??
+        [];
+      const primaryOwnerRow =
+        ownerList.find((o) => o.is_primary) ?? ownerList[0] ?? null;
+      const leadOwnerName =
+        (primaryOwnerRow?.full_name ?? "").trim() ||
+        ((leadRow?.lead_id as string | null) ?? "the");
       const link = `/leads/${input.leadId}?tab=notes#comment-${commentId}`;
+      const actorFirstName = firstNameOf(profile.fullName, profile.email);
       for (const recipientId of recipients) {
         const m = memberById.get(recipientId);
         if (!m?.email) continue;
@@ -171,9 +170,9 @@ export async function postComment(input: {
             body: {
               recipientEmail: m.email,
               recipientName: m.firstName,
-              actorName: profile.fullName,
+              actorFirstName,
               leadId: input.leadId,
-              leadAddress,
+              leadOwnerName,
               commentText: body,
               link,
             },
