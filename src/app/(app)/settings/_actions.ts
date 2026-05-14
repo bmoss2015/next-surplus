@@ -9,6 +9,75 @@ import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
 
+// -- My Profile (self-edit) --------------------------------------------------
+
+// Lets the signed-in user update their own display name and email. Both are
+// required — the rest of the app assumes a profile row always has both
+// (TeamSection, @mention picker, mention emails, audit log all read these).
+// Email change uses the admin API so the auth user's email is updated
+// immediately without a separate confirmation round-trip — staging UX choice.
+export async function updateMyProfile(
+  fullName: string,
+  email: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+
+  const cleanName = (fullName ?? "").trim().replace(/\s+/g, " ");
+  if (cleanName.length === 0) {
+    return { ok: false, error: "Name is required" };
+  }
+  const cleanEmail = (email ?? "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
+    return { ok: false, error: "Enter a valid email address" };
+  }
+
+  const admin = createServiceClient();
+
+  // If the email is changing, refuse if some *other* auth user already owns it.
+  if (cleanEmail !== (profile.email ?? "").toLowerCase()) {
+    const existing = await findAuthUserByEmail(admin, cleanEmail);
+    if (existing && existing.id !== profile.id) {
+      return { ok: false, error: "That email address is already in use." };
+    }
+    const { error: authErr } = await admin.auth.admin.updateUserById(profile.id, {
+      email: cleanEmail,
+      email_confirm: true,
+    });
+    if (authErr) return { ok: false, error: authErr.message };
+  }
+
+  const { error: profileErr } = await admin
+    .from("profiles")
+    .update({ full_name: cleanName, email: cleanEmail })
+    .eq("id", profile.id);
+  if (profileErr) return { ok: false, error: profileErr.message };
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// Used by the accept-invite page so the new user can confirm/correct the name
+// the admin typed at invite time. Email is bound to the invite token and stays
+// fixed — only the name is editable here, but it must be non-empty.
+export async function completeInviteProfile(
+  fullName: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const cleanName = (fullName ?? "").trim().replace(/\s+/g, " ");
+  if (cleanName.length === 0) {
+    return { ok: false, error: "First and last name are required" };
+  }
+  const admin = createServiceClient();
+  const { error } = await admin
+    .from("profiles")
+    .update({ full_name: cleanName })
+    .eq("id", profile.id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 // -- Team / invites ----------------------------------------------------------
 
 // Look up an existing auth user by email. There's no admin "get by email", so we

@@ -4,6 +4,17 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { completeInviteProfile } from "@/app/(app)/settings/_actions";
+
+function splitName(fullName: string | null | undefined): {
+  first: string;
+  last: string;
+} {
+  const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { first: "", last: "" };
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+}
 
 export default function AcceptInvitePage() {
   const router = useRouter();
@@ -12,6 +23,8 @@ export default function AcceptInvitePage() {
     "checking"
   );
   const [email, setEmail] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +35,15 @@ export default function AcceptInvitePage() {
     const params = new URLSearchParams(window.location.search);
     const tokenHash = params.get("token_hash");
     const type = params.get("type");
+
+    function applyUser(user: { email?: string | null; user_metadata?: Record<string, unknown> | null }) {
+      setEmail(user.email ?? null);
+      const metaName =
+        (user.user_metadata?.full_name as string | undefined) ?? "";
+      const { first, last } = splitName(metaName);
+      setFirstName(first);
+      setLastName(last);
+    }
 
     if (tokenHash && type === "invite") {
       // Exchange the single-use invite token for a session belonging to the
@@ -35,7 +57,7 @@ export default function AcceptInvitePage() {
             setStatus("invalid");
             return;
           }
-          setEmail(data.user.email ?? null);
+          applyUser(data.user);
           setStatus("ready");
           // Drop the spent token from the URL so a refresh doesn't retry it.
           window.history.replaceState(null, "", "/accept-invite");
@@ -43,10 +65,10 @@ export default function AcceptInvitePage() {
     } else {
       // No token in the URL (e.g. a refresh after it was consumed) — fall back
       // to the session verifyOtp just established.
-      supabase.auth.getSession().then(({ data }) => {
+      supabase.auth.getUser().then(({ data }) => {
         if (cancelled) return;
-        if (data.session) {
-          setEmail(data.session.user.email ?? null);
+        if (data.user) {
+          applyUser(data.user);
           setStatus("ready");
         } else {
           setStatus("invalid");
@@ -58,9 +80,18 @@ export default function AcceptInvitePage() {
     };
   }, [supabase]);
 
+  const namesReady =
+    firstName.trim().length > 0 && lastName.trim().length > 0;
+  const passwordsReady =
+    password.length >= 12 && password === confirm;
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!namesReady) {
+      setError("First and last name are required");
+      return;
+    }
     if (password.length < 12) {
       setError("Password must be at least 12 characters");
       return;
@@ -69,10 +100,16 @@ export default function AcceptInvitePage() {
       setError("Passwords don't match");
       return;
     }
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
     startTransition(async () => {
       const { error: updateErr } = await supabase.auth.updateUser({ password });
       if (updateErr) {
         setError(updateErr.message);
+        return;
+      }
+      const res = await completeInviteProfile(fullName);
+      if (!res.ok) {
+        setError(res.error);
         return;
       }
       router.push("/");
@@ -82,6 +119,10 @@ export default function AcceptInvitePage() {
 
   const inputClass =
     "w-full rounded-md border border-gray-200 bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-petrol-500";
+  const readOnlyClass =
+    "w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-500 outline-none";
+  const labelClass =
+    "mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500";
 
   if (status === "checking") {
     return <p className="text-[13px] text-gray-500">Checking your invite…</p>;
@@ -109,17 +150,40 @@ export default function AcceptInvitePage() {
         Welcome To Moss Equity Partners
       </h1>
       <p className="text-[12px] text-gray-500">
-        {email ? <>You&rsquo;re joining as <span className="font-medium text-ink">{email}</span>. </> : null}
-        Set a password to finish setting up your account. Must be at least 12
-        characters.
+        Confirm your name and set a password to finish setting up your account.
+        Password must be at least 12 characters.
       </p>
       <div>
-        <label className="mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500">
-          Password
-        </label>
+        <label className={labelClass}>Email</label>
+        <input type="email" value={email ?? ""} readOnly className={readOnlyClass} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={labelClass}>First Name</label>
+          <input
+            type="text"
+            autoFocus
+            required
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Last Name</label>
+          <input
+            type="text"
+            required
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+      </div>
+      <div>
+        <label className={labelClass}>Password</label>
         <input
           type="password"
-          autoFocus
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -127,9 +191,7 @@ export default function AcceptInvitePage() {
         />
       </div>
       <div>
-        <label className="mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500">
-          Confirm Password
-        </label>
+        <label className={labelClass}>Confirm Password</label>
         <input
           type="password"
           required
@@ -145,7 +207,7 @@ export default function AcceptInvitePage() {
       )}
       <button
         type="submit"
-        disabled={pending || !password || !confirm}
+        disabled={pending || !namesReady || !passwordsReady}
         className="w-full rounded-md btn-primary px-3 py-2 text-[13px] font-medium text-white disabled:opacity-50"
       >
         {pending ? "Setting Up…" : "Finish Setup"}

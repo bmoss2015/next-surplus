@@ -17,6 +17,7 @@ import { TemplatesSection } from "./_components/TemplatesSection";
 import { SmsTemplatesSection } from "./_components/SmsTemplatesSection";
 import { ResearchTemplatesSection } from "./_components/ResearchTemplatesSection";
 import { TeamSection } from "./_components/TeamSection";
+import { ProfileSection } from "./_components/ProfileSection";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,10 @@ export default async function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-[18px]">
+        <ProfileSection
+          initialFullName={profile.fullName}
+          initialEmail={profile.email ?? ""}
+        />
         {isAdmin && (
           <div className="col-span-2">
             <TeamSection initial={members!} currentUserId={profile.id} />
