@@ -628,35 +628,12 @@ export function ConversationTabClient({
         ) : (
           <button
             type="button"
-            onClick={() => {
-              // Multi-email contact → open the picker so the user can choose
-              // which address to write to. Single email → straight to compose.
-              if (selectedPerson) {
-                const clean = selectedPerson.emails.filter(
-                  (e) => typeof e === "string" && e.trim().length > 0
-                );
-                if (clean.length > 1) {
-                  setEmailPicker({ name: selectedPerson.name, emails: clean });
-                  return;
-                }
-                openComposeTo(clean[0] ?? null);
-                return;
-              }
-              openComposeTo(selectedRecentEmail ?? null);
-            }}
+            onClick={() => openComposeTo(null)}
             className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
-            title={
-              selectedPerson
-                ? `Compose to ${selectedPerson.name}`
-                : selectedRecentEmail
-                  ? `Compose to ${selectedRecentEmail}`
-                  : "Compose a new message"
-            }
+            title="Compose a new message"
           >
             <IconPencil size={13} stroke={2} />
-            {selectedPerson || selectedRecentEmail
-              ? `Email ${selectedPerson?.name ?? selectedRecentEmail}`
-              : "New Message"}
+            New Message
           </button>
         )}
       </div>
