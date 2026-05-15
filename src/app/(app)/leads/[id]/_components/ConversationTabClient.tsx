@@ -6,11 +6,14 @@ import {
   IconMessage2,
   IconPaperclip,
   IconPencil,
+  IconPhone,
+  IconFilter,
   IconX,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { ComposeBox } from "@/app/(app)/inbox/_components/ComposeBox";
 import { HtmlMessage } from "@/app/(app)/inbox/_components/HtmlMessage";
+import { formatPhoneUS } from "@/lib/phone";
 import type {
   LeadConversationMessage,
   LeadConversationThread,
@@ -125,11 +128,13 @@ export function ConversationTabClient({
 
   return (
     <div>
-      {/* PEOPLE STRIP — consistent treatment, hide unreachable, click to filter */}
+      {/* PEOPLE LIST — directory style with avatar + role + action icons on
+          the right (envelope to compose, filter to scope timeline). Hide
+          people unreachable by any channel; row-click filters. */}
       {reachable.length > 0 && (
         <div className="mb-3 rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
-          <div className="mb-[10px] flex items-center justify-between">
-            <h3 className="section-subheader m-0">People</h3>
+          <div className="mb-[6px] flex items-center justify-between">
+            <h3 className="section-subheader m-0">People on this Lead</h3>
             {selectedPerson && (
               <button
                 type="button"
@@ -141,60 +146,90 @@ export function ConversationTabClient({
               </button>
             )}
           </div>
-          <div className="flex flex-wrap gap-[6px]">
+          <div className="divide-y divide-gray-150">
             {reachable.map((p) => {
               const selected = selectedPersonId === p.id;
+              const primaryEmail = p.emails[0] ?? null;
+              const primaryPhone = p.phones[0] ?? null;
               return (
-                <button
+                <div
                   key={p.id}
-                  type="button"
-                  onClick={() => togglePerson(p.id)}
                   className={cn(
-                    "inline-flex items-center gap-[7px] rounded-full border bg-surface pl-[3px] pr-[10px] py-[3px] text-[12px] transition-colors",
-                    selected
-                      ? "border-petrol-500 bg-petrol-50 text-petrol-700"
-                      : "border-gray-200 text-ink hover:border-petrol-300 hover:bg-gray-50"
+                    "flex items-center gap-3 rounded-md px-2 py-[10px] -mx-2 transition-colors",
+                    selected ? "bg-petrol-50" : "hover:bg-gray-50"
                   )}
-                  title={`Click to filter to ${p.name}`}
                 >
-                  <span
+                  <div
                     className={cn(
-                      "flex h-[22px] w-[22px] items-center justify-center rounded-full text-[9.5px] font-semibold",
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
                       selected
                         ? "bg-petrol-500 text-white"
-                        : "bg-gray-100 text-gray-600"
+                        : "bg-petrol-50 text-petrol-700"
                     )}
                   >
                     {initialsOf(p.name)}
-                  </span>
-                  <span className="flex flex-col items-start leading-tight">
-                    <span className="font-medium">{p.name}</span>
-                    <span className="text-[9.5px] uppercase tracking-wide text-gray-400">
+                  </div>
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <div className="truncate text-[13px] font-semibold text-ink">
+                      {p.name}
+                    </div>
+                    <div className="mt-[1px] text-[10px] font-medium uppercase tracking-wide text-petrol-500">
                       {p.role}
-                    </span>
-                  </span>
-                </button>
+                    </div>
+                    <div className="mt-[3px] flex flex-wrap items-center gap-x-3 gap-y-[2px] text-[11px] text-gray-500">
+                      {primaryEmail && (
+                        <span className="truncate">{primaryEmail}</span>
+                      )}
+                      {primaryPhone && (
+                        <span>{formatPhoneUS(primaryPhone)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-[3px]">
+                    {primaryEmail && !noAccount && (
+                      <button
+                        type="button"
+                        onClick={() => openComposeTo(primaryEmail)}
+                        className="rounded-md border border-gray-200 bg-surface p-[6px] text-gray-500 transition-colors hover:border-petrol-500 hover:text-petrol-500"
+                        title={`Email ${p.name}`}
+                        aria-label="Email"
+                      >
+                        <IconMail size={13} stroke={1.75} />
+                      </button>
+                    )}
+                    {primaryPhone && (
+                      <a
+                        href={`tel:${primaryPhone}`}
+                        className="rounded-md border border-gray-200 bg-surface p-[6px] text-gray-500 transition-colors hover:border-petrol-500 hover:text-petrol-500"
+                        title={`Call ${p.name}`}
+                        aria-label="Call"
+                      >
+                        <IconPhone size={13} stroke={1.75} />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => togglePerson(p.id)}
+                      className={cn(
+                        "rounded-md border p-[6px] transition-colors",
+                        selected
+                          ? "border-petrol-500 bg-petrol-500 text-white"
+                          : "border-gray-200 bg-surface text-gray-500 hover:border-petrol-500 hover:text-petrol-500"
+                      )}
+                      title={
+                        selected
+                          ? "Clear filter"
+                          : `Show only conversations with ${p.name}`
+                      }
+                      aria-label="Filter"
+                    >
+                      <IconFilter size={13} stroke={1.75} />
+                    </button>
+                  </div>
+                </div>
               );
             })}
           </div>
-          {selectedPerson && (
-            <div className="mt-3 flex items-center justify-between rounded-md border border-gray-150 bg-gray-50 px-3 py-2">
-              <div className="text-[11.5px] text-gray-600">
-                Showing only conversations with{" "}
-                <span className="font-medium text-ink">{selectedPerson.name}</span>
-              </div>
-              {!noAccount && selectedPerson.emails[0] && (
-                <button
-                  type="button"
-                  onClick={() => openComposeTo(selectedPerson.emails[0])}
-                  className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[5px] text-[11px] font-medium text-white"
-                >
-                  <IconPencil size={11} stroke={2} />
-                  Compose to {selectedPerson.name.split(/\s+/)[0]}
-                </button>
-              )}
-            </div>
-          )}
         </div>
       )}
 

@@ -6,8 +6,10 @@ import {
   getUserInfo,
 } from "@/lib/email/google-oauth";
 import { encryptToken } from "@/lib/email/crypto";
+import { syncGmailAccount } from "@/lib/email/sync";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl;
@@ -91,14 +93,28 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Kick off backfill in the background. Fire-and-forget — the sync route is
-  // idempotent and can be re-triggered manually.
-  fetch(`${url.origin}/api/email/sync?accountAddress=${encodeURIComponent(userInfo.email)}`, {
-    method: "POST",
-    headers: {
-      "x-internal-trigger": process.env.INTERNAL_TRIGGER_SECRET ?? "",
-    },
-  }).catch(() => {});
+  // Trigger the initial backfill IN-LINE before redirecting back. Fire-and-
+  // forget here gets aborted by the Next runtime as soon as we send the
+  // redirect, which is why last_synced_at was staying null. Awaiting keeps
+  // the OAuth flow open until the first sync completes — slower (the OAuth
+  // response now takes 5-30s for a typical 90-day backfill), but reliable.
+  // Look up the account we just upserted to get its id.
+  const { data: justConnected } = await svc
+    .from("channel_accounts")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("provider", "gmail")
+    .eq("address", userInfo.email)
+    .maybeSingle();
+  if (justConnected?.id) {
+    try {
+      await syncGmailAccount(justConnected.id as string);
+    } catch (e) {
+      console.error("initial sync failed", e);
+      // Don't bail on the OAuth redirect — the account is connected, manual
+      // refresh in the inbox will retry.
+    }
+  }
 
   const redirect = NextResponse.redirect(
     new URL("/settings?email_connect=success", req.url)

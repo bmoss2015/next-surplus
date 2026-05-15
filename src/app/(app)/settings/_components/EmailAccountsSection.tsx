@@ -55,16 +55,28 @@ export function EmailAccountsSection({ initial }: { initial: EmailAccountRow[] }
         <div>
           <h2 className="section-subheader">Email Accounts</h2>
           <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
-            Connect your Gmail to send and receive directly from the portal.
+            {rows.length === 0
+              ? "Connect your Gmail to send and receive directly from the portal."
+              : `${rows.length} account${rows.length === 1 ? "" : "s"} connected. Connect another to monitor multiple inboxes from this portal.`}
           </div>
         </div>
-        <a
-          href="/api/oauth/google/start"
-          className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
-        >
-          <IconPlugConnected size={13} stroke={2} />
-          Connect Gmail
-        </a>
+        {rows.length === 0 ? (
+          <a
+            href="/api/oauth/google/start"
+            className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+          >
+            <IconPlugConnected size={13} stroke={2} />
+            Connect Gmail
+          </a>
+        ) : (
+          <a
+            href="/api/oauth/google/start"
+            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs font-medium text-ink hover:border-petrol-500"
+          >
+            <IconPlugConnected size={13} stroke={2} />
+            Connect Another
+          </a>
+        )}
       </div>
 
       {connectStatus === "success" && (
