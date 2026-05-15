@@ -29,6 +29,29 @@ function initialsOf(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+// Deterministic colored avatar per person — same name always gets the same
+// color. Tones tuned to read as a coherent set with the portal's petrol
+// palette (no neon), so they help differentiate without looking random.
+const AVATAR_PALETTE: { bg: string; text: string }[] = [
+  { bg: "#0d6c7d", text: "#ffffff" },
+  { bg: "#0a3d4a", text: "#ffffff" },
+  { bg: "#1a8a9c", text: "#ffffff" },
+  { bg: "#374151", text: "#ffffff" },
+  { bg: "#7c3aed", text: "#ffffff" },
+  { bg: "#b45309", text: "#ffffff" },
+  { bg: "#047857", text: "#ffffff" },
+  { bg: "#0369a1", text: "#ffffff" },
+  { bg: "#9d174d", text: "#ffffff" },
+  { bg: "#7e22ce", text: "#ffffff" },
+];
+
+function avatarColorFor(name: string): { bg: string; text: string } {
+  const t = (name || "?").trim();
+  let h = 0;
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+}
+
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
     weekday: "short",
@@ -63,6 +86,57 @@ export function ConversationTabClient({
     () => people.filter((p) => p.emails.length > 0),
     [people]
   );
+
+  // Message count per person — for the badge after each name. Matches
+  // each message's from / to / cc against the person's known emails so a
+  // contact reachable on multiple addresses still aggregates correctly.
+  const countByPersonId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of reachable) {
+      const emails = new Set(p.emails.map((e) => e.toLowerCase()));
+      let count = 0;
+      for (const m of messages) {
+        if (emails.has(m.from_address.toLowerCase())) {
+          count += 1;
+          continue;
+        }
+        if (m.to_addresses.some((a) => emails.has(a.toLowerCase()))) {
+          count += 1;
+        }
+      }
+      map.set(p.id, count);
+    }
+    return map;
+  }, [reachable, messages]);
+
+  // Recent addresses — anyone who's appeared in this lead's messages but
+  // ISN'T on the formal People list yet. Surfaced in their own row below
+  // the main grid so the user can compose to them without doing the
+  // "save as contact" dance first.
+  const recentParticipants = useMemo(() => {
+    const knownEmails = new Set<string>();
+    for (const p of people) for (const e of p.emails) knownEmails.add(e.toLowerCase());
+    for (const a of accounts) knownEmails.add(a.address.toLowerCase());
+    const seen = new Map<string, { name: string; email: string; count: number }>();
+    for (const m of messages) {
+      const candidates: { email: string; name: string | null }[] = [
+        { email: m.from_address, name: m.from_name ?? null },
+        ...m.to_addresses.map((a) => ({ email: a, name: null })),
+      ];
+      for (const c of candidates) {
+        const lc = c.email.toLowerCase().trim();
+        if (!lc || knownEmails.has(lc)) continue;
+        const existing = seen.get(lc);
+        if (existing) {
+          existing.count += 1;
+          if (!existing.name && c.name) existing.name = c.name;
+        } else {
+          seen.set(lc, { name: c.name ?? c.email, email: c.email, count: 1 });
+        }
+      }
+    }
+    return Array.from(seen.values()).sort((a, b) => b.count - a.count);
+  }, [people, accounts, messages]);
 
   const personById = useMemo(() => {
     const m = new Map<string, LeadPerson>();
@@ -152,56 +226,62 @@ export function ConversationTabClient({
               const selected = selectedPersonId === p.id;
               const primaryEmail = p.emails[0] ?? null;
               const primaryPhone = p.phones[0] ?? null;
+              const count = countByPersonId.get(p.id) ?? 0;
+              const color = avatarColorFor(p.name);
               return (
-                <div
+                <button
                   key={p.id}
+                  type="button"
+                  onClick={() => togglePerson(p.id)}
                   className={cn(
-                    "group flex items-center gap-2 rounded-md px-2 py-[6px] transition-colors",
+                    "group flex w-full items-center gap-2 rounded-md px-2 py-[6px] text-left transition-colors",
                     selected ? "bg-petrol-50" : "hover:bg-gray-50"
                   )}
+                  title={
+                    selected
+                      ? "Click to clear filter"
+                      : `Click to show only conversations with ${p.name}`
+                  }
                 >
                   <div
-                    className={cn(
-                      "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold",
-                      selected
-                        ? "bg-petrol-500 text-white"
-                        : "bg-gray-100 text-gray-600 group-hover:bg-petrol-50 group-hover:text-petrol-700"
-                    )}
+                    className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold"
+                    style={{ background: color.bg, color: color.text }}
                   >
                     {initialsOf(p.name)}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => togglePerson(p.id)}
-                    className="min-w-0 flex-1 truncate text-left leading-tight"
-                    title={
-                      selected
-                        ? "Click to clear filter"
-                        : `Click to show only conversations with ${p.name}`
-                    }
-                  >
-                    <div className="truncate text-[12.5px] font-medium text-ink">
-                      {p.name}
+                  <div className="min-w-0 flex-1 truncate leading-tight">
+                    <div className="flex items-baseline gap-[5px] truncate text-[12.5px] font-medium text-ink">
+                      <span className="truncate">{p.name}</span>
+                      {count > 0 && (
+                        <span className="shrink-0 text-[10px] font-medium tabular-nums text-petrol-500">
+                          {count}
+                        </span>
+                      )}
                     </div>
                     <div className="truncate text-[10px] uppercase tracking-wide text-gray-400">
                       {p.role}
                     </div>
-                  </button>
+                  </div>
                   <div className="flex shrink-0 items-center gap-[2px] opacity-0 transition-opacity group-hover:opacity-100">
                     {primaryEmail && !noAccount && (
-                      <button
-                        type="button"
-                        onClick={() => openComposeTo(primaryEmail)}
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openComposeTo(primaryEmail);
+                        }}
                         className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
                         title={`Email ${p.name}`}
                         aria-label="Email"
                       >
                         <IconMail size={12} stroke={1.75} />
-                      </button>
+                      </span>
                     )}
                     {primaryPhone && (
                       <a
                         href={`tel:${primaryPhone}`}
+                        onClick={(e) => e.stopPropagation()}
                         className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
                         title={`Call ${p.name}`}
                         aria-label="Call"
@@ -210,10 +290,58 @@ export function ConversationTabClient({
                       </a>
                     )}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
+
+          {recentParticipants.length > 0 && (
+            <div className="mt-3 border-t border-gray-150 pt-3">
+              <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Recent · not on this lead
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 md:grid-cols-3 xl:grid-cols-4">
+                {recentParticipants.slice(0, 8).map((r) => {
+                  const color = avatarColorFor(r.name);
+                  return (
+                    <button
+                      key={r.email}
+                      type="button"
+                      onClick={() => openComposeTo(r.email)}
+                      disabled={noAccount}
+                      className="group flex w-full items-center gap-2 rounded-md px-2 py-[5px] text-left hover:bg-gray-50 disabled:opacity-60"
+                      title={`Compose to ${r.email}`}
+                    >
+                      <div
+                        className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[9px] font-semibold opacity-80"
+                        style={{ background: color.bg, color: color.text }}
+                      >
+                        {initialsOf(r.name)}
+                      </div>
+                      <div className="min-w-0 flex-1 truncate text-left leading-tight">
+                        <div className="flex items-baseline gap-[5px] truncate text-[12px] text-ink">
+                          <span className="truncate">{r.name}</span>
+                          {r.count > 0 && (
+                            <span className="shrink-0 text-[10px] tabular-nums text-gray-400">
+                              {r.count}
+                            </span>
+                          )}
+                        </div>
+                        <div className="truncate text-[10px] text-gray-400">
+                          {r.email}
+                        </div>
+                      </div>
+                      <IconMail
+                        size={11}
+                        stroke={1.75}
+                        className="text-gray-400 opacity-0 transition-opacity group-hover:opacity-100"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
