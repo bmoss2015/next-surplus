@@ -1,13 +1,14 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/auth/current-user";
 import type { LeadRow, SortColumn, SortDir, Stage, SaleType, OwnerStatus } from "./types";
 
-// Fix 75: non-admin users only see leads assigned to them; admins see all
-// (including unassigned). Used by the Leads table, Kanban, Daily Work, Claims.
+// Originally added as "Fix 75" to restrict non-admins to leads explicitly
+// assigned to them. That turned out to hide every lead a member touched but
+// wasn't formally assigned (mentions, stage moves, etc.), so the team
+// couldn't find leads they'd just worked. Members now see every org lead by
+// default — matching the Dashboard and matching Salesforce/HubSpot defaults.
+// An opt-in "Only mine" filter on the UI can come back if anyone misses it.
 export async function currentAssignmentFilterId(): Promise<string | null> {
-  const profile = await getCurrentProfile();
-  if (profile && !profile.isAdmin) return profile.id;
   return null;
 }
 
