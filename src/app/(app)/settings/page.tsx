@@ -18,6 +18,8 @@ import { SmsTemplatesSection } from "./_components/SmsTemplatesSection";
 import { ResearchTemplatesSection } from "./_components/ResearchTemplatesSection";
 import { TeamSection } from "./_components/TeamSection";
 import { ProfileSection } from "./_components/ProfileSection";
+import { EmailAccountsSection } from "./_components/EmailAccountsSection";
+import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +32,14 @@ export default async function SettingsPage() {
   if (!profile) redirect("/");
   const isAdmin = profile.isAdmin;
 
-  const [attorneys, lostReasons, templates, researchTemplates] = await Promise.all([
-    fetchAttorneys(),
-    fetchLostReasonsAdmin(),
-    fetchTemplates(),
-    fetchResearchTemplates(),
-  ]);
+  const [attorneys, lostReasons, templates, researchTemplates, emailAccounts] =
+    await Promise.all([
+      fetchAttorneys(),
+      fetchLostReasonsAdmin(),
+      fetchTemplates(),
+      fetchResearchTemplates(),
+      fetchMyEmailAccounts(),
+    ]);
   const [defaults, members, needsActionThreshold] = isAdmin
     ? await Promise.all([fetchAppSettings(), fetchOrgMembers(), fetchNeedsActionThreshold()])
     : [null, null, null];
@@ -56,6 +60,7 @@ export default async function SettingsPage() {
           initialFullName={profile.fullName}
           initialEmail={profile.email ?? ""}
         />
+        <EmailAccountsSection initial={emailAccounts} />
         {isAdmin && (
           <div className="col-span-2">
             <TeamSection initial={members!} currentUserId={profile.id} />
