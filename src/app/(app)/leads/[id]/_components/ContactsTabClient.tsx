@@ -15,6 +15,7 @@ import {
 import type { ContactRow, OwnerRowFull } from "@/lib/leads/fetch-detail";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
 import { useRole } from "@/components/RoleProvider";
+import { Modal } from "@/components/Modal";
 import { cn } from "@/lib/cn";
 import { formatPhone } from "@/lib/format/phone";
 import { SectionSubheader } from "./SectionSubheader";
@@ -285,55 +286,68 @@ export function ContactsTabClient({
         )}
       </div>
 
-      {showOwnerForm && (
-        <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              autoFocus
-              value={newOwnerName}
-              onChange={(e) => setNewOwnerName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addOwner();
-                }
-              }}
-              placeholder="Full Name"
-              className="min-w-[200px] flex-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
-            />
-            <select
-              value={newOwnerStatus}
-              onChange={(e) => setNewOwnerStatus(e.target.value as OwnerStatus)}
-              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-xs text-ink outline-none focus:border-petrol-500"
-            >
-              {(Object.keys(OWNER_STATUS_LABELS) as OwnerStatus[]).map((s) => (
-                <option key={s} value={s}>
-                  {OWNER_STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                setShowOwnerForm(false);
-                setNewOwnerName("");
-              }}
-              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={addOwner}
-              disabled={!newOwnerName.trim()}
-              className="btn-primary cursor-pointer rounded-md px-3 py-[6px] text-xs font-medium disabled:opacity-50"
-            >
-              Add
-            </button>
-          </div>
+      <Modal
+        open={showOwnerForm}
+        onClose={() => {
+          setShowOwnerForm(false);
+          setNewOwnerName("");
+        }}
+        title="Add Owner"
+        description="Add a property owner to this lead. Phone, email, and mailing address can be filled in on the owner card after saving."
+        width={460}
+      >
+        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          Full Name
+        </label>
+        <input
+          type="text"
+          autoFocus
+          value={newOwnerName}
+          onChange={(e) => setNewOwnerName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addOwner();
+            }
+          }}
+          placeholder="Robert Smith"
+          className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+        />
+        <label className="mt-3 mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          Status
+        </label>
+        <select
+          value={newOwnerStatus}
+          onChange={(e) => setNewOwnerStatus(e.target.value as OwnerStatus)}
+          className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none focus:border-petrol-500"
+        >
+          {(Object.keys(OWNER_STATUS_LABELS) as OwnerStatus[]).map((s) => (
+            <option key={s} value={s}>
+              {OWNER_STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowOwnerForm(false);
+              setNewOwnerName("");
+            }}
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={addOwner}
+            disabled={!newOwnerName.trim()}
+            className="btn-primary cursor-pointer rounded-md px-4 py-[6px] text-xs font-medium disabled:opacity-50"
+          >
+            Add Owner
+          </button>
         </div>
-      )}
+      </Modal>
 
       {owners.length === 0 ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center text-[12px] text-gray-500">

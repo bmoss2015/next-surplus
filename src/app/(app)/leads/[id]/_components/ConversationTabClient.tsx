@@ -14,6 +14,7 @@ import { HtmlMessage } from "@/app/(app)/inbox/_components/HtmlMessage";
 import type {
   LeadConversationMessage,
   LeadConversationThread,
+  LeadPerson,
 } from "./ConversationTab";
 
 type ChannelFilter = "all" | "email" | "sms";
@@ -33,26 +34,24 @@ export function ConversationTabClient({
   threads,
   messages,
   accounts,
+  people,
 }: {
   leadId: string;
   threads: LeadConversationThread[];
   messages: LeadConversationMessage[];
   accounts: { id: string; address: string; display_name: string | null }[];
+  people: LeadPerson[];
 }) {
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
-  const [contactFilter, setContactFilter] = useState<string>("all");
+  const [personFilter, setPersonFilter] = useState<string>("all");
   const [composing, setComposing] = useState(false);
 
-  const contacts = useMemo(() => {
-    const set = new Set<string>();
-    for (const m of messages) {
-      if (m.direction === "inbound") set.add(m.from_address);
-      else {
-        for (const a of m.to_addresses) set.add(a);
-      }
-    }
-    return Array.from(set).sort();
-  }, [messages]);
+  // Map a person to the email/phone we'll match against messages.
+  const personById = useMemo(() => {
+    const m = new Map<string, LeadPerson>();
+    for (const p of people) m.set(p.id, p);
+    return m;
+  }, [people]);
 
   const counts = useMemo(() => {
     let email = 0,
@@ -65,18 +64,26 @@ export function ConversationTabClient({
   }, [messages]);
 
   const visible = useMemo(() => {
+    const selected = personFilter !== "all" ? personById.get(personFilter) : null;
+    const matchSet = new Set<string>();
+    if (selected) {
+      for (const e of selected.emails) matchSet.add(e.toLowerCase());
+      for (const p of selected.phones) matchSet.add(p);
+    }
+
     return messages.filter((m) => {
       if (channelFilter === "email" && m.channel === "quo_sms") return false;
       if (channelFilter === "sms" && m.channel !== "quo_sms") return false;
-      if (
-        contactFilter !== "all" &&
-        m.from_address !== contactFilter &&
-        !m.to_addresses.includes(contactFilter)
-      )
-        return false;
+      if (selected) {
+        const from = m.from_address.toLowerCase();
+        const to = m.to_addresses.map((a) => a.toLowerCase());
+        const hit =
+          matchSet.has(from) || to.some((a) => matchSet.has(a));
+        if (!hit) return false;
+      }
       return true;
     });
-  }, [messages, channelFilter, contactFilter]);
+  }, [messages, channelFilter, personFilter, personById]);
 
   // Map of conversation_id -> thread row, for the inbox-link affordance on
   // each card. Lets users jump from a single message into its full Gmail
@@ -131,17 +138,17 @@ export function ConversationTabClient({
             })}
           </div>
 
-          {/* Contact filter */}
-          {contacts.length > 0 && (
+          {/* Person filter — real named people from this lead's records */}
+          {people.length > 0 && (
             <select
-              value={contactFilter}
-              onChange={(e) => setContactFilter(e.target.value)}
+              value={personFilter}
+              onChange={(e) => setPersonFilter(e.target.value)}
               className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[11px] outline-none focus:border-petrol-500"
             >
-              <option value="all">All Contacts</option>
-              {contacts.map((c) => (
-                <option key={c} value={c}>
-                  {c}
+              <option value="all">Everyone On This Lead</option>
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.role} · {p.name}
                 </option>
               ))}
             </select>

@@ -7,7 +7,7 @@ import {
   IconEdit,
   IconBuildingBank,
 } from "@tabler/icons-react";
-import { Drawer } from "@/components/Drawer";
+import { Modal } from "@/components/Modal";
 import { formatPhoneUS } from "@/lib/phone";
 import {
   LEAD_PARTY_ROLE_LABELS,
@@ -193,11 +193,12 @@ export function OtherContactsSection({
         </div>
       )}
 
-      <Drawer
+      <Modal
         open={editing !== null}
         onClose={close}
         title={editing === "new" ? "Add Other Contact" : "Edit Contact"}
         description="Anyone connected to this lead who isn't an owner or relative."
+        width={500}
       >
         {editing !== null && (
           <LeadPartyForm
@@ -206,7 +207,7 @@ export function OtherContactsSection({
             onSave={save}
           />
         )}
-      </Drawer>
+      </Modal>
     </div>
   );
 }

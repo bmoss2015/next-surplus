@@ -5,6 +5,7 @@ import { IconPlus, IconTrash, IconUsersGroup } from "@tabler/icons-react";
 import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
+import { Modal } from "@/components/Modal";
 import { AgeEditField } from "./ContactsTabClient";
 import { formatPhone } from "@/lib/format/phone";
 import { properCaseName } from "@/lib/format/proper-case-name";
@@ -200,61 +201,78 @@ export function RelativesSection({
         </div>
       )}
 
-      {adding && (
-        <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <input
-              autoFocus
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              placeholder="Name"
-              className="rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
-            />
-            <select
-              value={draftRelationship}
-              onChange={(e) => setDraftRelationship(e.target.value)}
-              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12.5px] text-ink outline-none focus:border-petrol-500"
-            >
-              <option value="">Select Relationship</option>
-              {RELATIONSHIP_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-            <input
-              value={draftPhone}
-              onChange={(e) => setDraftPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-              placeholder="(555) 555-5555"
-              className="rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
-            />
-          </div>
-          {error && <div className="mt-2 text-[12px] text-danger">{error}</div>}
-          <div className="mt-3 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setAdding(false);
-                setDraftName("");
-                setDraftRelationship("");
-                setDraftPhone("");
-                setError(null);
-              }}
-              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-[12px] text-ink hover:border-gray-300"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={add}
-              disabled={!draftName.trim()}
-              className="btn-primary cursor-pointer rounded-md px-3 py-[6px] text-[12px] font-medium disabled:opacity-50"
-            >
-              Add Relative
-            </button>
-          </div>
+      <Modal
+        open={adding}
+        onClose={() => {
+          setAdding(false);
+          setDraftName("");
+          setDraftRelationship("");
+          setDraftPhone("");
+          setError(null);
+        }}
+        title="Add Relative"
+        description="Family members of an owner. Address and additional contact details can be edited on the relative card after saving."
+        width={460}
+      >
+        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          Full Name
+        </label>
+        <input
+          autoFocus
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          placeholder="Linda Smith Park"
+          className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+        />
+        <label className="mt-3 mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          Relationship
+        </label>
+        <select
+          value={draftRelationship}
+          onChange={(e) => setDraftRelationship(e.target.value)}
+          className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none focus:border-petrol-500"
+        >
+          <option value="">Select Relationship</option>
+          {RELATIONSHIP_OPTIONS.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+        <label className="mt-3 mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          Phone
+        </label>
+        <input
+          value={draftPhone}
+          onChange={(e) => setDraftPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+          placeholder="(555) 555-5555"
+          className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+        />
+        {error && <div className="mt-3 text-[12px] text-danger">{error}</div>}
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(false);
+              setDraftName("");
+              setDraftRelationship("");
+              setDraftPhone("");
+              setError(null);
+            }}
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={add}
+            disabled={!draftName.trim()}
+            className="btn-primary cursor-pointer rounded-md px-4 py-[6px] text-xs font-medium disabled:opacity-50"
+          >
+            Add Relative
+          </button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
