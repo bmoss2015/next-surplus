@@ -267,13 +267,6 @@ export function ComposeBox(props: Props) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Side-panel-only spacer: pushes the gradient header below the level of
-          the thread reader's subject section so the two columns align. Not
-          needed when compose floats standalone (e.g. Conversation tab). */}
-      {isReplyMode && (
-        <div className="h-[78px] shrink-0 border-b border-gray-200 bg-surface" />
-      )}
-
       {/* Petrol gradient mode-label bar — always at the top of the compose
           content, with the close button on the right. */}
       <div className="flex shrink-0 items-center justify-between bg-gradient-to-r from-petrol-700 to-petrol-500 px-5 py-[10px]">

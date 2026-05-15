@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   IconPlus,
   IconTrash,
@@ -8,6 +8,7 @@ import {
   IconBuildingBank,
   IconMail,
   IconPhone,
+  IconSettings,
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
 import { formatPhoneUS, formatPhoneInput } from "@/lib/phone";
@@ -19,21 +20,30 @@ import {
 import {
   upsertLeadParty,
   deleteLeadParty,
+  deleteCustomRole,
 } from "../_lead-parties-actions";
 
-const ROLE_OPTIONS: LeadPartyRole[] = [
-  "attorney_for_owner",
-  "trustee",
-  "successor_heir",
-  "county_clerk",
-  "court",
-  "opposing_counsel",
-  "title_company",
-  "realtor",
-  "notary",
-  "guardian",
-  "other",
-];
+// Built-in roles, displayed alphabetically by label. "Other" is excluded —
+// it's not a real role option; selecting it reveals the "+ Add new role"
+// text input below.
+const BUILT_IN_ROLES: LeadPartyRole[] = (
+  [
+    "attorney_for_owner",
+    "trustee",
+    "successor_heir",
+    "county_clerk",
+    "court",
+    "opposing_counsel",
+    "title_company",
+    "realtor",
+    "notary",
+    "guardian",
+  ] as const
+)
+  .slice()
+  .sort((a, b) =>
+    LEAD_PARTY_ROLE_LABELS[a].localeCompare(LEAD_PARTY_ROLE_LABELS[b])
+  );
 
 function roleLabel(row: LeadPartyRow): string {
   if (row.role === "other" && row.custom_role_label) {
@@ -53,6 +63,10 @@ export function OtherContactsSection({
 }) {
   const [rows, setRows] = useState(initial);
   const [editing, setEditing] = useState<LeadPartyRow | "new" | null>(null);
+  // Custom roles are mutable client-side so a delete reflects immediately
+  // in the dropdown without a full page refresh.
+  const [roles, setRoles] = useState<string[]>(customRoles);
+  const [managingRoles, setManagingRoles] = useState(false);
   const [, startTransition] = useTransition();
 
   function close() {
@@ -125,6 +139,36 @@ export function OtherContactsSection({
       await deleteLeadParty(id, leadId);
     });
   }
+
+  // Removing a custom role clears `custom_role_label` on every row across the
+  // org that uses it — those rows revert to plain "Other". We show the
+  // affected count up front so the user knows what they're agreeing to.
+  function removeRole(label: string) {
+    const usageCount = rows.filter(
+      (r) => r.role === "other" && r.custom_role_label === label
+    ).length;
+    const message =
+      usageCount > 0
+        ? `Delete the role "${label}"? ${usageCount} contact${usageCount === 1 ? "" : "s"} on this lead will revert to plain "Other". Org-wide totals will be higher.`
+        : `Delete the role "${label}" from the dropdown?`;
+    if (!confirm(message)) return;
+    setRoles((prev) => prev.filter((r) => r !== label));
+    setRows((prev) =>
+      prev.map((r) =>
+        r.role === "other" && r.custom_role_label === label
+          ? { ...r, custom_role_label: null }
+          : r
+      )
+    );
+    startTransition(async () => {
+      await deleteCustomRole(label);
+    });
+  }
+
+  const sortedRoles = useMemo(
+    () => roles.slice().sort((a, b) => a.localeCompare(b)),
+    [roles]
+  );
 
   return (
     <div className="mt-4 rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
@@ -229,11 +273,55 @@ export function OtherContactsSection({
         {editing !== null && (
           <LeadPartyForm
             initial={editing === "new" ? null : editing}
-            customRoles={customRoles}
+            customRoles={sortedRoles}
+            onManageRoles={() => setManagingRoles(true)}
             onCancel={close}
             onSave={save}
           />
         )}
+      </Modal>
+
+      <Modal
+        open={managingRoles}
+        onClose={() => setManagingRoles(false)}
+        title="Manage Custom Roles"
+        description="Custom roles are shared across your organization. Deleting one clears it on every contact that uses it — those contacts revert to plain Other."
+        width={420}
+      >
+        {sortedRoles.length === 0 ? (
+          <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-[12px] text-gray-500">
+            No custom roles yet. Pick &quot;+ Add new role&quot; in the Add
+            Contact dropdown to create one.
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-150">
+            {sortedRoles.map((label) => (
+              <div
+                key={label}
+                className="flex items-center justify-between gap-2 py-2"
+              >
+                <span className="truncate text-[13px] text-ink">{label}</span>
+                <button
+                  type="button"
+                  onClick={() => removeRole(label)}
+                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11px] font-medium text-gray-600 hover:border-danger hover:text-danger"
+                >
+                  <IconTrash size={11} stroke={1.75} />
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setManagingRoles(false)}
+            className="rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-xs text-ink hover:border-petrol-500"
+          >
+            Done
+          </button>
+        </div>
       </Modal>
     </div>
   );
@@ -252,11 +340,13 @@ type LeadPartyFormValues = {
 function LeadPartyForm({
   initial,
   customRoles,
+  onManageRoles,
   onCancel,
   onSave,
 }: {
   initial: LeadPartyRow | null;
   customRoles: string[];
+  onManageRoles: () => void;
   onCancel: () => void;
   onSave: (form: LeadPartyFormValues) => void;
 }) {
@@ -283,24 +373,48 @@ function LeadPartyForm({
   const inputClass =
     "w-full rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
 
+  // Built-in + custom roles merged into one alphabetized list. We display
+  // them together so users don't have to scan two separate sections to find
+  // the role they want.
+  type RoleEntry = { value: SelectionValue; label: string; isCustom: boolean };
+  const mergedRoles: RoleEntry[] = [
+    ...BUILT_IN_ROLES.map((r) => ({
+      value: r as SelectionValue,
+      label: LEAD_PARTY_ROLE_LABELS[r],
+      isCustom: false,
+    })),
+    ...customRoles.map((label) => ({
+      value: `custom:${label}` as SelectionValue,
+      label,
+      isCustom: true,
+    })),
+  ].sort((a, b) => a.label.localeCompare(b.label));
+
   return (
     <div>
-      <label className="mb-1 block text-[11px] font-medium text-gray-500">
-        Role
-      </label>
+      <div className="mb-1 flex items-center justify-between">
+        <label className="block text-[11px] font-medium text-gray-500">
+          Role
+        </label>
+        {customRoles.length > 0 && (
+          <button
+            type="button"
+            onClick={onManageRoles}
+            className="inline-flex items-center gap-1 text-[10.5px] text-gray-500 hover:text-petrol-500"
+          >
+            <IconSettings size={10} stroke={1.75} />
+            Manage Roles
+          </button>
+        )}
+      </div>
       <select
         value={selection}
         onChange={(e) => setSelection(e.target.value as SelectionValue)}
         className={inputClass}
       >
-        {ROLE_OPTIONS.filter((r) => r !== "other").map((r) => (
-          <option key={r} value={r}>
-            {LEAD_PARTY_ROLE_LABELS[r]}
-          </option>
-        ))}
-        {customRoles.map((label) => (
-          <option key={`custom:${label}`} value={`custom:${label}`}>
-            {label}
+        {mergedRoles.map((entry) => (
+          <option key={entry.value} value={entry.value}>
+            {entry.label}
           </option>
         ))}
         <option disabled>──────────</option>

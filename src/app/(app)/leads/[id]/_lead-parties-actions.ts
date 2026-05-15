@@ -69,3 +69,31 @@ export async function deleteLeadParty(
   revalidatePath(`/leads/${leadId}`);
   return { ok: true };
 }
+
+// Custom roles are just distinct `custom_role_label` values across the org's
+// lead_parties rows where role='other'. To "delete" a role we clear the label
+// on every row that uses it — those rows revert to plain "Other". RLS scopes
+// the update to the caller's org automatically.
+export async function deleteCustomRole(
+  label: string
+): Promise<{ ok: true; affected: number } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const trimmed = label.trim();
+  if (!trimmed) return { ok: false, error: "Empty label" };
+
+  const { data, error } = await sb
+    .from("lead_parties")
+    .update({ custom_role_label: null })
+    .eq("role", "other")
+    .eq("custom_role_label", trimmed)
+    .select("id, lead_id");
+  if (error) return { ok: false, error: error.message };
+
+  const leadIds = new Set<string>();
+  for (const r of (data ?? []) as { id: string; lead_id: string }[]) {
+    leadIds.add(r.lead_id);
+  }
+  for (const lid of leadIds) revalidatePath(`/leads/${lid}`);
+
+  return { ok: true, affected: data?.length ?? 0 };
+}

@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   IconMail,
   IconMessage2,
@@ -13,11 +12,15 @@ import {
   IconArrowBackUp,
   IconArrowBackUpDouble,
   IconArrowForwardUp,
+  IconChevronLeft,
+  IconChevronRight,
+  IconDownload,
+  IconPhoto,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { ComposeBox } from "@/app/(app)/inbox/_components/ComposeBox";
 import { HtmlMessage } from "@/app/(app)/inbox/_components/HtmlMessage";
-import { formatPhoneUS } from "@/lib/phone";
+import { markThreadRead } from "@/app/(app)/inbox/_actions";
 import { upsertLeadParty } from "../_lead-parties-actions";
 import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
 import type {
@@ -35,9 +38,6 @@ function initialsOf(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// Deterministic colored avatar per person — same name always gets the same
-// color. Tones tuned to read as a coherent set with the portal's petrol
-// palette (no neon), so they help differentiate without looking random.
 const AVATAR_PALETTE: { bg: string; text: string }[] = [
   { bg: "#0d6c7d", text: "#ffffff" },
   { bg: "#0a3d4a", text: "#ffffff" },
@@ -58,7 +58,31 @@ function avatarColorFor(name: string): { bg: string; text: string } {
   return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
 }
 
-function fmtTime(iso: string): string {
+function fmtClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function fmtShort(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) return fmtClock(iso);
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString(
+    "en-US",
+    sameYear
+      ? { month: "short", day: "numeric" }
+      : { month: "short", day: "numeric", year: "numeric" }
+  );
+}
+
+function fmtLong(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
     weekday: "short",
     month: "short",
@@ -66,6 +90,60 @@ function fmtTime(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function ClientText({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span suppressHydrationWarning className={className}>
+      {children}
+    </span>
+  );
+}
+
+type LightboxImage = {
+  filename: string;
+  src: string;
+};
+
+function isImageMime(mime: string | null): boolean {
+  return !!mime && mime.toLowerCase().startsWith("image/");
+}
+
+function attachmentUrl(storagePath: string | null): string {
+  return storagePath ? `/api/email/attachment?path=${encodeURIComponent(storagePath)}` : "#";
+}
+
+type ThreadGroup = {
+  id: string;
+  subject: string | null;
+  channel: LeadConversationMessage["channel"];
+  messages: LeadConversationMessage[];
+  lastAt: string;
+  unreadCount: number;
+};
+
+function groupByThread(messages: LeadConversationMessage[]): ThreadGroup[] {
+  const map = new Map<string, LeadConversationMessage[]>();
+  for (const m of messages) {
+    const arr = map.get(m.conversation_id) ?? [];
+    arr.push(m);
+    map.set(m.conversation_id, arr);
+  }
+  const out: ThreadGroup[] = [];
+  for (const [id, msgs] of map) {
+    msgs.sort((a, b) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime());
+    const last = msgs[msgs.length - 1];
+    out.push({
+      id,
+      subject: last.conversation_subject,
+      channel: last.channel,
+      messages: msgs,
+      lastAt: last.sent_at,
+      unreadCount: msgs.filter((m) => m.direction === "inbound" && !m.is_read).length,
+    });
+  }
+  out.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
+  return out;
 }
 
 export function ConversationTabClient({
@@ -81,27 +159,62 @@ export function ConversationTabClient({
   accounts: { id: string; address: string; display_name: string | null }[];
   people: LeadPerson[];
 }) {
+  void threads;
+
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
   const [selectedFilterId, setSelectedFilterId] = useState<string | null>(null);
   const [composeTo, setComposeTo] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const [savingRecent, startSavingRecent] = useTransition();
   const [recentSaved, setRecentSaved] = useState<Set<string>>(new Set());
-  // Inline reply panel state: when set, we're replying to a specific message
-  // from the timeline. ComposeBox opens in side-panel mode with that thread.
   const [replyTo, setReplyTo] = useState<{
     mode: "reply" | "replyAll" | "forward";
     message: LeadConversationMessage;
   } | null>(null);
+  const [readOverrides, setReadOverrides] = useState<Set<string>>(new Set());
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{
+    images: LightboxImage[];
+    index: number;
+  } | null>(null);
 
-  const reachable = useMemo(
-    () => people.filter((p) => p.emails.length > 0),
-    [people]
-  );
+  const readerRef = useRef<HTMLDivElement>(null);
 
-  // Message count per person — for the badge after each name. Matches
-  // each message's from / to / cc against the person's known emails so a
-  // contact reachable on multiple addresses still aggregates correctly.
+  // Esc + arrow keys for the lightbox.
+  useEffect(() => {
+    if (!lightbox) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setLightbox(null);
+      else if (e.key === "ArrowLeft") {
+        setLightbox((cur) =>
+          cur ? { ...cur, index: (cur.index - 1 + cur.images.length) % cur.images.length } : cur
+        );
+      } else if (e.key === "ArrowRight") {
+        setLightbox((cur) =>
+          cur ? { ...cur, index: (cur.index + 1) % cur.images.length } : cur
+        );
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
+
+  function markRead(conversationId: string) {
+    if (readOverrides.has(conversationId)) return;
+    const hasUnread = messages.some(
+      (m) => m.conversation_id === conversationId && m.direction === "inbound" && !m.is_read
+    );
+    if (!hasUnread) return;
+    setReadOverrides((prev) => {
+      const next = new Set(prev);
+      next.add(conversationId);
+      return next;
+    });
+    void markThreadRead(conversationId);
+  }
+
+  const reachable = useMemo(() => people.filter((p) => p.emails.length > 0), [people]);
+
   const countByPersonId = useMemo(() => {
     const map = new Map<string, number>();
     for (const p of reachable) {
@@ -112,19 +225,13 @@ export function ConversationTabClient({
           count += 1;
           continue;
         }
-        if (m.to_addresses.some((a) => emails.has(a.toLowerCase()))) {
-          count += 1;
-        }
+        if (m.to_addresses.some((a) => emails.has(a.toLowerCase()))) count += 1;
       }
       map.set(p.id, count);
     }
     return map;
   }, [reachable, messages]);
 
-  // Recent addresses — anyone who's appeared in this lead's messages but
-  // ISN'T on the formal People list yet. Surfaced in their own row below
-  // the main grid so the user can compose to them without doing the
-  // "save as contact" dance first.
   const recentParticipants = useMemo(() => {
     const knownEmails = new Set<string>();
     for (const p of people) for (const e of p.emails) knownEmails.add(e.toLowerCase());
@@ -160,19 +267,13 @@ export function ConversationTabClient({
     selectedFilterId && !selectedFilterId.startsWith("recent:")
       ? personById.get(selectedFilterId) ?? null
       : null;
-
-  const selectedRecentEmail =
-    selectedFilterId?.startsWith("recent:")
-      ? selectedFilterId.slice("recent:".length)
-      : null;
-
-  const selectedLabel = selectedPerson
-    ? selectedPerson.name
-    : selectedRecentEmail ?? null;
+  const selectedRecentEmail = selectedFilterId?.startsWith("recent:")
+    ? selectedFilterId.slice("recent:".length)
+    : null;
+  const selectedLabel = selectedPerson ? selectedPerson.name : selectedRecentEmail ?? null;
 
   const counts = useMemo(() => {
-    let email = 0,
-      sms = 0;
+    let email = 0, sms = 0;
     for (const m of messages) {
       if (m.channel === "quo_sms") sms += 1;
       else email += 1;
@@ -200,6 +301,32 @@ export function ConversationTabClient({
     });
   }, [messages, channelFilter, selectedPerson, selectedRecentEmail]);
 
+  const threadGroups = useMemo(() => {
+    const groups = groupByThread(visible);
+    return groups.map((g) => (readOverrides.has(g.id) ? { ...g, unreadCount: 0 } : g));
+  }, [visible, readOverrides]);
+
+  // Auto-pick the most recent thread when nothing is selected or when the
+  // current selection got filtered out.
+  useEffect(() => {
+    if (threadGroups.length === 0) {
+      if (selectedThreadId !== null) setSelectedThreadId(null);
+      return;
+    }
+    if (!selectedThreadId || !threadGroups.find((t) => t.id === selectedThreadId)) {
+      setSelectedThreadId(threadGroups[0].id);
+      markRead(threadGroups[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadGroups.map((t) => t.id).join(",")]);
+
+  // Scroll the reader to the top when the selected thread changes — like
+  // every real email client.
+  useEffect(() => {
+    const el = readerRef.current;
+    if (el) el.scrollTop = 0;
+  }, [selectedThreadId]);
+
   const nameByAddress = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of people) {
@@ -208,8 +335,11 @@ export function ConversationTabClient({
     return m;
   }, [people]);
 
+  const accountAddresses = useMemo(() => accounts.map((a) => a.address.toLowerCase()), [accounts]);
+
   const primaryAccount = accounts[0];
   const noAccount = !primaryAccount;
+  const selectedThread = threadGroups.find((t) => t.id === selectedThreadId) ?? null;
 
   function openComposeTo(email: string | null) {
     setComposeTo(email);
@@ -218,6 +348,16 @@ export function ConversationTabClient({
 
   function toggleFilter(filterId: string) {
     setSelectedFilterId((cur) => (cur === filterId ? null : filterId));
+  }
+
+  function selectThread(threadId: string) {
+    setSelectedThreadId(threadId);
+    markRead(threadId);
+  }
+
+  function startReply(mode: "reply" | "replyAll" | "forward", message: LeadConversationMessage) {
+    setReplyTo({ mode, message });
+    markRead(message.conversation_id);
   }
 
   function saveRecentAsContact(email: string, displayName: string) {
@@ -231,9 +371,7 @@ export function ConversationTabClient({
         name: placeholderName,
         email,
       });
-      if (res.ok) {
-        setRecentSaved((prev) => new Set(prev).add(email.toLowerCase()));
-      }
+      if (res.ok) setRecentSaved((prev) => new Set(prev).add(email.toLowerCase()));
     });
   }
 
@@ -245,10 +383,7 @@ export function ConversationTabClient({
 
   return (
     <div>
-      {/* PEOPLE — grid layout that uses the full width. Each cell is the
-          avatar+name+role+actions design from the prior list pattern, but
-          arranged 2/3/4 columns wide instead of stacking. No email preview
-          (was clutter). Action icons on hover. */}
+      {/* PEOPLE */}
       {reachable.length > 0 && (
         <div className="mb-3 rounded-[10px] border border-gray-200 bg-surface px-4 py-[12px] shadow-card">
           <div className="mb-2 flex items-center justify-between">
@@ -280,11 +415,6 @@ export function ConversationTabClient({
                     "group flex w-full items-center gap-2 rounded-md px-2 py-[6px] text-left transition-colors",
                     selected ? "bg-petrol-50" : "hover:bg-gray-50"
                   )}
-                  title={
-                    selected
-                      ? "Click to clear filter"
-                      : `Click to show only conversations with ${p.name}`
-                  }
                 >
                   <div
                     className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold"
@@ -315,8 +445,6 @@ export function ConversationTabClient({
                           openComposeTo(primaryEmail);
                         }}
                         className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
-                        title={`Email ${p.name}`}
-                        aria-label="Email"
                       >
                         <IconMail size={12} stroke={1.75} />
                       </span>
@@ -326,8 +454,6 @@ export function ConversationTabClient({
                         href={`tel:${primaryPhone}`}
                         onClick={(e) => e.stopPropagation()}
                         className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
-                        title={`Call ${p.name}`}
-                        aria-label="Call"
                       >
                         <IconPhone size={12} stroke={1.75} />
                       </a>
@@ -361,11 +487,6 @@ export function ConversationTabClient({
                         type="button"
                         onClick={() => toggleFilter(filterId)}
                         className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                        title={
-                          selected
-                            ? "Click to clear filter"
-                            : `Show only messages with ${r.email}`
-                        }
                       >
                         <div
                           className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[9px] font-semibold opacity-80"
@@ -382,9 +503,7 @@ export function ConversationTabClient({
                               </span>
                             )}
                           </div>
-                          <div className="truncate text-[10px] text-gray-400">
-                            {r.email}
-                          </div>
+                          <div className="truncate text-[10px] text-gray-400">{r.email}</div>
                         </div>
                       </button>
                       <div className="flex shrink-0 items-center gap-[2px] opacity-0 transition-opacity group-hover:opacity-100">
@@ -396,8 +515,6 @@ export function ConversationTabClient({
                               openComposeTo(r.email);
                             }}
                             className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
-                            title={`Compose to ${r.email}`}
-                            aria-label="Compose"
                           >
                             <IconMail size={11} stroke={1.75} />
                           </button>
@@ -415,12 +532,6 @@ export function ConversationTabClient({
                               ? "text-success-strong"
                               : "text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
                           )}
-                          title={
-                            alreadySaved
-                              ? "Saved — refresh to see them above"
-                              : "Save as a contact on this lead"
-                          }
-                          aria-label="Save as contact"
                         >
                           <IconUserPlus size={11} stroke={1.75} />
                         </button>
@@ -434,9 +545,9 @@ export function ConversationTabClient({
         </div>
       )}
 
-      {/* TOOLBAR */}
+      {/* TOOLBAR — flat, no card. */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex items-center gap-[3px] rounded-md bg-gray-150 p-[2px]">
+        <div className="inline-flex items-center gap-[3px]">
           {FILTERS.map((f) => {
             const active = channelFilter === f.value;
             return (
@@ -445,56 +556,102 @@ export function ConversationTabClient({
                 type="button"
                 onClick={() => setChannelFilter(f.value)}
                 className={cn(
-                  "inline-flex items-baseline gap-[5px] whitespace-nowrap rounded px-[10px] py-[5px] text-[11px]",
+                  "relative inline-flex items-baseline gap-1.5 px-3 py-1 text-[12px] transition-colors",
                   active
-                    ? "bg-petrol-500 font-medium text-white"
-                    : "text-gray-600 hover:text-ink"
+                    ? "font-semibold text-ink"
+                    : "text-gray-500 hover:text-ink"
                 )}
               >
                 <span>{f.label}</span>
-                <span
-                  className={cn(
-                    "text-[10px] tabular-nums",
-                    active ? "text-white/70" : "text-gray-400"
-                  )}
-                >
-                  {f.count}
-                </span>
+                <span className="text-[10.5px] tabular-nums text-gray-400">{f.count}</span>
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-2 -bottom-[2px] h-[2px] bg-petrol-500"
+                  />
+                )}
               </button>
             );
           })}
         </div>
-
-        <div className="flex items-center gap-2">
-          {noAccount ? (
-            <a
-              href="/settings"
-              className="text-[11px] text-petrol-500 hover:text-petrol-700"
-            >
-              Connect Gmail to send →
-            </a>
-          ) : (
-            <button
-              type="button"
-              onClick={() => openComposeTo(null)}
-              className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
-            >
-              <IconPencil size={13} stroke={2} />
-              New Message
-            </button>
-          )}
-        </div>
+        {!noAccount && (
+          <button
+            type="button"
+            onClick={() => openComposeTo(null)}
+            className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+          >
+            <IconPencil size={13} stroke={2} />
+            New Message
+          </button>
+        )}
       </div>
 
-      {/* TIMELINE — width-constrained so cards don't stretch */}
-      <Timeline
-        messages={visible}
-        accountAddresses={accounts.map((a) => a.address.toLowerCase())}
-        nameByAddress={nameByAddress}
-        onAction={(mode, message) => setReplyTo({ mode, message })}
-      />
+      {/* TWO-COLUMN READER — Hey.com / Apple Mail / Front pattern. No cards.
+          Hairline divider between the two columns. Each column scrolls
+          independently inside a fixed-height surface so the page feels like a
+          real email client instead of a list of vertical cards. */}
+      <div
+        className="grid overflow-hidden rounded-[6px] border border-gray-200 bg-surface"
+        style={{
+          height: "min(82vh, 920px)",
+          gridTemplateColumns: "320px 1fr",
+        }}
+      >
+        {/* LEFT — thread list. Pure type, no avatars, no chrome. */}
+        <aside className="flex flex-col border-r border-gray-200 bg-[#fbfcfd]">
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+            <div className="text-[11.5px] font-medium text-gray-500">
+              {threadGroups.length === 0
+                ? "No conversations"
+                : `${threadGroups.length} ${threadGroups.length === 1 ? "conversation" : "conversations"}`}
+            </div>
+          </div>
 
-      {/* Floating compose — new mode (no reply context) */}
+          <div className="flex-1 overflow-y-auto">
+            {threadGroups.length === 0 ? (
+              <div className="px-4 py-10 text-center text-[12px] text-gray-400">
+                No threads.
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-150">
+                {threadGroups.map((t) => (
+                  <ThreadRow
+                    key={t.id}
+                    thread={t}
+                    selected={t.id === selectedThreadId}
+                    onSelect={() => selectThread(t.id)}
+                    accountAddresses={accountAddresses}
+                    nameByAddress={nameByAddress}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
+
+        {/* RIGHT — selected thread reader. Full-bleed editorial typography. */}
+        <section
+          ref={readerRef}
+          className="flex flex-col overflow-y-auto bg-surface"
+        >
+          {selectedThread ? (
+            <ThreadReader
+              thread={selectedThread}
+              accountAddresses={accountAddresses}
+              nameByAddress={nameByAddress}
+              onAction={startReply}
+              noAccount={noAccount}
+              onOpenLightbox={(images, index) => setLightbox({ images, index })}
+            />
+          ) : (
+            <div className="flex flex-1 items-center justify-center px-6 py-12 text-center text-[13px] text-gray-400">
+              No conversation yet. Use New Message to start one.
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Floating compose — new message */}
       {composing && primaryAccount && (
         <div className="fixed bottom-0 right-0 z-40 m-4 flex h-[78vh] w-[520px] flex-col overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-elevated">
           <ComposeBox
@@ -511,14 +668,30 @@ export function ConversationTabClient({
         </div>
       )}
 
-      {/* Inline reply — opens the same composer but anchored to the message's
-          thread so In-Reply-To + References + threadId are preserved. */}
+      {/* Image lightbox */}
+      {lightbox && (
+        <Lightbox
+          images={lightbox.images}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onPrev={() =>
+            setLightbox((cur) =>
+              cur ? { ...cur, index: (cur.index - 1 + cur.images.length) % cur.images.length } : cur
+            )
+          }
+          onNext={() =>
+            setLightbox((cur) =>
+              cur ? { ...cur, index: (cur.index + 1) % cur.images.length } : cur
+            )
+          }
+        />
+      )}
+
+      {/* Floating reply pop-out */}
       {replyTo && (() => {
         const m = replyTo.message;
-        const accountForReply =
-          accounts.find((a) => a.id === m.channel_account_id) ?? primaryAccount;
+        const accountForReply = accounts.find((a) => a.id === m.channel_account_id) ?? primaryAccount;
         if (!accountForReply) return null;
-        // Build the minimum ThreadDetail + ThreadMessage that ComposeBox needs.
         const threadDetail: ThreadDetail = {
           id: m.conversation_id,
           subject: m.conversation_subject,
@@ -574,77 +747,350 @@ export function ConversationTabClient({
   );
 }
 
-function Timeline({
-  messages,
+// LEFT-COLUMN ROW — Hey.com style. Pure type, no avatars in the list, no
+// box chrome. Selected gets a petrol left rail + warm bg.
+function ThreadRow({
+  thread,
+  selected,
+  onSelect,
+  accountAddresses,
+  nameByAddress,
+}: {
+  thread: ThreadGroup;
+  selected: boolean;
+  onSelect: () => void;
+  accountAddresses: string[];
+  nameByAddress: Map<string, string>;
+}) {
+  const participants = useMemo(() => {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const m of thread.messages) {
+      const fromLc = m.from_address.toLowerCase();
+      if (!accountAddresses.includes(fromLc) && !seen.has(fromLc)) {
+        seen.add(fromLc);
+        names.push(m.from_name || nameByAddress.get(fromLc) || m.from_address);
+      }
+      for (const to of m.to_addresses) {
+        const toLc = to.toLowerCase();
+        if (!accountAddresses.includes(toLc) && !seen.has(toLc)) {
+          seen.add(toLc);
+          names.push(nameByAddress.get(toLc) || to);
+        }
+      }
+    }
+    return names;
+  }, [thread.messages, accountAddresses, nameByAddress]);
+
+  const hasUnread = thread.unreadCount > 0;
+  const participantText = participants.length === 0
+    ? "—"
+    : participants.length === 1
+      ? participants[0]
+      : `${participants[0]} +${participants.length - 1}`;
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(
+          "relative block w-full px-4 py-3 text-left transition-colors",
+          selected ? "bg-petrol-50" : "hover:bg-white"
+        )}
+      >
+        {selected && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-0 h-full w-[3px] bg-petrol-500"
+          />
+        )}
+        <div className="flex items-baseline justify-between gap-2">
+          <span
+            className={cn(
+              "truncate text-[13px] tracking-[-0.005em]",
+              hasUnread ? "font-bold text-ink" : "font-semibold text-ink"
+            )}
+          >
+            {participantText}
+          </span>
+          <ClientText
+            className={cn(
+              "shrink-0 whitespace-nowrap text-[10.5px] tabular-nums",
+              hasUnread ? "font-semibold text-petrol-500" : "text-gray-400"
+            )}
+          >
+            {fmtShort(thread.lastAt)}
+          </ClientText>
+        </div>
+        {thread.subject && (
+          <div
+            className={cn(
+              "mt-[2px] truncate text-[12px]",
+              hasUnread ? "font-medium text-ink" : "text-gray-700"
+            )}
+          >
+            {thread.subject}
+          </div>
+        )}
+        <div className="mt-[2px] flex items-center justify-between gap-2">
+          <div className="truncate text-[11px] text-gray-400">
+            {thread.messages[thread.messages.length - 1].snippet ??
+              (thread.messages[thread.messages.length - 1].body_text?.slice(0, 100) ?? "")}
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 text-[10px] text-gray-400">
+            {thread.messages.length > 1 && (
+              <span className="tabular-nums">{thread.messages.length}</span>
+            )}
+            {hasUnread && (
+              <span className="inline-block h-[6px] w-[6px] rounded-full bg-petrol-500" />
+            )}
+          </div>
+        </div>
+      </button>
+    </li>
+  );
+}
+
+// RIGHT COLUMN — Magazine-style reading view. Big subject heading at the
+// top, participants line below, then messages flow with strong typography
+// and hairline dividers. No card chrome. No tinted backgrounds.
+function ThreadReader({
+  thread,
   accountAddresses,
   nameByAddress,
   onAction,
+  noAccount,
+  onOpenLightbox,
 }: {
-  messages: LeadConversationMessage[];
+  thread: ThreadGroup;
   accountAddresses: string[];
   nameByAddress: Map<string, string>;
-  onAction: (
-    mode: "reply" | "replyAll" | "forward",
-    message: LeadConversationMessage
-  ) => void;
+  onAction: (mode: "reply" | "replyAll" | "forward", message: LeadConversationMessage) => void;
+  noAccount: boolean;
+  onOpenLightbox: (images: LightboxImage[], index: number) => void;
 }) {
-  if (messages.length === 0) {
-    return (
-      <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-[12px] text-gray-500">
-        No conversation activity yet. Sent and received messages will appear
-        here as they happen.
-      </div>
-    );
-  }
+  const participantsLabel = useMemo(() => {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (const m of thread.messages) {
+      const fromLc = m.from_address.toLowerCase();
+      if (!accountAddresses.includes(fromLc) && !seen.has(fromLc)) {
+        seen.add(fromLc);
+        names.push(m.from_name || nameByAddress.get(fromLc) || m.from_address);
+      }
+      for (const to of m.to_addresses) {
+        const toLc = to.toLowerCase();
+        if (!accountAddresses.includes(toLc) && !seen.has(toLc)) {
+          seen.add(toLc);
+          names.push(nameByAddress.get(toLc) || to);
+        }
+      }
+    }
+    return names.join(", ");
+  }, [thread.messages, accountAddresses, nameByAddress]);
 
-  const groups = groupByDay(messages);
+  const ChannelIcon = thread.channel === "quo_sms" ? IconMessage2 : IconMail;
+  const lastMsg = thread.messages[thread.messages.length - 1];
 
   return (
-    <div className="mx-auto flex max-w-[820px] flex-col gap-3">
-      {groups.map((g) => (
-        <section key={g.key}>
-          <div className="my-2 flex items-center gap-3">
-            <div className="h-px flex-1 bg-gray-150" />
-            <div className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
-              {g.label}
-            </div>
-            <div className="h-px flex-1 bg-gray-150" />
+    <div className="mx-auto w-full max-w-[760px] px-8 py-8">
+      {/* SUBJECT — magazine-headline scale. */}
+      <header className="mb-6 border-b border-gray-200 pb-5">
+        <h2 className="flex items-start gap-3 text-[22px] font-semibold leading-[1.25] tracking-[-0.015em] text-ink">
+          <ChannelIcon size={18} stroke={2} className="mt-[5px] shrink-0 text-petrol-500" />
+          <span>{thread.subject || "(No subject)"}</span>
+        </h2>
+        <div className="mt-2 pl-[30px] text-[12.5px] text-gray-500">
+          {participantsLabel || "—"} <span className="text-gray-300">·</span>{" "}
+          {thread.messages.length} {thread.messages.length === 1 ? "message" : "messages"}
+        </div>
+      </header>
+
+      {/* MESSAGES — flow with hairlines, no cards. */}
+      <div className="space-y-8">
+        {thread.messages.map((m, idx) => (
+          <Message
+            key={m.id}
+            message={m}
+            accountAddresses={accountAddresses}
+            nameByAddress={nameByAddress}
+            isLast={idx === thread.messages.length - 1}
+            onAction={(mode) => onAction(mode, m)}
+            noAccount={noAccount}
+            onOpenLightbox={onOpenLightbox}
+          />
+        ))}
+      </div>
+
+      {/* Sticky-feel reply rail at the bottom */}
+      {!noAccount && thread.channel !== "quo_sms" && (
+        <div className="mt-10 border-t border-gray-200 pt-5">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+            Continue Conversation
           </div>
-          <div className="flex flex-col gap-2">
-            {g.items.map((m) => (
-              <MessageCard
-                key={m.id}
-                message={m}
-                accountAddresses={accountAddresses}
-                nameByAddress={nameByAddress}
-                onAction={(mode) => onAction(mode, m)}
-              />
-            ))}
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onAction("reply", lastMsg)}
+              className="inline-flex items-center gap-1.5 rounded-md btn-primary px-4 py-[6px] text-[12px] font-medium text-white"
+            >
+              <IconArrowBackUp size={13} stroke={2} />
+              Reply
+            </button>
+            <button
+              type="button"
+              onClick={() => onAction("replyAll", lastMsg)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-surface px-4 py-[6px] text-[12px] text-ink hover:border-petrol-500 hover:text-petrol-700"
+            >
+              <IconArrowBackUpDouble size={13} stroke={2} />
+              Reply All
+            </button>
+            <button
+              type="button"
+              onClick={() => onAction("forward", lastMsg)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-surface px-4 py-[6px] text-[12px] text-ink hover:border-petrol-500 hover:text-petrol-700"
+            >
+              <IconArrowForwardUp size={13} stroke={2} />
+              Forward
+            </button>
           </div>
-        </section>
-      ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function MessageCard({
+function Lightbox({
+  images,
+  index,
+  onClose,
+  onPrev,
+  onNext,
+}: {
+  images: LightboxImage[];
+  index: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const image = images[index];
+  if (!image) return null;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="absolute right-5 top-5 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+        aria-label="Close"
+        title="Close (Esc)"
+      >
+        <IconX size={20} stroke={2} />
+      </button>
+      <a
+        href={image.src}
+        download={image.filename}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute right-16 top-5 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+        aria-label="Download"
+        title="Download"
+      >
+        <IconDownload size={20} stroke={2} />
+      </a>
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPrev();
+            }}
+            className="absolute left-5 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white transition-colors hover:bg-white/20"
+            aria-label="Previous"
+            title="Previous (←)"
+          >
+            <IconChevronLeft size={24} stroke={2} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNext();
+            }}
+            className="absolute right-5 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white transition-colors hover:bg-white/20"
+            aria-label="Next"
+            title="Next (→)"
+          >
+            <IconChevronRight size={24} stroke={2} />
+          </button>
+        </>
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={image.src}
+        alt={image.filename}
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[88vh] max-w-[92vw] rounded-md object-contain shadow-2xl"
+      />
+      <div
+        className="absolute bottom-5 left-1/2 inline-flex -translate-x-1/2 items-center gap-3 rounded-full bg-white/10 px-4 py-2 text-[12px] text-white backdrop-blur-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="truncate">{image.filename}</span>
+        {images.length > 1 && (
+          <span className="text-white/70 tabular-nums">
+            {index + 1} / {images.length}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Message({
   message,
   accountAddresses,
   nameByAddress,
+  isLast,
   onAction,
+  noAccount,
+  onOpenLightbox,
 }: {
   message: LeadConversationMessage;
   accountAddresses: string[];
   nameByAddress: Map<string, string>;
+  isLast: boolean;
   onAction: (mode: "reply" | "replyAll" | "forward") => void;
+  noAccount: boolean;
+  onOpenLightbox: (images: LightboxImage[], index: number) => void;
 }) {
+  void isLast;
+  void onAction;
+  void noAccount;
+
   const outbound = message.direction === "outbound";
 
+  // Split images from other attachments so we can render images as thumbnails
+  // and pipe them into the lightbox.
+  const visibleAttachments = message.attachments.filter((att) => !att.is_inline);
+  const imageAttachments: LightboxImage[] = visibleAttachments
+    .filter((att) => isImageMime(att.mime_type))
+    .map((att) => ({ filename: att.filename, src: attachmentUrl(att.storage_path) }));
+  const fileAttachments = visibleAttachments.filter((att) => !isImageMime(att.mime_type));
   const senderName = outbound
     ? "You"
-    : message.from_name ||
-      nameByAddress.get(message.from_address.toLowerCase()) ||
-      message.from_address;
+    : message.from_name || nameByAddress.get(message.from_address.toLowerCase()) || message.from_address;
+  const senderColor = outbound
+    ? { bg: "#0d6c7d", text: "#ffffff" }
+    : avatarColorFor(senderName);
 
   const recipients = message.to_addresses
     .filter((a) => !accountAddresses.includes(a.toLowerCase()))
@@ -656,146 +1102,78 @@ function MessageCard({
         ? recipients[0]
         : `${recipients[0]} +${recipients.length - 1}`;
 
-  const ChannelIcon = message.channel === "quo_sms" ? IconMessage2 : IconMail;
-  const channelLabel = message.channel === "quo_sms" ? "SMS" : "Email";
-
   return (
-    <article
-      className={cn(
-        "flex gap-3 rounded-[10px] border bg-surface px-3.5 py-3 shadow-card transition-shadow hover:shadow-card-hover",
-        outbound ? "border-petrol-100 bg-petrol-50/30" : "border-gray-200"
-      )}
-    >
-      <div
-        className={cn(
-          "flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
-          outbound
-            ? "bg-petrol-500 text-white"
-            : "bg-gray-100 text-gray-600"
-        )}
-      >
-        {initialsOf(senderName)}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <div className="min-w-0 text-[12px]">
-            <span className="font-semibold text-ink">{senderName}</span>
-            <span className="mx-[5px] text-gray-300">→</span>
-            <span className="text-gray-600">{recipientLabel}</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-2 text-[10px]">
-            <span className="inline-flex items-center gap-[3px] rounded-full bg-gray-100 px-[6px] py-[1px] font-medium text-gray-500">
-              <ChannelIcon size={9} stroke={2} />
-              {channelLabel}
-            </span>
-            <span className="text-gray-400">{fmtTime(message.sent_at)}</span>
-          </div>
+    <article>
+      <div className="flex items-start gap-3">
+        <div
+          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-[11.5px] font-semibold"
+          style={{ background: senderColor.bg, color: senderColor.text }}
+        >
+          {initialsOf(senderName)}
         </div>
-        {message.conversation_subject && (
-          <div className="mt-[1px] truncate text-[11.5px] font-medium text-gray-700">
-            {message.conversation_subject}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <div className="min-w-0">
+              <span className="text-[14px] font-semibold tracking-[-0.005em] text-ink">
+                {senderName}
+              </span>
+              <span className="ml-2 text-[12px] text-gray-400">
+                to {recipientLabel}
+              </span>
+            </div>
+            <ClientText className="shrink-0 whitespace-nowrap text-[11.5px] tabular-nums text-gray-400">
+              {fmtLong(message.sent_at)}
+            </ClientText>
           </div>
-        )}
-        <div className="mt-[6px] text-[12.5px] leading-relaxed text-ink">
-          {message.body_html ? (
-            <HtmlMessage html={message.body_html} />
-          ) : (
-            <div className="whitespace-pre-wrap">
-              {message.body_text ?? message.snippet ?? ""}
+          <div className="mt-3 text-[14.5px] leading-[1.7] text-ink">
+            {message.body_html ? (
+              <HtmlMessage html={message.body_html} />
+            ) : (
+              <div className="whitespace-pre-wrap">
+                {message.body_text ?? message.snippet ?? ""}
+              </div>
+            )}
+          </div>
+          {imageAttachments.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {imageAttachments.map((img, i) => (
+                <button
+                  key={img.src}
+                  type="button"
+                  onClick={() => onOpenLightbox(imageAttachments, i)}
+                  className="group relative h-[140px] w-[180px] overflow-hidden rounded-md border border-gray-200 bg-gray-50"
+                  title={img.filename}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.src}
+                    alt={img.filename}
+                    className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]"
+                  />
+                  <span className="absolute bottom-0 left-0 right-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 py-1 text-[10.5px] text-white">
+                    <IconPhoto size={10} stroke={2} className="mr-1 inline" />
+                    {img.filename}
+                  </span>
+                </button>
+              ))}
             </div>
           )}
-        </div>
-        {message.attachments.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {message.attachments
-              .filter((att) => !att.is_inline)
-              .map((att) => (
+          {fileAttachments.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {fileAttachments.map((att) => (
                 <a
                   key={att.id}
-                  href={
-                    att.storage_path
-                      ? `/api/email/attachment?path=${encodeURIComponent(att.storage_path)}`
-                      : "#"
-                  }
-                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11px] text-ink hover:border-petrol-500"
+                  href={attachmentUrl(att.storage_path)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-[11.5px] text-ink hover:bg-petrol-50 hover:text-petrol-700"
                 >
                   <IconPaperclip size={11} stroke={1.75} />
                   {att.filename}
                 </a>
               ))}
-          </div>
-        )}
-
-        {/* Reply / Reply All / Forward — inline action row at the bottom of
-            each card so users can respond without navigating to the Inbox. */}
-        {message.channel !== "quo_sms" && (
-          <div className="mt-2 flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => onAction("reply")}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[10.5px] font-medium text-ink hover:border-petrol-500 hover:text-petrol-700"
-            >
-              <IconArrowBackUp size={11} stroke={2} />
-              Reply
-            </button>
-            <button
-              type="button"
-              onClick={() => onAction("replyAll")}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[10.5px] text-ink hover:border-petrol-500 hover:text-petrol-700"
-            >
-              <IconArrowBackUpDouble size={11} stroke={2} />
-              Reply All
-            </button>
-            <button
-              type="button"
-              onClick={() => onAction("forward")}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[10.5px] text-ink hover:border-petrol-500 hover:text-petrol-700"
-            >
-              <IconArrowForwardUp size={11} stroke={2} />
-              Forward
-            </button>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </article>
   );
-}
-
-function groupByDay(messages: LeadConversationMessage[]): {
-  key: string;
-  label: string;
-  items: LeadConversationMessage[];
-}[] {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const yesterday = today - 24 * 3600 * 1000;
-  const groups: Record<string, LeadConversationMessage[]> = {};
-  for (const m of messages) {
-    const d = new Date(m.sent_at);
-    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(m);
-  }
-  return Object.entries(groups)
-    .sort((a, b) => {
-      const aDate = new Date(a[1][0].sent_at).getTime();
-      const bDate = new Date(b[1][0].sent_at).getTime();
-      return aDate - bDate;
-    })
-    .map(([key, items]) => {
-      const d = new Date(items[0].sent_at);
-      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-      let label: string;
-      if (dayStart === today) label = "Today";
-      else if (dayStart === yesterday) label = "Yesterday";
-      else
-        label = d.toLocaleDateString("en-US", {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-          year: now.getFullYear() === d.getFullYear() ? undefined : "numeric",
-        });
-      return { key, label, items };
-    });
 }
