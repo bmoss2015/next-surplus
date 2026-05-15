@@ -111,7 +111,10 @@ export function RelativesSection({
   const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftRelationship, setDraftRelationship] = useState("");
+  const [draftAge, setDraftAge] = useState("");
   const [draftPhone, setDraftPhone] = useState("");
+  const [draftPhoneDnc, setDraftPhoneDnc] = useState(false);
+  const [draftPhoneLitigator, setDraftPhoneLitigator] = useState(false);
   const [draftEmail, setDraftEmail] = useState("");
   const [draftNotes, setDraftNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +123,10 @@ export function RelativesSection({
   function resetDrafts() {
     setDraftName("");
     setDraftRelationship("");
+    setDraftAge("");
     setDraftPhone("");
+    setDraftPhoneDnc(false);
+    setDraftPhoneLitigator(false);
     setDraftEmail("");
     setDraftNotes("");
     setError(null);
@@ -137,16 +143,24 @@ export function RelativesSection({
     const email = draftEmail.trim().toLowerCase() || null;
     const notes = draftNotes.trim() || null;
     const relationship = draftRelationship.trim() || null;
+    const ageNum = draftAge.trim() ? Number(draftAge.trim()) : null;
+    const age = ageNum != null && !Number.isNaN(ageNum) ? ageNum : null;
     startTransition(async () => {
       const res = await upsertRelative(leadId, null, {
         full_name: name,
         relationship,
+        age,
         phone,
+        phone_is_dnc: phone ? draftPhoneDnc : false,
+        phone_is_litigator: phone ? draftPhoneLitigator : false,
         email,
         notes,
       });
       if (res.ok) {
         const row = makeRelativeRow(res.id, leadId, name, relationship, phone);
+        row.age = age;
+        row.phone_is_dnc = phone ? draftPhoneDnc : false;
+        row.phone_is_litigator = phone ? draftPhoneLitigator : false;
         row.email = email;
         row.notes = notes;
         setRelatives((prev) => [...prev, row]);
@@ -235,21 +249,38 @@ export function RelativesSection({
           placeholder="Linda Smith Park"
           className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
         />
-        <label className="mt-3 mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
-          Relationship
-        </label>
-        <select
-          value={draftRelationship}
-          onChange={(e) => setDraftRelationship(e.target.value)}
-          className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none focus:border-petrol-500"
-        >
-          <option value="">Select Relationship</option>
-          {RELATIONSHIP_OPTIONS.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
+        <div className="mt-3 grid grid-cols-[1fr_120px] gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              Relationship
+            </label>
+            <select
+              value={draftRelationship}
+              onChange={(e) => setDraftRelationship(e.target.value)}
+              className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none focus:border-petrol-500"
+            >
+              <option value="">Select Relationship</option>
+              {RELATIONSHIP_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              Age
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={draftAge}
+              onChange={(e) => setDraftAge(e.target.value.replace(/\D/g, "").slice(0, 3))}
+              placeholder="—"
+              className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+            />
+          </div>
+        </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
@@ -262,6 +293,26 @@ export function RelativesSection({
               placeholder="(555) 555-1234"
               className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
             />
+            {draftPhone.trim().length > 0 && (
+              <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-600">
+                <label className="inline-flex cursor-pointer items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={draftPhoneDnc}
+                    onChange={(e) => setDraftPhoneDnc(e.target.checked)}
+                  />
+                  DNC
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={draftPhoneLitigator}
+                    onChange={(e) => setDraftPhoneLitigator(e.target.checked)}
+                  />
+                  Litigator
+                </label>
+              </div>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
@@ -445,6 +496,25 @@ function RelativeCard({
         </div>
       </div>
 
+      {relative.notes && (
+        <div className="border-t border-gray-150 pt-2">
+          <SectionSubheader className="mb-0">Notes</SectionSubheader>
+          <NotesEditor
+            value={relative.notes}
+            onCommit={(v) => onPatch({ notes: v })}
+          />
+        </div>
+      )}
+      {!relative.notes && (
+        <div className="border-t border-gray-150 pt-2">
+          <NotesEditor
+            value=""
+            onCommit={(v) => onPatch({ notes: v })}
+            placeholder="+ Add notes"
+          />
+        </div>
+      )}
+
       {canRemove && (
         <button
           type="button"
@@ -457,6 +527,60 @@ function RelativeCard({
         </button>
       )}
     </div>
+  );
+}
+
+function NotesEditor({
+  value,
+  onCommit,
+  placeholder,
+}: {
+  value: string;
+  onCommit: (next: string | null) => void;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  if (editing) {
+    return (
+      <textarea
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          const next = draft.trim();
+          if (next !== value) onCommit(next || null);
+        }}
+        rows={2}
+        placeholder="Notes — hostile to outreach, has POA, knows where owner lives, etc."
+        className="w-full resize-y rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[11.5px] leading-relaxed text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+      />
+    );
+  }
+  if (!value) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="cursor-text text-[11px] italic text-gray-400 hover:text-petrol-500"
+      >
+        {placeholder ?? "+ Add notes"}
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="block w-full cursor-text whitespace-pre-wrap rounded px-1 py-[2px] text-left text-[11.5px] italic leading-relaxed text-gray-600 hover:bg-petrol-50"
+    >
+      {value}
+    </button>
   );
 }
 

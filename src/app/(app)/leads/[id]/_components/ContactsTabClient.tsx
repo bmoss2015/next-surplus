@@ -142,7 +142,10 @@ export function ContactsTabClient({
   const [showOwnerForm, setShowOwnerForm] = useState(false);
   const [newOwnerName, setNewOwnerName] = useState("");
   const [newOwnerStatus, setNewOwnerStatus] = useState<OwnerStatus>("unknown");
+  const [newOwnerAge, setNewOwnerAge] = useState("");
   const [newOwnerPhone, setNewOwnerPhone] = useState("");
+  const [newOwnerPhoneDnc, setNewOwnerPhoneDnc] = useState(false);
+  const [newOwnerPhoneLitigator, setNewOwnerPhoneLitigator] = useState(false);
   const [newOwnerEmail, setNewOwnerEmail] = useState("");
   const [newOwnerNotes, setNewOwnerNotes] = useState("");
   const [, startTransition] = useTransition();
@@ -150,7 +153,10 @@ export function ContactsTabClient({
   function resetOwnerForm() {
     setNewOwnerName("");
     setNewOwnerStatus("unknown");
+    setNewOwnerAge("");
     setNewOwnerPhone("");
+    setNewOwnerPhoneDnc(false);
+    setNewOwnerPhoneLitigator(false);
     setNewOwnerEmail("");
     setNewOwnerNotes("");
   }
@@ -162,11 +168,14 @@ export function ContactsTabClient({
     const phone = newOwnerPhone.trim();
     const email = newOwnerEmail.trim().toLowerCase();
     const notes = newOwnerNotes.trim() || null;
+    const ageNumeric = newOwnerAge.trim() ? Number(newOwnerAge.trim()) : null;
+    const age = ageNumeric != null && !Number.isNaN(ageNumeric) ? ageNumeric : null;
     startTransition(async () => {
       const result = await upsertOwner(leadId, null, {
         full_name: name,
         status: newOwnerStatus,
         is_primary: willBePrimary,
+        age,
         notes,
       });
       if (!result.ok) return;
@@ -179,6 +188,8 @@ export function ContactsTabClient({
           value: phone,
           status: "untested",
           is_primary: true,
+          is_dnc: newOwnerPhoneDnc,
+          is_litigator: newOwnerPhoneLitigator,
         });
         if (r.ok) {
           newContacts.push({
@@ -193,8 +204,8 @@ export function ContactsTabClient({
             last_attempted: null,
             is_primary: true,
             phone_type: null,
-            is_dnc: false,
-            is_litigator: false,
+            is_dnc: newOwnerPhoneDnc,
+            is_litigator: newOwnerPhoneLitigator,
             mailed: false,
             mailed_at: null,
             notes: null,
@@ -240,7 +251,7 @@ export function ContactsTabClient({
           date_of_death: null,
           is_primary: willBePrimary,
           is_deceased: false,
-          age: null,
+          age,
           relationship: null,
           notes,
         },
@@ -384,20 +395,37 @@ export function ContactsTabClient({
           placeholder="Robert Smith"
           className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
         />
-        <label className="mt-3 mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
-          Status
-        </label>
-        <select
-          value={newOwnerStatus}
-          onChange={(e) => setNewOwnerStatus(e.target.value as OwnerStatus)}
-          className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none focus:border-petrol-500"
-        >
-          {(Object.keys(OWNER_STATUS_LABELS) as OwnerStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {OWNER_STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
+        <div className="mt-3 grid grid-cols-[1fr_120px] gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              Status
+            </label>
+            <select
+              value={newOwnerStatus}
+              onChange={(e) => setNewOwnerStatus(e.target.value as OwnerStatus)}
+              className="w-full cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none focus:border-petrol-500"
+            >
+              {(Object.keys(OWNER_STATUS_LABELS) as OwnerStatus[]).map((s) => (
+                <option key={s} value={s}>
+                  {OWNER_STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              Age
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={newOwnerAge}
+              onChange={(e) => setNewOwnerAge(e.target.value.replace(/\D/g, "").slice(0, 3))}
+              placeholder="—"
+              className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+            />
+          </div>
+        </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
@@ -410,6 +438,26 @@ export function ContactsTabClient({
               placeholder="(555) 555-1234"
               className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
             />
+            {newOwnerPhone.trim().length > 0 && (
+              <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-600">
+                <label className="inline-flex cursor-pointer items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={newOwnerPhoneDnc}
+                    onChange={(e) => setNewOwnerPhoneDnc(e.target.checked)}
+                  />
+                  DNC
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={newOwnerPhoneLitigator}
+                    onChange={(e) => setNewOwnerPhoneLitigator(e.target.checked)}
+                  />
+                  Litigator
+                </label>
+              </div>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">

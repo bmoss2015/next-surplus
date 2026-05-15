@@ -293,44 +293,29 @@ function LeadPartyForm({
         onChange={(e) => setSelection(e.target.value as SelectionValue)}
         className={inputClass}
       >
-        <optgroup label="Standard">
-          {ROLE_OPTIONS.filter((r) => r !== "other").map((r) => (
-            <option key={r} value={r}>
-              {LEAD_PARTY_ROLE_LABELS[r]}
-            </option>
-          ))}
-        </optgroup>
-        {customRoles.length > 0 && (
-          <optgroup label="Custom (used before)">
-            {customRoles.map((label) => (
-              <option key={`custom:${label}`} value={`custom:${label}`}>
-                {label}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        <optgroup label="Other">
-          <option value="other">+ Add a new role…</option>
-        </optgroup>
+        {ROLE_OPTIONS.filter((r) => r !== "other").map((r) => (
+          <option key={r} value={r}>
+            {LEAD_PARTY_ROLE_LABELS[r]}
+          </option>
+        ))}
+        {customRoles.map((label) => (
+          <option key={`custom:${label}`} value={`custom:${label}`}>
+            {label}
+          </option>
+        ))}
+        <option disabled>──────────</option>
+        <option value="other">+ Add new role</option>
       </select>
 
       {showingCustomEntry && (
-        <>
-          <label className="mt-3 mb-1 block text-[11px] font-medium text-gray-500">
-            New Role Label
-          </label>
-          <input
-            type="text"
-            value={customLabel}
-            onChange={(e) => setCustomLabel(e.target.value)}
-            placeholder="e.g., Probate Referee, Court Clerk, Auctioneer"
-            className={inputClass}
-          />
-          <div className="mt-1 text-[10.5px] text-gray-400">
-            This label will be available in the dropdown next time anyone
-            on the team adds a contact.
-          </div>
-        </>
+        <input
+          autoFocus
+          type="text"
+          value={customLabel}
+          onChange={(e) => setCustomLabel(e.target.value)}
+          placeholder="Type the new role name"
+          className={`${inputClass} mt-2`}
+        />
       )}
 
       <label className="mt-3 mb-1 block text-[11px] font-medium text-gray-500">
