@@ -454,14 +454,14 @@ export function ConversationTabClient({
                 <div
                   key={p.id}
                   className={cn(
-                    "group relative flex w-full items-center gap-2 rounded-md px-2 py-[6px] transition-colors",
+                    "group relative flex w-full items-center gap-1.5 rounded-md px-2 py-[6px] transition-colors",
                     selected ? "bg-petrol-50" : "hover:bg-gray-50"
                   )}
                 >
                   <button
                     type="button"
                     onClick={() => toggleFilter(p.id)}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    className="flex min-w-0 items-center gap-2 text-left"
                   >
                     <div
                       className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold"
