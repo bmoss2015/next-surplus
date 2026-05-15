@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import {
   IconMail,
   IconMessage2,
   IconPaperclip,
   IconPencil,
+  IconX,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { ComposeBox } from "@/app/(app)/inbox/_components/ComposeBox";
@@ -19,29 +19,11 @@ import type {
 
 type ChannelFilter = "all" | "email" | "sms";
 
-const AVATAR_PALETTE = [
-  { bg: "#0d6c7d", text: "#ffffff" }, // petrol
-  { bg: "#0a3d4a", text: "#ffffff" }, // petrol-dark
-  { bg: "#1a8a9c", text: "#ffffff" }, // petrol-light
-  { bg: "#374151", text: "#ffffff" }, // slate
-  { bg: "#7c3aed", text: "#ffffff" }, // violet
-  { bg: "#b45309", text: "#ffffff" }, // amber-dark
-  { bg: "#047857", text: "#ffffff" }, // emerald
-  { bg: "#b91c1c", text: "#ffffff" }, // danger
-  { bg: "#0369a1", text: "#ffffff" }, // sky
-  { bg: "#7e22ce", text: "#ffffff" }, // purple
-];
-
-function avatarFor(name: string): { initials: string; color: { bg: string; text: string } } {
-  const trimmed = (name || "?").trim();
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  const initials = parts.length === 1
-    ? parts[0].slice(0, 2).toUpperCase()
-    : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  let hash = 0;
-  for (let i = 0; i < trimmed.length; i++) hash = (hash * 31 + trimmed.charCodeAt(i)) | 0;
-  const color = AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
-  return { initials, color };
+function initialsOf(name: string): string {
+  const parts = (name || "?").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function fmtTime(iso: string): string {
@@ -68,8 +50,24 @@ export function ConversationTabClient({
   people: LeadPerson[];
 }) {
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
+  // Selected person — drives BOTH the filter (timeline shows only their msgs)
+  // and the "Compose to {name}" action button.
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [composeTo, setComposeTo] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+
+  const reachable = useMemo(
+    () => people.filter((p) => p.emails.length > 0),
+    [people]
+  );
+
+  const personById = useMemo(() => {
+    const m = new Map<string, LeadPerson>();
+    for (const p of people) m.set(p.id, p);
+    return m;
+  }, [people]);
+
+  const selectedPerson = selectedPersonId ? personById.get(selectedPersonId) ?? null : null;
 
   const counts = useMemo(() => {
     let email = 0,
@@ -82,21 +80,23 @@ export function ConversationTabClient({
   }, [messages]);
 
   const visible = useMemo(() => {
+    const matchSet = new Set<string>();
+    if (selectedPerson) {
+      for (const e of selectedPerson.emails) matchSet.add(e.toLowerCase());
+      for (const p of selectedPerson.phones) matchSet.add(p);
+    }
     return messages.filter((m) => {
       if (channelFilter === "email" && m.channel === "quo_sms") return false;
       if (channelFilter === "sms" && m.channel !== "quo_sms") return false;
+      if (selectedPerson) {
+        const from = m.from_address.toLowerCase();
+        const to = m.to_addresses.map((a) => a.toLowerCase());
+        if (!(matchSet.has(from) || to.some((a) => matchSet.has(a)))) return false;
+      }
       return true;
     });
-  }, [messages, channelFilter]);
+  }, [messages, channelFilter, selectedPerson]);
 
-  const threadById = useMemo(() => {
-    const m = new Map<string, LeadConversationThread>();
-    for (const t of threads) m.set(t.id, t);
-    return m;
-  }, [threads]);
-
-  // Resolve names for outbound recipients and inbound senders, so cards can
-  // show "You → Robert Smith" instead of "you@…  →  robert@…".
   const nameByAddress = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of people) {
@@ -108,77 +108,97 @@ export function ConversationTabClient({
   const primaryAccount = accounts[0];
   const noAccount = !primaryAccount;
 
+  function openComposeTo(email: string | null) {
+    setComposeTo(email);
+    setComposing(true);
+  }
+
+  function togglePerson(personId: string) {
+    setSelectedPersonId((cur) => (cur === personId ? null : personId));
+  }
+
   const FILTERS: { value: ChannelFilter; label: string; count: number }[] = [
     { value: "all", label: "All", count: counts.all },
     { value: "email", label: "Email", count: counts.email },
     { value: "sms", label: "SMS", count: counts.sms },
   ];
 
-  function openComposeTo(personEmail: string | null) {
-    setComposeTo(personEmail);
-    setComposing(true);
-  }
-
   return (
     <div>
-      {/* PEOPLE STRIP — primary affordance for "send to a person on this lead" */}
-      {people.length > 0 && (
-        <div className="mb-3 rounded-[10px] border border-gray-200 bg-surface p-3 shadow-card">
-          <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            People — click to send
+      {/* PEOPLE STRIP — consistent treatment, hide unreachable, click to filter */}
+      {reachable.length > 0 && (
+        <div className="mb-3 rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
+          <div className="mb-[10px] flex items-center justify-between">
+            <h3 className="section-subheader m-0">People</h3>
+            {selectedPerson && (
+              <button
+                type="button"
+                onClick={() => setSelectedPersonId(null)}
+                className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-ink"
+              >
+                <IconX size={11} stroke={1.75} />
+                Clear filter
+              </button>
+            )}
           </div>
-          <div className="flex flex-wrap gap-2">
-            {people.map((p) => {
-              const a = avatarFor(p.name);
-              const email = p.emails[0] ?? null;
-              const sendable = !!email && !noAccount;
+          <div className="flex flex-wrap gap-[6px]">
+            {reachable.map((p) => {
+              const selected = selectedPersonId === p.id;
               return (
                 <button
                   key={p.id}
                   type="button"
-                  disabled={!sendable}
-                  onClick={() => sendable && openComposeTo(email)}
+                  onClick={() => togglePerson(p.id)}
                   className={cn(
-                    "group inline-flex items-center gap-[8px] rounded-full border bg-surface pl-[3px] pr-3 py-[3px] text-[12px] transition-colors",
-                    sendable
-                      ? "border-gray-200 hover:border-petrol-500 hover:bg-petrol-50"
-                      : "cursor-not-allowed border-gray-150 opacity-60"
+                    "inline-flex items-center gap-[7px] rounded-full border bg-surface pl-[3px] pr-[10px] py-[3px] text-[12px] transition-colors",
+                    selected
+                      ? "border-petrol-500 bg-petrol-50 text-petrol-700"
+                      : "border-gray-200 text-ink hover:border-petrol-300 hover:bg-gray-50"
                   )}
-                  title={
-                    !email
-                      ? "No email on file"
-                      : noAccount
-                        ? "Connect Gmail to send"
-                        : `Compose to ${email}`
-                  }
+                  title={`Click to filter to ${p.name}`}
                 >
                   <span
-                    className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[9.5px] font-semibold"
-                    style={{ background: a.color.bg, color: a.color.text }}
+                    className={cn(
+                      "flex h-[22px] w-[22px] items-center justify-center rounded-full text-[9.5px] font-semibold",
+                      selected
+                        ? "bg-petrol-500 text-white"
+                        : "bg-gray-100 text-gray-600"
+                    )}
                   >
-                    {a.initials}
+                    {initialsOf(p.name)}
                   </span>
                   <span className="flex flex-col items-start leading-tight">
-                    <span className="font-medium text-ink">{p.name}</span>
+                    <span className="font-medium">{p.name}</span>
                     <span className="text-[9.5px] uppercase tracking-wide text-gray-400">
                       {p.role}
                     </span>
                   </span>
-                  {sendable && (
-                    <IconPencil
-                      size={11}
-                      stroke={1.75}
-                      className="text-gray-400 group-hover:text-petrol-500"
-                    />
-                  )}
                 </button>
               );
             })}
           </div>
+          {selectedPerson && (
+            <div className="mt-3 flex items-center justify-between rounded-md border border-gray-150 bg-gray-50 px-3 py-2">
+              <div className="text-[11.5px] text-gray-600">
+                Showing only conversations with{" "}
+                <span className="font-medium text-ink">{selectedPerson.name}</span>
+              </div>
+              {!noAccount && selectedPerson.emails[0] && (
+                <button
+                  type="button"
+                  onClick={() => openComposeTo(selectedPerson.emails[0])}
+                  className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[5px] text-[11px] font-medium text-white"
+                >
+                  <IconPencil size={11} stroke={2} />
+                  Compose to {selectedPerson.name.split(/\s+/)[0]}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* TOOLBAR — channel filters + general compose */}
+      {/* TOOLBAR */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex items-center gap-[3px] rounded-md bg-gray-150 p-[2px]">
           {FILTERS.map((f) => {
@@ -211,12 +231,12 @@ export function ConversationTabClient({
 
         <div className="flex items-center gap-2">
           {noAccount ? (
-            <Link
+            <a
               href="/settings"
               className="text-[11px] text-petrol-500 hover:text-petrol-700"
             >
               Connect Gmail to send →
-            </Link>
+            </a>
           ) : (
             <button
               type="button"
@@ -230,10 +250,9 @@ export function ConversationTabClient({
         </div>
       </div>
 
-      {/* TIMELINE */}
+      {/* TIMELINE — width-constrained so cards don't stretch */}
       <Timeline
         messages={visible}
-        threadById={threadById}
         accountAddresses={accounts.map((a) => a.address.toLowerCase())}
         nameByAddress={nameByAddress}
       />
@@ -260,12 +279,10 @@ export function ConversationTabClient({
 
 function Timeline({
   messages,
-  threadById,
   accountAddresses,
   nameByAddress,
 }: {
   messages: LeadConversationMessage[];
-  threadById: Map<string, LeadConversationThread>;
   accountAddresses: string[];
   nameByAddress: Map<string, string>;
 }) {
@@ -281,7 +298,7 @@ function Timeline({
   const groups = groupByDay(messages);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="mx-auto flex max-w-[820px] flex-col gap-3">
       {groups.map((g) => (
         <section key={g.key}>
           <div className="my-2 flex items-center gap-3">
@@ -296,7 +313,6 @@ function Timeline({
               <MessageCard
                 key={m.id}
                 message={m}
-                thread={threadById.get(m.conversation_id)}
                 accountAddresses={accountAddresses}
                 nameByAddress={nameByAddress}
               />
@@ -310,26 +326,21 @@ function Timeline({
 
 function MessageCard({
   message,
-  thread,
   accountAddresses,
   nameByAddress,
 }: {
   message: LeadConversationMessage;
-  thread: LeadConversationThread | undefined;
   accountAddresses: string[];
   nameByAddress: Map<string, string>;
 }) {
   const outbound = message.direction === "outbound";
 
-  // Sender label: "You" for outbound, otherwise resolve to a contact name if
-  // we have one, else fall back to the email address.
   const senderName = outbound
     ? "You"
     : message.from_name ||
       nameByAddress.get(message.from_address.toLowerCase()) ||
       message.from_address;
 
-  // Recipient label: drop the user's own addresses, prefer names over emails.
   const recipients = message.to_addresses
     .filter((a) => !accountAddresses.includes(a.toLowerCase()))
     .map((a) => nameByAddress.get(a.toLowerCase()) || a);
@@ -340,49 +351,48 @@ function MessageCard({
         ? recipients[0]
         : `${recipients[0]} +${recipients.length - 1}`;
 
-  const a = avatarFor(senderName);
-  const channelLabel = message.channel === "quo_sms" ? "SMS" : "Email";
   const ChannelIcon = message.channel === "quo_sms" ? IconMessage2 : IconMail;
+  const channelLabel = message.channel === "quo_sms" ? "SMS" : "Email";
 
   return (
     <article
       className={cn(
-        "flex gap-3 rounded-[10px] border bg-surface px-4 py-3 shadow-card transition-shadow hover:shadow-card-hover",
+        "flex gap-3 rounded-[10px] border bg-surface px-3.5 py-3 shadow-card transition-shadow hover:shadow-card-hover",
         outbound ? "border-petrol-100 bg-petrol-50/30" : "border-gray-200"
       )}
     >
-      {/* Avatar */}
       <div
-        className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
-        style={{ background: a.color.bg, color: a.color.text }}
+        className={cn(
+          "flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+          outbound
+            ? "bg-petrol-500 text-white"
+            : "bg-gray-100 text-gray-600"
+        )}
       >
-        {a.initials}
+        {initialsOf(senderName)}
       </div>
 
-      {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <div className="min-w-0 text-[12.5px]">
+          <div className="min-w-0 text-[12px]">
             <span className="font-semibold text-ink">{senderName}</span>
-            <span className="mx-[6px] text-gray-400">→</span>
+            <span className="mx-[5px] text-gray-300">→</span>
             <span className="text-gray-600">{recipientLabel}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="inline-flex items-center gap-[3px] rounded-full bg-gray-100 px-[7px] py-[1px] text-[10px] font-medium text-gray-500">
-              <ChannelIcon size={10} stroke={2} />
+          <div className="flex shrink-0 items-center gap-2 text-[10px]">
+            <span className="inline-flex items-center gap-[3px] rounded-full bg-gray-100 px-[6px] py-[1px] font-medium text-gray-500">
+              <ChannelIcon size={9} stroke={2} />
               {channelLabel}
             </span>
-            <span className="text-[10px] text-gray-400">
-              {fmtTime(message.sent_at)}
-            </span>
+            <span className="text-gray-400">{fmtTime(message.sent_at)}</span>
           </div>
         </div>
         {message.conversation_subject && (
-          <div className="mt-[2px] truncate text-[11.5px] font-medium text-gray-600">
+          <div className="mt-[1px] truncate text-[11.5px] font-medium text-gray-700">
             {message.conversation_subject}
           </div>
         )}
-        <div className="mt-2 text-[12.5px] leading-relaxed text-ink">
+        <div className="mt-[6px] text-[12.5px] leading-relaxed text-ink">
           {message.body_html ? (
             <HtmlMessage html={message.body_html} />
           ) : (
@@ -409,17 +419,6 @@ function MessageCard({
                   {att.filename}
                 </a>
               ))}
-          </div>
-        )}
-        {thread && (
-          <div className="mt-2">
-            <Link
-              href={`/inbox?c=${thread.id}`}
-              className="text-[10.5px] text-petrol-500 hover:text-petrol-700"
-              title="Open this thread in the Inbox"
-            >
-              Open Thread →
-            </Link>
           </div>
         )}
       </div>
