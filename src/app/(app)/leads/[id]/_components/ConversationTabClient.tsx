@@ -140,7 +140,7 @@ export function ConversationTabClient({
       )}
 
       {composing && primaryAccount && (
-        <div className="fixed bottom-0 right-0 z-40 m-4 w-[520px] rounded-[10px] border border-gray-200 bg-surface shadow-elevated">
+        <div className="fixed bottom-0 right-0 z-40 m-4 flex h-[78vh] w-[520px] flex-col overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-elevated">
           <ComposeBox
             mode="new"
             accountId={primaryAccount.id}

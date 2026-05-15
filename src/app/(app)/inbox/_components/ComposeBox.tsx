@@ -262,29 +262,33 @@ export function ComposeBox(props: Props) {
 
   const totalAttachmentBytes = attachments.reduce((s, a) => s + a.size, 0);
 
+  const isReplyMode =
+    props.mode === "reply" || props.mode === "replyAll" || props.mode === "forward";
+
   return (
     <div className="flex h-full flex-col">
-      {/* Top spacer + close button — matches the height of the thread reader's
-          header strip so the petrol gradient title bar below aligns with the
-          message area, not with the subject. */}
-      <div className="flex h-[78px] shrink-0 items-start justify-end border-b border-gray-200 bg-surface px-5 pt-4">
-        <button
-          type="button"
-          onClick={props.onClose}
-          className="rounded p-[2px] text-gray-400 hover:bg-gray-100 hover:text-ink"
-          aria-label="Discard"
-        >
-          <IconX size={14} stroke={2} />
-        </button>
-      </div>
+      {/* Side-panel-only spacer: pushes the gradient header below the level of
+          the thread reader's subject section so the two columns align. Not
+          needed when compose floats standalone (e.g. Conversation tab). */}
+      {isReplyMode && (
+        <div className="h-[78px] shrink-0 border-b border-gray-200 bg-surface" />
+      )}
 
-      {/* Petrol gradient mode-label bar — aligned with where messages start
-          in the thread reader. */}
-      <div className="flex shrink-0 items-center bg-gradient-to-r from-petrol-700 to-petrol-500 px-5 py-[10px]">
+      {/* Petrol gradient mode-label bar — always at the top of the compose
+          content, with the close button on the right. */}
+      <div className="flex shrink-0 items-center justify-between bg-gradient-to-r from-petrol-700 to-petrol-500 px-5 py-[10px]">
         <div className="inline-flex min-w-0 items-center gap-2 text-[12px] font-medium text-white">
           {icon}
           <span className="truncate">{text}</span>
         </div>
+        <button
+          type="button"
+          onClick={props.onClose}
+          className="rounded p-[2px] text-white/70 hover:bg-white/15 hover:text-white"
+          aria-label="Discard"
+        >
+          <IconX size={14} stroke={2} />
+        </button>
       </div>
 
       {/* Scrollable middle */}
