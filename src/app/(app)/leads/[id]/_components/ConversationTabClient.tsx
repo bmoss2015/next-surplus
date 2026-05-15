@@ -483,7 +483,7 @@ export function ConversationTabClient({
                       </div>
                     </div>
                   </button>
-                  <div className="flex shrink-0 items-center gap-[2px] opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex shrink-0 items-center gap-[2px]">
                     {cleanEmails.length > 0 && !noAccount && (
                       <EmailButton
                         emails={cleanEmails}
@@ -497,7 +497,7 @@ export function ConversationTabClient({
                         className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
                         title={`Call ${primaryPhone}`}
                       >
-                        <IconPhone size={12} stroke={1.75} />
+                        <IconPhone size={14} stroke={1.75} />
                       </a>
                     )}
                   </div>
@@ -548,7 +548,7 @@ export function ConversationTabClient({
                           <div className="truncate text-[10px] text-gray-400">{r.email}</div>
                         </div>
                       </button>
-                      <div className="flex shrink-0 items-center gap-[2px] opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="flex shrink-0 items-center gap-[2px]">
                         {!noAccount && (
                           <button
                             type="button"
@@ -558,7 +558,7 @@ export function ConversationTabClient({
                             }}
                             className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
                           >
-                            <IconMail size={11} stroke={1.75} />
+                            <IconMail size={14} stroke={1.75} />
                           </button>
                         )}
                         <button
@@ -575,7 +575,7 @@ export function ConversationTabClient({
                               : "text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
                           )}
                         >
-                          <IconUserPlus size={11} stroke={1.75} />
+                          <IconUserPlus size={14} stroke={1.75} />
                         </button>
                       </div>
                     </div>
@@ -1170,7 +1170,7 @@ function EmailButton({
         title={`Email ${contactName} at ${emails[0]}`}
         aria-label="Email"
       >
-        <IconMail size={12} stroke={1.75} />
+        <IconMail size={14} stroke={1.75} />
       </button>
     );
   }
@@ -1189,7 +1189,7 @@ function EmailButton({
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <IconMail size={12} stroke={1.75} />
+        <IconMail size={14} stroke={1.75} />
       </button>
       {open && (
         <div

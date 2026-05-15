@@ -190,25 +190,14 @@ export function OtherContactsSection({
             owners and their relatives.
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setManagingRoles(true)}
-            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs font-medium text-ink hover:border-petrol-500"
-            title="Manage custom roles for Other Contacts"
-          >
-            <IconSettings size={12} stroke={1.75} />
-            Manage Roles
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditing("new")}
-            className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
-          >
-            <IconPlus size={13} stroke={2} />
-            Add Contact
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setEditing("new")}
+          className="inline-flex shrink-0 items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+        >
+          <IconPlus size={13} stroke={2} />
+          Add Contact
+        </button>
       </div>
 
       {rows.length === 0 ? (
