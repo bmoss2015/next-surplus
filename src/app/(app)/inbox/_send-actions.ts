@@ -10,6 +10,7 @@ import {
   getHeader,
   extractBodies,
 } from "@/lib/email/gmail";
+import { findLeadForAddress } from "@/lib/email/auto-link";
 
 export type SendInput = {
   accountId: string;
@@ -99,6 +100,26 @@ export async function sendEmail(
     .eq("provider_thread_key", full.threadId)
     .maybeSingle();
 
+  // If no leadId was passed in AND the conversation isn't already linked,
+  // run the auto-link ladder against the recipients. Catches the case where
+  // a user replies to an unlinked thread whose recipient is a known lead
+  // contact — the reply (and the whole thread going forward) gets linked.
+  let resolvedLeadId: string | null =
+    input.leadId ?? (existingConv?.lead_id as string | null | undefined) ?? null;
+  if (!resolvedLeadId) {
+    const candidates = [...input.to, ...(input.cc ?? [])];
+    for (const addr of candidates) {
+      const match = await findLeadForAddress(svc, {
+        orgId: acct.org_id,
+        address: addr,
+      });
+      if (match) {
+        resolvedLeadId = match;
+        break;
+      }
+    }
+  }
+
   let convId: string;
   if (existingConv) {
     convId = existingConv.id as string;
@@ -107,7 +128,7 @@ export async function sendEmail(
       .update({
         last_message_at: new Date(dateMs).toISOString(),
         last_message_preview: (full.snippet ?? "").slice(0, 240),
-        lead_id: input.leadId ?? (existingConv.lead_id as string | null),
+        lead_id: resolvedLeadId,
         // The user sending an outbound reply demonstrably means they've seen
         // any prior inbound on this thread — clear the unread badge.
         unread_count: 0,
@@ -130,7 +151,7 @@ export async function sendEmail(
         channel: "gmail",
         provider_thread_key: full.threadId,
         subject,
-        lead_id: input.leadId ?? null,
+        lead_id: resolvedLeadId,
         participants: [
           { address: acct.address, name: acct.display_name ?? undefined },
           ...input.to.map((a) => ({ address: a })),
@@ -217,6 +238,6 @@ export async function sendEmail(
   }
 
   revalidatePath("/inbox");
-  if (input.leadId) revalidatePath(`/leads/${input.leadId}`);
+  if (resolvedLeadId) revalidatePath(`/leads/${resolvedLeadId}`);
   return { ok: true, messageId: msgRow.id as string };
 }

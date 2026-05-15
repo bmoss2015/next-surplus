@@ -128,11 +128,13 @@ export function ConversationTabClient({
 
   return (
     <div>
-      {/* PEOPLE — dense list. Single-line rows, action icons on hover, click
-          row body to filter. Stays small even with 10 people on a lead. */}
+      {/* PEOPLE — grid layout that uses the full width. Each cell is the
+          avatar+name+role+actions design from the prior list pattern, but
+          arranged 2/3/4 columns wide instead of stacking. No email preview
+          (was clutter). Action icons on hover. */}
       {reachable.length > 0 && (
-        <div className="mb-3 rounded-[10px] border border-gray-200 bg-surface px-4 py-[10px] shadow-card">
-          <div className="mb-1 flex items-center justify-between">
+        <div className="mb-3 rounded-[10px] border border-gray-200 bg-surface px-4 py-[12px] shadow-card">
+          <div className="mb-2 flex items-center justify-between">
             <h3 className="section-subheader m-0">People on this Lead</h3>
             {selectedPerson && (
               <button
@@ -145,7 +147,7 @@ export function ConversationTabClient({
               </button>
             )}
           </div>
-          <div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 md:grid-cols-3 xl:grid-cols-4">
             {reachable.map((p) => {
               const selected = selectedPersonId === p.id;
               const primaryEmail = p.emails[0] ?? null;
@@ -154,13 +156,13 @@ export function ConversationTabClient({
                 <div
                   key={p.id}
                   className={cn(
-                    "group -mx-2 flex items-center gap-[10px] rounded px-2 py-[5px] transition-colors",
+                    "group flex items-center gap-2 rounded-md px-2 py-[6px] transition-colors",
                     selected ? "bg-petrol-50" : "hover:bg-gray-50"
                   )}
                 >
                   <div
                     className={cn(
-                      "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
+                      "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold",
                       selected
                         ? "bg-petrol-500 text-white"
                         : "bg-gray-100 text-gray-600 group-hover:bg-petrol-50 group-hover:text-petrol-700"
@@ -171,23 +173,20 @@ export function ConversationTabClient({
                   <button
                     type="button"
                     onClick={() => togglePerson(p.id)}
-                    className="min-w-0 flex-1 truncate text-left text-[12px]"
+                    className="min-w-0 flex-1 truncate text-left leading-tight"
                     title={
                       selected
                         ? "Click to clear filter"
                         : `Click to show only conversations with ${p.name}`
                     }
                   >
-                    <span className="font-medium text-ink">{p.name}</span>
-                    <span className="ml-1.5 text-[10.5px] text-gray-400">
-                      · {p.role}
-                    </span>
+                    <div className="truncate text-[12.5px] font-medium text-ink">
+                      {p.name}
+                    </div>
+                    <div className="truncate text-[10px] uppercase tracking-wide text-gray-400">
+                      {p.role}
+                    </div>
                   </button>
-                  <div className="hidden shrink-0 items-center gap-1 text-[10px] text-gray-400 sm:flex">
-                    {primaryEmail && (
-                      <span className="max-w-[180px] truncate">{primaryEmail}</span>
-                    )}
-                  </div>
                   <div className="flex shrink-0 items-center gap-[2px] opacity-0 transition-opacity group-hover:opacity-100">
                     {primaryEmail && !noAccount && (
                       <button
