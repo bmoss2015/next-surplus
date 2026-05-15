@@ -482,7 +482,7 @@ export function ConversationTabClient({
                             {count}
                           </span>
                         )}
-                        <span className="flex shrink-0 items-center gap-[2px] text-gray-400">
+                        <span className="ml-3 flex shrink-0 items-center gap-1 text-gray-400">
                           {cleanEmails.length > 0 && !noAccount && (
                             <span onClick={(e) => e.stopPropagation()}>
                               <EmailButton
@@ -1135,9 +1135,34 @@ function ThreadReader({
   );
 }
 
+type MxStatus = "checking" | "valid" | "invalid" | "error";
+
+function StatusDot({ status }: { status: MxStatus | undefined }) {
+  const bg =
+    status === "valid"
+      ? "bg-success"
+      : status === "invalid"
+        ? "bg-danger"
+        : status === "error"
+          ? "bg-gray-400"
+          : status === "checking"
+            ? "bg-gray-300 animate-pulse"
+            : "bg-gray-200";
+  return (
+    <span
+      aria-hidden
+      className={cn("inline-block h-[7px] w-[7px] shrink-0 rounded-full", bg)}
+    />
+  );
+}
+
 // Multi-email picker. Single email → click sends compose target directly.
 // Multiple → click opens a small dropdown listing every address so the user
 // can choose which one to write to. Closes on outside click or Escape.
+//
+// Each address auto-runs an MX-record check on dropdown open and displays
+// a colored dot — green = the domain accepts mail, red = no MX records or
+// bad domain. Catches obvious typos like `@gnail.com` at no cost.
 function EmailButton({
   emails,
   onPick,
@@ -1148,6 +1173,7 @@ function EmailButton({
   contactName: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [statuses, setStatuses] = useState<Record<string, MxStatus>>({});
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1165,6 +1191,39 @@ function EmailButton({
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  // Verify every address in parallel when the dropdown opens. Results stay
+  // cached for the session so a quick close/re-open doesn't re-query.
+  useEffect(() => {
+    if (!open) return;
+    const toCheck = emails.filter((e) => !statuses[e]);
+    if (toCheck.length === 0) return;
+    setStatuses((prev) => {
+      const next = { ...prev };
+      for (const e of toCheck) next[e] = "checking";
+      return next;
+    });
+    for (const e of toCheck) {
+      void (async () => {
+        try {
+          const res = await fetch("/api/email/verify-mx", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: e }),
+          });
+          const data = (await res.json()) as
+            | { ok: true; status: "valid" | "invalid" }
+            | { ok: false; error: string };
+          setStatuses((prev) => ({
+            ...prev,
+            [e]: data.ok ? data.status : "error",
+          }));
+        } catch {
+          setStatuses((prev) => ({ ...prev, [e]: "error" }));
+        }
+      })();
+    }
+  }, [open, emails, statuses]);
 
   if (emails.length === 1) {
     return (
@@ -1202,26 +1261,41 @@ function EmailButton({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-30 mt-1 min-w-[220px] overflow-hidden rounded-md border border-gray-200 bg-surface shadow-elevated"
+          className="absolute right-0 top-full z-30 mt-1 min-w-[260px] overflow-hidden rounded-md border border-gray-200 bg-surface shadow-elevated"
         >
           <div className="border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-gray-400">
             Email {contactName}
           </div>
-          {emails.map((email) => (
-            <button
-              key={email}
-              type="button"
-              role="menuitem"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-                onPick(email);
-              }}
-              className="block w-full truncate px-3 py-2 text-left text-[12px] text-ink hover:bg-petrol-50"
-            >
-              {email}
-            </button>
-          ))}
+          {emails.map((email) => {
+            const s = statuses[email];
+            return (
+              <button
+                key={email}
+                type="button"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                  onPick(email);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-ink hover:bg-petrol-50"
+                title={
+                  s === "valid"
+                    ? "MX records found — domain accepts mail"
+                    : s === "invalid"
+                      ? "No MX records — likely bad address"
+                      : s === "checking"
+                        ? "Verifying…"
+                        : s === "error"
+                          ? "Verification failed"
+                          : "Click to pick"
+                }
+              >
+                <StatusDot status={s} />
+                <span className="truncate">{email}</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
