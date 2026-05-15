@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   IconMail,
   IconMessage2,
@@ -213,7 +214,33 @@ export function ConversationTabClient({
     void markThreadRead(conversationId);
   }
 
-  const reachable = useMemo(() => people.filter((p) => p.emails.length > 0), [people]);
+  // Tightened filter: a contact is "reachable" if they have at least one
+  // non-empty email address. This excludes phone-only contacts and any
+  // garbage rows that stored an empty string for email.
+  const reachable = useMemo(
+    () =>
+      people.filter((p) =>
+        p.emails.some((e) => typeof e === "string" && e.trim().length > 0)
+      ),
+    [people]
+  );
+
+  // Honor ?compose_to=<email> from the URL — used by the Contacts tab to jump
+  // here with the compose drawer already open for a specific address.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  useEffect(() => {
+    const target = searchParams.get("compose_to");
+    if (!target) return;
+    setComposeTo(target);
+    setComposing(true);
+    // Clear the param so re-renders don't keep re-opening the drawer.
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("compose_to");
+    router.replace(`${pathname}?${next.toString()}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const countByPersonId = useMemo(() => {
     const map = new Map<string, number>();
@@ -383,11 +410,11 @@ export function ConversationTabClient({
 
   return (
     <div>
-      {/* PEOPLE */}
+      {/* CONTACTS */}
       {reachable.length > 0 && (
         <div className="mb-3 rounded-[10px] border border-gray-200 bg-surface px-4 py-[12px] shadow-card">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="section-subheader m-0">People on this Lead</h3>
+            <h3 className="section-subheader m-0">Contacts</h3>
             {selectedLabel && (
               <button
                 type="button"
@@ -402,64 +429,64 @@ export function ConversationTabClient({
           <div className="grid grid-cols-2 gap-x-3 gap-y-1 md:grid-cols-3 xl:grid-cols-4">
             {reachable.map((p) => {
               const selected = selectedFilterId === p.id;
-              const primaryEmail = p.emails[0] ?? null;
+              const cleanEmails = p.emails.filter(
+                (e) => typeof e === "string" && e.trim().length > 0
+              );
               const primaryPhone = p.phones[0] ?? null;
               const count = countByPersonId.get(p.id) ?? 0;
               const color = avatarColorFor(p.name);
               return (
-                <button
+                <div
                   key={p.id}
-                  type="button"
-                  onClick={() => toggleFilter(p.id)}
                   className={cn(
-                    "group flex w-full items-center gap-2 rounded-md px-2 py-[6px] text-left transition-colors",
+                    "group relative flex w-full items-center gap-2 rounded-md px-2 py-[6px] transition-colors",
                     selected ? "bg-petrol-50" : "hover:bg-gray-50"
                   )}
                 >
-                  <div
-                    className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold"
-                    style={{ background: color.bg, color: color.text }}
+                  <button
+                    type="button"
+                    onClick={() => toggleFilter(p.id)}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
                   >
-                    {initialsOf(p.name)}
-                  </div>
-                  <div className="min-w-0 flex-1 truncate leading-tight">
-                    <div className="flex items-baseline gap-[5px] truncate text-[12.5px] font-medium text-ink">
-                      <span className="truncate">{p.name}</span>
-                      {count > 0 && (
-                        <span className="shrink-0 text-[10px] font-medium tabular-nums text-petrol-500">
-                          {count}
-                        </span>
-                      )}
+                    <div
+                      className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold"
+                      style={{ background: color.bg, color: color.text }}
+                    >
+                      {initialsOf(p.name)}
                     </div>
-                    <div className="truncate text-[10px] uppercase tracking-wide text-gray-400">
-                      {p.role}
+                    <div className="min-w-0 flex-1 truncate leading-tight">
+                      <div className="flex items-baseline gap-[5px] truncate text-[12.5px] font-medium text-ink">
+                        <span className="truncate">{p.name}</span>
+                        {count > 0 && (
+                          <span className="shrink-0 text-[10px] font-medium tabular-nums text-petrol-500">
+                            {count}
+                          </span>
+                        )}
+                      </div>
+                      <div className="truncate text-[10px] uppercase tracking-wide text-gray-400">
+                        {p.role}
+                      </div>
                     </div>
-                  </div>
+                  </button>
                   <div className="flex shrink-0 items-center gap-[2px] opacity-0 transition-opacity group-hover:opacity-100">
-                    {primaryEmail && !noAccount && (
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openComposeTo(primaryEmail);
-                        }}
-                        className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
-                      >
-                        <IconMail size={12} stroke={1.75} />
-                      </span>
+                    {cleanEmails.length > 0 && !noAccount && (
+                      <EmailButton
+                        emails={cleanEmails}
+                        onPick={(email) => openComposeTo(email)}
+                        contactName={p.name}
+                      />
                     )}
                     {primaryPhone && (
                       <a
                         href={`tel:${primaryPhone}`}
-                        onClick={(e) => e.stopPropagation()}
                         className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
+                        title={`Call ${primaryPhone}`}
                       >
                         <IconPhone size={12} stroke={1.75} />
                       </a>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -574,7 +601,16 @@ export function ConversationTabClient({
             );
           })}
         </div>
-        {!noAccount && (
+        {noAccount ? (
+          <a
+            href="/settings"
+            className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+            title="Connect Gmail to start sending"
+          >
+            <IconMail size={13} stroke={2} />
+            Connect Gmail to Send
+          </a>
+        ) : (
           <button
             type="button"
             onClick={() => openComposeTo(null)}
@@ -955,6 +991,99 @@ function ThreadReader({
               Forward
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Multi-email picker. Single email → click sends compose target directly.
+// Multiple → click opens a small dropdown listing every address so the user
+// can choose which one to write to. Closes on outside click or Escape.
+function EmailButton({
+  emails,
+  onPick,
+  contactName,
+}: {
+  emails: string[];
+  onPick: (email: string) => void;
+  contactName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (emails.length === 1) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onPick(emails[0]);
+        }}
+        className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
+        title={`Email ${contactName} at ${emails[0]}`}
+        aria-label="Email"
+      >
+        <IconMail size={12} stroke={1.75} />
+      </button>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
+        title={`Email ${contactName} (${emails.length} addresses)`}
+        aria-label="Email"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <IconMail size={12} stroke={1.75} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-30 mt-1 min-w-[220px] overflow-hidden rounded-md border border-gray-200 bg-surface shadow-elevated"
+        >
+          <div className="border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+            Email {contactName}
+          </div>
+          {emails.map((email) => (
+            <button
+              key={email}
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                onPick(email);
+              }}
+              className="block w-full truncate px-3 py-2 text-left text-[12px] text-ink hover:bg-petrol-50"
+            >
+              {email}
+            </button>
+          ))}
         </div>
       )}
     </div>

@@ -291,57 +291,29 @@ export function OtherContactsSection({
         )}
       </Modal>
 
+      {/* Manage Roles — single persistent modal. The body switches between
+          the list view and the per-role replacement form so the user can
+          manage as many roles as they want in one session without closing
+          and re-opening the modal each time. */}
       <Modal
-        open={managingRoles && !roleToReplace}
-        onClose={() => setManagingRoles(false)}
-        title="Manage Custom Roles"
-        description="Custom roles are shared across your organization. Deleting one prompts you to reassign every contact using it."
-        width={420}
-      >
-        {sortedRoles.length === 0 ? (
-          <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-[12px] text-gray-500">
-            No custom roles yet. Pick &quot;+ Add new role&quot; in the Add
-            Contact dropdown to create one.
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-150">
-            {sortedRoles.map((label) => (
-              <div
-                key={label}
-                className="flex items-center justify-between gap-2 py-2"
-              >
-                <span className="truncate text-[13px] text-ink">{label}</span>
-                <button
-                  type="button"
-                  onClick={() => setRoleToReplace(label)}
-                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11px] font-medium text-gray-600 hover:border-danger hover:text-danger"
-                >
-                  <IconTrash size={11} stroke={1.75} />
-                  Delete
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={() => setManagingRoles(false)}
-            className="rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-xs text-ink hover:border-petrol-500"
-          >
-            Done
-          </button>
-        </div>
-      </Modal>
-
-      <Modal
-        open={!!roleToReplace}
-        onClose={() => setRoleToReplace(null)}
-        title={`Delete "${roleToReplace ?? ""}"`}
-        description="Pick where the contacts currently using this role should be moved. The role will be removed from the dropdown afterwards."
+        open={managingRoles}
+        onClose={() => {
+          setManagingRoles(false);
+          setRoleToReplace(null);
+        }}
+        title={
+          roleToReplace
+            ? `Delete "${roleToReplace}"`
+            : "Manage Custom Roles"
+        }
+        description={
+          roleToReplace
+            ? "Pick where the contacts currently using this role should be moved. The role will be removed from the dropdown afterwards."
+            : "Custom roles are shared across your organization. Deleting one prompts you to reassign every contact using it."
+        }
         width={460}
       >
-        {roleToReplace && (
+        {roleToReplace ? (
           <DeleteRoleForm
             label={roleToReplace}
             allCustomRoles={sortedRoles}
@@ -355,6 +327,52 @@ export function OtherContactsSection({
               applyRoleReplacement(roleToReplace, replacement)
             }
           />
+        ) : sortedRoles.length === 0 ? (
+          <>
+            <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-[12px] text-gray-500">
+              No custom roles yet. Pick &quot;+ Add new role&quot; in the Add
+              Contact dropdown to create one.
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setManagingRoles(false)}
+                className="rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-xs text-ink hover:border-petrol-500"
+              >
+                Done
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="divide-y divide-gray-150">
+              {sortedRoles.map((label) => (
+                <div
+                  key={label}
+                  className="flex items-center justify-between gap-2 py-2"
+                >
+                  <span className="truncate text-[13px] text-ink">{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRoleToReplace(label)}
+                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11px] font-medium text-gray-600 hover:border-danger hover:text-danger"
+                  >
+                    <IconTrash size={11} stroke={1.75} />
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setManagingRoles(false)}
+                className="rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-xs text-ink hover:border-petrol-500"
+              >
+                Done
+              </button>
+            </div>
+          </>
         )}
       </Modal>
     </div>

@@ -1,10 +1,13 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   IconPlus,
   IconTrash,
   IconPencil,
+  IconMail,
 } from "@tabler/icons-react";
 import {
   upsertContact,
@@ -858,6 +861,13 @@ function ContactLine({
   const [editingType, setEditingType] = useState(false);
   const [editingStatus, setEditingStatus] = useState(false);
   const ptype = phoneType ?? null;
+  // For email contacts we surface a "Compose" affordance that hops to the
+  // Conversation tab with the address pre-filled. Keeps the user inside the
+  // lead instead of forcing them to navigate around to send a one-off email.
+  const pathname = usePathname();
+  const composeHref = !isPhone
+    ? `${pathname}?tab=conversation&compose_to=${encodeURIComponent(value)}`
+    : null;
 
   const statusClass = (s: ContactStatus) =>
     s === "valid"
@@ -925,6 +935,16 @@ function ContactLine({
           </div>
         )}
         <span className="flex-1" />
+        {composeHref && (
+          <Link
+            href={composeHref}
+            className="shrink-0 cursor-pointer rounded p-[2px] text-gray-400 hover:bg-petrol-50 hover:text-petrol-700"
+            aria-label="Compose Email"
+            title={`Compose to ${value}`}
+          >
+            <IconMail size={11} stroke={1.75} />
+          </Link>
+        )}
         {canRemove && (
           <button
             type="button"
