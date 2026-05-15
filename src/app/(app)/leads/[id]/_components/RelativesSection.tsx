@@ -8,6 +8,7 @@ import { useRole } from "@/components/RoleProvider";
 import { Modal } from "@/components/Modal";
 import { AgeEditField } from "./ContactsTabClient";
 import { formatPhone } from "@/lib/format/phone";
+import { formatPhoneInput } from "@/lib/phone";
 import { properCaseName } from "@/lib/format/proper-case-name";
 import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
@@ -111,8 +112,19 @@ export function RelativesSection({
   const [draftName, setDraftName] = useState("");
   const [draftRelationship, setDraftRelationship] = useState("");
   const [draftPhone, setDraftPhone] = useState("");
+  const [draftEmail, setDraftEmail] = useState("");
+  const [draftNotes, setDraftNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  function resetDrafts() {
+    setDraftName("");
+    setDraftRelationship("");
+    setDraftPhone("");
+    setDraftEmail("");
+    setDraftNotes("");
+    setError(null);
+  }
 
   function add() {
     setError(null);
@@ -122,21 +134,23 @@ export function RelativesSection({
       return;
     }
     const phone = draftPhone.trim() || null;
+    const email = draftEmail.trim().toLowerCase() || null;
+    const notes = draftNotes.trim() || null;
     const relationship = draftRelationship.trim() || null;
     startTransition(async () => {
       const res = await upsertRelative(leadId, null, {
         full_name: name,
         relationship,
         phone,
+        email,
+        notes,
       });
       if (res.ok) {
-        setRelatives((prev) => [
-          ...prev,
-          makeRelativeRow(res.id, leadId, name, relationship, phone),
-        ]);
-        setDraftName("");
-        setDraftRelationship("");
-        setDraftPhone("");
+        const row = makeRelativeRow(res.id, leadId, name, relationship, phone);
+        row.email = email;
+        row.notes = notes;
+        setRelatives((prev) => [...prev, row]);
+        resetDrafts();
         setAdding(false);
       } else {
         setError(res.error);
@@ -205,14 +219,11 @@ export function RelativesSection({
         open={adding}
         onClose={() => {
           setAdding(false);
-          setDraftName("");
-          setDraftRelationship("");
-          setDraftPhone("");
-          setError(null);
+          resetDrafts();
         }}
         title="Add Relative"
-        description="Family members of an owner. Address and additional contact details can be edited on the relative card after saving."
-        width={460}
+        description="Capture the full details up front. Additional phones, addresses, and metadata can be edited on the relative card afterwards."
+        width={500}
       >
         <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
           Full Name
@@ -239,14 +250,41 @@ export function RelativesSection({
             </option>
           ))}
         </select>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              Phone
+            </label>
+            <input
+              type="tel"
+              value={draftPhone}
+              onChange={(e) => setDraftPhone(formatPhoneInput(e.target.value))}
+              placeholder="(555) 555-1234"
+              className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              Email
+            </label>
+            <input
+              type="email"
+              value={draftEmail}
+              onChange={(e) => setDraftEmail(e.target.value)}
+              placeholder="linda@example.com"
+              className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+            />
+          </div>
+        </div>
         <label className="mt-3 mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
-          Phone
+          Notes
         </label>
-        <input
-          value={draftPhone}
-          onChange={(e) => setDraftPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-          placeholder="(555) 555-5555"
-          className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+        <textarea
+          value={draftNotes}
+          onChange={(e) => setDraftNotes(e.target.value)}
+          rows={3}
+          placeholder="Optional context — relationship details, best time to reach, etc."
+          className="w-full resize-y rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
         />
         {error && <div className="mt-3 text-[12px] text-danger">{error}</div>}
         <div className="mt-5 flex justify-end gap-2">
@@ -254,10 +292,7 @@ export function RelativesSection({
             type="button"
             onClick={() => {
               setAdding(false);
-              setDraftName("");
-              setDraftRelationship("");
-              setDraftPhone("");
-              setError(null);
+              resetDrafts();
             }}
             className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
           >

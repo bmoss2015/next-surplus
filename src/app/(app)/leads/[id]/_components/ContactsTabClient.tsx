@@ -18,6 +18,7 @@ import { useRole } from "@/components/RoleProvider";
 import { Modal } from "@/components/Modal";
 import { cn } from "@/lib/cn";
 import { formatPhone } from "@/lib/format/phone";
+import { formatPhoneInput } from "@/lib/phone";
 import { SectionSubheader } from "./SectionSubheader";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -141,38 +142,114 @@ export function ContactsTabClient({
   const [showOwnerForm, setShowOwnerForm] = useState(false);
   const [newOwnerName, setNewOwnerName] = useState("");
   const [newOwnerStatus, setNewOwnerStatus] = useState<OwnerStatus>("unknown");
+  const [newOwnerPhone, setNewOwnerPhone] = useState("");
+  const [newOwnerEmail, setNewOwnerEmail] = useState("");
+  const [newOwnerNotes, setNewOwnerNotes] = useState("");
   const [, startTransition] = useTransition();
+
+  function resetOwnerForm() {
+    setNewOwnerName("");
+    setNewOwnerStatus("unknown");
+    setNewOwnerPhone("");
+    setNewOwnerEmail("");
+    setNewOwnerNotes("");
+  }
 
   function addOwner() {
     const name = newOwnerName.trim();
     if (!name) return;
     const willBePrimary = owners.length === 0;
+    const phone = newOwnerPhone.trim();
+    const email = newOwnerEmail.trim().toLowerCase();
+    const notes = newOwnerNotes.trim() || null;
     startTransition(async () => {
       const result = await upsertOwner(leadId, null, {
         full_name: name,
         status: newOwnerStatus,
         is_primary: willBePrimary,
+        notes,
       });
-      if (result.ok) {
-        setOwners((prev) => [
-          ...prev,
-          {
-            id: result.id,
+      if (!result.ok) return;
+      const ownerId = result.id;
+
+      const newContacts: ContactRow[] = [];
+      if (phone) {
+        const r = await upsertContact(leadId, ownerId, null, {
+          channel: "phone",
+          value: phone,
+          status: "untested",
+          is_primary: true,
+        });
+        if (r.ok) {
+          newContacts.push({
+            id: r.id,
+            owner_id: ownerId,
             lead_id: leadId,
-            full_name: name,
-            status: newOwnerStatus,
-            date_of_death: null,
-            is_primary: willBePrimary,
-            is_deceased: false,
-            age: null,
-            relationship: null,
+            channel: "phone",
+            value: phone,
+            status: "untested",
+            connection_status: null,
+            source: null,
+            last_attempted: null,
+            is_primary: true,
+            phone_type: null,
+            is_dnc: false,
+            is_litigator: false,
+            mailed: false,
+            mailed_at: null,
             notes: null,
-          },
-        ]);
-        setNewOwnerName("");
-        setNewOwnerStatus("unknown");
-        setShowOwnerForm(false);
+          });
+        }
       }
+      if (email) {
+        const r = await upsertContact(leadId, ownerId, null, {
+          channel: "email",
+          value: email,
+          status: "untested",
+          is_primary: true,
+        });
+        if (r.ok) {
+          newContacts.push({
+            id: r.id,
+            owner_id: ownerId,
+            lead_id: leadId,
+            channel: "email",
+            value: email,
+            status: "untested",
+            connection_status: null,
+            source: null,
+            last_attempted: null,
+            is_primary: true,
+            phone_type: null,
+            is_dnc: false,
+            is_litigator: false,
+            mailed: false,
+            mailed_at: null,
+            notes: null,
+          });
+        }
+      }
+
+      setOwners((prev) => [
+        ...prev,
+        {
+          id: ownerId,
+          lead_id: leadId,
+          full_name: name,
+          status: newOwnerStatus,
+          date_of_death: null,
+          is_primary: willBePrimary,
+          is_deceased: false,
+          age: null,
+          relationship: null,
+          notes,
+        },
+      ]);
+      if (newContacts.length > 0) {
+        setContacts((prev) => [...prev, ...newContacts]);
+      }
+      resetOwnerForm();
+      setShowOwnerForm(false);
     });
   }
 
@@ -290,11 +367,11 @@ export function ContactsTabClient({
         open={showOwnerForm}
         onClose={() => {
           setShowOwnerForm(false);
-          setNewOwnerName("");
+          resetOwnerForm();
         }}
         title="Add Owner"
-        description="Add a property owner to this lead. Phone, email, and mailing address can be filled in on the owner card after saving."
-        width={460}
+        description="Capture the owner's full details up front. Additional phones, emails, and mailing addresses can be added on the card afterwards."
+        width={500}
       >
         <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
           Full Name
@@ -304,12 +381,6 @@ export function ContactsTabClient({
           autoFocus
           value={newOwnerName}
           onChange={(e) => setNewOwnerName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addOwner();
-            }
-          }}
           placeholder="Robert Smith"
           className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
         />
@@ -327,12 +398,48 @@ export function ContactsTabClient({
             </option>
           ))}
         </select>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              Phone
+            </label>
+            <input
+              type="tel"
+              value={newOwnerPhone}
+              onChange={(e) => setNewOwnerPhone(formatPhoneInput(e.target.value))}
+              placeholder="(555) 555-1234"
+              className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              Email
+            </label>
+            <input
+              type="email"
+              value={newOwnerEmail}
+              onChange={(e) => setNewOwnerEmail(e.target.value)}
+              placeholder="robert@example.com"
+              className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+            />
+          </div>
+        </div>
+        <label className="mt-3 mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          Notes
+        </label>
+        <textarea
+          value={newOwnerNotes}
+          onChange={(e) => setNewOwnerNotes(e.target.value)}
+          rows={3}
+          placeholder="Optional context about this owner — preferences, history, anything useful for the team."
+          className="w-full resize-y rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+        />
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
             onClick={() => {
               setShowOwnerForm(false);
-              setNewOwnerName("");
+              resetOwnerForm();
             }}
             className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
           >

@@ -6,9 +6,11 @@ import {
   IconTrash,
   IconEdit,
   IconBuildingBank,
+  IconMail,
+  IconPhone,
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
-import { formatPhoneUS } from "@/lib/phone";
+import { formatPhoneUS, formatPhoneInput } from "@/lib/phone";
 import {
   LEAD_PARTY_ROLE_LABELS,
   type LeadPartyRole,
@@ -152,25 +154,47 @@ export function OtherContactsSection({
           {rows.map((row) => (
             <div
               key={row.id}
-              className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 py-3 first:pt-0 last:pb-0"
+              className="grid grid-cols-[auto_1fr_auto_auto] items-start gap-3 py-3 first:pt-0 last:pb-0"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-petrol-50 text-petrol-500">
-                <IconBuildingBank size={15} stroke={1.75} />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-petrol-50 text-petrol-500">
+                <IconBuildingBank size={16} stroke={1.75} />
               </div>
               <div className="min-w-0">
-                <div className="text-[13px] font-medium text-ink">
-                  <span className="text-petrol-500">{roleLabel(row)}</span>
-                  <span className="text-gray-400"> · </span>
-                  {row.name}
-                  {row.organization ? (
-                    <span className="text-gray-500"> ({row.organization})</span>
-                  ) : null}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[13.5px] font-semibold text-ink">
+                    {row.name}
+                  </span>
+                  {row.organization && (
+                    <span className="truncate text-[11.5px] text-gray-500">
+                      · {row.organization}
+                    </span>
+                  )}
                 </div>
-                <div className="truncate text-[11px] text-gray-500">
-                  {[row.email, row.phone ? formatPhoneUS(row.phone) : null]
-                    .filter(Boolean)
-                    .join("  ·  ") || "No contact info"}
+                <div className="mt-[1px] text-[9.5px] font-medium uppercase tracking-wide text-petrol-500">
+                  {roleLabel(row)}
                 </div>
+                <div className="mt-[6px] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-gray-600">
+                  {row.email && (
+                    <span className="inline-flex items-center gap-1">
+                      <IconMail size={11} stroke={1.75} className="text-gray-400" />
+                      {row.email}
+                    </span>
+                  )}
+                  {row.phone && (
+                    <span className="inline-flex items-center gap-1">
+                      <IconPhone size={11} stroke={1.75} className="text-gray-400" />
+                      {formatPhoneUS(row.phone)}
+                    </span>
+                  )}
+                  {!row.email && !row.phone && (
+                    <span className="text-gray-400">No contact info</span>
+                  )}
+                </div>
+                {row.notes && (
+                  <div className="mt-2 border-l-2 border-gray-200 pl-2 text-[11.5px] italic leading-relaxed text-gray-600">
+                    {row.notes}
+                  </div>
+                )}
               </div>
               <button
                 type="button"
@@ -319,7 +343,7 @@ function LeadPartyForm({
           <input
             type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
             placeholder="(555) 555-1234"
             className={inputClass}
           />
