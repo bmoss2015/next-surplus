@@ -19,7 +19,9 @@ import { ResearchTemplatesSection } from "./_components/ResearchTemplatesSection
 import { TeamSection } from "./_components/TeamSection";
 import { ProfileSection } from "./_components/ProfileSection";
 import { EmailAccountsSection } from "./_components/EmailAccountsSection";
+import { OtherContactRolesSection } from "./_components/OtherContactRolesSection";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
+import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
 
 export const dynamic = "force-dynamic";
 
@@ -32,14 +34,21 @@ export default async function SettingsPage() {
   if (!profile) redirect("/");
   const isAdmin = profile.isAdmin;
 
-  const [attorneys, lostReasons, templates, researchTemplates, emailAccounts] =
-    await Promise.all([
-      fetchAttorneys(),
-      fetchLostReasonsAdmin(),
-      fetchTemplates(),
-      fetchResearchTemplates(),
-      fetchMyEmailAccounts(),
-    ]);
+  const [
+    attorneys,
+    lostReasons,
+    templates,
+    researchTemplates,
+    emailAccounts,
+    customContactRoles,
+  ] = await Promise.all([
+    fetchAttorneys(),
+    fetchLostReasonsAdmin(),
+    fetchTemplates(),
+    fetchResearchTemplates(),
+    fetchMyEmailAccounts(),
+    fetchOrgCustomRoles(),
+  ]);
   const [defaults, members, needsActionThreshold] = isAdmin
     ? await Promise.all([fetchAppSettings(), fetchOrgMembers(), fetchNeedsActionThreshold()])
     : [null, null, null];
@@ -74,6 +83,7 @@ export default async function SettingsPage() {
         {isAdmin && <DefaultsSection initial={defaults!} />}
         <LostReasonsSection initial={lostReasons} />
         <AttorneysSection initial={attorneys} />
+        <OtherContactRolesSection initial={customContactRoles} />
         <TemplatesSection initial={templates} />
         <SmsTemplatesSection initial={templates} />
         <div className="col-span-2">
