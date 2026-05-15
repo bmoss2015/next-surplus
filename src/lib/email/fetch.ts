@@ -12,7 +12,7 @@ export async function fetchMyEmailAccounts(): Promise<EmailAccountRow[]> {
   const { data, error } = await sb
     .from("channel_accounts")
     .select(
-      "id, provider, address, display_name, status, last_synced_at, created_at"
+      "id, provider, address, display_name, status, last_synced_at, sync_read_to_provider, created_at"
     )
     .order("created_at", { ascending: true });
   if (error) throw error;

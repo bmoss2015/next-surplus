@@ -205,6 +205,24 @@ export async function sendMessage(opts: {
   });
 }
 
+// users.messages.modify — used by the optional "sync read status to Gmail"
+// toggle. Strip UNREAD when we mark a thread read locally.
+export async function modifyMessage(opts: {
+  accountId: string;
+  messageId: string;
+  removeLabelIds?: string[];
+  addLabelIds?: string[];
+}): Promise<void> {
+  await gmailFetch(opts.accountId, `/users/me/messages/${opts.messageId}/modify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      removeLabelIds: opts.removeLabelIds ?? [],
+      addLabelIds: opts.addLabelIds ?? [],
+    }),
+  });
+}
+
 // ---- header/body helpers ----
 
 export function getHeader(

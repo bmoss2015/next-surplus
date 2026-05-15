@@ -22,3 +22,17 @@ export async function disconnectEmailAccount(
   revalidatePath("/settings");
   return { ok: true };
 }
+
+export async function setEmailAccountReadSync(
+  accountId: string,
+  enabled: boolean
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { error } = await sb
+    .from("channel_accounts")
+    .update({ sync_read_to_provider: enabled })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}

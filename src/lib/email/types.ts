@@ -10,6 +10,7 @@ export type EmailAccountRow = {
   display_name: string | null;
   status: "active" | "reauth_required" | "disabled";
   last_synced_at: string | null;
+  sync_read_to_provider: boolean;
   created_at: string;
 };
 

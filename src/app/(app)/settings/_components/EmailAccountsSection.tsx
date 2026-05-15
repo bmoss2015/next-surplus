@@ -10,7 +10,10 @@ import {
   IconCircleCheck,
 } from "@tabler/icons-react";
 import type { EmailAccountRow } from "@/lib/email/types";
-import { disconnectEmailAccount } from "../_email-actions";
+import {
+  disconnectEmailAccount,
+  setEmailAccountReadSync,
+} from "../_email-actions";
 
 function relativeTime(iso: string | null): string {
   if (!iso) return "Never synced";
@@ -38,6 +41,16 @@ export function EmailAccountsSection({ initial }: { initial: EmailAccountRow[] }
     setRows((prev) => prev.filter((r) => r.id !== id));
     startTransition(async () => {
       await disconnectEmailAccount(id);
+      router.refresh();
+    });
+  }
+
+  function toggleReadSync(id: string, next: boolean) {
+    setRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, sync_read_to_provider: next } : r))
+    );
+    startTransition(async () => {
+      await setEmailAccountReadSync(id, next);
       router.refresh();
     });
   }
@@ -120,42 +133,58 @@ export function EmailAccountsSection({ initial }: { initial: EmailAccountRow[] }
           {rows.map((row) => (
             <div
               key={row.id}
-              className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 py-3 first:pt-0 last:pb-0"
+              className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-petrol-50 text-petrol-500">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-petrol-50 text-petrol-500">
                 <IconMail size={16} stroke={1.75} />
               </div>
-              <div>
-                <div className="text-[13px] font-medium text-ink">
-                  {row.address}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[13px] font-medium text-ink">
+                    {row.address}
+                  </span>
+                  {row.status === "active" && (
+                    <span className="rounded-full bg-success-bg px-2 py-[2px] text-[10px] font-medium text-success-strong">
+                      Active
+                    </span>
+                  )}
+                  {row.status === "reauth_required" && (
+                    <span className="rounded-full bg-danger-bg px-2 py-[2px] text-[10px] font-medium text-danger">
+                      Reconnect
+                    </span>
+                  )}
+                  {row.status === "disabled" && (
+                    <span className="rounded-full bg-gray-100 px-2 py-[2px] text-[10px] font-medium text-gray-500">
+                      Disabled
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-gray-500">
                   {row.display_name ? `${row.display_name} · ` : ""}
                   {row.provider === "gmail" ? "Gmail" : row.provider}
                   {" · "}Last sync {relativeTime(row.last_synced_at)}
                 </div>
-              </div>
-              <div>
-                {row.status === "active" && (
-                  <span className="rounded-full bg-success-bg px-2 py-[2px] text-[10px] font-medium text-success-strong">
-                    Active
+                <label className="mt-2 flex cursor-pointer items-start gap-2 text-[11.5px] text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={row.sync_read_to_provider}
+                    onChange={(e) => toggleReadSync(row.id, e.target.checked)}
+                    className="mt-[2px] cursor-pointer"
+                  />
+                  <span>
+                    <span className="font-medium">Sync read status to Gmail</span>
+                    <span className="block text-[10.5px] text-gray-500">
+                      When you mark an email read in the portal, also remove
+                      the UNREAD label in Gmail so your real inbox stays in
+                      sync.
+                    </span>
                   </span>
-                )}
-                {row.status === "reauth_required" && (
-                  <span className="rounded-full bg-danger-bg px-2 py-[2px] text-[10px] font-medium text-danger">
-                    Reconnect
-                  </span>
-                )}
-                {row.status === "disabled" && (
-                  <span className="rounded-full bg-gray-100 px-2 py-[2px] text-[10px] font-medium text-gray-500">
-                    Disabled
-                  </span>
-                )}
+                </label>
               </div>
               <button
                 type="button"
                 onClick={() => remove(row.id)}
-                className="text-gray-400 hover:text-danger"
+                className="shrink-0 text-gray-400 hover:text-danger"
                 aria-label="Disconnect"
                 title="Disconnect"
               >

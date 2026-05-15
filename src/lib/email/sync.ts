@@ -16,6 +16,11 @@ import {
 import { findLeadForAddress } from "./auto-link";
 
 const BACKFILL_QUERY = "newer_than:90d";
+// Soft cap on how many messages a single sync run will pull during backfill.
+// Keeps the OAuth callback and manual-refresh action from hanging for minutes
+// on busy mailboxes. Subsequent runs continue from the historyId cursor that
+// gets saved after the first batch.
+const BACKFILL_MESSAGE_CAP = 150;
 
 type SyncResult = {
   accountId: string;
@@ -86,28 +91,32 @@ async function backfill(
 ) {
   const svc = createServiceClient();
   let pageToken: string | undefined;
-  const seen: string[] = [];
-  do {
+  let ingestedSoFar = 0;
+  outer: do {
     const page = await listMessages({
       accountId,
       query: BACKFILL_QUERY,
       pageToken,
-      maxResults: 100,
+      maxResults: 50,
     });
     for (const m of page.messages ?? []) {
       try {
         const ingested = await ingestMessage(accountId, acct, m.id);
         if (ingested) result.messagesIngested += 1;
         result.attachmentsStored += ingested?.attachments ?? 0;
-        seen.push(m.id);
+        ingestedSoFar += 1;
       } catch (e) {
         result.errors.push(`msg ${m.id}: ${e instanceof Error ? e.message : e}`);
       }
+      if (ingestedSoFar >= BACKFILL_MESSAGE_CAP) break outer;
     }
     pageToken = page.nextPageToken;
   } while (pageToken);
 
   // Set cursor to the current historyId so subsequent syncs are incremental.
+  // We always set this even if the cap was hit — the older messages we didn't
+  // pull stay un-ingested but everything *new* from this point flows through
+  // incrementalSync via the history API.
   try {
     const profile = await getProfile(accountId);
     await svc

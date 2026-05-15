@@ -186,6 +186,15 @@ export async function fetchThreadDetail(
 
 export async function markThreadRead(threadId: string): Promise<void> {
   const sb = await createClient();
+
+  // First find which messages were unread (we need their provider ids before
+  // we overwrite is_read, in case the user has Gmail read-sync turned on).
+  const { data: pendingMessages } = await sb
+    .from("messages")
+    .select("provider_message_id, conversations!inner(channel_account_id)")
+    .eq("conversation_id", threadId)
+    .eq("is_read", false);
+
   await sb
     .from("messages")
     .update({ is_read: true })
@@ -195,6 +204,50 @@ export async function markThreadRead(threadId: string): Promise<void> {
     .from("conversations")
     .update({ unread_count: 0 })
     .eq("id", threadId);
+
+  // If the owning account has sync_read_to_provider enabled, also strip the
+  // UNREAD label on each Gmail message so the user's actual inbox reflects
+  // the read state.
+  if (pendingMessages && pendingMessages.length > 0) {
+    type Row = {
+      provider_message_id: string | null;
+      conversations:
+        | { channel_account_id: string }
+        | { channel_account_id: string }[]
+        | null;
+    };
+    const accountId = (() => {
+      const c = (pendingMessages[0] as unknown as Row).conversations;
+      const obj = Array.isArray(c) ? c[0] : c;
+      return obj?.channel_account_id ?? null;
+    })();
+    if (accountId) {
+      const { data: acct } = await sb
+        .from("channel_accounts")
+        .select("provider, sync_read_to_provider")
+        .eq("id", accountId)
+        .maybeSingle();
+      if (
+        acct?.sync_read_to_provider &&
+        acct.provider === "gmail"
+      ) {
+        const { modifyMessage } = await import("./gmail");
+        for (const m of pendingMessages as unknown as Row[]) {
+          const pid = m.provider_message_id;
+          if (!pid) continue;
+          try {
+            await modifyMessage({
+              accountId,
+              messageId: pid,
+              removeLabelIds: ["UNREAD"],
+            });
+          } catch (e) {
+            console.error("Gmail read-sync failed for", pid, e);
+          }
+        }
+      }
+    }
+  }
 }
 
 export async function fetchInboxFilterCounts(): Promise<InboxFilterCounts> {
