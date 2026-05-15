@@ -264,16 +264,17 @@ export function ComposeBox(props: Props) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Sticky header */}
-      <div className="flex shrink-0 items-center justify-between bg-gradient-to-r from-petrol-700 to-petrol-500 px-5 py-[10px]">
-        <div className="inline-flex items-center gap-2 text-[12px] font-medium text-white">
-          {icon}
+      {/* Sticky header — matches the thread reader header so the two columns
+          read as a unified surface, not competing chrome. */}
+      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-surface px-5 py-4">
+        <div className="inline-flex min-w-0 items-center gap-2 text-[13px] font-medium text-ink">
+          <span className="text-petrol-500">{icon}</span>
           <span className="truncate">{text}</span>
         </div>
         <button
           type="button"
           onClick={props.onClose}
-          className="rounded p-[2px] text-white/70 hover:bg-white/10 hover:text-white"
+          className="rounded p-[2px] text-gray-400 hover:bg-gray-100 hover:text-ink"
           aria-label="Discard"
         >
           <IconX size={14} stroke={2} />

@@ -10,8 +10,8 @@ import {
   IconArrowBackUp,
   IconArrowBackUpDouble,
   IconArrowForwardUp,
+  IconArrowRight,
   IconRefresh,
-  IconExternalLink,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
@@ -91,14 +91,11 @@ export function ThreadReader({
               {detail.lead_id ? (
                 <a
                   href={`/leads/${detail.lead_id}`}
-                  className="group inline-flex items-center gap-[5px] rounded-full border border-petrol-200 bg-petrol-50 px-[10px] py-[3px] text-[11px] font-medium text-petrol-700 hover:border-petrol-500 hover:bg-petrol-100"
-                  title="Open lead in new context"
+                  className="inline-flex items-center gap-[6px] rounded-full btn-primary px-[10px] py-[4px] text-[11px] font-medium text-white"
+                  title="Open lead"
                 >
-                  <IconLink size={11} stroke={1.75} />
-                  <span className="underline-offset-2 group-hover:underline">
-                    {detail.lead_label}
-                  </span>
-                  <IconExternalLink size={10} stroke={1.75} />
+                  <span>Linked to {detail.lead_label}</span>
+                  <IconArrowRight size={11} stroke={2} />
                 </a>
               ) : (
                 <button

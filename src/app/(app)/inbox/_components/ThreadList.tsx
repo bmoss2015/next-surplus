@@ -148,7 +148,7 @@ export function ThreadList({
             />
           </button>
         </div>
-        <div className="mt-3 flex flex-wrap gap-1">
+        <div className="mt-3 flex items-center gap-[3px]">
           {FILTERS.map((f) => {
             const count = counts[f.countKey];
             const active = filter === f.value;
@@ -157,19 +157,17 @@ export function ThreadList({
                 key={f.value}
                 href={hrefForFilter(f.value)}
                 className={cn(
-                  "inline-flex items-center gap-[5px] rounded-full px-2 py-[2px] text-[11px]",
+                  "inline-flex flex-1 items-baseline justify-center gap-[4px] whitespace-nowrap rounded-md px-[6px] py-[3px] text-[10.5px]",
                   active
-                    ? "bg-petrol-500 text-white"
+                    ? "bg-petrol-500 font-medium text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 )}
               >
-                {f.label}
+                <span>{f.label}</span>
                 <span
                   className={cn(
-                    "rounded-full px-[6px] py-[1px] text-[10px] font-medium leading-none",
-                    active
-                      ? "bg-white/25 text-white"
-                      : "bg-white text-gray-500"
+                    "text-[10px] tabular-nums",
+                    active ? "text-white/70" : "text-gray-400"
                   )}
                 >
                   {count}
