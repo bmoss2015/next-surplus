@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { IconSend, IconX } from "@tabler/icons-react";
-import type { ThreadDetail, ThreadMessage } from "@/lib/email/inbox";
+import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
 import { sendEmail } from "../_send-actions";
 
 type Props =

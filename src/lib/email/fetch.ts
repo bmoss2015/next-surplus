@@ -1,15 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import type { EmailAccountRow } from "./types";
 
-export type EmailAccountRow = {
-  id: string;
-  provider: "gmail" | "outlook" | "quo_sms";
-  address: string;
-  display_name: string | null;
-  status: "active" | "reauth_required" | "disabled";
-  last_synced_at: string | null;
-  created_at: string;
-};
+// Re-export so existing server-side imports keep working.
+export type { EmailAccountRow } from "./types";
 
 // Fetches the channel accounts owned by the current user. RLS already scopes
 // to user_id = auth.uid(); this is just a convenience wrapper.

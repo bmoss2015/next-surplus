@@ -13,7 +13,7 @@ import {
   LEAD_PARTY_ROLE_LABELS,
   type LeadPartyRole,
   type LeadPartyRow,
-} from "@/lib/leads/lead-parties";
+} from "@/lib/leads/lead-parties-types";
 import {
   upsertLeadParty,
   deleteLeadParty,

@@ -10,7 +10,7 @@ import {
   IconArrowBackUp,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
-import type { ThreadDetail, ThreadMessage } from "@/lib/email/inbox";
+import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
 import { archiveThread, markThreadRead } from "../_actions";
 import { ComposeBox } from "./ComposeBox";
 import { HtmlMessage } from "./HtmlMessage";

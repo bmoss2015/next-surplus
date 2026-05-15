@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { toE164 } from "@/lib/phone";
-import type { LeadPartyRole } from "@/lib/leads/lead-parties";
+import type { LeadPartyRole } from "@/lib/leads/lead-parties-types";
 
 export type LeadPartyInput = {
   id?: string | null;

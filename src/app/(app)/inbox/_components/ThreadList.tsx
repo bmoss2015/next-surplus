@@ -9,7 +9,7 @@ import {
   IconCircleFilled,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
-import type { InboxThreadRow, InboxFilter } from "@/lib/email/inbox";
+import type { InboxThreadRow, InboxFilter } from "@/lib/email/types";
 
 const FILTERS: { value: InboxFilter; label: string }[] = [
   { value: "all", label: "All" },

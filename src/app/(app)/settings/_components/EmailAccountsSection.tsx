@@ -9,7 +9,7 @@ import {
   IconAlertTriangle,
   IconCircleCheck,
 } from "@tabler/icons-react";
-import type { EmailAccountRow } from "@/lib/email/fetch";
+import type { EmailAccountRow } from "@/lib/email/types";
 import { disconnectEmailAccount } from "../_email-actions";
 
 function relativeTime(iso: string | null): string {
