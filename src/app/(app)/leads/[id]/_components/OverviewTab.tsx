@@ -110,7 +110,9 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
   const primaryEmail = emailContacts.find((c) => c.is_primary) ?? emailContacts[0] ?? null;
   const hasAnyContacts = owners.length > 0 || contacts.length > 0;
   const findings = (lead.research_overall_findings ?? "").trim();
-  const recentNotes = notes.slice(0, 2);
+  // Overview is a glance view — one most-recent note is the preview, full
+  // thread lives in the Notes tab.
+  const recentNotes = notes.slice(0, 1);
 
   return (
     <div className="space-y-6">
@@ -183,7 +185,7 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
               {recentNotes.map((note) => (
                 <div key={note.id} className="rounded-md border border-gray-200 bg-surface px-3 py-[10px]">
                   <div className="text-[10.5px] text-gray-500">{noteByline(note.created_at, note)}</div>
-                  <div className="mt-1 whitespace-pre-wrap text-[13px] text-ink">{(note.payload?.body as string) ?? ""}</div>
+                  <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-ink">{(note.payload?.body as string) ?? ""}</div>
                 </div>
               ))}
             </div>

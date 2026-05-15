@@ -507,6 +507,11 @@ function RecipientField({
   const [suggestions, setSuggestions] = useState<ContactSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
+  // Only show suggestions after the user actually types — programmatic
+  // pre-fills (e.g. clicking "Email Karen Williams" → picker → compose
+  // opens with To=alice@x.com) should NOT immediately offer her other
+  // addresses as if the user hadn't decided yet.
+  const [userTyped, setUserTyped] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Discards stale fetches when the user types faster than the server can
@@ -516,7 +521,7 @@ function RecipientField({
   const { current } = splitLastToken(value);
 
   useEffect(() => {
-    if (current.length < 1) {
+    if (!userTyped || current.length < 1) {
       setSuggestions([]);
       setOpen(false);
       return;

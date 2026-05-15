@@ -454,53 +454,61 @@ export function ConversationTabClient({
                 <div
                   key={p.id}
                   className={cn(
-                    "group relative flex w-full items-center gap-1.5 rounded-md px-2 py-[6px] transition-colors",
+                    "group relative flex w-full items-center gap-2 rounded-md px-2 py-[6px] transition-colors",
                     selected ? "bg-petrol-50" : "hover:bg-gray-50"
                   )}
                 >
                   <button
                     type="button"
                     onClick={() => toggleFilter(p.id)}
-                    className="flex min-w-0 items-center gap-2 text-left"
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
                   >
                     <div
-                      className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold"
+                      className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
                       style={{ background: color.bg, color: color.text }}
                     >
                       {initialsOf(p.name)}
                     </div>
-                    <div className="min-w-0 flex-1 truncate leading-tight">
-                      <div className="flex items-baseline gap-[5px] truncate text-[12.5px] font-medium text-ink">
-                        <span className="truncate">{p.name}</span>
+                    {/* Name + icons share line 1; role sits on line 2 — keeps
+                        the icons visually attached to the contact name, not
+                        floating between two lines of text. */}
+                    <div className="min-w-0 flex-1 leading-tight">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-[12.5px] font-medium text-ink">
+                          {p.name}
+                        </span>
                         {count > 0 && (
                           <span className="shrink-0 text-[10px] font-medium tabular-nums text-petrol-500">
                             {count}
                           </span>
                         )}
+                        <span className="flex shrink-0 items-center gap-[2px] text-gray-400">
+                          {cleanEmails.length > 0 && !noAccount && (
+                            <span onClick={(e) => e.stopPropagation()}>
+                              <EmailButton
+                                emails={cleanEmails}
+                                onPick={(email) => openComposeTo(email)}
+                                contactName={p.name}
+                              />
+                            </span>
+                          )}
+                          {primaryPhone && (
+                            <a
+                              href={`tel:${primaryPhone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="rounded p-[3px] text-gray-400 hover:bg-petrol-50 hover:text-petrol-500"
+                              title={`Call ${primaryPhone}`}
+                            >
+                              <IconPhone size={14} stroke={1.75} />
+                            </a>
+                          )}
+                        </span>
                       </div>
-                      <div className="truncate text-[10px] uppercase tracking-wide text-gray-400">
+                      <div className="mt-[1px] truncate text-[10px] uppercase tracking-wide text-gray-400">
                         {p.role}
                       </div>
                     </div>
                   </button>
-                  <div className="flex shrink-0 items-center gap-[2px]">
-                    {cleanEmails.length > 0 && !noAccount && (
-                      <EmailButton
-                        emails={cleanEmails}
-                        onPick={(email) => openComposeTo(email)}
-                        contactName={p.name}
-                      />
-                    )}
-                    {primaryPhone && (
-                      <a
-                        href={`tel:${primaryPhone}`}
-                        className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
-                        title={`Call ${primaryPhone}`}
-                      >
-                        <IconPhone size={14} stroke={1.75} />
-                      </a>
-                    )}
-                  </div>
                 </div>
               );
             })}

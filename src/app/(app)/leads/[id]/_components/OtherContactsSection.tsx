@@ -444,19 +444,9 @@ function LeadPartyForm({
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between">
-        <label className="block text-[11px] font-medium text-gray-500">
-          Role
-        </label>
-        <button
-          type="button"
-          onClick={onManageRoles}
-          className="inline-flex items-center gap-1 text-[10.5px] text-gray-500 hover:text-petrol-500"
-        >
-          <IconSettings size={10} stroke={1.75} />
-          Manage Roles
-        </button>
-      </div>
+      <label className="mb-1 block text-[11px] font-medium text-gray-500">
+        Role
+      </label>
       <select
         value={selection}
         onChange={(e) => setSelection(e.target.value as SelectionValue)}
