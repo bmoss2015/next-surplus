@@ -22,6 +22,7 @@ import { DocumentsTab } from "./_components/DocumentsTab";
 import { NotesTab } from "./_components/NotesTab";
 import { LeadTasksTab } from "./_components/LeadTasksTab";
 import { ActivityTab } from "./_components/ActivityTab";
+import { ConversationTab } from "./_components/ConversationTab";
 import { RecoveryFeeField } from "./_components/RecoveryFeeField";
 import { ConfirmedSurplusProvider } from "./_components/ConfirmedSurplusContext";
 
@@ -35,6 +36,7 @@ const VALID_TABS: TabKey[] = [
   "documents",
   "notes",
   "tasks",
+  "conversation",
   "activity",
 ];
 
@@ -57,18 +59,27 @@ export default async function LeadDetailPage({
       : "overview";
 
   const sb = await createClient();
-  const [lead, lostReasons, teamMembers, openTaskRes] = await Promise.all([
-    fetchLeadDetail(id),
-    fetchLostReasons(),
-    listTeamMembers(),
-    sb
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("lead_id", id)
-      .eq("completed", false),
-  ]);
+  const [lead, lostReasons, teamMembers, openTaskRes, convUnreadRes] =
+    await Promise.all([
+      fetchLeadDetail(id),
+      fetchLostReasons(),
+      listTeamMembers(),
+      sb
+        .from("tasks")
+        .select("id", { count: "exact", head: true })
+        .eq("lead_id", id)
+        .eq("completed", false),
+      sb
+        .from("conversations")
+        .select("unread_count")
+        .eq("lead_id", id),
+    ]);
   if (!lead) notFound();
   const openTaskCount = openTaskRes.count ?? 0;
+  const conversationUnread = (convUnreadRes.data ?? []).reduce(
+    (sum, r) => sum + ((r.unread_count as number | null) ?? 0),
+    0
+  );
   const [dataSources, leadSources] =
     activeTab === "property"
       ? await Promise.all([fetchDataSources(), fetchLeadSources()])
@@ -87,7 +98,11 @@ export default async function LeadDetailPage({
       </div>
 
       <div className="mt-4">
-        <TabBar active={activeTab} openTaskCount={openTaskCount} />
+        <TabBar
+          active={activeTab}
+          openTaskCount={openTaskCount}
+          conversationUnread={conversationUnread}
+        />
         <div className="grid grid-cols-[1fr_280px] gap-[18px]">
           <div className="min-w-0">
             {activeTab === "overview" && <OverviewTab lead={lead} />}
@@ -99,6 +114,7 @@ export default async function LeadDetailPage({
             {activeTab === "documents" && <DocumentsTab leadId={lead.id} />}
             {activeTab === "notes" && <NotesTab leadId={lead.id} />}
             {activeTab === "tasks" && <LeadTasksTab leadId={lead.id} />}
+            {activeTab === "conversation" && <ConversationTab leadId={lead.id} />}
             {activeTab === "activity" && <ActivityTab leadId={lead.id} />}
           </div>
 

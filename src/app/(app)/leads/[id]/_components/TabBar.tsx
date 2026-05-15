@@ -12,6 +12,7 @@ const TABS = [
   { key: "documents", label: "Documents" },
   { key: "notes", label: "Notes" },
   { key: "tasks", label: "Tasks" },
+  { key: "conversation", label: "Conversation" },
   { key: "activity", label: "Activity" },
 ] as const;
 
@@ -20,9 +21,11 @@ export type TabKey = (typeof TABS)[number]["key"];
 export function TabBar({
   active,
   openTaskCount = 0,
+  conversationUnread = 0,
 }: {
   active: TabKey;
   openTaskCount?: number;
+  conversationUnread?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -45,7 +48,10 @@ export function TabBar({
     <div className="mb-4 inline-flex gap-[3px] rounded-lg bg-gray-150 p-1">
       {TABS.map((tab) => {
         const isActive = tab.key === active;
-        const showBadge = tab.key === "tasks" && openTaskCount > 0;
+        const taskBadge = tab.key === "tasks" && openTaskCount > 0;
+        const convBadge = tab.key === "conversation" && conversationUnread > 0;
+        const showBadge = taskBadge || convBadge;
+        const badgeCount = taskBadge ? openTaskCount : conversationUnread;
         return (
           <button
             key={tab.key}
@@ -66,7 +72,7 @@ export function TabBar({
                   isActive ? "bg-white/25 text-white" : "bg-petrol-100 text-petrol-700"
                 )}
               >
-                {openTaskCount}
+                {badgeCount}
               </span>
             )}
           </button>

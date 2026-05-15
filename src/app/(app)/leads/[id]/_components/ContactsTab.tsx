@@ -3,20 +3,23 @@ import {
   fetchRelatives,
   fetchAttorneyOptions,
 } from "@/lib/leads/fetch-detail";
+import { fetchLeadParties } from "@/lib/leads/lead-parties";
 import { createClient } from "@/lib/supabase/server";
 import { ContactsTabClient } from "./ContactsTabClient";
 import { RelativesSection } from "./RelativesSection";
 import { AttorneyAssignment } from "./AttorneyAssignment";
 import { MailingAddresses } from "./Overview/MailingAddresses";
+import { OtherContactsSection } from "./OtherContactsSection";
 
 export async function ContactsTab({ leadId }: { leadId: string }) {
   const sb = await createClient();
-  const [{ owners, contacts }, relatives, attorneys, leadRow] =
+  const [{ owners, contacts }, relatives, attorneys, leadRow, leadParties] =
     await Promise.all([
       fetchOwnersWithContacts(leadId),
       fetchRelatives(leadId),
       fetchAttorneyOptions(),
       sb.from("leads").select("attorney_id, attorney_cost").eq("id", leadId).maybeSingle(),
+      fetchLeadParties(leadId),
     ]);
 
   const currentAttorneyId =
@@ -47,6 +50,7 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
         />
       </div>
       <RelativesSection leadId={leadId} initial={relatives} />
+      <OtherContactsSection leadId={leadId} initial={leadParties} />
       <div className="mt-4">
         <MailingAddresses
           leadId={leadId}

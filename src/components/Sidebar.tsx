@@ -18,6 +18,7 @@ const NAV: NavItem[] = [
   { label: "Dashboard", href: "/" },
   { label: "Leads", href: "/leads", divider: true },
   { label: "Tasks", href: "/tasks" },
+  { label: "Inbox", href: "/inbox" },
   { label: "Claims", href: "/claims" },
   { label: "Imports", href: "/imports", divider: true },
   { label: "Reports", href: "/reports", divider: true },
