@@ -1,19 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTransition } from "react";
 import {
   IconMail,
   IconMessage2,
   IconPaperclip,
   IconPencil,
   IconPhone,
-  IconFilter,
+  IconUserPlus,
   IconX,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { ComposeBox } from "@/app/(app)/inbox/_components/ComposeBox";
 import { HtmlMessage } from "@/app/(app)/inbox/_components/HtmlMessage";
 import { formatPhoneUS } from "@/lib/phone";
+import { upsertLeadParty } from "../_lead-parties-actions";
 import type {
   LeadConversationMessage,
   LeadConversationThread,
@@ -76,11 +78,14 @@ export function ConversationTabClient({
   people: LeadPerson[];
 }) {
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
-  // Selected person — drives BOTH the filter (timeline shows only their msgs)
-  // and the "Compose to {name}" action button.
-  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  // Filter id either refers to a known person (their LeadPerson.id) or a
+  // recent-but-unsaved correspondent ("recent:foo@bar.com"). Both resolve
+  // to a set of email addresses for the timeline match below.
+  const [selectedFilterId, setSelectedFilterId] = useState<string | null>(null);
   const [composeTo, setComposeTo] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  const [savingRecent, startSavingRecent] = useTransition();
+  const [recentSaved, setRecentSaved] = useState<Set<string>>(new Set());
 
   const reachable = useMemo(
     () => people.filter((p) => p.emails.length > 0),
@@ -144,7 +149,19 @@ export function ConversationTabClient({
     return m;
   }, [people]);
 
-  const selectedPerson = selectedPersonId ? personById.get(selectedPersonId) ?? null : null;
+  const selectedPerson =
+    selectedFilterId && !selectedFilterId.startsWith("recent:")
+      ? personById.get(selectedFilterId) ?? null
+      : null;
+
+  const selectedRecentEmail =
+    selectedFilterId?.startsWith("recent:")
+      ? selectedFilterId.slice("recent:".length)
+      : null;
+
+  const selectedLabel = selectedPerson
+    ? selectedPerson.name
+    : selectedRecentEmail ?? null;
 
   const counts = useMemo(() => {
     let email = 0,
@@ -161,18 +178,20 @@ export function ConversationTabClient({
     if (selectedPerson) {
       for (const e of selectedPerson.emails) matchSet.add(e.toLowerCase());
       for (const p of selectedPerson.phones) matchSet.add(p);
+    } else if (selectedRecentEmail) {
+      matchSet.add(selectedRecentEmail.toLowerCase());
     }
     return messages.filter((m) => {
       if (channelFilter === "email" && m.channel === "quo_sms") return false;
       if (channelFilter === "sms" && m.channel !== "quo_sms") return false;
-      if (selectedPerson) {
+      if (matchSet.size > 0) {
         const from = m.from_address.toLowerCase();
         const to = m.to_addresses.map((a) => a.toLowerCase());
         if (!(matchSet.has(from) || to.some((a) => matchSet.has(a)))) return false;
       }
       return true;
     });
-  }, [messages, channelFilter, selectedPerson]);
+  }, [messages, channelFilter, selectedPerson, selectedRecentEmail]);
 
   const nameByAddress = useMemo(() => {
     const m = new Map<string, string>();
@@ -190,8 +209,25 @@ export function ConversationTabClient({
     setComposing(true);
   }
 
-  function togglePerson(personId: string) {
-    setSelectedPersonId((cur) => (cur === personId ? null : personId));
+  function toggleFilter(filterId: string) {
+    setSelectedFilterId((cur) => (cur === filterId ? null : filterId));
+  }
+
+  function saveRecentAsContact(email: string, displayName: string) {
+    const placeholderName =
+      displayName && displayName !== email ? displayName : email.split("@")[0];
+    startSavingRecent(async () => {
+      const res = await upsertLeadParty({
+        lead_id: leadId,
+        role: "other",
+        custom_role_label: "New Contact",
+        name: placeholderName,
+        email,
+      });
+      if (res.ok) {
+        setRecentSaved((prev) => new Set(prev).add(email.toLowerCase()));
+      }
+    });
   }
 
   const FILTERS: { value: ChannelFilter; label: string; count: number }[] = [
@@ -210,20 +246,20 @@ export function ConversationTabClient({
         <div className="mb-3 rounded-[10px] border border-gray-200 bg-surface px-4 py-[12px] shadow-card">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="section-subheader m-0">People on this Lead</h3>
-            {selectedPerson && (
+            {selectedLabel && (
               <button
                 type="button"
-                onClick={() => setSelectedPersonId(null)}
+                onClick={() => setSelectedFilterId(null)}
                 className="inline-flex items-center gap-1 text-[10.5px] text-gray-500 hover:text-ink"
               >
                 <IconX size={10} stroke={1.75} />
-                Clear filter
+                Clear filter on {selectedLabel}
               </button>
             )}
           </div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1 md:grid-cols-3 xl:grid-cols-4">
             {reachable.map((p) => {
-              const selected = selectedPersonId === p.id;
+              const selected = selectedFilterId === p.id;
               const primaryEmail = p.emails[0] ?? null;
               const primaryPhone = p.phones[0] ?? null;
               const count = countByPersonId.get(p.id) ?? 0;
@@ -232,7 +268,7 @@ export function ConversationTabClient({
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => togglePerson(p.id)}
+                  onClick={() => toggleFilter(p.id)}
                   className={cn(
                     "group flex w-full items-center gap-2 rounded-md px-2 py-[6px] text-left transition-colors",
                     selected ? "bg-petrol-50" : "hover:bg-gray-50"
@@ -302,41 +338,87 @@ export function ConversationTabClient({
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 md:grid-cols-3 xl:grid-cols-4">
                 {recentParticipants.slice(0, 8).map((r) => {
+                  const filterId = `recent:${r.email.toLowerCase()}`;
+                  const selected = selectedFilterId === filterId;
                   const color = avatarColorFor(r.name);
+                  const alreadySaved = recentSaved.has(r.email.toLowerCase());
                   return (
-                    <button
+                    <div
                       key={r.email}
-                      type="button"
-                      onClick={() => openComposeTo(r.email)}
-                      disabled={noAccount}
-                      className="group flex w-full items-center gap-2 rounded-md px-2 py-[5px] text-left hover:bg-gray-50 disabled:opacity-60"
-                      title={`Compose to ${r.email}`}
+                      className={cn(
+                        "group flex items-center gap-2 rounded-md px-2 py-[5px] transition-colors",
+                        selected ? "bg-petrol-50" : "hover:bg-gray-50"
+                      )}
                     >
-                      <div
-                        className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[9px] font-semibold opacity-80"
-                        style={{ background: color.bg, color: color.text }}
+                      <button
+                        type="button"
+                        onClick={() => toggleFilter(filterId)}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        title={
+                          selected
+                            ? "Click to clear filter"
+                            : `Show only messages with ${r.email}`
+                        }
                       >
-                        {initialsOf(r.name)}
-                      </div>
-                      <div className="min-w-0 flex-1 truncate text-left leading-tight">
-                        <div className="flex items-baseline gap-[5px] truncate text-[12px] text-ink">
-                          <span className="truncate">{r.name}</span>
-                          {r.count > 0 && (
-                            <span className="shrink-0 text-[10px] tabular-nums text-gray-400">
-                              {r.count}
-                            </span>
+                        <div
+                          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[9px] font-semibold opacity-80"
+                          style={{ background: color.bg, color: color.text }}
+                        >
+                          {initialsOf(r.name)}
+                        </div>
+                        <div className="min-w-0 flex-1 truncate leading-tight">
+                          <div className="flex items-baseline gap-[5px] truncate text-[12px] text-ink">
+                            <span className="truncate">{r.name}</span>
+                            {r.count > 0 && (
+                              <span className="shrink-0 text-[10px] tabular-nums text-gray-400">
+                                {r.count}
+                              </span>
+                            )}
+                          </div>
+                          <div className="truncate text-[10px] text-gray-400">
+                            {r.email}
+                          </div>
+                        </div>
+                      </button>
+                      <div className="flex shrink-0 items-center gap-[2px] opacity-0 transition-opacity group-hover:opacity-100">
+                        {!noAccount && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openComposeTo(r.email);
+                            }}
+                            className="rounded p-[4px] text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
+                            title={`Compose to ${r.email}`}
+                            aria-label="Compose"
+                          >
+                            <IconMail size={11} stroke={1.75} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={alreadySaved || savingRecent}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            saveRecentAsContact(r.email, r.name);
+                          }}
+                          className={cn(
+                            "rounded p-[4px]",
+                            alreadySaved
+                              ? "text-success-strong"
+                              : "text-gray-500 hover:bg-petrol-50 hover:text-petrol-500"
                           )}
-                        </div>
-                        <div className="truncate text-[10px] text-gray-400">
-                          {r.email}
-                        </div>
+                          title={
+                            alreadySaved
+                              ? "Saved — refresh to see them above"
+                              : "Save as a contact on this lead"
+                          }
+                          aria-label="Save as contact"
+                        >
+                          <IconUserPlus size={11} stroke={1.75} />
+                        </button>
                       </div>
-                      <IconMail
-                        size={11}
-                        stroke={1.75}
-                        className="text-gray-400 opacity-0 transition-opacity group-hover:opacity-100"
-                      />
-                    </button>
+                    </div>
                   );
                 })}
               </div>
