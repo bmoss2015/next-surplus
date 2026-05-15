@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   IconArrowBackUp,
   IconArrowBackUpDouble,
@@ -13,6 +13,14 @@ import {
 import { cn } from "@/lib/cn";
 import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
 import { sendEmail } from "../_send-actions";
+
+// Shape of /api/email/contacts-search responses. Kept in sync with the route.
+type ContactSuggestion = {
+  name: string;
+  email: string;
+  role: string | null;
+  source: "lead" | "org" | "recent";
+};
 
 export type ComposeMode = "reply" | "replyAll" | "forward" | "new";
 
@@ -192,6 +200,13 @@ export function ComposeBox(props: Props) {
 
   const { icon, text } = modeLabel(props);
 
+  // Autocomplete uses the lead context to boost contacts on this lead. New
+  // mode carries defaultLeadId; reply/forward modes inherit thread.lead_id.
+  const leadIdForAutocomplete: string | null =
+    props.mode === "new"
+      ? props.defaultLeadId ?? null
+      : props.thread.lead_id ?? null;
+
   async function onFilesPicked(files: FileList | null) {
     if (!files || files.length === 0) return;
     const next: AttachedFile[] = [...attachments];
@@ -291,10 +306,11 @@ export function ComposeBox(props: Props) {
           <span className="truncate">{props.accountAddress}</span>
         </div>
 
-        <FieldRow
+        <RecipientField
           label="To"
           value={to}
           onChange={setTo}
+          leadId={leadIdForAutocomplete}
           placeholder="email@example.com"
         >
           <div className="flex items-center gap-2 text-[11px]">
@@ -317,13 +333,25 @@ export function ComposeBox(props: Props) {
               </button>
             )}
           </div>
-        </FieldRow>
+        </RecipientField>
 
         {showCc && (
-          <FieldRow label="Cc" value={cc} onChange={setCc} placeholder="" />
+          <RecipientField
+            label="Cc"
+            value={cc}
+            onChange={setCc}
+            leadId={leadIdForAutocomplete}
+            placeholder=""
+          />
         )}
         {showBcc && (
-          <FieldRow label="Bcc" value={bcc} onChange={setBcc} placeholder="" />
+          <RecipientField
+            label="Bcc"
+            value={bcc}
+            onChange={setBcc}
+            leadId={leadIdForAutocomplete}
+            placeholder=""
+          />
         )}
         <FieldRow
           label="Subject"
@@ -448,6 +476,200 @@ function FieldRow({
         className="flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-gray-300"
       />
       {children}
+    </div>
+  );
+}
+
+// Splits a comma-separated recipient string into (everything before the
+// current token) + (current partial). Used to apply autocomplete to only the
+// last entry — so "alice@x.com, bo" suggests for "bo" and leaves alice intact.
+function splitLastToken(v: string): { prefix: string; current: string } {
+  const idx = v.lastIndexOf(",");
+  if (idx === -1) return { prefix: "", current: v.trimStart() };
+  return { prefix: v.slice(0, idx + 1) + " ", current: v.slice(idx + 1).trim() };
+}
+
+function RecipientField({
+  label,
+  value,
+  onChange,
+  leadId,
+  placeholder,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  leadId: string | null;
+  placeholder?: string;
+  children?: React.ReactNode;
+}) {
+  const [suggestions, setSuggestions] = useState<ContactSuggestion[]>([]);
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Discards stale fetches when the user types faster than the server can
+  // respond — only the latest request's results are accepted.
+  const reqIdRef = useRef(0);
+
+  const { current } = splitLastToken(value);
+
+  useEffect(() => {
+    if (current.length < 1) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+    const myReq = ++reqIdRef.current;
+    const t = setTimeout(async () => {
+      try {
+        const url = new URL(
+          "/api/email/contacts-search",
+          window.location.origin
+        );
+        url.searchParams.set("q", current);
+        if (leadId) url.searchParams.set("leadId", leadId);
+        const res = await fetch(url.toString(), { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as ContactSuggestion[];
+        if (myReq !== reqIdRef.current) return;
+        setSuggestions(data);
+        setOpen(data.length > 0);
+        setHighlighted(0);
+      } catch {
+        // Silent fail — autocomplete is non-essential.
+      }
+    }, 180);
+    return () => clearTimeout(t);
+  }, [current, leadId]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  function pick(s: ContactSuggestion) {
+    const { prefix } = splitLastToken(value);
+    onChange(`${prefix}${s.email}, `);
+    setOpen(false);
+    setSuggestions([]);
+    setHighlighted(0);
+    inputRef.current?.focus();
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlighted((h) => (h + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlighted(
+        (h) => (h - 1 + suggestions.length) % suggestions.length
+      );
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      pick(suggestions[highlighted]);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-[6px]">
+        <label className="w-[56px] shrink-0 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          {label}
+        </label>
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => {
+            if (suggestions.length > 0) setOpen(true);
+          }}
+          onKeyDown={onKeyDown}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-gray-300"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={`${label}-autocomplete-list`}
+        />
+        {children}
+      </div>
+      {open && suggestions.length > 0 && (
+        <ul
+          id={`${label}-autocomplete-list`}
+          role="listbox"
+          className="absolute left-[78px] right-5 top-full z-20 mt-1 max-h-[280px] overflow-y-auto rounded-md border border-gray-200 bg-surface shadow-elevated"
+        >
+          {suggestions.map((s, i) => {
+            const active = i === highlighted;
+            return (
+              <li key={`${s.email}-${i}`} role="option" aria-selected={active}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    // mousedown beats the outside-click handler that would
+                    // otherwise close the dropdown before onClick fires.
+                    e.preventDefault();
+                    pick(s);
+                  }}
+                  onMouseEnter={() => setHighlighted(i)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-2 px-3 py-2 text-left",
+                    active ? "bg-petrol-50" : "hover:bg-gray-50"
+                  )}
+                >
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <div className="truncate text-[12.5px] font-medium text-ink">
+                      {s.name}
+                    </div>
+                    <div className="truncate text-[11px] text-gray-500">
+                      {s.email}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {s.role && (
+                      <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                        {s.role}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        "rounded-full px-[5px] py-[1px] text-[9px] font-medium",
+                        s.source === "lead"
+                          ? "bg-petrol-500 text-white"
+                          : s.source === "org"
+                            ? "bg-petrol-50 text-petrol-700"
+                            : "bg-gray-100 text-gray-500"
+                      )}
+                    >
+                      {s.source === "lead"
+                        ? "This Lead"
+                        : s.source === "org"
+                          ? "Org"
+                          : "Recent"}
+                    </span>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

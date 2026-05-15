@@ -97,3 +97,59 @@ export async function deleteCustomRole(
 
   return { ok: true, affected: data?.length ?? 0 };
 }
+
+// Replace a custom role org-wide. Every lead_parties row whose role='other'
+// and custom_role_label matches `oldLabel` gets rewritten according to the
+// `replacement` directive:
+//
+//   { kind: "builtin", role }      → moves rows to a built-in role
+//   { kind: "custom",  label }     → re-tags rows under a different custom label
+//   { kind: "plain_other" }        → clears the label (rows become plain "Other")
+//
+// Returns the affected row count so the UI can confirm the impact.
+export type CustomRoleReplacement =
+  | { kind: "builtin"; role: LeadPartyRole }
+  | { kind: "custom"; label: string }
+  | { kind: "plain_other" };
+
+export async function replaceCustomRole(
+  oldLabel: string,
+  replacement: CustomRoleReplacement
+): Promise<{ ok: true; affected: number } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const trimmed = oldLabel.trim();
+  if (!trimmed) return { ok: false, error: "Empty label" };
+
+  let patch: { role: LeadPartyRole; custom_role_label: string | null };
+  if (replacement.kind === "builtin") {
+    if (replacement.role === "other") {
+      return { ok: false, error: "Pick a specific built-in role or use plain_other" };
+    }
+    patch = { role: replacement.role, custom_role_label: null };
+  } else if (replacement.kind === "custom") {
+    const newLabel = replacement.label.trim();
+    if (!newLabel) return { ok: false, error: "Empty replacement label" };
+    if (newLabel === trimmed) {
+      return { ok: false, error: "Replacement is the same as the original" };
+    }
+    patch = { role: "other", custom_role_label: newLabel };
+  } else {
+    patch = { role: "other", custom_role_label: null };
+  }
+
+  const { data, error } = await sb
+    .from("lead_parties")
+    .update(patch)
+    .eq("role", "other")
+    .eq("custom_role_label", trimmed)
+    .select("id, lead_id");
+  if (error) return { ok: false, error: error.message };
+
+  const leadIds = new Set<string>();
+  for (const r of (data ?? []) as { id: string; lead_id: string }[]) {
+    leadIds.add(r.lead_id);
+  }
+  for (const lid of leadIds) revalidatePath(`/leads/${lid}`);
+
+  return { ok: true, affected: data?.length ?? 0 };
+}

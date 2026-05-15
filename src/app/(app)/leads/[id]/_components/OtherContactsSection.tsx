@@ -20,7 +20,8 @@ import {
 import {
   upsertLeadParty,
   deleteLeadParty,
-  deleteCustomRole,
+  replaceCustomRole,
+  type CustomRoleReplacement,
 } from "../_lead-parties-actions";
 
 // Built-in roles, displayed alphabetically by label. "Other" is excluded —
@@ -140,28 +141,37 @@ export function OtherContactsSection({
     });
   }
 
-  // Removing a custom role clears `custom_role_label` on every row across the
-  // org that uses it — those rows revert to plain "Other". We show the
-  // affected count up front so the user knows what they're agreeing to.
-  function removeRole(label: string) {
-    const usageCount = rows.filter(
-      (r) => r.role === "other" && r.custom_role_label === label
-    ).length;
-    const message =
-      usageCount > 0
-        ? `Delete the role "${label}"? ${usageCount} contact${usageCount === 1 ? "" : "s"} on this lead will revert to plain "Other". Org-wide totals will be higher.`
-        : `Delete the role "${label}" from the dropdown?`;
-    if (!confirm(message)) return;
-    setRoles((prev) => prev.filter((r) => r !== label));
+  // Open the replacement modal for a role. The modal lets the user move every
+  // contact using this role to a different role (built-in, another custom, or
+  // plain "Other") before the label is removed from the dropdown.
+  const [roleToReplace, setRoleToReplace] = useState<string | null>(null);
+
+  function applyRoleReplacement(
+    oldLabel: string,
+    replacement: CustomRoleReplacement
+  ) {
+    // Optimistically update local state: clear the old label from the
+    // dropdown, and rewrite every affected row on this lead.
+    setRoles((prev) => prev.filter((r) => r !== oldLabel));
+    if (replacement.kind === "custom") {
+      // Make sure the destination label is in the dropdown going forward.
+      setRoles((prev) => (prev.includes(replacement.label) ? prev : [...prev, replacement.label]));
+    }
     setRows((prev) =>
-      prev.map((r) =>
-        r.role === "other" && r.custom_role_label === label
-          ? { ...r, custom_role_label: null }
-          : r
-      )
+      prev.map((r) => {
+        if (!(r.role === "other" && r.custom_role_label === oldLabel)) return r;
+        if (replacement.kind === "builtin") {
+          return { ...r, role: replacement.role, custom_role_label: null };
+        }
+        if (replacement.kind === "custom") {
+          return { ...r, role: "other", custom_role_label: replacement.label };
+        }
+        return { ...r, role: "other", custom_role_label: null };
+      })
     );
+    setRoleToReplace(null);
     startTransition(async () => {
-      await deleteCustomRole(label);
+      await replaceCustomRole(oldLabel, replacement);
     });
   }
 
@@ -282,10 +292,10 @@ export function OtherContactsSection({
       </Modal>
 
       <Modal
-        open={managingRoles}
+        open={managingRoles && !roleToReplace}
         onClose={() => setManagingRoles(false)}
         title="Manage Custom Roles"
-        description="Custom roles are shared across your organization. Deleting one clears it on every contact that uses it — those contacts revert to plain Other."
+        description="Custom roles are shared across your organization. Deleting one prompts you to reassign every contact using it."
         width={420}
       >
         {sortedRoles.length === 0 ? (
@@ -303,7 +313,7 @@ export function OtherContactsSection({
                 <span className="truncate text-[13px] text-ink">{label}</span>
                 <button
                   type="button"
-                  onClick={() => removeRole(label)}
+                  onClick={() => setRoleToReplace(label)}
                   className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11px] font-medium text-gray-600 hover:border-danger hover:text-danger"
                 >
                   <IconTrash size={11} stroke={1.75} />
@@ -322,6 +332,30 @@ export function OtherContactsSection({
             Done
           </button>
         </div>
+      </Modal>
+
+      <Modal
+        open={!!roleToReplace}
+        onClose={() => setRoleToReplace(null)}
+        title={`Delete "${roleToReplace ?? ""}"`}
+        description="Pick where the contacts currently using this role should be moved. The role will be removed from the dropdown afterwards."
+        width={460}
+      >
+        {roleToReplace && (
+          <DeleteRoleForm
+            label={roleToReplace}
+            allCustomRoles={sortedRoles}
+            usageCountOnThisLead={
+              rows.filter(
+                (r) => r.role === "other" && r.custom_role_label === roleToReplace
+              ).length
+            }
+            onCancel={() => setRoleToReplace(null)}
+            onConfirm={(replacement) =>
+              applyRoleReplacement(roleToReplace, replacement)
+            }
+          />
+        )}
       </Modal>
     </div>
   );
@@ -528,6 +562,118 @@ function LeadPartyForm({
           className="rounded-md btn-primary px-3 py-[5px] text-xs font-medium text-white disabled:opacity-50"
         >
           {initial ? "Save Changes" : "Add Contact"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Choices the user can make when deleting a role: move to a built-in,
+// re-tag to another custom label, or revert to plain "Other".
+type ReplacementChoice =
+  | { kind: "builtin"; role: LeadPartyRole }
+  | { kind: "custom"; label: string }
+  | { kind: "plain_other" };
+
+function choiceKey(c: ReplacementChoice): string {
+  if (c.kind === "builtin") return `builtin:${c.role}`;
+  if (c.kind === "custom") return `custom:${c.label}`;
+  return "plain_other";
+}
+
+function choiceFromKey(key: string): ReplacementChoice {
+  if (key.startsWith("builtin:")) {
+    return { kind: "builtin", role: key.slice("builtin:".length) as LeadPartyRole };
+  }
+  if (key.startsWith("custom:")) {
+    return { kind: "custom", label: key.slice("custom:".length) };
+  }
+  return { kind: "plain_other" };
+}
+
+function DeleteRoleForm({
+  label,
+  allCustomRoles,
+  usageCountOnThisLead,
+  onCancel,
+  onConfirm,
+}: {
+  label: string;
+  allCustomRoles: string[];
+  usageCountOnThisLead: number;
+  onCancel: () => void;
+  onConfirm: (replacement: ReplacementChoice) => void;
+}) {
+  // Merged + alphabetized replacement options, excluding the role being
+  // deleted itself. Built-ins come from BUILT_IN_ROLES which is already
+  // alphabetized.
+  type Option = { key: string; label: string };
+  const otherCustomRoles = allCustomRoles.filter((r) => r !== label);
+  const options: Option[] = [
+    ...BUILT_IN_ROLES.map((r) => ({
+      key: choiceKey({ kind: "builtin", role: r }),
+      label: LEAD_PARTY_ROLE_LABELS[r],
+    })),
+    ...otherCustomRoles.map((l) => ({
+      key: choiceKey({ kind: "custom", label: l }),
+      label: l,
+    })),
+  ].sort((a, b) => a.label.localeCompare(b.label));
+  options.push({
+    key: choiceKey({ kind: "plain_other" }),
+    label: 'Plain "Other" (no label)',
+  });
+
+  const [selected, setSelected] = useState<string>(options[0].key);
+
+  return (
+    <div>
+      {usageCountOnThisLead > 0 ? (
+        <div className="mb-3 rounded-md border border-petrol-100 bg-petrol-50 px-3 py-2 text-[12px] text-petrol-700">
+          <strong className="font-semibold">
+            {usageCountOnThisLead} contact{usageCountOnThisLead === 1 ? "" : "s"}
+          </strong>{" "}
+          on this lead currently use this role. Org-wide the total is at least
+          this many. Pick a replacement and every affected contact will be
+          re-tagged in one step.
+        </div>
+      ) : (
+        <div className="mb-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[12px] text-gray-600">
+          No contacts on this lead use this role. There may be matches on
+          other leads — those will also be re-tagged.
+        </div>
+      )}
+
+      <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+        Move Contacts To
+      </label>
+      <select
+        value={selected}
+        onChange={(e) => setSelected(e.target.value)}
+        className="w-full rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink outline-none focus:border-petrol-500"
+      >
+        {options.map((o) => (
+          <option key={o.key} value={o.key}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => onConfirm(choiceFromKey(selected))}
+          className="inline-flex items-center gap-1 rounded-md bg-danger px-4 py-[6px] text-xs font-medium text-white hover:bg-danger-strong"
+        >
+          <IconTrash size={11} stroke={1.75} />
+          Delete &amp; Reassign
         </button>
       </div>
     </div>
