@@ -290,6 +290,15 @@ export function ContactsTabClient({
     });
   }
 
+  function changeOwnerNotes(ownerId: string, notes: string | null) {
+    setOwners((prev) =>
+      prev.map((o) => (o.id === ownerId ? { ...o, notes } : o))
+    );
+    startTransition(async () => {
+      await upsertOwner(leadId, ownerId, { notes });
+    });
+  }
+
   function addContact(
     ownerId: string,
     channel: "phone" | "email",
@@ -522,6 +531,7 @@ export function ContactsTabClient({
               )}
               onChangeStatus={(s) => changeOwnerStatus(owner.id, s)}
               onChangeAge={(n) => changeOwnerAge(owner.id, n)}
+              onChangeNotes={(n) => changeOwnerNotes(owner.id, n)}
               onRemoveOwner={() => removeOwner(owner.id)}
               onAddContact={(channel, value) =>
                 addContact(owner.id, channel, value)
@@ -543,6 +553,7 @@ function OwnerCard({
   emails,
   onChangeStatus,
   onChangeAge,
+  onChangeNotes,
   onRemoveOwner,
   onAddContact,
   onRemoveContact,
@@ -554,6 +565,7 @@ function OwnerCard({
   emails: ContactRow[];
   onChangeStatus: (s: OwnerStatus) => void;
   onChangeAge: (n: number | null) => void;
+  onChangeNotes: (n: string | null) => void;
   onRemoveOwner: () => void;
   onAddContact: (channel: "phone" | "email", value: string) => void;
   onRemoveContact: (id: string) => void;
@@ -754,7 +766,66 @@ function OwnerCard({
           )
         )}
       </div>
+
+      <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
+        <SectionSubheader className="mb-0">Notes</SectionSubheader>
+        <OwnerNotesEditor value={owner.notes ?? ""} onCommit={onChangeNotes} />
+      </div>
     </div>
+  );
+}
+
+function OwnerNotesEditor({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (next: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  // Sync prop changes (parent state update) into the local draft when not
+  // actively editing, so notes saved elsewhere reflect here.
+  if (!editing && draft !== value) {
+    // setState during render is allowed for syncing derived state.
+    setDraft(value);
+  }
+  if (editing) {
+    return (
+      <textarea
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          const next = draft.trim();
+          if (next !== (value ?? "")) onCommit(next || null);
+        }}
+        rows={2}
+        placeholder="Notes about this owner — preferences, history, anything useful for the team."
+        className="w-full resize-y rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[11.5px] leading-relaxed text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+      />
+    );
+  }
+  if (!value) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="w-fit cursor-text text-[11px] italic text-gray-400 hover:text-petrol-500"
+      >
+        + Add notes
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="block w-full cursor-text whitespace-pre-wrap rounded px-1 py-[2px] text-left text-[11.5px] italic leading-relaxed text-gray-600 hover:bg-petrol-50"
+    >
+      {value}
+    </button>
   );
 }
 
