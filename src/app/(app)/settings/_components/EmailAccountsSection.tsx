@@ -9,6 +9,7 @@ import {
   IconAlertTriangle,
   IconCircleCheck,
 } from "@tabler/icons-react";
+import { cn } from "@/lib/cn";
 import type { EmailAccountRow } from "@/lib/email/types";
 import {
   disconnectEmailAccount,
@@ -164,22 +165,45 @@ export function EmailAccountsSection({ initial }: { initial: EmailAccountRow[] }
                   {row.provider === "gmail" ? "Gmail" : row.provider}
                   {" · "}Last sync {relativeTime(row.last_synced_at)}
                 </div>
-                <label className="mt-2 flex cursor-pointer items-start gap-2 text-[11.5px] text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={row.sync_read_to_provider}
-                    onChange={(e) => toggleReadSync(row.id, e.target.checked)}
-                    className="mt-[2px] cursor-pointer"
-                  />
-                  <span>
-                    <span className="font-medium">Sync read status to Gmail</span>
-                    <span className="block text-[10.5px] text-gray-500">
-                      When you mark an email read in the portal, also remove
-                      the UNREAD label in Gmail so your real inbox stays in
-                      sync.
-                    </span>
-                  </span>
-                </label>
+                <div className="mt-2 flex items-start justify-between gap-3 rounded-md border border-gray-150 bg-gray-50 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-[11.5px] font-medium text-ink">
+                      Sync read status to Gmail
+                    </div>
+                    <div className="mt-[2px] text-[10.5px] text-gray-500">
+                      When you mark an email read here, also strip the UNREAD
+                      label in Gmail so your real inbox matches.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={row.sync_read_to_provider}
+                    onClick={() =>
+                      toggleReadSync(row.id, !row.sync_read_to_provider)
+                    }
+                    className={cn(
+                      "relative mt-[2px] inline-flex h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full transition-colors",
+                      row.sync_read_to_provider
+                        ? "bg-petrol-500"
+                        : "bg-gray-300"
+                    )}
+                    title={
+                      row.sync_read_to_provider
+                        ? "Turn off"
+                        : "Turn on"
+                    }
+                  >
+                    <span
+                      className={cn(
+                        "inline-block h-[16px] w-[16px] transform rounded-full bg-white shadow transition-transform",
+                        row.sync_read_to_provider
+                          ? "translate-x-[18px]"
+                          : "translate-x-[2px]"
+                      )}
+                    />
+                  </button>
+                </div>
               </div>
               <button
                 type="button"

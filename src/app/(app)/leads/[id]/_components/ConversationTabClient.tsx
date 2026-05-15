@@ -10,12 +10,16 @@ import {
   IconPhone,
   IconUserPlus,
   IconX,
+  IconArrowBackUp,
+  IconArrowBackUpDouble,
+  IconArrowForwardUp,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { ComposeBox } from "@/app/(app)/inbox/_components/ComposeBox";
 import { HtmlMessage } from "@/app/(app)/inbox/_components/HtmlMessage";
 import { formatPhoneUS } from "@/lib/phone";
 import { upsertLeadParty } from "../_lead-parties-actions";
+import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
 import type {
   LeadConversationMessage,
   LeadConversationThread,
@@ -78,14 +82,17 @@ export function ConversationTabClient({
   people: LeadPerson[];
 }) {
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
-  // Filter id either refers to a known person (their LeadPerson.id) or a
-  // recent-but-unsaved correspondent ("recent:foo@bar.com"). Both resolve
-  // to a set of email addresses for the timeline match below.
   const [selectedFilterId, setSelectedFilterId] = useState<string | null>(null);
   const [composeTo, setComposeTo] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const [savingRecent, startSavingRecent] = useTransition();
   const [recentSaved, setRecentSaved] = useState<Set<string>>(new Set());
+  // Inline reply panel state: when set, we're replying to a specific message
+  // from the timeline. ComposeBox opens in side-panel mode with that thread.
+  const [replyTo, setReplyTo] = useState<{
+    mode: "reply" | "replyAll" | "forward";
+    message: LeadConversationMessage;
+  } | null>(null);
 
   const reachable = useMemo(
     () => people.filter((p) => p.emails.length > 0),
@@ -484,9 +491,10 @@ export function ConversationTabClient({
         messages={visible}
         accountAddresses={accounts.map((a) => a.address.toLowerCase())}
         nameByAddress={nameByAddress}
+        onAction={(mode, message) => setReplyTo({ mode, message })}
       />
 
-      {/* Floating compose */}
+      {/* Floating compose — new mode (no reply context) */}
       {composing && primaryAccount && (
         <div className="fixed bottom-0 right-0 z-40 m-4 flex h-[78vh] w-[520px] flex-col overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-elevated">
           <ComposeBox
@@ -502,6 +510,66 @@ export function ConversationTabClient({
           />
         </div>
       )}
+
+      {/* Inline reply — opens the same composer but anchored to the message's
+          thread so In-Reply-To + References + threadId are preserved. */}
+      {replyTo && (() => {
+        const m = replyTo.message;
+        const accountForReply =
+          accounts.find((a) => a.id === m.channel_account_id) ?? primaryAccount;
+        if (!accountForReply) return null;
+        // Build the minimum ThreadDetail + ThreadMessage that ComposeBox needs.
+        const threadDetail: ThreadDetail = {
+          id: m.conversation_id,
+          subject: m.conversation_subject,
+          channel: m.channel,
+          channel_account_id: m.channel_account_id,
+          provider_thread_key: m.provider_thread_key,
+          lead_id: leadId,
+          lead_label: null,
+          lead_address: null,
+          participants: [],
+          messages: [],
+        };
+        const threadMessage: ThreadMessage = {
+          id: m.id,
+          direction: m.direction,
+          channel: m.channel,
+          from_address: m.from_address,
+          from_name: m.from_name,
+          to_addresses: m.to_addresses,
+          cc_addresses: m.cc_addresses,
+          subject: m.conversation_subject,
+          body_text: m.body_text,
+          body_html: m.body_html,
+          snippet: m.snippet,
+          sent_at: m.sent_at,
+          is_read: m.is_read,
+          in_reply_to: m.in_reply_to,
+          references_chain: m.references_chain,
+          provider_message_id: m.provider_message_id,
+          metadata: m.metadata,
+          attachments: m.attachments.map((a) => ({
+            id: a.id,
+            filename: a.filename,
+            mime_type: a.mime_type,
+            size_bytes: a.size_bytes,
+            storage_path: a.storage_path,
+            is_inline: a.is_inline,
+          })),
+        };
+        return (
+          <div className="fixed bottom-0 right-0 z-40 m-4 flex h-[78vh] w-[520px] flex-col overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-elevated">
+            <ComposeBox
+              mode={replyTo.mode}
+              thread={threadDetail}
+              replyTo={threadMessage}
+              accountAddress={accountForReply.address}
+              onClose={() => setReplyTo(null)}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -510,10 +578,15 @@ function Timeline({
   messages,
   accountAddresses,
   nameByAddress,
+  onAction,
 }: {
   messages: LeadConversationMessage[];
   accountAddresses: string[];
   nameByAddress: Map<string, string>;
+  onAction: (
+    mode: "reply" | "replyAll" | "forward",
+    message: LeadConversationMessage
+  ) => void;
 }) {
   if (messages.length === 0) {
     return (
@@ -544,6 +617,7 @@ function Timeline({
                 message={m}
                 accountAddresses={accountAddresses}
                 nameByAddress={nameByAddress}
+                onAction={(mode) => onAction(mode, m)}
               />
             ))}
           </div>
@@ -557,10 +631,12 @@ function MessageCard({
   message,
   accountAddresses,
   nameByAddress,
+  onAction,
 }: {
   message: LeadConversationMessage;
   accountAddresses: string[];
   nameByAddress: Map<string, string>;
+  onAction: (mode: "reply" | "replyAll" | "forward") => void;
 }) {
   const outbound = message.direction === "outbound";
 
@@ -648,6 +724,37 @@ function MessageCard({
                   {att.filename}
                 </a>
               ))}
+          </div>
+        )}
+
+        {/* Reply / Reply All / Forward — inline action row at the bottom of
+            each card so users can respond without navigating to the Inbox. */}
+        {message.channel !== "quo_sms" && (
+          <div className="mt-2 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onAction("reply")}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[10.5px] font-medium text-ink hover:border-petrol-500 hover:text-petrol-700"
+            >
+              <IconArrowBackUp size={11} stroke={2} />
+              Reply
+            </button>
+            <button
+              type="button"
+              onClick={() => onAction("replyAll")}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[10.5px] text-ink hover:border-petrol-500 hover:text-petrol-700"
+            >
+              <IconArrowBackUpDouble size={11} stroke={2} />
+              Reply All
+            </button>
+            <button
+              type="button"
+              onClick={() => onAction("forward")}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[10.5px] text-ink hover:border-petrol-500 hover:text-petrol-700"
+            >
+              <IconArrowForwardUp size={11} stroke={2} />
+              Forward
+            </button>
           </div>
         )}
       </div>

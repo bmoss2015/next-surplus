@@ -16,13 +16,22 @@ export type LeadConversationMessage = {
   from_address: string;
   from_name: string | null;
   to_addresses: string[];
+  cc_addresses: string[];
   body_text: string | null;
   body_html: string | null;
   snippet: string | null;
   sent_at: string;
+  in_reply_to: string | null;
+  references_chain: string[];
+  provider_message_id: string | null;
+  provider_thread_key: string;
+  channel_account_id: string;
+  metadata: Record<string, unknown>;
+  is_read: boolean;
   attachments: {
     id: string;
     filename: string;
+    mime_type: string | null;
     storage_path: string | null;
     size_bytes: number | null;
     is_inline: boolean;
@@ -50,9 +59,10 @@ export async function ConversationTab({ leadId }: { leadId: string }) {
         .from("messages")
         .select(
           `id, conversation_id, channel, direction, from_address, from_name,
-           to_addresses, body_text, body_html, snippet, sent_at,
-           conversations!inner ( lead_id, subject ),
-           message_attachments ( id, filename, storage_path, size_bytes, is_inline )`
+           to_addresses, cc_addresses, body_text, body_html, snippet, sent_at,
+           in_reply_to, references_chain, provider_message_id, metadata, is_read,
+           conversations!inner ( lead_id, subject, provider_thread_key, channel_account_id ),
+           message_attachments ( id, filename, mime_type, storage_path, size_bytes, is_inline )`
         )
         .eq("conversations.lead_id", leadId)
         .order("sent_at", { ascending: true })
@@ -79,22 +89,40 @@ export async function ConversationTab({ leadId }: { leadId: string }) {
   const messages: LeadConversationMessage[] = ((messagesRaw.data ?? []) as unknown[]).map(
     (m) => {
       const r = m as Record<string, unknown>;
+      const conv = r.conversations as
+        | {
+            subject?: string | null;
+            provider_thread_key?: string;
+            channel_account_id?: string;
+          }
+        | {
+            subject?: string | null;
+            provider_thread_key?: string;
+            channel_account_id?: string;
+          }[]
+        | null;
+      const convObj = Array.isArray(conv) ? conv[0] : conv;
       return {
         id: r.id as string,
         conversation_id: r.conversation_id as string,
-        conversation_subject:
-          ((r.conversations as { subject?: string | null } | null)?.subject as
-            | string
-            | null) ?? null,
+        conversation_subject: (convObj?.subject as string | null) ?? null,
+        provider_thread_key: (convObj?.provider_thread_key as string) ?? "",
+        channel_account_id: (convObj?.channel_account_id as string) ?? "",
         channel: r.channel as LeadConversationMessage["channel"],
         direction: r.direction as LeadConversationMessage["direction"],
         from_address: r.from_address as string,
         from_name: (r.from_name as string | null) ?? null,
         to_addresses: (r.to_addresses as string[]) ?? [],
+        cc_addresses: (r.cc_addresses as string[]) ?? [],
         body_text: (r.body_text as string | null) ?? null,
         body_html: (r.body_html as string | null) ?? null,
         snippet: (r.snippet as string | null) ?? null,
         sent_at: r.sent_at as string,
+        in_reply_to: (r.in_reply_to as string | null) ?? null,
+        references_chain: (r.references_chain as string[]) ?? [],
+        provider_message_id: (r.provider_message_id as string | null) ?? null,
+        metadata: (r.metadata as Record<string, unknown>) ?? {},
+        is_read: (r.is_read as boolean) ?? true,
         attachments:
           ((r.message_attachments as LeadConversationMessage["attachments"]) ??
             []),
