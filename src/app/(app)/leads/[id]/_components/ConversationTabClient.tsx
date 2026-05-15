@@ -214,14 +214,22 @@ export function ConversationTabClient({
     void markThreadRead(conversationId);
   }
 
-  // Tightened filter: a contact is "reachable" if they have at least one
-  // non-empty email address. This excludes phone-only contacts and any
-  // garbage rows that stored an empty string for email.
+  // A contact is "reachable" if they have at least one non-empty email OR
+  // phone. Phone-only contacts belong here — the user can still call them
+  // today (tel: link on hover) and SMS will land in the same stream once the
+  // QUO send path is wired. We only filter out contacts who have no way to
+  // be reached at all.
   const reachable = useMemo(
     () =>
-      people.filter((p) =>
-        p.emails.some((e) => typeof e === "string" && e.trim().length > 0)
-      ),
+      people.filter((p) => {
+        const hasEmail = p.emails.some(
+          (e) => typeof e === "string" && e.trim().length > 0
+        );
+        const hasPhone = p.phones.some(
+          (n) => typeof n === "string" && n.trim().length > 0
+        );
+        return hasEmail || hasPhone;
+      }),
     [people]
   );
 
