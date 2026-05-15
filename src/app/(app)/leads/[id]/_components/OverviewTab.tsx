@@ -9,13 +9,12 @@ import {
 } from "@tabler/icons-react";
 import type { LeadDetailWithCounts } from "@/lib/leads/fetch-detail";
 import { fetchOwnersWithContacts } from "@/lib/leads/fetch-detail";
-import { fetchNotes, fetchDocuments } from "@/lib/leads/fetch-tab-data";
+import { fetchDocuments } from "@/lib/leads/fetch-tab-data";
 import { fetchRecentActivity } from "@/lib/leads/activities";
 import {
   formatActivity,
   relativeTime,
   activityActorName,
-  noteByline,
 } from "@/lib/leads/activity-format";
 import { createClient } from "@/lib/supabase/server";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
@@ -87,9 +86,8 @@ const EMPTY =
 export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
   const leadId = lead.id;
   const sb = await createClient();
-  const [{ owners, contacts }, notes, documents, activity, lrtRes] = await Promise.all([
+  const [{ owners, contacts }, documents, activity, lrtRes] = await Promise.all([
     fetchOwnersWithContacts(leadId),
-    fetchNotes(leadId),
     fetchDocuments(leadId),
     fetchRecentActivity(leadId, 5),
     sb.from("lead_research_templates").select("steps").eq("lead_id", leadId),
@@ -110,9 +108,6 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
   const primaryEmail = emailContacts.find((c) => c.is_primary) ?? emailContacts[0] ?? null;
   const hasAnyContacts = owners.length > 0 || contacts.length > 0;
   const findings = (lead.research_overall_findings ?? "").trim();
-  // Overview is a glance view — one most-recent note is the preview, full
-  // thread lives in the Notes tab.
-  const recentNotes = notes.slice(0, 1);
 
   return (
     <div className="space-y-6">
@@ -173,24 +168,6 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
             </div>
           )}
           <CardLink href={`/leads/${leadId}?tab=research`}>Go To Research</CardLink>
-        </div>
-
-        {/* Notes */}
-        <div className={CARD}>
-          <SectionSubheader>Notes</SectionSubheader>
-          {recentNotes.length === 0 ? (
-            <div className={EMPTY}>No Notes Yet</div>
-          ) : (
-            <div className="flex-1 space-y-3">
-              {recentNotes.map((note) => (
-                <div key={note.id} className="rounded-md border border-gray-200 bg-surface px-3 py-[10px]">
-                  <div className="text-[10.5px] text-gray-500">{noteByline(note.created_at, note)}</div>
-                  <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-ink">{(note.payload?.body as string) ?? ""}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          <CardLink href={`/leads/${leadId}?tab=notes`}>Open Notes</CardLink>
         </div>
 
         {/* Documents */}
