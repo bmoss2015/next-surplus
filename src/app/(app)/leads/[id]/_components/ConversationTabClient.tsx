@@ -178,6 +178,13 @@ export function ConversationTabClient({
     images: LightboxImage[];
     index: number;
   } | null>(null);
+  // Multi-email picker overlay — when the user clicks "Email <Name>" on a
+  // contact who has two or more email addresses, we surface a picker first
+  // instead of silently picking the first one.
+  const [emailPicker, setEmailPicker] = useState<{
+    name: string;
+    emails: string[];
+  } | null>(null);
 
   const readerRef = useRef<HTMLDivElement>(null);
 
@@ -622,14 +629,20 @@ export function ConversationTabClient({
           <button
             type="button"
             onClick={() => {
-              // If the user has filtered to a specific contact, pre-fill the
-              // compose To with their first email — they almost certainly
-              // wanted to message that person.
-              const presetEmail =
-                selectedPerson?.emails.find(
+              // Multi-email contact → open the picker so the user can choose
+              // which address to write to. Single email → straight to compose.
+              if (selectedPerson) {
+                const clean = selectedPerson.emails.filter(
                   (e) => typeof e === "string" && e.trim().length > 0
-                ) ?? selectedRecentEmail ?? null;
-              openComposeTo(presetEmail);
+                );
+                if (clean.length > 1) {
+                  setEmailPicker({ name: selectedPerson.name, emails: clean });
+                  return;
+                }
+                openComposeTo(clean[0] ?? null);
+                return;
+              }
+              openComposeTo(selectedRecentEmail ?? null);
             }}
             className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
             title={
@@ -734,11 +747,21 @@ export function ConversationTabClient({
                 <button
                   type="button"
                   onClick={() => {
-                    const presetEmail =
-                      selectedPerson?.emails.find(
+                    if (selectedPerson) {
+                      const clean = selectedPerson.emails.filter(
                         (e) => typeof e === "string" && e.trim().length > 0
-                      ) ?? selectedRecentEmail ?? null;
-                    openComposeTo(presetEmail);
+                      );
+                      if (clean.length > 1) {
+                        setEmailPicker({
+                          name: selectedPerson.name,
+                          emails: clean,
+                        });
+                        return;
+                      }
+                      openComposeTo(clean[0] ?? null);
+                      return;
+                    }
+                    openComposeTo(selectedRecentEmail ?? null);
                   }}
                   className="mt-1 inline-flex items-center gap-1.5 rounded-md btn-primary px-3.5 py-[7px] text-[12px] font-medium text-white"
                 >
@@ -779,6 +802,58 @@ export function ConversationTabClient({
               setComposeTo(null);
             }}
           />
+        </div>
+      )}
+
+      {/* Multi-email picker — surfaced before compose when a contact has
+          more than one email address on file. */}
+      {emailPicker && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setEmailPicker(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[400px] overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-elevated"
+          >
+            <div className="flex items-center justify-between border-b border-gray-150 px-4 py-3">
+              <div>
+                <div className="text-[14px] font-semibold text-ink">
+                  Email {emailPicker.name}
+                </div>
+                <div className="text-[11px] text-gray-500">
+                  Which address?
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEmailPicker(null)}
+                className="rounded p-1 text-gray-400 hover:text-ink"
+                aria-label="Close"
+              >
+                <IconX size={14} stroke={2} />
+              </button>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {emailPicker.emails.map((email) => (
+                <button
+                  key={email}
+                  type="button"
+                  onClick={() => {
+                    const picked = email;
+                    setEmailPicker(null);
+                    openComposeTo(picked);
+                  }}
+                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-petrol-50"
+                >
+                  <span className="truncate text-[13px] text-ink">{email}</span>
+                  <IconMail size={12} stroke={1.75} className="shrink-0 text-petrol-500" />
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
