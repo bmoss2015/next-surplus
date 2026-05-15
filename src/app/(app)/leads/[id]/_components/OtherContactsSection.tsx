@@ -45,9 +45,11 @@ function roleLabel(row: LeadPartyRow): string {
 export function OtherContactsSection({
   leadId,
   initial,
+  customRoles,
 }: {
   leadId: string;
   initial: LeadPartyRow[];
+  customRoles: string[];
 }) {
   const [rows, setRows] = useState(initial);
   const [editing, setEditing] = useState<LeadPartyRow | "new" | null>(null);
@@ -227,6 +229,7 @@ export function OtherContactsSection({
         {editing !== null && (
           <LeadPartyForm
             initial={editing === "new" ? null : editing}
+            customRoles={customRoles}
             onCancel={close}
             onSave={save}
           />
@@ -248,16 +251,28 @@ type LeadPartyFormValues = {
 
 function LeadPartyForm({
   initial,
+  customRoles,
   onCancel,
   onSave,
 }: {
   initial: LeadPartyRow | null;
+  customRoles: string[];
   onCancel: () => void;
   onSave: (form: LeadPartyFormValues) => void;
 }) {
-  const [role, setRole] = useState<LeadPartyRole>(initial?.role ?? "attorney_for_owner");
+  // Selection model: a single dropdown shows built-in roles, then any custom
+  // labels this org has used before, then "Other (Add New)" which reveals a
+  // free-text field. Picking a previously-used custom label saves it again as
+  // role='other' + custom_role_label=<label>, so it stays reusable.
+  type SelectionValue = LeadPartyRole | `custom:${string}`;
+  const initialSelection: SelectionValue =
+    initial?.role === "other" && initial.custom_role_label
+      ? `custom:${initial.custom_role_label}`
+      : initial?.role ?? "attorney_for_owner";
+  const [selection, setSelection] = useState<SelectionValue>(initialSelection);
+  const showingCustomEntry = selection === "other";
   const [customLabel, setCustomLabel] = useState(
-    initial?.custom_role_label ?? ""
+    initial?.role === "other" ? initial.custom_role_label ?? "" : ""
   );
   const [name, setName] = useState(initial?.name ?? "");
   const [organization, setOrganization] = useState(initial?.organization ?? "");
@@ -274,29 +289,47 @@ function LeadPartyForm({
         Role
       </label>
       <select
-        value={role}
-        onChange={(e) => setRole(e.target.value as LeadPartyRole)}
+        value={selection}
+        onChange={(e) => setSelection(e.target.value as SelectionValue)}
         className={inputClass}
       >
-        {ROLE_OPTIONS.map((r) => (
-          <option key={r} value={r}>
-            {LEAD_PARTY_ROLE_LABELS[r]}
-          </option>
-        ))}
+        <optgroup label="Standard">
+          {ROLE_OPTIONS.filter((r) => r !== "other").map((r) => (
+            <option key={r} value={r}>
+              {LEAD_PARTY_ROLE_LABELS[r]}
+            </option>
+          ))}
+        </optgroup>
+        {customRoles.length > 0 && (
+          <optgroup label="Custom (used before)">
+            {customRoles.map((label) => (
+              <option key={`custom:${label}`} value={`custom:${label}`}>
+                {label}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label="Other">
+          <option value="other">+ Add a new role…</option>
+        </optgroup>
       </select>
 
-      {role === "other" && (
+      {showingCustomEntry && (
         <>
           <label className="mt-3 mb-1 block text-[11px] font-medium text-gray-500">
-            Custom Role Label
+            New Role Label
           </label>
           <input
             type="text"
             value={customLabel}
             onChange={(e) => setCustomLabel(e.target.value)}
-            placeholder="e.g., Probate Referee"
+            placeholder="e.g., Probate Referee, Court Clerk, Auctioneer"
             className={inputClass}
           />
+          <div className="mt-1 text-[10.5px] text-gray-400">
+            This label will be available in the dropdown next time anyone
+            on the team adds a contact.
+          </div>
         </>
       )}
 
@@ -371,18 +404,28 @@ function LeadPartyForm({
         </button>
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
+            // Resolve the selection into (role, custom_role_label) for save.
+            const role: LeadPartyRole = selection.startsWith("custom:")
+              ? "other"
+              : (selection as LeadPartyRole);
+            const labelForCustom = selection.startsWith("custom:")
+              ? selection.slice("custom:".length)
+              : customLabel;
             onSave({
               role,
-              custom_role_label: customLabel,
+              custom_role_label: labelForCustom,
               name,
               organization,
               email,
               phone,
               notes,
-            })
+            });
+          }}
+          disabled={
+            !name.trim() ||
+            (showingCustomEntry && !customLabel.trim())
           }
-          disabled={!name.trim() || (role === "other" && !customLabel.trim())}
           className="rounded-md btn-primary px-3 py-[5px] text-xs font-medium text-white disabled:opacity-50"
         >
           {initial ? "Save Changes" : "Add Contact"}
