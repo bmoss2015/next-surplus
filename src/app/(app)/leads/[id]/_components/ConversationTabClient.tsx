@@ -10,6 +10,7 @@ import {
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { ComposeBox } from "@/app/(app)/inbox/_components/ComposeBox";
+import { HtmlMessage } from "@/app/(app)/inbox/_components/HtmlMessage";
 import type {
   LeadConversationMessage,
   LeadConversationThread,
@@ -27,15 +28,6 @@ function fmtTime(iso: string): string {
   });
 }
 
-function stripHtml(html: string | null): string | null {
-  if (!html) return null;
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 export function ConversationTabClient({
   leadId,
@@ -203,8 +195,14 @@ function ActivityView({ messages }: { messages: LeadConversationMessage[] }) {
               {m.conversation_subject}
             </div>
           )}
-          <div className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink">
-            {m.body_text ?? stripHtml(m.body_html) ?? m.snippet ?? ""}
+          <div className="mt-2 text-[12.5px] leading-relaxed text-ink">
+            {m.body_html ? (
+              <HtmlMessage html={m.body_html} />
+            ) : (
+              <div className="whitespace-pre-wrap">
+                {m.body_text ?? m.snippet ?? ""}
+              </div>
+            )}
           </div>
           {m.attachments.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">

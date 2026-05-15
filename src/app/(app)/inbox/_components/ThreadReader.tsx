@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 import type { ThreadDetail, ThreadMessage } from "@/lib/email/inbox";
 import { archiveThread, markThreadRead } from "../_actions";
 import { ComposeBox } from "./ComposeBox";
+import { HtmlMessage } from "./HtmlMessage";
 import { LinkToLeadPicker } from "./LinkToLeadPicker";
 
 function fmtTime(iso: string): string {
@@ -122,7 +123,7 @@ export function ThreadReader({
           onClose={() => setReplyTo(null)}
         />
       ) : (
-        <div className="border-t border-gray-200 bg-surface px-6 py-3">
+        <div className="flex justify-end border-t border-gray-200 bg-surface px-6 py-3">
           <button
             type="button"
             onClick={() => setReplyTo(detail.messages[detail.messages.length - 1])}
@@ -191,8 +192,14 @@ function MessageCard({
           </button>
         </div>
       </div>
-      <div className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink">
-        {message.body_text ?? stripHtml(message.body_html) ?? message.snippet ?? ""}
+      <div className="mt-2 text-[12.5px] leading-relaxed text-ink">
+        {message.body_html ? (
+          <HtmlMessage html={message.body_html} />
+        ) : (
+          <div className="whitespace-pre-wrap">
+            {message.body_text ?? message.snippet ?? ""}
+          </div>
+        )}
       </div>
       {message.attachments.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -210,16 +217,6 @@ function MessageCard({
       )}
     </div>
   );
-}
-
-function stripHtml(html: string | null): string | null {
-  if (!html) return null;
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function AttachmentChip({
