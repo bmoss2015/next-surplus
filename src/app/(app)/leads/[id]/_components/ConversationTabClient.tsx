@@ -613,11 +613,29 @@ export function ConversationTabClient({
         ) : (
           <button
             type="button"
-            onClick={() => openComposeTo(null)}
+            onClick={() => {
+              // If the user has filtered to a specific contact, pre-fill the
+              // compose To with their first email — they almost certainly
+              // wanted to message that person.
+              const presetEmail =
+                selectedPerson?.emails.find(
+                  (e) => typeof e === "string" && e.trim().length > 0
+                ) ?? selectedRecentEmail ?? null;
+              openComposeTo(presetEmail);
+            }}
             className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+            title={
+              selectedPerson
+                ? `Compose to ${selectedPerson.name}`
+                : selectedRecentEmail
+                  ? `Compose to ${selectedRecentEmail}`
+                  : "Compose a new message"
+            }
           >
             <IconPencil size={13} stroke={2} />
-            New Message
+            {selectedPerson || selectedRecentEmail
+              ? `Email ${selectedPerson?.name ?? selectedRecentEmail}`
+              : "New Message"}
           </button>
         )}
       </div>
@@ -679,9 +697,61 @@ export function ConversationTabClient({
               noAccount={noAccount}
               onOpenLightbox={(images, index) => setLightbox({ images, index })}
             />
+          ) : selectedPerson || selectedRecentEmail ? (
+            // Contact filtered but no prior thread exists — make the next
+            // step obvious instead of a dead-end empty state.
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+              {selectedPerson && (
+                <div
+                  className="flex h-[44px] w-[44px] items-center justify-center rounded-full text-[14px] font-semibold"
+                  style={{
+                    background: avatarColorFor(selectedPerson.name).bg,
+                    color: avatarColorFor(selectedPerson.name).text,
+                  }}
+                >
+                  {initialsOf(selectedPerson.name)}
+                </div>
+              )}
+              <div>
+                <div className="text-[14px] font-semibold text-ink">
+                  No conversation with{" "}
+                  {selectedPerson?.name ?? selectedRecentEmail} yet
+                </div>
+                <div className="mt-1 text-[12px] text-gray-500">
+                  Start one — they&apos;ll see it land in their inbox like any
+                  other email.
+                </div>
+              </div>
+              {!noAccount && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const presetEmail =
+                      selectedPerson?.emails.find(
+                        (e) => typeof e === "string" && e.trim().length > 0
+                      ) ?? selectedRecentEmail ?? null;
+                    openComposeTo(presetEmail);
+                  }}
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-md btn-primary px-3.5 py-[7px] text-[12px] font-medium text-white"
+                >
+                  <IconPencil size={13} stroke={2} />
+                  Email {selectedPerson?.name ?? selectedRecentEmail}
+                </button>
+              )}
+              {noAccount && (
+                <a
+                  href="/settings"
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-md btn-primary px-3.5 py-[7px] text-[12px] font-medium text-white"
+                >
+                  <IconMail size={13} stroke={2} />
+                  Connect Gmail to Send
+                </a>
+              )}
+            </div>
           ) : (
             <div className="flex flex-1 items-center justify-center px-6 py-12 text-center text-[13px] text-gray-400">
-              No conversation yet. Use New Message to start one.
+              No conversation yet.
+              {!noAccount && " Use New Message to start one, or click a contact above to email them."}
             </div>
           )}
         </section>
