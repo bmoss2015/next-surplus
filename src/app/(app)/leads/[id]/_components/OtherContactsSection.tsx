@@ -191,17 +191,15 @@ export function OtherContactsSection({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {sortedRoles.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setManagingRoles(true)}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs font-medium text-ink hover:border-petrol-500"
-              title="Rename or delete custom roles"
-            >
-              <IconSettings size={12} stroke={1.75} />
-              Manage Roles
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setManagingRoles(true)}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs font-medium text-ink hover:border-petrol-500"
+            title="Manage custom roles for Other Contacts"
+          >
+            <IconSettings size={12} stroke={1.75} />
+            Manage Roles
+          </button>
           <button
             type="button"
             onClick={() => setEditing("new")}
@@ -461,16 +459,14 @@ function LeadPartyForm({
         <label className="block text-[11px] font-medium text-gray-500">
           Role
         </label>
-        {customRoles.length > 0 && (
-          <button
-            type="button"
-            onClick={onManageRoles}
-            className="inline-flex items-center gap-1 text-[10.5px] text-gray-500 hover:text-petrol-500"
-          >
-            <IconSettings size={10} stroke={1.75} />
-            Manage Roles
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onManageRoles}
+          className="inline-flex items-center gap-1 text-[10.5px] text-gray-500 hover:text-petrol-500"
+        >
+          <IconSettings size={10} stroke={1.75} />
+          Manage Roles
+        </button>
       </div>
       <select
         value={selection}
