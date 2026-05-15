@@ -8,13 +8,20 @@ import {
   IconArchive,
   IconLink,
   IconArrowBackUp,
+  IconArrowBackUpDouble,
+  IconArrowForwardUp,
+  IconRefresh,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
-import { archiveThread, markThreadRead } from "../_actions";
+import { archiveThread, markThreadRead, markThreadUnread } from "../_actions";
 import { ComposeBox } from "./ComposeBox";
 import { HtmlMessage } from "./HtmlMessage";
 import { LinkToLeadPicker } from "./LinkToLeadPicker";
+
+type ReplyState =
+  | { mode: "reply" | "replyAll" | "forward"; message: ThreadMessage }
+  | null;
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -34,7 +41,7 @@ export function ThreadReader({
   detail: ThreadDetail;
   accountAddress: string;
 }) {
-  const [replyTo, setReplyTo] = useState<ThreadMessage | null>(null);
+  const [reply, setReply] = useState<ReplyState>(null);
   const [showLinkPicker, setShowLinkPicker] = useState(false);
   const [, startTransition] = useTransition();
 
@@ -54,6 +61,15 @@ export function ThreadReader({
       window.location.href = "/inbox";
     });
   }
+
+  function markUnread() {
+    startTransition(async () => {
+      await markThreadUnread(detail.id);
+      window.location.href = "/inbox";
+    });
+  }
+
+  const last = detail.messages[detail.messages.length - 1];
 
   return (
     <div className="flex h-full flex-1 flex-col bg-canvas">
@@ -88,6 +104,15 @@ export function ThreadReader({
             )}
             <button
               type="button"
+              onClick={markUnread}
+              className="text-gray-400 hover:text-ink"
+              title="Mark Unread"
+              aria-label="Mark Unread"
+            >
+              <IconRefresh size={14} stroke={1.75} />
+            </button>
+            <button
+              type="button"
               onClick={archive}
               className="text-gray-400 hover:text-ink"
               title="Archive"
@@ -106,27 +131,42 @@ export function ThreadReader({
             <MessageCard
               key={m.id}
               message={m}
-              accountAddress={accountAddress}
-              onReply={() => setReplyTo(m)}
+              onAction={(mode) => setReply({ mode, message: m })}
             />
           ))}
         </div>
       </div>
 
       {/* Compose / Reply */}
-      {replyTo ? (
+      {reply ? (
         <ComposeBox
-          mode="reply"
-          replyTo={replyTo}
+          mode={reply.mode}
+          replyTo={reply.message}
           thread={detail}
           accountAddress={accountAddress}
-          onClose={() => setReplyTo(null)}
+          onClose={() => setReply(null)}
         />
       ) : (
-        <div className="flex justify-end border-t border-gray-200 bg-surface px-6 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-gray-200 bg-surface px-6 py-3">
           <button
             type="button"
-            onClick={() => setReplyTo(detail.messages[detail.messages.length - 1])}
+            onClick={() => setReply({ mode: "forward", message: last })}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+          >
+            <IconArrowForwardUp size={13} stroke={2} />
+            Forward
+          </button>
+          <button
+            type="button"
+            onClick={() => setReply({ mode: "replyAll", message: last })}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+          >
+            <IconArrowBackUpDouble size={13} stroke={2} />
+            Reply All
+          </button>
+          <button
+            type="button"
+            onClick={() => setReply({ mode: "reply", message: last })}
             className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
           >
             <IconArrowBackUp size={13} stroke={2} />
@@ -147,12 +187,10 @@ export function ThreadReader({
 
 function MessageCard({
   message,
-  accountAddress,
-  onReply,
+  onAction,
 }: {
   message: ThreadMessage;
-  accountAddress: string;
-  onReply: () => void;
+  onAction: (mode: "reply" | "replyAll" | "forward") => void;
 }) {
   const outbound = message.direction === "outbound";
   return (
@@ -179,17 +217,31 @@ function MessageCard({
             {message.to_addresses.join(", ")}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-400">
-            {fmtTime(message.sent_at)}
-          </span>
-          <button
-            type="button"
-            onClick={onReply}
-            className="text-[10px] text-petrol-500 hover:text-petrol-700"
-          >
-            Reply
-          </button>
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="text-gray-400">{fmtTime(message.sent_at)}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onAction("reply")}
+              className="text-petrol-500 hover:text-petrol-700"
+            >
+              Reply
+            </button>
+            <button
+              type="button"
+              onClick={() => onAction("replyAll")}
+              className="text-petrol-500 hover:text-petrol-700"
+            >
+              Reply All
+            </button>
+            <button
+              type="button"
+              onClick={() => onAction("forward")}
+              className="text-petrol-500 hover:text-petrol-700"
+            >
+              Forward
+            </button>
+          </div>
         </div>
       </div>
       <div className="mt-2 text-[12.5px] leading-relaxed text-ink">

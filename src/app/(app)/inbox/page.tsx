@@ -3,12 +3,14 @@ import { getCurrentProfile } from "@/lib/auth/current-user";
 import {
   fetchInboxThreads,
   fetchThreadDetail,
+  fetchInboxFilterCounts,
   type InboxFilter,
 } from "@/lib/email/inbox";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { ThreadList } from "./_components/ThreadList";
 import { ThreadReader } from "./_components/ThreadReader";
 import { InboxEmptyState } from "./_components/InboxEmptyState";
+import { FilterEmptyState } from "./_components/FilterEmptyState";
 
 export const dynamic = "force-dynamic";
 
@@ -36,16 +38,16 @@ export default async function InboxPage({
   const q = typeof sp.q === "string" ? sp.q : "";
   const selectedId = typeof sp.c === "string" ? sp.c : null;
 
-  const [accounts, threads, detail] = await Promise.all([
+  const [accounts, threads, detail, counts] = await Promise.all([
     fetchMyEmailAccounts(),
     fetchInboxThreads({ filter, q }),
     selectedId ? fetchThreadDetail(selectedId) : Promise.resolve(null),
+    fetchInboxFilterCounts(),
   ]);
 
   const hasAccount = accounts.length > 0;
-  const selfAddresses = accounts.map((a) => a.address);
+  const selfAddresses = accounts.map((a: { address: string }) => a.address);
 
-  // No account connected at all → full-page empty state with Connect CTA.
   if (!hasAccount) {
     return (
       <div className="h-full">
@@ -55,7 +57,7 @@ export default async function InboxPage({
   }
 
   const accountForReader = detail
-    ? accounts.find((a) => a.id === detail.channel_account_id)
+    ? accounts.find((a: { id: string }) => a.id === detail.channel_account_id)
     : null;
 
   return (
@@ -66,6 +68,7 @@ export default async function InboxPage({
         q={q}
         selectedId={selectedId}
         selfAddresses={selfAddresses}
+        counts={counts}
       />
       {detail && accountForReader ? (
         <ThreadReader
@@ -73,7 +76,7 @@ export default async function InboxPage({
           accountAddress={accountForReader.address}
         />
       ) : threads.length === 0 ? (
-        <InboxEmptyState hasAccount={true} />
+        <FilterEmptyState filter={filter} q={q} />
       ) : (
         <div className="flex h-full flex-1 items-center justify-center bg-canvas text-[12px] text-gray-500">
           Select a conversation to read.

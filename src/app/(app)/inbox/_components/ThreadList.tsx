@@ -1,22 +1,33 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   IconMail,
   IconMessage2,
+  IconRefresh,
   IconSearch,
   IconCircleFilled,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
-import type { InboxThreadRow, InboxFilter } from "@/lib/email/types";
+import { triggerSync } from "../_actions";
+import type {
+  InboxThreadRow,
+  InboxFilter,
+  InboxFilterCounts,
+} from "@/lib/email/types";
 
-const FILTERS: { value: InboxFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "unread", label: "Unread" },
-  { value: "email", label: "Email" },
-  { value: "sms", label: "SMS" },
-  { value: "unlinked", label: "Unlinked" },
+const FILTERS: {
+  value: InboxFilter;
+  label: string;
+  countKey: keyof InboxFilterCounts;
+}[] = [
+  { value: "all", label: "All", countKey: "all" },
+  { value: "unread", label: "Unread", countKey: "unread" },
+  { value: "email", label: "Email", countKey: "email" },
+  { value: "sms", label: "SMS", countKey: "sms" },
+  { value: "unlinked", label: "Unlinked", countKey: "unlinked" },
 ];
 
 function relativeTime(iso: string | null): string {
@@ -51,15 +62,26 @@ export function ThreadList({
   q,
   selectedId,
   selfAddresses,
+  counts,
 }: {
   rows: InboxThreadRow[];
   filter: InboxFilter;
   q: string;
   selectedId: string | null;
   selfAddresses: string[];
+  counts: InboxFilterCounts;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const sp = useSearchParams();
+  const [refreshing, startRefresh] = useTransition();
+
+  function refresh() {
+    startRefresh(async () => {
+      await triggerSync();
+      router.refresh();
+    });
+  }
 
   function hrefForFilter(f: InboxFilter): string {
     const next = new URLSearchParams(sp.toString());
@@ -85,46 +107,76 @@ export function ThreadList({
   return (
     <div className="flex h-full w-[360px] flex-col border-r border-gray-200 bg-surface">
       <div className="border-b border-gray-200 px-4 pt-4 pb-3">
-        <form
-          action={pathname}
-          method="get"
-          className="relative"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const form = e.currentTarget;
-            const formData = new FormData(form);
-            const newQ = String(formData.get("q") ?? "");
-            window.location.href = hrefForSearch(newQ);
-          }}
-        >
-          <IconSearch
-            size={13}
-            stroke={1.75}
-            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            name="q"
-            defaultValue={q}
-            placeholder="Search inbox"
-            className="w-full rounded-md border border-gray-200 bg-surface pl-7 pr-2 py-[6px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
-          />
-        </form>
+        <div className="flex items-center gap-2">
+          <form
+            action={pathname}
+            method="get"
+            className="relative flex-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              const formData = new FormData(form);
+              const newQ = String(formData.get("q") ?? "");
+              window.location.href = hrefForSearch(newQ);
+            }}
+          >
+            <IconSearch
+              size={13}
+              stroke={1.75}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              name="q"
+              defaultValue={q}
+              placeholder="Search inbox"
+              className="w-full rounded-md border border-gray-200 bg-surface pl-7 pr-2 py-[6px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+            />
+          </form>
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={refreshing}
+            className="rounded-md border border-gray-200 bg-surface p-[6px] text-gray-500 hover:border-petrol-500 hover:text-petrol-500 disabled:opacity-50"
+            title="Refresh"
+            aria-label="Refresh"
+          >
+            <IconRefresh
+              size={13}
+              stroke={1.75}
+              className={refreshing ? "animate-spin" : ""}
+            />
+          </button>
+        </div>
         <div className="mt-3 flex flex-wrap gap-1">
-          {FILTERS.map((f) => (
-            <Link
-              key={f.value}
-              href={hrefForFilter(f.value)}
-              className={cn(
-                "rounded-full px-2 py-[2px] text-[11px]",
-                filter === f.value
-                  ? "bg-petrol-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              )}
-            >
-              {f.label}
-            </Link>
-          ))}
+          {FILTERS.map((f) => {
+            const count = counts[f.countKey];
+            const active = filter === f.value;
+            return (
+              <Link
+                key={f.value}
+                href={hrefForFilter(f.value)}
+                className={cn(
+                  "inline-flex items-center gap-[5px] rounded-full px-2 py-[2px] text-[11px]",
+                  active
+                    ? "bg-petrol-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                )}
+              >
+                {f.label}
+                <span
+                  className={cn(
+                    "rounded-full px-[6px] py-[1px] text-[10px] font-medium leading-none",
+                    active
+                      ? "bg-white/25 text-white"
+                      : "bg-white text-gray-500"
+                  )}
+                >
+                  {count}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </div>
 

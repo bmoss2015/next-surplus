@@ -28,6 +28,14 @@ export type InboxThreadRow = {
 
 export type InboxFilter = "all" | "unread" | "email" | "sms" | "unlinked";
 
+export type InboxFilterCounts = {
+  all: number;
+  unread: number;
+  email: number;
+  sms: number;
+  unlinked: number;
+};
+
 export type ThreadMessage = {
   id: string;
   direction: "inbound" | "outbound";

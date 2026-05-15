@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   InboxThreadRow,
   InboxFilter,
+  InboxFilterCounts,
   ThreadDetail,
   ThreadMessage,
 } from "./types";
@@ -11,6 +12,7 @@ import type {
 export type {
   InboxThreadRow,
   InboxFilter,
+  InboxFilterCounts,
   ThreadDetail,
   ThreadMessage,
 } from "./types";
@@ -193,4 +195,25 @@ export async function markThreadRead(threadId: string): Promise<void> {
     .from("conversations")
     .update({ unread_count: 0 })
     .eq("id", threadId);
+}
+
+export async function fetchInboxFilterCounts(): Promise<InboxFilterCounts> {
+  const sb = await createClient();
+  const { data } = await sb
+    .from("conversations")
+    .select("channel, unread_count, lead_id, is_archived");
+  const rows = (data ?? []) as {
+    channel: string;
+    unread_count: number;
+    lead_id: string | null;
+    is_archived: boolean;
+  }[];
+  const visible = rows.filter((r) => !r.is_archived);
+  return {
+    all: visible.length,
+    unread: visible.filter((r) => (r.unread_count ?? 0) > 0).length,
+    email: visible.filter((r) => r.channel === "gmail" || r.channel === "outlook").length,
+    sms: visible.filter((r) => r.channel === "quo_sms").length,
+    unlinked: visible.filter((r) => r.lead_id == null).length,
+  };
 }
