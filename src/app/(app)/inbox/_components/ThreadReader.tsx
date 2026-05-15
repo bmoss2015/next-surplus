@@ -11,6 +11,7 @@ import {
   IconArrowBackUpDouble,
   IconArrowForwardUp,
   IconRefresh,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
@@ -72,107 +73,120 @@ export function ThreadReader({
   const last = detail.messages[detail.messages.length - 1];
 
   return (
-    <div className="flex h-full flex-1 flex-col bg-canvas">
-      {/* Header strip */}
-      <div className="border-b border-gray-200 bg-surface px-6 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="m-0 truncate text-[15px] font-medium text-ink">
-              {detail.subject || "(No subject)"}
-            </h2>
-            <div className="mt-1 truncate text-[11px] text-gray-500">
-              {detail.participants.map((p) => p.name || p.address).join(", ")}
+    <div className="flex h-full flex-1 bg-canvas">
+      {/* LEFT: thread + messages (always full height, shrinks when compose opens) */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Header strip */}
+        <div className="border-b border-gray-200 bg-surface px-6 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="m-0 truncate text-[15px] font-medium text-ink">
+                {detail.subject || "(No subject)"}
+              </h2>
+              <div className="mt-1 truncate text-[11px] text-gray-500">
+                {detail.participants.map((p) => p.name || p.address).join(", ")}
+              </div>
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {detail.lead_id ? (
-              <a
-                href={`/leads/${detail.lead_id}`}
-                className="inline-flex items-center gap-1 rounded-full bg-petrol-50 px-2 py-[3px] text-[10px] font-medium text-petrol-700 hover:bg-petrol-100"
-              >
-                → {detail.lead_label}
-              </a>
-            ) : (
+            <div className="flex shrink-0 items-center gap-2">
+              {detail.lead_id ? (
+                <a
+                  href={`/leads/${detail.lead_id}`}
+                  className="group inline-flex items-center gap-[5px] rounded-full border border-petrol-200 bg-petrol-50 px-[10px] py-[3px] text-[11px] font-medium text-petrol-700 hover:border-petrol-500 hover:bg-petrol-100"
+                  title="Open lead in new context"
+                >
+                  <IconLink size={11} stroke={1.75} />
+                  <span className="underline-offset-2 group-hover:underline">
+                    {detail.lead_label}
+                  </span>
+                  <IconExternalLink size={10} stroke={1.75} />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowLinkPicker(true)}
+                  className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-[3px] text-[11px] font-medium text-gray-600 hover:bg-gray-200"
+                >
+                  <IconLink size={11} stroke={1.75} />
+                  Link To Lead
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => setShowLinkPicker(true)}
-                className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-[3px] text-[10px] font-medium text-gray-600 hover:bg-gray-200"
+                onClick={markUnread}
+                className="text-gray-400 hover:text-ink"
+                title="Mark Unread"
+                aria-label="Mark Unread"
               >
-                <IconLink size={11} stroke={1.75} />
-                Link To Lead
+                <IconRefresh size={14} stroke={1.75} />
               </button>
-            )}
-            <button
-              type="button"
-              onClick={markUnread}
-              className="text-gray-400 hover:text-ink"
-              title="Mark Unread"
-              aria-label="Mark Unread"
-            >
-              <IconRefresh size={14} stroke={1.75} />
-            </button>
-            <button
-              type="button"
-              onClick={archive}
-              className="text-gray-400 hover:text-ink"
-              title="Archive"
-              aria-label="Archive"
-            >
-              <IconArchive size={15} stroke={1.75} />
-            </button>
+              <button
+                type="button"
+                onClick={archive}
+                className="text-gray-400 hover:text-ink"
+                title="Archive"
+                aria-label="Archive"
+              >
+                <IconArchive size={15} stroke={1.75} />
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Message list */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="mx-auto flex max-w-[820px] flex-col gap-3">
+            {detail.messages.map((m) => (
+              <MessageCard
+                key={m.id}
+                message={m}
+                onAction={(mode) => setReply({ mode, message: m })}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom action bar only when no compose is open */}
+        {!reply && (
+          <div className="flex items-center justify-end gap-2 border-t border-gray-200 bg-surface px-6 py-3">
+            <button
+              type="button"
+              onClick={() => setReply({ mode: "forward", message: last })}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+            >
+              <IconArrowForwardUp size={13} stroke={2} />
+              Forward
+            </button>
+            <button
+              type="button"
+              onClick={() => setReply({ mode: "replyAll", message: last })}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+            >
+              <IconArrowBackUpDouble size={13} stroke={2} />
+              Reply All
+            </button>
+            <button
+              type="button"
+              onClick={() => setReply({ mode: "reply", message: last })}
+              className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+            >
+              <IconArrowBackUp size={13} stroke={2} />
+              Reply
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Message list */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
-        <div className="mx-auto flex max-w-[820px] flex-col gap-3">
-          {detail.messages.map((m) => (
-            <MessageCard
-              key={m.id}
-              message={m}
-              onAction={(mode) => setReply({ mode, message: m })}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Compose / Reply */}
-      {reply ? (
-        <ComposeBox
-          mode={reply.mode}
-          replyTo={reply.message}
-          thread={detail}
-          accountAddress={accountAddress}
-          onClose={() => setReply(null)}
-        />
-      ) : (
-        <div className="flex items-center justify-end gap-2 border-t border-gray-200 bg-surface px-6 py-3">
-          <button
-            type="button"
-            onClick={() => setReply({ mode: "forward", message: last })}
-            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
-          >
-            <IconArrowForwardUp size={13} stroke={2} />
-            Forward
-          </button>
-          <button
-            type="button"
-            onClick={() => setReply({ mode: "replyAll", message: last })}
-            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
-          >
-            <IconArrowBackUpDouble size={13} stroke={2} />
-            Reply All
-          </button>
-          <button
-            type="button"
-            onClick={() => setReply({ mode: "reply", message: last })}
-            className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
-          >
-            <IconArrowBackUp size={13} stroke={2} />
-            Reply
-          </button>
-        </div>
+      {/* RIGHT: compose side panel — slides in next to the thread, full height */}
+      {reply && (
+        <aside className="flex w-[520px] shrink-0 flex-col border-l border-gray-200 bg-surface">
+          <ComposeBox
+            mode={reply.mode}
+            replyTo={reply.message}
+            thread={detail}
+            accountAddress={accountAddress}
+            onClose={() => setReply(null)}
+          />
+        </aside>
       )}
 
       {showLinkPicker && (

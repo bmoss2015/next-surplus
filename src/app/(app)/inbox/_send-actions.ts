@@ -9,7 +9,6 @@ import {
   getMessage as gmailGet,
   getHeader,
   extractBodies,
-  extractAttachments,
 } from "@/lib/email/gmail";
 
 export type SendInput = {
@@ -18,11 +17,12 @@ export type SendInput = {
   cc?: string[];
   bcc?: string[];
   subject: string;
-  body: string; // plain text body for v1 — html is the same as text wrapped
-  threadId?: string; // gmail thread id when replying
-  inReplyTo?: string | null; // Message-ID header value
+  body: string;
+  threadId?: string;
+  inReplyTo?: string | null;
   referencesChain?: string[];
   leadId?: string | null;
+  attachments?: { filename: string; mimeType: string; base64: string }[];
 };
 
 export async function sendEmail(
@@ -56,6 +56,7 @@ export async function sendEmail(
     bodyText: input.body,
     inReplyTo: input.inReplyTo ?? undefined,
     references: input.referencesChain,
+    attachments: input.attachments,
   });
 
   let sent;
@@ -88,7 +89,6 @@ export async function sendEmail(
   const inReplyToHdr = getHeader(full.payload, "In-Reply-To");
   const referencesHdr = getHeader(full.payload, "References");
   const bodies = extractBodies(full.payload);
-  const attachments = extractAttachments(full.payload);
   const dateMs = Number(full.internalDate);
 
   // Upsert conversation: use full.threadId.
@@ -176,10 +176,33 @@ export async function sendEmail(
     };
   }
 
-  // Mirror any outbound attachments (e.g., user attached docs in a future
-  // version). Currently v1 sends text-only, so attachments are usually empty.
-  for (const _a of attachments) {
-    // no-op placeholder for v2 outbound attachment storage
+  // Persist outbound attachments locally so they appear on the thread reader.
+  // The user already sent the base64 payload — upload it to Storage and
+  // insert a message_attachments row pointing at it.
+  for (let i = 0; i < (input.attachments ?? []).length; i++) {
+    const att = input.attachments![i];
+    try {
+      const path = `${acct.org_id}/${input.accountId}/${msgRow.id}/${att.filename}`;
+      const bytes = Buffer.from(att.base64, "base64");
+      const { error: upErr } = await svc.storage
+        .from("email-attachments")
+        .upload(path, bytes, { contentType: att.mimeType, upsert: true });
+      if (upErr && !upErr.message?.includes("already")) {
+        console.error("outbound attachment upload failed", upErr);
+        continue;
+      }
+      await svc.from("message_attachments").insert({
+        org_id: acct.org_id,
+        message_id: msgRow.id,
+        filename: att.filename,
+        mime_type: att.mimeType,
+        size_bytes: bytes.byteLength,
+        storage_path: path,
+        is_inline: false,
+      });
+    } catch (e) {
+      console.error("outbound attachment persist failed", e);
+    }
   }
 
   revalidatePath("/inbox");

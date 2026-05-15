@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   IconArrowBackUp,
   IconArrowBackUpDouble,
@@ -32,6 +32,15 @@ type Props =
       defaultLeadId?: string | null;
       onClose: () => void;
     };
+
+const MAX_ATTACHMENT_TOTAL_BYTES = 24 * 1024 * 1024; // Gmail caps raw size at 25MB; leave headroom for headers/base64 overhead.
+
+type AttachedFile = {
+  filename: string;
+  mimeType: string;
+  size: number;
+  base64: string;
+};
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
@@ -93,7 +102,6 @@ function deriveInitialValues(props: Props): {
     ...r.cc_addresses,
   ]);
   if (isInbound) allRecipients.delete(accountLc);
-  // Reply All keeps original CCs, plus original "to" minus self.
   const replyAllTo = isInbound ? r.from_address : r.to_addresses[0] ?? "";
   const replyAllCc = Array.from(allRecipients).filter(
     (a) => a.toLowerCase() !== replyAllTo.toLowerCase()
@@ -120,7 +128,6 @@ function deriveInitialValues(props: Props): {
       showCc: replyAllCc.length > 0,
     };
   }
-  // reply
   return {
     to: replyAllTo,
     cc: "",
@@ -149,6 +156,26 @@ function modeLabel(props: Props): { icon: React.ReactNode; text: string } {
   return { icon: <IconMail size={13} stroke={2} />, text: "New Message" };
 }
 
+async function fileToBase64(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buf);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(bytes.subarray(i, i + chunk))
+    );
+  }
+  return btoa(binary);
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function ComposeBox(props: Props) {
   const initial = deriveInitialValues(props);
   const [to, setTo] = useState(initial.to);
@@ -158,12 +185,41 @@ export function ComposeBox(props: Props) {
   const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState(initial.subject);
   const [body, setBody] = useState(initial.body);
+  const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isReplyMode =
-    props.mode === "reply" || props.mode === "replyAll" || props.mode === "forward";
   const { icon, text } = modeLabel(props);
+
+  async function onFilesPicked(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const next: AttachedFile[] = [...attachments];
+    const currentTotal = next.reduce((s, a) => s + a.size, 0);
+    let total = currentTotal;
+    for (const file of Array.from(files)) {
+      if (total + file.size > MAX_ATTACHMENT_TOTAL_BYTES) {
+        setError(
+          `Combined attachments exceed 24 MB (Gmail's limit). Removed: ${file.name}.`
+        );
+        continue;
+      }
+      const base64 = await fileToBase64(file);
+      next.push({
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        base64,
+      });
+      total += file.size;
+    }
+    setAttachments(next);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }
 
   function send() {
     setError(null);
@@ -189,6 +245,11 @@ export function ComposeBox(props: Props) {
           props.mode === "new"
             ? props.defaultLeadId ?? null
             : props.thread.lead_id,
+        attachments: attachments.map((a) => ({
+          filename: a.filename,
+          mimeType: a.mimeType,
+          base64: a.base64,
+        })),
       });
       if (!result.ok) {
         setError(result.error);
@@ -199,13 +260,15 @@ export function ComposeBox(props: Props) {
     });
   }
 
+  const totalAttachmentBytes = attachments.reduce((s, a) => s + a.size, 0);
+
   return (
-    <div className="overflow-hidden rounded-t-[10px] border-t border-x border-gray-200 bg-surface shadow-elevated">
-      {/* Header strip — petrol-tinted gradient with mode label + actions */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-petrol-700 to-petrol-500 px-5 py-[10px]">
+    <div className="flex h-full flex-col">
+      {/* Sticky header */}
+      <div className="flex shrink-0 items-center justify-between bg-gradient-to-r from-petrol-700 to-petrol-500 px-5 py-[10px]">
         <div className="inline-flex items-center gap-2 text-[12px] font-medium text-white">
           {icon}
-          {text}
+          <span className="truncate">{text}</span>
         </div>
         <button
           type="button"
@@ -217,72 +280,113 @@ export function ComposeBox(props: Props) {
         </button>
       </div>
 
-      {/* From banner */}
-      <div className="flex items-center gap-2 border-b border-gray-150 bg-gray-50 px-5 py-[6px] text-[11px] text-gray-500">
-        <span className="font-medium text-gray-700">From</span>
-        <span>{props.accountAddress}</span>
+      {/* Scrollable middle */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="flex items-center gap-2 border-b border-gray-150 bg-gray-50 px-5 py-[6px] text-[11px] text-gray-500">
+          <span className="font-medium text-gray-700">From</span>
+          <span className="truncate">{props.accountAddress}</span>
+        </div>
+
+        <FieldRow
+          label="To"
+          value={to}
+          onChange={setTo}
+          placeholder="email@example.com"
+        >
+          <div className="flex items-center gap-2 text-[11px]">
+            {!showCc && (
+              <button
+                type="button"
+                onClick={() => setShowCc(true)}
+                className="text-petrol-500 hover:text-petrol-700"
+              >
+                Cc
+              </button>
+            )}
+            {!showBcc && (
+              <button
+                type="button"
+                onClick={() => setShowBcc(true)}
+                className="text-petrol-500 hover:text-petrol-700"
+              >
+                Bcc
+              </button>
+            )}
+          </div>
+        </FieldRow>
+
+        {showCc && (
+          <FieldRow label="Cc" value={cc} onChange={setCc} placeholder="" />
+        )}
+        {showBcc && (
+          <FieldRow label="Bcc" value={bcc} onChange={setBcc} placeholder="" />
+        )}
+        <FieldRow
+          label="Subject"
+          value={subject}
+          onChange={setSubject}
+          placeholder=""
+        />
+
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={14}
+          placeholder="Write your message…"
+          className="block w-full resize-y bg-surface px-5 py-3 text-[13px] leading-relaxed text-ink outline-none placeholder:text-gray-400"
+        />
+
+        {/* Attachment chips */}
+        {attachments.length > 0 && (
+          <div className="border-t border-gray-150 bg-gray-50 px-5 py-3">
+            <div className="flex flex-wrap gap-2">
+              {attachments.map((a, i) => (
+                <div
+                  key={i}
+                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11px] text-ink"
+                >
+                  <IconPaperclip size={11} stroke={1.75} className="text-petrol-500" />
+                  <span className="max-w-[180px] truncate">{a.filename}</span>
+                  <span className="text-gray-400">· {formatSize(a.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(i)}
+                    className="ml-[2px] text-gray-400 hover:text-danger"
+                    aria-label="Remove attachment"
+                  >
+                    <IconX size={11} stroke={2} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 text-[10px] text-gray-400">
+              Total · {formatSize(totalAttachmentBytes)} of 24 MB
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="border-t border-danger-border bg-danger-bg px-5 py-2 text-[11px] text-danger">
+            {error}
+          </div>
+        )}
       </div>
 
-      {/* Field rows */}
-      <FieldRow label="To" value={to} onChange={setTo} placeholder="email@example.com">
-        <div className="flex items-center gap-2 text-[11px]">
-          {!showCc && (
-            <button
-              type="button"
-              onClick={() => setShowCc(true)}
-              className="text-petrol-500 hover:text-petrol-700"
-            >
-              Cc
-            </button>
-          )}
-          {!showBcc && (
-            <button
-              type="button"
-              onClick={() => setShowBcc(true)}
-              className="text-petrol-500 hover:text-petrol-700"
-            >
-              Bcc
-            </button>
-          )}
-        </div>
-      </FieldRow>
-
-      {showCc && (
-        <FieldRow label="Cc" value={cc} onChange={setCc} placeholder="" />
-      )}
-      {showBcc && (
-        <FieldRow label="Bcc" value={bcc} onChange={setBcc} placeholder="" />
-      )}
-      <FieldRow
-        label="Subject"
-        value={subject}
-        onChange={setSubject}
-        placeholder=""
-      />
-
-      {/* Body */}
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        rows={props.mode === "forward" ? 12 : 8}
-        placeholder="Write your message…"
-        className="block w-full resize-y bg-surface px-5 py-3 text-[13px] leading-relaxed text-ink outline-none placeholder:text-gray-400"
-      />
-
-      {error && (
-        <div className="border-t border-danger-border bg-danger-bg px-5 py-2 text-[11px] text-danger">
-          {error}
-        </div>
-      )}
-
-      {/* Bottom toolbar */}
-      <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-5 py-[10px]">
-        <div className="flex items-center gap-2 text-gray-400">
+      {/* Sticky footer */}
+      <div className="flex shrink-0 items-center justify-between border-t border-gray-200 bg-gray-50 px-5 py-[10px]">
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={(e) => onFilesPicked(e.target.files)}
+            className="hidden"
+          />
           <button
             type="button"
-            disabled
-            title="Attachments coming soon"
-            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[11px] text-gray-400"
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[11px] text-ink hover:border-petrol-500"
+            title="Attach files"
           >
             <IconPaperclip size={12} stroke={1.75} />
             Attach
@@ -347,8 +451,6 @@ function FieldRow({
 function threadIdForSend(
   props: Extract<Props, { mode: "reply" | "replyAll" | "forward" }>
 ): string | undefined {
-  // Forwards start a new thread per email convention — drop the threadId so
-  // Gmail allocates a fresh one. Replies stay in the existing thread.
   if (props.mode === "forward") return undefined;
   return props.thread.provider_thread_key;
 }

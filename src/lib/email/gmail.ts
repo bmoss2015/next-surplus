@@ -284,7 +284,16 @@ export function parseFromHeader(raw: string | undefined): {
   return { email: raw.trim().toLowerCase() };
 }
 
-// Build an RFC 2822 message and base64url-encode it for Gmail.users.messages.send
+export type OutboundAttachment = {
+  filename: string;
+  mimeType: string;
+  base64: string; // standard base64, the builder re-wraps for transport
+};
+
+// Build an RFC 2822 message and base64url-encode it for Gmail.users.messages.send.
+// When attachments are present, the structure becomes multipart/mixed:
+//   - first part: text body (or multipart/alternative when both plain + html)
+//   - subsequent parts: each attachment with Content-Disposition: attachment
 export function buildRawMessage(opts: {
   from: string;
   to: string[];
@@ -295,6 +304,7 @@ export function buildRawMessage(opts: {
   bodyHtml?: string;
   inReplyTo?: string;
   references?: string[];
+  attachments?: OutboundAttachment[];
 }): string {
   const lines: string[] = [];
   lines.push(`From: ${opts.from}`);
@@ -307,27 +317,54 @@ export function buildRawMessage(opts: {
     lines.push(`References: ${opts.references.join(" ")}`);
   lines.push("MIME-Version: 1.0");
 
-  if (opts.bodyHtml && opts.bodyText) {
-    const boundary = `b_${Date.now()}`;
-    lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+  const hasAttachments = (opts.attachments?.length ?? 0) > 0;
+
+  function bodyPart(): string[] {
+    const out: string[] = [];
+    if (opts.bodyHtml && opts.bodyText) {
+      const altBoundary = `alt_${Date.now()}`;
+      out.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+      out.push("");
+      out.push(`--${altBoundary}`);
+      out.push(`Content-Type: text/plain; charset="UTF-8"`);
+      out.push("");
+      out.push(opts.bodyText);
+      out.push(`--${altBoundary}`);
+      out.push(`Content-Type: text/html; charset="UTF-8"`);
+      out.push("");
+      out.push(opts.bodyHtml);
+      out.push(`--${altBoundary}--`);
+    } else if (opts.bodyHtml) {
+      out.push(`Content-Type: text/html; charset="UTF-8"`);
+      out.push("");
+      out.push(opts.bodyHtml);
+    } else {
+      out.push(`Content-Type: text/plain; charset="UTF-8"`);
+      out.push("");
+      out.push(opts.bodyText ?? "");
+    }
+    return out;
+  }
+
+  if (hasAttachments) {
+    const mixedBoundary = `mixed_${Date.now()}`;
+    lines.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`);
     lines.push("");
-    lines.push(`--${boundary}`);
-    lines.push(`Content-Type: text/plain; charset="UTF-8"`);
-    lines.push("");
-    lines.push(opts.bodyText);
-    lines.push(`--${boundary}`);
-    lines.push(`Content-Type: text/html; charset="UTF-8"`);
-    lines.push("");
-    lines.push(opts.bodyHtml);
-    lines.push(`--${boundary}--`);
-  } else if (opts.bodyHtml) {
-    lines.push(`Content-Type: text/html; charset="UTF-8"`);
-    lines.push("");
-    lines.push(opts.bodyHtml);
+    lines.push(`--${mixedBoundary}`);
+    lines.push(...bodyPart());
+    for (const att of opts.attachments!) {
+      const safeName = att.filename.replace(/"/g, "\\\"");
+      const wrapped = att.base64.replace(/(.{76})/g, "$1\r\n");
+      lines.push(`--${mixedBoundary}`);
+      lines.push(`Content-Type: ${att.mimeType}; name="${safeName}"`);
+      lines.push(`Content-Disposition: attachment; filename="${safeName}"`);
+      lines.push("Content-Transfer-Encoding: base64");
+      lines.push("");
+      lines.push(wrapped);
+    }
+    lines.push(`--${mixedBoundary}--`);
   } else {
-    lines.push(`Content-Type: text/plain; charset="UTF-8"`);
-    lines.push("");
-    lines.push(opts.bodyText ?? "");
+    lines.push(...bodyPart());
   }
 
   const raw = lines.join("\r\n");
