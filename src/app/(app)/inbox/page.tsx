@@ -50,7 +50,7 @@ export default async function InboxPage({
 
   if (!hasAccount) {
     return (
-      <div className="h-full">
+      <div className="h-full w-full">
         <InboxEmptyState hasAccount={false} />
       </div>
     );
@@ -61,7 +61,7 @@ export default async function InboxPage({
     : null;
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full w-full">
       <ThreadList
         rows={threads}
         filter={filter}
@@ -70,18 +70,20 @@ export default async function InboxPage({
         selfAddresses={selfAddresses}
         counts={counts}
       />
-      {detail && accountForReader ? (
-        <ThreadReader
-          detail={detail}
-          accountAddress={accountForReader.address}
-        />
-      ) : threads.length === 0 ? (
-        <FilterEmptyState filter={filter} q={q} />
-      ) : (
-        <div className="flex h-full flex-1 items-center justify-center bg-canvas text-[12px] text-gray-500">
-          Select a conversation to read.
-        </div>
-      )}
+      <div className="flex h-full flex-1 min-w-0">
+        {detail && accountForReader ? (
+          <ThreadReader
+            detail={detail}
+            accountAddress={accountForReader.address}
+          />
+        ) : threads.length === 0 ? (
+          <FilterEmptyState filter={filter} q={q} />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-canvas text-[12px] text-gray-500">
+            Select a conversation to read.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

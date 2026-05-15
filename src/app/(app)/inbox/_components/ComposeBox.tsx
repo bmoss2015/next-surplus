@@ -264,13 +264,10 @@ export function ComposeBox(props: Props) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Sticky header — matches the thread reader header so the two columns
-          read as a unified surface, not competing chrome. */}
-      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-surface px-5 py-4">
-        <div className="inline-flex min-w-0 items-center gap-2 text-[13px] font-medium text-ink">
-          <span className="text-petrol-500">{icon}</span>
-          <span className="truncate">{text}</span>
-        </div>
+      {/* Top spacer + close button — matches the height of the thread reader's
+          header strip so the petrol gradient title bar below aligns with the
+          message area, not with the subject. */}
+      <div className="flex h-[78px] shrink-0 items-start justify-end border-b border-gray-200 bg-surface px-5 pt-4">
         <button
           type="button"
           onClick={props.onClose}
@@ -279,6 +276,15 @@ export function ComposeBox(props: Props) {
         >
           <IconX size={14} stroke={2} />
         </button>
+      </div>
+
+      {/* Petrol gradient mode-label bar — aligned with where messages start
+          in the thread reader. */}
+      <div className="flex shrink-0 items-center bg-gradient-to-r from-petrol-700 to-petrol-500 px-5 py-[10px]">
+        <div className="inline-flex min-w-0 items-center gap-2 text-[12px] font-medium text-white">
+          {icon}
+          <span className="truncate">{text}</span>
+        </div>
       </div>
 
       {/* Scrollable middle */}

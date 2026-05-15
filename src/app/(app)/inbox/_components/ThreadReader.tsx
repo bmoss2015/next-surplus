@@ -88,25 +88,6 @@ export function ThreadReader({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {detail.lead_id ? (
-                <a
-                  href={`/leads/${detail.lead_id}`}
-                  className="inline-flex items-center gap-[6px] rounded-full btn-primary px-[10px] py-[4px] text-[11px] font-medium text-white"
-                  title="Open lead"
-                >
-                  <span>Linked to {detail.lead_label}</span>
-                  <IconArrowRight size={11} stroke={2} />
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowLinkPicker(true)}
-                  className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-[3px] text-[11px] font-medium text-gray-600 hover:bg-gray-200"
-                >
-                  <IconLink size={11} stroke={1.75} />
-                  Link To Lead
-                </button>
-              )}
               <button
                 type="button"
                 onClick={markUnread}
@@ -127,6 +108,37 @@ export function ThreadReader({
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Link-to-lead banner — full row below the subject. The teal-gradient
+            chip is impossible to miss; unlinked threads get a softer dashed
+            prompt that opens the picker. */}
+        <div className="flex items-center justify-between border-b border-gray-150 bg-gray-50 px-6 py-[10px]">
+          {detail.lead_id ? (
+            <a
+              href={`/leads/${detail.lead_id}`}
+              className="inline-flex items-center gap-2 rounded-md btn-primary px-3 py-[6px] text-[12px] font-medium text-white"
+              title="Open lead"
+            >
+              <IconLink size={12} stroke={2} />
+              <span>Linked to {detail.lead_label}</span>
+              <IconArrowRight size={12} stroke={2} />
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowLinkPicker(true)}
+              className="inline-flex items-center gap-2 rounded-md border border-dashed border-gray-300 bg-surface px-3 py-[6px] text-[12px] font-medium text-gray-600 hover:border-petrol-500 hover:text-petrol-700"
+            >
+              <IconLink size={12} stroke={2} />
+              Not linked — link to a lead
+            </button>
+          )}
+          {detail.lead_address && (
+            <span className="truncate text-[11px] text-gray-400">
+              {detail.lead_address}
+            </span>
+          )}
         </div>
 
         {/* Message list */}
