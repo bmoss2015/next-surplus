@@ -182,7 +182,7 @@ export function OtherContactsSection({
 
   return (
     <div className="mt-4 rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="section-subheader">Other Contacts</h3>
           <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
@@ -190,14 +190,27 @@ export function OtherContactsSection({
             owners and their relatives.
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing("new")}
-          className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
-        >
-          <IconPlus size={13} stroke={2} />
-          Add Contact
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {sortedRoles.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setManagingRoles(true)}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs font-medium text-ink hover:border-petrol-500"
+              title="Rename or delete custom roles"
+            >
+              <IconSettings size={12} stroke={1.75} />
+              Manage Roles
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setEditing("new")}
+            className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+          >
+            <IconPlus size={13} stroke={2} />
+            Add Contact
+          </button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
