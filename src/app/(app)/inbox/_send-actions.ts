@@ -108,8 +108,19 @@ export async function sendEmail(
         last_message_at: new Date(dateMs).toISOString(),
         last_message_preview: (full.snippet ?? "").slice(0, 240),
         lead_id: input.leadId ?? (existingConv.lead_id as string | null),
+        // The user sending an outbound reply demonstrably means they've seen
+        // any prior inbound on this thread — clear the unread badge.
+        unread_count: 0,
       })
       .eq("id", convId);
+    // Also mark any inbound messages on this thread as read so the lead's
+    // Conversation-tab unread badge clears even when we only had a stale
+    // unread_count without per-message reset.
+    await svc
+      .from("messages")
+      .update({ is_read: true })
+      .eq("conversation_id", convId)
+      .eq("is_read", false);
   } else {
     const { data: inserted, error: convErr } = await svc
       .from("conversations")
