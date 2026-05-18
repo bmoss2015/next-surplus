@@ -81,9 +81,22 @@ serve(async (req: Request) => {
   const safeComment = escapeHtml(commentText).replace(/\n/g, "<br/>");
   const safeLink = escapeHtml(link);
 
+  // <meta color-scheme: light> opts the email out of Gmail/Outlook/Apple Mail
+  // dark-mode auto-inversion. Without it, those clients darken our white card
+  // but leave the dark text alone — yielding unreadable dark-on-dark.
   const html = `<!doctype html>
-<html>
-<body style="margin:0;padding:0;background-color:#f5f7fa;font-family:Inter,Helvetica,Arial,sans-serif;">
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <style>
+    :root { color-scheme: light; supported-color-schemes: light; }
+    body { color-scheme: light; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f7fa;font-family:Inter,Helvetica,Arial,sans-serif;color-scheme:light;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f7fa;padding:32px 16px;">
     <tr>
       <td align="center">
@@ -114,7 +127,7 @@ serve(async (req: Request) => {
               </table>`
                   : ""
               }
-              <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#94a3b8;">You received this because you were @mentioned on a lead in the Moss Equity Operations Portal.</p>
+              <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#475569;">You received this because you were @mentioned on a lead in the Moss Equity Operations Portal.</p>
             </td>
           </tr>
         </table>
