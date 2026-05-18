@@ -81,37 +81,34 @@ serve(async (req: Request) => {
   const safeComment = escapeHtml(commentText).replace(/\n/g, "<br/>");
   const safeLink = escapeHtml(link);
 
-  // <meta color-scheme: light> opts the email out of Gmail/Outlook/Apple Mail
-  // dark-mode auto-inversion. Without it, those clients darken our white card
-  // but leave the dark text alone — yielding unreadable dark-on-dark.
+  // Email is intentionally dark-themed top to bottom so Gmail / Outlook / Apple
+  // Mail dark-mode auto-inversion has nothing to flip — already-dark emails
+  // get left alone by every client we care about. White text on dark teal
+  // backgrounds reads identically in light-mode and dark-mode previews.
   const html = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <meta name="supported-color-schemes" content="light">
-  <style>
-    :root { color-scheme: light; supported-color-schemes: light; }
-    body { color-scheme: light; }
-  </style>
+  <meta name="color-scheme" content="dark light">
+  <meta name="supported-color-schemes" content="dark light">
 </head>
-<body style="margin:0;padding:0;background-color:#f5f7fa;font-family:Inter,Helvetica,Arial,sans-serif;color-scheme:light;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f7fa;padding:32px 16px;">
+<body style="margin:0;padding:0;background-color:#062831;font-family:Inter,Helvetica,Arial,sans-serif;color:#ffffff;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#062831" style="background-color:#062831;padding:32px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,41,0.06),0 4px 12px rgba(15,23,41,0.04);overflow:hidden;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" bgcolor="#0a3d4a" style="max-width:560px;width:100%;background-color:#0a3d4a;border-radius:12px;overflow:hidden;">
           <tr>
-            <td style="background:linear-gradient(90deg,#0a3d4a,#0d6c7d);padding:24px 28px;">
-              <div style="font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:#ffffff;font-weight:600;opacity:0.85;">Moss Equity Partners</div>
+            <td bgcolor="#0d6c7d" style="background-color:#0d6c7d;padding:24px 28px;">
+              <div style="font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:#ffffff;font-weight:600;">Moss Equity Partners</div>
               <div style="font-size:18px;line-height:1.3;color:#ffffff;font-weight:600;margin-top:6px;">${safeActorFirst} mentioned you${safeOwner ? ` on the ${safeOwner} Lead` : ""}</div>
             </td>
           </tr>
           <tr>
             <td style="padding:28px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 24px;background-color:#f8fafc;border-radius:10px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0e4c5a" style="margin:0 0 24px;background-color:#0e4c5a;border-radius:10px;">
                 <tr>
-                  <td style="padding:18px 22px;font-size:14px;line-height:1.7;color:#0f1729;">
+                  <td style="padding:18px 22px;font-size:14px;line-height:1.7;color:#ffffff;">
                     ${safeComment}
                   </td>
                 </tr>
@@ -120,14 +117,14 @@ serve(async (req: Request) => {
                 link
                   ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="background:linear-gradient(90deg,#0a3d4a,#0d6c7d);border-radius:6px;">
+                  <td bgcolor="#1a8a9c" style="background-color:#1a8a9c;border-radius:6px;">
                     <a href="${safeLink}" style="display:inline-block;padding:11px 22px;font-size:13px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;letter-spacing:0.2px;">Open The Discussion</a>
                   </td>
                 </tr>
               </table>`
                   : ""
               }
-              <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#475569;">You received this because you were @mentioned on a lead in the Moss Equity Operations Portal.</p>
+              <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#cfe9ed;">You received this because you were @mentioned on a lead in the Moss Equity Operations Portal.</p>
             </td>
           </tr>
         </table>
