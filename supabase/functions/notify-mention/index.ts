@@ -110,7 +110,7 @@ serve(async (req: Request) => {
       <td align="center">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,41,0.06),0 4px 12px rgba(15,23,41,0.04);overflow:hidden;">
           <tr>
-            <td bgcolor="#0a3d4a" style="background-color:#0a3d4a;padding:24px 28px;">
+            <td bgcolor="#1a8a9c" style="background-color:#1a8a9c;padding:24px 28px;">
               <div class="keep-white" style="font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:#ffffff;font-weight:600;"><font color="#ffffff">Moss Equity Partners</font></div>
               <div class="keep-white" style="font-size:18px;line-height:1.3;color:#ffffff;font-weight:600;margin-top:6px;"><font color="#ffffff">${safeActorFirst} mentioned you${safeOwner ? ` on the ${safeOwner} Lead` : ""}</font></div>
             </td>
@@ -128,7 +128,7 @@ serve(async (req: Request) => {
                 link
                   ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td bgcolor="#0a3d4a" style="background-color:#0a3d4a;border-radius:6px;">
+                  <td bgcolor="#1a8a9c" style="background-color:#1a8a9c;border-radius:6px;">
                     <a href="${safeLink}" class="keep-white" style="display:inline-block;padding:11px 22px;font-size:13px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;letter-spacing:0.2px;"><font color="#ffffff">Open The Discussion</font></a>
                   </td>
                 </tr>
