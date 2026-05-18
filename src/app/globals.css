@@ -71,6 +71,13 @@ body {
   height: 100%;
 }
 
+/* Pin the portal to a light color-scheme. Without this, browsers running
+   forced/auto dark mode (Chrome's "Auto Dark Mode for Web Contents", etc.)
+   invert the sidebar gradient and eat the white logo + user name. */
+:root {
+  color-scheme: light;
+}
+
 body {
   background: var(--color-canvas);
   color: var(--color-ink);
