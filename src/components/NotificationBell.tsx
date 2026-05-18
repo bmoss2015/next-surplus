@@ -188,16 +188,26 @@ export function NotificationBell() {
                   type="button"
                   onClick={() => onClickItem(n)}
                   className={cn(
-                    "flex w-full cursor-pointer flex-col gap-0.5 border-b border-gray-100 px-3 py-2.5 text-left transition-colors hover:bg-gray-50",
-                    !n.read && "bg-petrol-50/60"
+                    "flex w-full cursor-pointer flex-col gap-0.5 border-b border-gray-100 py-2.5 pr-3 text-left transition-colors hover:bg-gray-50",
+                    !n.read
+                      ? "border-l-2 border-l-petrol-300 bg-petrol-100/70 pl-[10px] hover:bg-petrol-100"
+                      : "pl-3"
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] text-ink">
-                      <span className="font-medium">
-                        {n.actor_first_name ?? "Someone"}
-                      </span>{" "}
-                      Mentioned You
+                    <span className="flex items-center gap-1.5 text-[13px] text-ink">
+                      {!n.read && (
+                        <span
+                          aria-hidden
+                          className="inline-block h-1.5 w-1.5 flex-none rounded-full bg-petrol-500"
+                        />
+                      )}
+                      <span>
+                        <span className="font-medium">
+                          {n.actor_first_name ?? "Someone"}
+                        </span>{" "}
+                        Mentioned You
+                      </span>
                     </span>
                     <span className="flex-none text-[10.5px] text-gray-400">
                       {relativeTime(n.created_at)}
