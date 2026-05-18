@@ -17,18 +17,24 @@ export function HtmlMessage({ html }: { html: string }) {
   // Wrap the email HTML with a base stylesheet that matches the portal:
   // Inter, ink color, petrol-tinted links, max-width images, gentler
   // blockquotes. `<base target="_blank">` opens every link in a new tab.
+  // Pin the iframe to a light color-scheme so dark-mode browsers (and senders
+  // who set `@media (prefers-color-scheme: dark)` rules) don't render the
+  // email's text on top of a dark surface. Without this, our forced
+  // color: #0f1729 + the sender's dark bg = unreadable dark-on-dark.
   const wrapped = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <base target="_blank">
   <style>
-    html, body { margin: 0; padding: 0; }
+    :root { color-scheme: light; }
+    html, body { margin: 0; padding: 0; background: #ffffff; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
       font-size: 13px;
       line-height: 1.55;
-      color: #0f1729;
       padding: 2px 4px;
       word-wrap: break-word;
       overflow-wrap: break-word;
@@ -40,7 +46,6 @@ export function HtmlMessage({ html }: { html: string }) {
       border-left: 3px solid #e5e7eb;
       margin: 8px 0 8px 0;
       padding: 0 0 0 12px;
-      color: #6b7280;
     }
     pre {
       background: #f8f9fa;
