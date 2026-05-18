@@ -81,11 +81,28 @@ serve(async (req: Request) => {
   const safeComment = escapeHtml(commentText).replace(/\n/g, "<br/>");
   const safeLink = escapeHtml(link);
 
+  // Gmail's documented opt-in: declare color-scheme: light dark + ship our own
+  // @media (prefers-color-scheme: dark) rules. With this, Gmail Web stops the
+  // aggressive auto-inversion and uses our overrides instead. The .keep-white
+  // class on the header texts and button label stays pure white in dark mode.
   const html = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <style>
+    :root { color-scheme: light dark; supported-color-schemes: light dark; }
+    .keep-white { color: #ffffff !important; }
+    @media (prefers-color-scheme: dark) {
+      .keep-white,
+      a.keep-white,
+      [data-ogsc] .keep-white {
+        color: #ffffff !important;
+      }
+    }
+  </style>
 </head>
 <body style="margin:0;padding:0;background-color:#f5f7fa;font-family:Inter,Helvetica,Arial,sans-serif;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f7fa;padding:32px 16px;">
@@ -94,8 +111,8 @@ serve(async (req: Request) => {
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,41,0.06),0 4px 12px rgba(15,23,41,0.04);overflow:hidden;">
           <tr>
             <td bgcolor="#0a3d4a" style="background-color:#0a3d4a;background:linear-gradient(90deg,#0a3d4a,#0d6c7d);padding:24px 28px;">
-              <div style="font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:#fefefe !important;font-weight:600;mso-line-height-rule:exactly;"><font color="#fefefe">Moss Equity Partners</font></div>
-              <div style="font-size:18px;line-height:1.3;color:#fefefe !important;font-weight:600;margin-top:6px;mso-line-height-rule:exactly;"><font color="#fefefe">${safeActorFirst} mentioned you${safeOwner ? ` on the ${safeOwner} Lead` : ""}</font></div>
+              <div class="keep-white" style="font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:#ffffff;font-weight:600;"><font color="#ffffff">Moss Equity Partners</font></div>
+              <div class="keep-white" style="font-size:18px;line-height:1.3;color:#ffffff;font-weight:600;margin-top:6px;"><font color="#ffffff">${safeActorFirst} mentioned you${safeOwner ? ` on the ${safeOwner} Lead` : ""}</font></div>
             </td>
           </tr>
           <tr>
@@ -112,7 +129,7 @@ serve(async (req: Request) => {
                   ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td bgcolor="#0a3d4a" style="background-color:#0a3d4a;background:linear-gradient(90deg,#0a3d4a,#0d6c7d);border-radius:6px;">
-                    <a href="${safeLink}" style="display:inline-block;padding:11px 22px;font-size:13px;font-weight:600;color:#fefefe !important;text-decoration:none;border-radius:6px;letter-spacing:0.2px;"><font color="#fefefe">Open The Discussion</font></a>
+                    <a href="${safeLink}" class="keep-white" style="display:inline-block;padding:11px 22px;font-size:13px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;letter-spacing:0.2px;"><font color="#ffffff">Open The Discussion</font></a>
                   </td>
                 </tr>
               </table>`
