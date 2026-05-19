@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { IconPlus, IconTrash, IconCheck } from "@tabler/icons-react";
+import { useRouter } from "next/navigation";
+import { IconPlus, IconTrash, IconCheck, IconPencil } from "@tabler/icons-react";
 import {
   addMailingAddress,
   setMailingAddressMailed,
   deleteContact,
+  upsertContact,
 } from "../../_actions";
 import type {
   ContactRow,
@@ -34,9 +36,27 @@ function joinAddress(d: AddrDraft): string {
   return [d.line1.trim(), tail].filter(Boolean).join(", ");
 }
 
+// Split a stored "line1, city, ST zip" string back into its components so the
+// edit form can prefill correctly. Mirrors the parser in src/lib/mail/address.ts
+// but is lenient — falls back to putting everything in line1 when the format
+// is unexpected, so a user can still fix a malformed legacy entry.
+function splitAddress(value: string): AddrDraft {
+  const parts = value.split(",").map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 3) return { line1: value, city: "", state: "", zip: "" };
+  const tail = parts[parts.length - 1];
+  const tailMatch = tail.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
+  if (!tailMatch) return { line1: value, city: "", state: "", zip: "" };
+  return {
+    line1: parts.slice(0, parts.length - 2).join(", "),
+    city: parts[parts.length - 2],
+    state: tailMatch[1].toUpperCase(),
+    zip: tailMatch[2],
+  };
+}
+
 // Fix AAA Patch: a mailing address can be addressed to any owner OR any
 // relative. We keep contacts.owner_id (FK) pointing at an owner, and store the
-// full recipient label (e.g. "Jane Doe (Relative)") in contacts.notes.
+// full recipient label (e.g. "Jane Doe (Relative)") in contacts.recipient_label.
 type Recipient = { key: string; label: string; ownerId: string };
 
 function buildRecipients(
@@ -71,6 +91,7 @@ export function MailingAddresses({
   owners: OwnerRowFull[];
   relatives?: RelativeRow[];
 }) {
+  const router = useRouter();
   const { isAdmin } = useRole();
   const [rows, setRows] = useState<ContactRow[]>(
     initialAddresses.filter((c) => c.channel === "mailing_address")
@@ -81,6 +102,8 @@ export function MailingAddresses({
   const [newRecipientKey, setNewRecipientKey] = useState(
     recipients[0]?.key ?? ""
   );
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAddr, setEditAddr] = useState<AddrDraft>(EMPTY_ADDR);
   const [, startTransition] = useTransition();
 
   function add() {
@@ -113,11 +136,39 @@ export function MailingAddresses({
             is_litigator: false,
             mailed: false,
             mailed_at: null,
-            notes: recipient.label,
+            recipient_label: recipient.label,
           },
         ]);
         setAddr(EMPTY_ADDR);
         setAdding(false);
+        // Re-fetch the server component so the Send Mail button picks up
+        // the new candidate.
+        router.refresh();
+      }
+    });
+  }
+
+  function startEdit(row: ContactRow) {
+    setEditingId(row.id);
+    setEditAddr(splitAddress(row.value));
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditAddr(EMPTY_ADDR);
+  }
+
+  function saveEdit(row: ContactRow) {
+    const value = joinAddress(editAddr);
+    if (!editAddr.line1.trim()) return;
+    startTransition(async () => {
+      const res = await upsertContact(leadId, row.owner_id, row.id, { value });
+      if (res.ok) {
+        setRows((prev) =>
+          prev.map((r) => (r.id === row.id ? { ...r, value } : r))
+        );
+        cancelEdit();
+        router.refresh();
       }
     });
   }
@@ -140,6 +191,7 @@ export function MailingAddresses({
     setRows((prev) => prev.filter((r) => r.id !== row.id));
     startTransition(async () => {
       await deleteContact(row.id, leadId);
+      router.refresh();
     });
   }
 
@@ -148,7 +200,7 @@ export function MailingAddresses({
   }
 
   function recipientLabel(row: ContactRow) {
-    if (row.notes && row.notes.trim()) return row.notes;
+    if (row.recipient_label && row.recipient_label.trim()) return row.recipient_label;
     return `${ownerName(row.owner_id)} (Owner)`;
   }
 
@@ -196,6 +248,7 @@ export function MailingAddresses({
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {rows.map((row) => {
               const { street, rest } = addressLines(row.value);
+              const isEditing = editingId === row.id;
               return (
                 <div
                   key={row.id}
@@ -204,36 +257,112 @@ export function MailingAddresses({
                   <div className="text-[11px] text-gray-500">
                     {recipientLabel(row)}
                   </div>
-                  <div className="text-[12px] leading-snug text-ink">
-                    <div>{street}</div>
-                    {rest && <div className="text-gray-500">{rest}</div>}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleMailed(row)}
-                    className={cn(
-                      "inline-flex w-fit cursor-pointer items-center gap-1 rounded-full px-2.5 py-[3px] text-[10px] font-medium transition-colors",
-                      row.mailed
-                        ? "border-none bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] text-white"
-                        : "border border-[#e2e8f0] bg-[#f1f5f9] text-[#64748b] hover:border-petrol-200"
-                    )}
-                    title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
-                  >
-                    {row.mailed && <IconCheck size={11} stroke={2.5} />}
-                    {row.mailed && row.mailed_at
-                      ? `Mailed ${fmtMailedAt(row.mailed_at)}`
-                      : "Not Mailed"}
-                  </button>
-                  {isAdmin && (
+                  {isEditing ? (
+                    <div className="flex flex-col gap-2">
+                      <input
+                        autoFocus
+                        value={editAddr.line1}
+                        onChange={(e) =>
+                          setEditAddr((d) => ({ ...d, line1: e.target.value }))
+                        }
+                        placeholder="Street"
+                        className={inputClass}
+                      />
+                      <input
+                        value={editAddr.city}
+                        onChange={(e) =>
+                          setEditAddr((d) => ({ ...d, city: e.target.value }))
+                        }
+                        placeholder="City"
+                        className={inputClass}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          value={editAddr.state}
+                          maxLength={2}
+                          onChange={(e) =>
+                            setEditAddr((d) => ({
+                              ...d,
+                              state: e.target.value.toUpperCase(),
+                            }))
+                          }
+                          placeholder="ST"
+                          className={inputClass}
+                        />
+                        <input
+                          value={editAddr.zip}
+                          onChange={(e) =>
+                            setEditAddr((d) => ({ ...d, zip: e.target.value }))
+                          }
+                          placeholder="Zip"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11px] text-ink hover:border-gray-300"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => saveEdit(row)}
+                          disabled={!editAddr.line1.trim()}
+                          className="btn-primary cursor-pointer rounded-md px-2 py-[4px] text-[11px] font-medium disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-[12px] leading-snug text-ink">
+                      <div>{street}</div>
+                      {rest && <div className="text-gray-500">{rest}</div>}
+                    </div>
+                  )}
+                  {!isEditing && (
                     <button
                       type="button"
-                      onClick={() => remove(row)}
-                      className="mt-auto inline-flex w-fit cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-danger"
-                      aria-label="Remove Mailing Address"
+                      onClick={() => toggleMailed(row)}
+                      className={cn(
+                        "inline-flex w-fit cursor-pointer items-center gap-1 rounded-full px-2.5 py-[3px] text-[10px] font-medium transition-colors",
+                        row.mailed
+                          ? "border-none bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] text-white"
+                          : "border border-[#e2e8f0] bg-[#f1f5f9] text-[#64748b] hover:border-petrol-200"
+                      )}
+                      title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
                     >
-                      <IconTrash size={12} stroke={1.75} />
-                      Remove
+                      {row.mailed && <IconCheck size={11} stroke={2.5} />}
+                      {row.mailed && row.mailed_at
+                        ? `Mailed ${fmtMailedAt(row.mailed_at)}`
+                        : "Not Mailed"}
                     </button>
+                  )}
+                  {!isEditing && (
+                    <div className="mt-auto flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(row)}
+                        className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-petrol-600"
+                        aria-label="Edit Mailing Address"
+                      >
+                        <IconPencil size={12} stroke={1.75} />
+                        Edit
+                      </button>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => remove(row)}
+                          className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-danger"
+                          aria-label="Remove Mailing Address"
+                        >
+                          <IconTrash size={12} stroke={1.75} />
+                          Remove
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               );

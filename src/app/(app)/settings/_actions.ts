@@ -294,6 +294,441 @@ export async function removeMember(
   return { ok: true };
 }
 
+// -- Company info ------------------------------------------------------------
+
+// Admins update their org's display name, legal name, contact details, and
+// mailing address. RLS already restricts this row to the caller's org; the
+// admin guard here is just for a nicer error message.
+export async function updateOrgInfo(input: {
+  name: string;
+  legal_name: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const norm = (v: string | null) => {
+    if (v == null) return null;
+    const t = v.trim();
+    return t.length === 0 ? null : t;
+  };
+  // Company Name can be left blank — we fall back to Legal Name in that case.
+  // One of the two must be present so the org always has *some* display name.
+  const rawName = (input.name ?? "").trim();
+  const legal = norm(input.legal_name);
+  const cleanName = rawName || legal || "";
+  if (!cleanName) {
+    return { ok: false, error: "Enter a Legal Name or Company Name" };
+  }
+  const cleanEmail = norm(input.email);
+  if (cleanEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
+    return { ok: false, error: "Enter a valid email address" };
+  }
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+  const { error } = await sb
+    .from("orgs")
+    .update({
+      name: cleanName,
+      legal_name: legal,
+      email: cleanEmail,
+      phone: norm(input.phone),
+      website: norm(input.website),
+      address_line1: norm(input.address_line1),
+      address_line2: norm(input.address_line2),
+      city: norm(input.city),
+      region: norm(input.region),
+      postal_code: norm(input.postal_code),
+      country: norm(input.country),
+    })
+    .eq("id", profile.orgId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// -- Mail settings ----------------------------------------------------------
+
+// Admins update the human-facing mail fields (signer + default class) on the
+// org row. Signature image upload is a separate flow (storage bucket).
+export async function updateMailSettings(input: {
+  signer_name: string | null;
+  signer_title: string | null;
+  default_mail_class: "standard" | "first_class" | "certified";
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const norm = (v: string | null) => {
+    if (v == null) return null;
+    const t = v.trim();
+    return t.length === 0 ? null : t;
+  };
+  const dmc =
+    input.default_mail_class === "standard" ||
+    input.default_mail_class === "certified"
+      ? input.default_mail_class
+      : "first_class";
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+  const { error } = await sb
+    .from("orgs")
+    .update({
+      signer_name: norm(input.signer_name),
+      signer_title: norm(input.signer_title),
+      default_mail_class: dmc,
+    })
+    .eq("id", profile.orgId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// -- Signature image upload -------------------------------------------------
+
+// Org admins upload a handwritten signature image (PNG/JPEG, <= 5 MB) into the
+// private `signatures` bucket. The path is stored on orgs.signature_image_path
+// and resolved to a short-lived signed URL at mail-send time so the printer
+// (Click2Mail / Lob) can fetch it during rendering. Files are namespaced by
+// org_id so a future tightening of storage RLS doesn't need any code changes.
+export async function uploadSignatureImage(
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Pick an image to upload" };
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    return { ok: false, error: "Image must be 5 MB or smaller" };
+  }
+  const type = file.type.toLowerCase();
+  if (type !== "image/png" && type !== "image/jpeg") {
+    return { ok: false, error: "Use a PNG or JPEG image" };
+  }
+  const ext = type === "image/png" ? "png" : "jpg";
+  const path = `${profile.orgId}/sig-${Date.now()}.${ext}`;
+
+  const admin = createServiceClient();
+
+  // Drop any prior signature for this org so the bucket doesn't accumulate
+  // orphans. Listing the folder is cheap (small N) and gives us the exact
+  // names to remove.
+  const { data: existing } = await admin.storage
+    .from("signatures")
+    .list(profile.orgId);
+  if (existing && existing.length > 0) {
+    await admin.storage
+      .from("signatures")
+      .remove(existing.map((f) => `${profile.orgId}/${f.name}`));
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const { error: uploadErr } = await admin.storage
+    .from("signatures")
+    .upload(path, new Uint8Array(arrayBuffer), {
+      contentType: type,
+      upsert: true,
+    });
+  if (uploadErr) return { ok: false, error: uploadErr.message };
+
+  const sb = await createClient();
+  const { error: updateErr } = await sb
+    .from("orgs")
+    .update({ signature_image_path: path })
+    .eq("id", profile.orgId);
+  if (updateErr) return { ok: false, error: updateErr.message };
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function removeSignatureImage(): Promise<
+  { ok: true } | { ok: false; error: string }
+> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+
+  const admin = createServiceClient();
+  const { data: existing } = await admin.storage
+    .from("signatures")
+    .list(profile.orgId);
+  if (existing && existing.length > 0) {
+    await admin.storage
+      .from("signatures")
+      .remove(existing.map((f) => `${profile.orgId}/${f.name}`));
+  }
+
+  const sb = await createClient();
+  const { error } = await sb
+    .from("orgs")
+    .update({ signature_image_path: null })
+    .eq("id", profile.orgId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// -- Mail bank accounts -----------------------------------------------------
+
+import { lobCreateBankAccount, lobVerifyBankAccount } from "@/lib/mail";
+
+export async function createMailBankAccount(input: {
+  routing_number: string;
+  account_number: string;
+  account_holder_name: string;
+  account_type: "company" | "individual";
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const routing = input.routing_number.replace(/\D/g, "");
+  const account = input.account_number.replace(/\D/g, "");
+  const holder = input.account_holder_name.trim();
+  if (!routing || routing.length !== 9) {
+    return { ok: false, error: "Routing number must be 9 digits" };
+  }
+  if (!account || account.length < 4) {
+    return { ok: false, error: "Enter a valid account number" };
+  }
+  if (!holder) {
+    return { ok: false, error: "Account holder name is required" };
+  }
+
+  const lobRes = await lobCreateBankAccount({
+    routing_number: routing,
+    account_number: account,
+    account_holder_name: holder,
+    account_type: input.account_type === "individual" ? "individual" : "company",
+  });
+  if (!lobRes.ok) return { ok: false, error: lobRes.error };
+
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("mail_bank_accounts")
+    .insert({
+      lob_bank_account_id: lobRes.lob_bank_account_id,
+      bank_name: lobRes.bank_name,
+      account_holder_name: holder,
+      routing_last_four: lobRes.routing_last_four,
+      account_last_four: lobRes.account_last_four,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true, id: data.id as string };
+}
+
+export async function verifyMailBankAccount(input: {
+  id: string;
+  amount_1_cents: number;
+  amount_2_cents: number;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { data: row } = await sb
+    .from("mail_bank_accounts")
+    .select("lob_bank_account_id")
+    .eq("id", input.id)
+    .single();
+  const bnk = (row?.lob_bank_account_id as string | null) ?? null;
+  if (!bnk) return { ok: false, error: "Bank account not found" };
+  const lobRes = await lobVerifyBankAccount(bnk, [
+    input.amount_1_cents,
+    input.amount_2_cents,
+  ]);
+  if (!lobRes.ok) return { ok: false, error: lobRes.error };
+  await sb
+    .from("mail_bank_accounts")
+    .update({ status: "verified", verified_at: new Date().toISOString() })
+    .eq("id", input.id);
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function deleteMailBankAccount(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { error } = await sb.from("mail_bank_accounts").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// -- Mail templates ---------------------------------------------------------
+
+export async function upsertMailTemplate(input: {
+  id?: string | null;
+  name: string;
+  folder_id?: string | null;
+  body_html: string;
+  default_mail_class: "standard" | "first_class" | "certified";
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Template name is required" };
+  const body = input.body_html.trim();
+  if (!body) return { ok: false, error: "Template body is required" };
+  const dmc =
+    input.default_mail_class === "standard" ||
+    input.default_mail_class === "certified"
+      ? input.default_mail_class
+      : "first_class";
+  const folderId = input.folder_id?.trim() || null;
+  const sb = await createClient();
+  if (input.id) {
+    const { error } = await sb
+      .from("mail_templates")
+      .update({
+        name,
+        folder_id: folderId,
+        body_html: body,
+        default_mail_class: dmc,
+      })
+      .eq("id", input.id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/settings");
+    return { ok: true, id: input.id };
+  }
+  const { data, error } = await sb
+    .from("mail_templates")
+    .insert({
+      name,
+      folder_id: folderId,
+      body_html: body,
+      default_mail_class: dmc,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true, id: data.id as string };
+}
+
+export async function deleteMailTemplate(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { error } = await sb.from("mail_templates").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// -- DOCX template import ----------------------------------------------------
+
+// Admins upload a .docx with their letter design (logo headers, formatted
+// paragraphs, etc.); we convert it to HTML in-memory with mammoth and hand
+// the HTML back to the editor. The user then sprinkles {{merge_fields}}
+// where they want personalization. No file is stored — only the resulting
+// HTML, which lives on mail_templates.body_html.
+export async function convertDocxToHtml(
+  formData: FormData
+): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Pick a .docx file" };
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    return { ok: false, error: "File must be 10 MB or smaller" };
+  }
+  const name = (file.name ?? "").toLowerCase();
+  if (!name.endsWith(".docx")) {
+    return { ok: false, error: "File must be a .docx" };
+  }
+  try {
+    const mammoth = (await import("mammoth")) as typeof import("mammoth");
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const result = await mammoth.convertToHtml({ buffer });
+    return { ok: true, html: result.value };
+  } catch (err) {
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? `Could not parse the .docx: ${err.message}`
+          : "Could not parse the .docx",
+    };
+  }
+}
+
+// -- Mail template folders --------------------------------------------------
+
+// Admins create, rename, and delete folders to organize templates the way
+// they want (no opinionated category enum). Deleting a folder leaves its
+// templates with folder_id = null — they fall back to "Unfiled" in the UI.
+export async function createMailTemplateFolder(
+  name: string
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const clean = name.trim();
+  if (!clean) return { ok: false, error: "Folder name is required" };
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("mail_template_folders")
+    .insert({ name: clean })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true, id: data.id as string };
+}
+
+export async function renameMailTemplateFolder(
+  id: string,
+  name: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const clean = name.trim();
+  if (!clean) return { ok: false, error: "Folder name is required" };
+  const sb = await createClient();
+  const { error } = await sb
+    .from("mail_template_folders")
+    .update({ name: clean, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function deleteMailTemplateFolder(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { error } = await sb.from("mail_template_folders").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 // -- App settings ------------------------------------------------------------
 
 export async function updateAppSetting(

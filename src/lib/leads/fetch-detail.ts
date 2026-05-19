@@ -26,7 +26,10 @@ export type ContactRow = {
   is_litigator: boolean;
   mailed: boolean;
   mailed_at: string | null;
-  notes: string | null;
+  // Only meaningful for channel='mailing_address' rows. Stores the recipient
+  // label shown in the picker (e.g. "John Doe (Owner)"). Phone/email rows
+  // write null. Renamed from `notes` in migration 0107.
+  recipient_label: string | null;
 };
 
 export type OwnerRowFull = {
@@ -186,7 +189,7 @@ export async function fetchOwnersWithContacts(leadId: string): Promise<{
     sb
       .from("contacts")
       .select(
-        "id, owner_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, notes"
+        "id, owner_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, recipient_label"
       )
       .eq("lead_id", leadId)
       .order("channel", { ascending: true })

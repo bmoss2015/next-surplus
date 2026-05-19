@@ -19,6 +19,7 @@ const NAV: NavItem[] = [
   { label: "Leads", href: "/leads", divider: true },
   { label: "Tasks", href: "/tasks" },
   { label: "Inbox", href: "/inbox" },
+  { label: "Mail", href: "/mail" },
   { label: "Claims", href: "/claims" },
   { label: "Imports", href: "/imports", divider: true },
   { label: "Reports", href: "/reports", divider: true },

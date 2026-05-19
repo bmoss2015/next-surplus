@@ -122,6 +122,38 @@ export function formatActivity(
       if (text) return { text, icon: "default" };
       return { text: p.mailed === false ? "Mailer Status Cleared" : "Mailer Sent", icon: "default" };
     }
+    case "mail_sent": {
+      const name = ((p.recipient_name as string | null) ?? "").trim();
+      const mc = (p.mail_class as string | null) ?? "first_class";
+      const mcLabel =
+        mc === "standard"
+          ? "Standard"
+          : mc === "certified"
+            ? "Certified"
+            : "First Class";
+      const withCheck =
+        p.include_check === true && typeof p.check_amount_cents === "number"
+          ? ` with check $${((p.check_amount_cents as number) / 100).toFixed(2)}`
+          : "";
+      const text = name
+        ? `Mailed ${mcLabel} Letter To ${name}${withCheck}`
+        : `Mail Sent (${mcLabel})${withCheck}`;
+      return { text, icon: "default" };
+    }
+    case "mail_delivered": {
+      const name = ((p.recipient_name as string | null) ?? "").trim();
+      return {
+        text: name ? `Mail Delivered To ${name}` : "Mail Delivered",
+        icon: "default",
+      };
+    }
+    case "mail_returned": {
+      const name = ((p.recipient_name as string | null) ?? "").trim();
+      return {
+        text: name ? `Mail Returned From ${name}` : "Mail Returned",
+        icon: "default",
+      };
+    }
     default:
       return { text: toTitleish(row.activity_type.replace(/_/g, " ")), icon: "default" };
   }

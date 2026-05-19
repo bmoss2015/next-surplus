@@ -10,18 +10,28 @@ import { RelativesSection } from "./RelativesSection";
 import { AttorneyAssignment } from "./AttorneyAssignment";
 import { MailingAddresses } from "./Overview/MailingAddresses";
 import { OtherContactsSection } from "./OtherContactsSection";
+import { SendMailButtonServer } from "@/components/mail/SendMailButtonServer";
+import { buildLeadSendMailCandidates } from "@/lib/mail/lead-candidates";
 
 export async function ContactsTab({ leadId }: { leadId: string }) {
   const sb = await createClient();
-  const [{ owners, contacts }, relatives, attorneys, leadRow, leadParties, customRoles] =
-    await Promise.all([
-      fetchOwnersWithContacts(leadId),
-      fetchRelatives(leadId),
-      fetchAttorneyOptions(),
-      sb.from("leads").select("attorney_id, attorney_cost").eq("id", leadId).maybeSingle(),
-      fetchLeadParties(leadId),
-      fetchOrgCustomRoles(),
-    ]);
+  const [
+    { owners, contacts },
+    relatives,
+    attorneys,
+    leadRow,
+    leadParties,
+    customRoles,
+    sendMailCandidates,
+  ] = await Promise.all([
+    fetchOwnersWithContacts(leadId),
+    fetchRelatives(leadId),
+    fetchAttorneyOptions(),
+    sb.from("leads").select("attorney_id, attorney_cost").eq("id", leadId).maybeSingle(),
+    fetchLeadParties(leadId),
+    fetchOrgCustomRoles(),
+    buildLeadSendMailCandidates(leadId),
+  ]);
 
   const currentAttorneyId =
     (leadRow.data?.attorney_id as string | null | undefined) ?? null;
@@ -88,7 +98,10 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
         initial={leadParties}
         customRoles={customRoles}
       />
-      <div className="mt-4">
+      <div className="mt-4 flex flex-col gap-3">
+        <div className="flex items-center justify-end">
+          <SendMailButtonServer candidates={sendMailCandidates} />
+        </div>
         <MailingAddresses
           leadId={leadId}
           initialAddresses={contacts}

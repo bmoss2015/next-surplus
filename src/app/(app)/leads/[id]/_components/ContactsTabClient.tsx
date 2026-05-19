@@ -211,7 +211,7 @@ export function ContactsTabClient({
             is_litigator: newOwnerPhoneLitigator,
             mailed: false,
             mailed_at: null,
-            notes: null,
+            recipient_label: null,
           });
         }
       }
@@ -239,7 +239,7 @@ export function ContactsTabClient({
             is_litigator: false,
             mailed: false,
             mailed_at: null,
-            notes: null,
+            recipient_label: null,
           });
         }
       }
@@ -334,7 +334,7 @@ export function ContactsTabClient({
             is_litigator: false,
             mailed: false,
             mailed_at: null,
-            notes: null,
+            recipient_label: null,
           },
         ]);
       }

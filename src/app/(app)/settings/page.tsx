@@ -7,8 +7,14 @@ import {
   fetchResearchTemplates,
   fetchOrgMembers,
   fetchNeedsActionThreshold,
+  fetchOrgInfo,
+  fetchMailSettings,
+  fetchMailBankAccounts,
+  fetchMailTemplates,
+  fetchMailTemplateFolders,
 } from "@/lib/settings/fetch";
 import { getCurrentProfile } from "@/lib/auth/current-user";
+import { CompanyInfoSection } from "./_components/CompanyInfoSection";
 import { DefaultsSection } from "./_components/DefaultsSection";
 import { AttorneysSection } from "./_components/AttorneysSection";
 import { LostReasonsSection } from "./_components/LostReasonsSection";
@@ -20,6 +26,9 @@ import { TeamSection } from "./_components/TeamSection";
 import { ProfileSection } from "./_components/ProfileSection";
 import { EmailAccountsSection } from "./_components/EmailAccountsSection";
 import { OtherContactRolesSection } from "./_components/OtherContactRolesSection";
+import { MailSettingsSection } from "./_components/MailSettingsSection";
+import { MailBankAccountsSection } from "./_components/MailBankAccountsSection";
+import { MailTemplatesSection } from "./_components/MailTemplatesSection";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
 
@@ -41,6 +50,8 @@ export default async function SettingsPage() {
     researchTemplates,
     emailAccounts,
     customContactRoles,
+    mailTemplates,
+    mailTemplateFolders,
   ] = await Promise.all([
     fetchAttorneys(),
     fetchLostReasonsAdmin(),
@@ -48,10 +59,26 @@ export default async function SettingsPage() {
     fetchResearchTemplates(),
     fetchMyEmailAccounts(),
     fetchOrgCustomRoles(),
+    fetchMailTemplates(),
+    fetchMailTemplateFolders(),
   ]);
-  const [defaults, members, needsActionThreshold] = isAdmin
-    ? await Promise.all([fetchAppSettings(), fetchOrgMembers(), fetchNeedsActionThreshold()])
-    : [null, null, null];
+  const [
+    defaults,
+    members,
+    needsActionThreshold,
+    orgInfo,
+    mailSettings,
+    mailBankAccounts,
+  ] = isAdmin
+    ? await Promise.all([
+        fetchAppSettings(),
+        fetchOrgMembers(),
+        fetchNeedsActionThreshold(),
+        fetchOrgInfo(),
+        fetchMailSettings(),
+        fetchMailBankAccounts(),
+      ])
+    : [null, null, null, null, null, null];
 
   return (
     <div className="px-7 py-6">
@@ -70,6 +97,17 @@ export default async function SettingsPage() {
           initialEmail={profile.email ?? ""}
         />
         <EmailAccountsSection initial={emailAccounts} />
+        {isAdmin && <CompanyInfoSection initial={orgInfo!} />}
+        {isAdmin && <MailSettingsSection initial={mailSettings!} />}
+        {isAdmin && (
+          <MailBankAccountsSection initial={mailBankAccounts!} />
+        )}
+        {isAdmin && (
+          <MailTemplatesSection
+            initialTemplates={mailTemplates}
+            initialFolders={mailTemplateFolders}
+          />
+        )}
         {isAdmin && (
           <div className="col-span-2">
             <TeamSection initial={members!} currentUserId={profile.id} />

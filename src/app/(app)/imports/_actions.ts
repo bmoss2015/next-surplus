@@ -6,6 +6,11 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/imports/format-address";
 import {
+  parseAddressString,
+  smartParseAddress,
+  formatAddressForStorage,
+} from "@/lib/mail/address";
+import {
   DEFAULT_LEAD_SOURCE,
   normalizePhone,
   SELECTABLE_REPLACE_FIELDS,
@@ -558,14 +563,25 @@ export async function importLeads(
     // Mailing addresses — dedupe by lowercased trim so repeated imports of
     // the same lead don't accumulate identical mailing rows. Mailing has no
     // mergeable flags, so an existing match is a no-op.
+    //
+    // Normalize each incoming value before insert so the Send Mail parser
+    // (which requires "line1, city, ST ZIP") never gets a malformed row.
+    // If it's already canonical → keep as-is. If smartParseAddress can
+    // recover the structure → rewrite to canonical. If neither → store
+    // the raw value so the user can fix it later via per-card Edit.
     for (const value of mailingAddresses) {
-      const norm = value.toLowerCase().trim();
+      let normalizedValue = value;
+      if (!parseAddressString(value)) {
+        const parsed = smartParseAddress(value);
+        if (parsed) normalizedValue = formatAddressForStorage(parsed);
+      }
+      const norm = normalizedValue.toLowerCase().trim();
       if (mailingIndex.has(norm)) continue;
       const { error } = await sb.from("contacts").insert({
         owner_id: ownerId,
         lead_id: leadId,
         channel: "mailing_address",
-        value,
+        value: normalizedValue,
         status: "untested",
         is_primary: false,
         phone_type: null,
@@ -574,7 +590,7 @@ export async function importLeads(
       });
       if (error) {
         errors.push(
-          `mailing address insert failed for "${value}" (${error.message})`
+          `mailing address insert failed for "${normalizedValue}" (${error.message})`
         );
       } else {
         written += 1;

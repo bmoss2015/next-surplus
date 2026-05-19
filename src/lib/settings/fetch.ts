@@ -60,6 +60,171 @@ export async function fetchOrgMembers(): Promise<OrgMemberRow[]> {
   });
 }
 
+export type OrgInfo = {
+  name: string;
+  legal_name: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
+};
+
+export async function fetchOrgInfo(): Promise<OrgInfo> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("orgs")
+    .select(
+      "name, legal_name, email, phone, website, address_line1, address_line2, city, region, postal_code, country"
+    )
+    .single();
+  if (error) throw error;
+  return {
+    name: (data.name as string | null) ?? "",
+    legal_name: (data.legal_name as string | null) ?? null,
+    email: (data.email as string | null) ?? null,
+    phone: (data.phone as string | null) ?? null,
+    website: (data.website as string | null) ?? null,
+    address_line1: (data.address_line1 as string | null) ?? null,
+    address_line2: (data.address_line2 as string | null) ?? null,
+    city: (data.city as string | null) ?? null,
+    region: (data.region as string | null) ?? null,
+    postal_code: (data.postal_code as string | null) ?? null,
+    country: (data.country as string | null) ?? null,
+  };
+}
+
+export type MailSettings = {
+  signer_name: string | null;
+  signer_title: string | null;
+  signature_image_path: string | null;
+  // Short-lived signed URL resolved on the server so the settings page can show
+  // a preview thumbnail. Null when no signature is uploaded.
+  signature_image_url: string | null;
+  default_mail_class: "standard" | "first_class" | "certified";
+};
+
+export async function fetchMailSettings(): Promise<MailSettings> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("orgs")
+    .select("signer_name, signer_title, signature_image_path, default_mail_class")
+    .single();
+  if (error) throw error;
+  const dmc = (data.default_mail_class as string | null) ?? "first_class";
+  const path = (data.signature_image_path as string | null) ?? null;
+  let signedUrl: string | null = null;
+  if (path) {
+    // 1 hour is plenty for the settings page preview; the mail-send path
+    // generates its own longer signed URL when actually sending.
+    const admin = createServiceClient();
+    const { data: signed } = await admin.storage
+      .from("signatures")
+      .createSignedUrl(path, 60 * 60);
+    signedUrl = signed?.signedUrl ?? null;
+  }
+  return {
+    signer_name: (data.signer_name as string | null) ?? null,
+    signer_title: (data.signer_title as string | null) ?? null,
+    signature_image_path: path,
+    signature_image_url: signedUrl,
+    default_mail_class:
+      dmc === "standard" || dmc === "first_class" || dmc === "certified"
+        ? dmc
+        : "first_class",
+  };
+}
+
+export type MailBankAccountRow = {
+  id: string;
+  bank_name: string | null;
+  account_holder_name: string;
+  routing_last_four: string | null;
+  account_last_four: string | null;
+  status: "unverified" | "verified" | "disabled";
+  verified_at: string | null;
+};
+
+export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("mail_bank_accounts")
+    .select(
+      "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at"
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    bank_name: (r.bank_name as string | null) ?? null,
+    account_holder_name: (r.account_holder_name as string | null) ?? "",
+    routing_last_four: (r.routing_last_four as string | null) ?? null,
+    account_last_four: (r.account_last_four as string | null) ?? null,
+    status:
+      r.status === "verified" || r.status === "disabled"
+        ? (r.status as "verified" | "disabled")
+        : "unverified",
+    verified_at: (r.verified_at as string | null) ?? null,
+  }));
+}
+
+export type MailTemplateFolderRow = {
+  id: string;
+  name: string;
+  sort_order: number;
+};
+
+export type MailTemplateRow = {
+  id: string;
+  name: string;
+  folder_id: string | null;
+  body_html: string | null;
+  default_mail_class: "standard" | "first_class" | "certified";
+  updated_at: string;
+};
+
+export async function fetchMailTemplateFolders(): Promise<MailTemplateFolderRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("mail_template_folders")
+    .select("id, name, sort_order")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    name: (r.name as string | null) ?? "",
+    sort_order: Number(r.sort_order ?? 0),
+  }));
+}
+
+export async function fetchMailTemplates(): Promise<MailTemplateRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("mail_templates")
+    .select("id, name, folder_id, body_html, default_mail_class, updated_at")
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => {
+    const dmc = r.default_mail_class as string;
+    return {
+      id: r.id as string,
+      name: (r.name as string | null) ?? "",
+      folder_id: (r.folder_id as string | null) ?? null,
+      body_html: (r.body_html as string | null) ?? null,
+      default_mail_class:
+        dmc === "standard" || dmc === "certified"
+          ? (dmc as "standard" | "certified")
+          : "first_class",
+      updated_at: (r.updated_at as string) ?? new Date().toISOString(),
+    };
+  });
+}
+
 export type AppSettings = {
   default_recovery_fee_percent: number;
   default_attorney_cost: number;

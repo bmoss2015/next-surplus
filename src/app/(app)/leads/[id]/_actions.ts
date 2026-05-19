@@ -502,7 +502,7 @@ export async function addMailingAddress(
     is_primary: false,
     mailed: false,
     mailed_at: null,
-    notes: recipientLabel?.trim() || null,
+    recipient_label: recipientLabel?.trim() || null,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/leads/${leadId}`);
@@ -569,7 +569,7 @@ export async function upsertContact(
     phone_type?: string | null;
     is_dnc?: boolean;
     is_litigator?: boolean;
-    notes?: string | null;
+    recipient_label?: string | null;
   }
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const sb = await createClient();
@@ -594,7 +594,7 @@ export async function upsertContact(
         phone_type: patch.phone_type ?? null,
         is_dnc: patch.is_dnc ?? false,
         is_litigator: patch.is_litigator ?? false,
-        notes: patch.notes ?? null,
+        recipient_label: patch.recipient_label ?? null,
         mailed: false,
         mailed_at: null,
       })
