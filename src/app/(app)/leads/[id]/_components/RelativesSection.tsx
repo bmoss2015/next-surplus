@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { IconPlus, IconTrash, IconUsersGroup } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconUsersGroup, IconPencil } from "@tabler/icons-react";
 import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
@@ -124,6 +124,10 @@ export function RelativesSection({
   const { isAdmin } = useRole();
   const [relatives, setRelatives] = useState<RelativeRow[]>(initial);
   const [adding, setAdding] = useState(false);
+  // Keys of phone slots currently being validated server-side, formatted as
+  // "<relativeId>:<base>" (e.g. "abc-123:phone_2"). Drives the "Verifying…"
+  // pill on the slot while the action awaits Veriphone.
+  const [verifyingSlots, setVerifyingSlots] = useState<Set<string>>(() => new Set());
   const [draftName, setDraftName] = useState("");
   const [draftRelationship, setDraftRelationship] = useState("");
   const [draftAge, setDraftAge] = useState("");
@@ -191,8 +195,37 @@ export function RelativesSection({
     setRelatives((prev) =>
       prev.map((r) => (r.id === id ? ({ ...r, ...fields } as RelativeRow) : r))
     );
+    // If this patch sets a phone value on any slot, mark that slot as verifying
+    // while the server-side validation runs.
+    const fieldsRecord = fields as Record<string, unknown>;
+    const phoneBases = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const;
+    const touchedKeys: string[] = [];
+    for (const base of phoneBases) {
+      const v = fieldsRecord[base];
+      if (typeof v === "string" && v.trim().length > 0) {
+        touchedKeys.push(`${id}:${base}`);
+      }
+    }
+    if (touchedKeys.length > 0) {
+      setVerifyingSlots((prev) => {
+        const next = new Set(prev);
+        for (const k of touchedKeys) next.add(k);
+        return next;
+      });
+    }
     startTransition(async () => {
-      await upsertRelative(leadId, id, fields);
+      const result = await upsertRelative(leadId, id, fields);
+      if (result.ok && result.row) {
+        const validated = result.row as RelativeRow;
+        setRelatives((prev) => prev.map((r) => (r.id === id ? validated : r)));
+      }
+      if (touchedKeys.length > 0) {
+        setVerifyingSlots((prev) => {
+          const next = new Set(prev);
+          for (const k of touchedKeys) next.delete(k);
+          return next;
+        });
+      }
     });
   }
 
@@ -239,6 +272,7 @@ export function RelativesSection({
               canRemove={isAdmin}
               onPatch={(fields) => patch(r.id, fields)}
               onRemove={() => remove(r.id)}
+              verifyingSlots={verifyingSlots}
             />
           ))}
         </div>
@@ -383,11 +417,13 @@ function RelativeCard({
   canRemove,
   onPatch,
   onRemove,
+  verifyingSlots,
 }: {
   relative: RelativeRow;
   canRemove: boolean;
   onPatch: (fields: RelativePatch) => void;
   onRemove: () => void;
+  verifyingSlots: Set<string>;
 }) {
   const [street, setStreet] = useState(relative.street ?? "");
   const [city, setCity] = useState(relative.city ?? "");
@@ -442,6 +478,7 @@ function RelativeCard({
             slot={PHONE_SLOTS[i]}
             relative={relative}
             onPatch={onPatch}
+            isVerifying={verifyingSlots.has(`${relative.id}:${PHONE_SLOTS[i].value}`)}
           />
         ))}
         {visiblePhoneCount < 5 && (
@@ -599,32 +636,50 @@ function NotesEditor({
   );
 }
 
+// Status labels match the owner-contact section so the two surfaces look
+// identical (single source of truth would be nicer; for now we mirror).
+const RELATIVE_PHONE_STATUS_LABELS: Record<"untested" | "valid" | "invalid", string> = {
+  untested: "Not Verified",
+  valid: "Valid",
+  invalid: "Invalid",
+};
+
 function PhoneSlot({
   slot,
   relative,
   onPatch,
+  isVerifying,
 }: {
   slot: (typeof PHONE_SLOTS)[number];
   relative: RelativeRow;
   onPatch: (fields: RelativePatch) => void;
+  isVerifying?: boolean;
 }) {
   const stored = ((relative[slot.value] as string | null) ?? "").trim();
+  // Empty slots open straight into edit mode (so the user can type); filled
+  // slots stay committed until the user clicks the pencil. Matches the
+  // owner-contact card pattern.
+  const [editing, setEditing] = useState(stored.length === 0);
   const [val, setVal] = useState(stored);
-  // Show the formatted number while the field is idle; drop to raw digits the
-  // moment it's focused so the value stays clean to edit.
-  const [focused, setFocused] = useState(false);
   useEffect(() => {
-    setVal(((relative[slot.value] as string | null) ?? "").trim());
+    const next = ((relative[slot.value] as string | null) ?? "").trim();
+    setVal(next);
+    // Drop out of edit mode whenever the server returns a saved value — keeps
+    // the committed display fresh after onPatch round-trips.
+    if (next.length > 0) setEditing(false);
   }, [relative, slot.value]);
 
   const type = relative[slot.type] as string | null;
   const isDnc = relative[slot.dnc] as boolean;
   const isLit = relative[slot.lit] as boolean;
-  const status = (relative[slot.status] as string | null) ?? "untested";
+  const status = ((relative[slot.status] as string | null) ?? "untested") as
+    | "untested"
+    | "valid"
+    | "invalid";
   const checkedAt = relative[slot.checkedAt] as string | null;
   const provider = relative[slot.provider] as string | null;
   const isDead = status === "invalid";
-  const deadTooltip = (() => {
+  const validationTooltip = (() => {
     if (!checkedAt) return undefined;
     const when = new Date(checkedAt).toLocaleDateString();
     const providerLabel = provider
@@ -641,31 +696,71 @@ function PhoneSlot({
     return undefined;
   })();
 
-  const pill = (active: boolean, activeClass: string) =>
+  const statusPillClass = (s: "untested" | "valid" | "invalid") =>
+    s === "valid"
+      ? "bg-petrol-500 text-white"
+      : s === "invalid"
+        ? "bg-danger text-white"
+        : "bg-gray-200 text-gray-700";
+
+  const togglePill = (active: boolean, activeClass: string) =>
     cn(
       "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium transition-colors",
       active ? activeClass : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
     );
 
+  const commit = () => {
+    const t = val.trim();
+    if (t !== stored) onPatch({ [slot.value]: t || null } as RelativePatch);
+    if (t.length > 0) setEditing(false);
+  };
+
+  // Empty + non-editing shouldn't happen, but guard anyway.
+  const showInput = editing || stored.length === 0;
+
   return (
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">
       <div className="flex items-center gap-1">
-        <input
-          value={focused ? val : formatPhone(val)}
-          title={!focused ? deadTooltip : undefined}
-          onFocus={() => setFocused(true)}
-          onChange={(e) => setVal(e.target.value.replace(/\D/g, "").slice(0, 10))}
-          onBlur={() => {
-            setFocused(false);
-            const t = val.trim();
-            if (t !== stored) onPatch({ [slot.value]: t || null } as RelativePatch);
-          }}
-          placeholder="(555) 555-5555"
-          className={cn(
-            "min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] outline-none placeholder:text-gray-400 focus:border-petrol-500",
-            isDead && !focused ? "text-gray-400 line-through" : "text-ink"
-          )}
-        />
+        {showInput ? (
+          <input
+            autoFocus={editing}
+            value={val}
+            onChange={(e) => setVal(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+              }
+              if (e.key === "Escape") {
+                setVal(stored);
+                if (stored.length > 0) setEditing(false);
+              }
+            }}
+            placeholder="(555) 555-5555"
+            className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+          />
+        ) : (
+          <span
+            title={validationTooltip}
+            className={cn(
+              "min-w-0 flex-1 whitespace-nowrap text-[11.5px] font-medium",
+              isDead ? "text-gray-400 line-through" : "text-ink"
+            )}
+          >
+            {formatPhone(stored)}
+          </span>
+        )}
+        {!showInput && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="cursor-pointer text-gray-300 hover:text-petrol-500"
+            aria-label="Edit Phone"
+          >
+            <IconPencil size={11} stroke={1.75} />
+          </button>
+        )}
         {stored && (
           <button
             type="button"
@@ -691,10 +786,30 @@ function PhoneSlot({
         >
           {phoneTypeShort(type)}
         </button>
+        {/* Status pill — matches owner-contact section. Shows "Verifying…"
+            with a pulse while the server-side validation is in flight. */}
+        {stored && (
+          isVerifying ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-petrol-100 px-1.5 py-[1px] text-[9px] font-medium leading-none text-petrol-700">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-petrol-500" />
+              Verifying…
+            </span>
+          ) : (
+            <span
+              title={validationTooltip}
+              className={cn(
+                "rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none",
+                statusPillClass(status)
+              )}
+            >
+              {RELATIVE_PHONE_STATUS_LABELS[status]}
+            </span>
+          )
+        )}
         <button
           type="button"
           onClick={() => onPatch({ [slot.dnc]: !isDnc } as RelativePatch)}
-          className={pill(isDnc, "bg-danger-bg text-danger")}
+          className={togglePill(isDnc, "bg-danger-bg text-danger")}
           aria-label="Do Not Call"
         >
           DNC
@@ -702,7 +817,7 @@ function PhoneSlot({
         <button
           type="button"
           onClick={() => onPatch({ [slot.lit]: !isLit } as RelativePatch)}
-          className={pill(isLit, "bg-[#7f1d1d] text-white")}
+          className={togglePill(isLit, "bg-[#7f1d1d] text-white")}
           aria-label="Litigator"
         >
           Litigator
