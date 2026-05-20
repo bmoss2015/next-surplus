@@ -2,10 +2,12 @@ import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { Resend } from "resend";
 import { createServiceClient } from "./supabase/service";
 
-// Veriphone Free tier is 1,000 requests/month. We cap 50 below to keep a
-// buffer for retries and avoid 429s from their side. Override per-org by
-// inserting a row into app_settings with key='phone_validation_quota_cap'.
-const DEFAULT_QUOTA_CAP = 950;
+// Veriphone Free tier is 1,000 requests/month — that's the cap. If Veriphone
+// returns 429 on the very last call, the validator just treats it as
+// 'untested' and the next sweep retries next month. Override per-org by
+// inserting a row into app_settings with key='phone_validation_quota_cap'
+// (e.g., 5000 once on Veriphone Starter at $6.99/mo).
+const DEFAULT_QUOTA_CAP = 1000;
 const VERIPHONE_ENDPOINT = "https://api.veriphone.io/v2/verify";
 const ADDON_KEY = "phone_validation";
 
