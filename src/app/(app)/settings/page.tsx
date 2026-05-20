@@ -10,6 +10,7 @@ import {
   fetchOrgInfo,
   fetchMailSettings,
   fetchMailBankAccounts,
+  fetchMyNotificationPrefs,
 } from "@/lib/settings/fetch";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { CompanyInfoSection } from "./_components/CompanyInfoSection";
@@ -28,6 +29,7 @@ import { OtherContactRolesSection } from "./_components/OtherContactRolesSection
 import { MailSettingsSection } from "./_components/MailSettingsSection";
 import { MailBankAccountsSection } from "./_components/MailBankAccountsSection";
 import { BillingSection } from "./_components/BillingSection";
+import { NotificationsSection } from "./_components/NotificationsSection";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
 
@@ -49,6 +51,7 @@ export default async function SettingsPage() {
     researchTemplates,
     emailAccounts,
     customContactRoles,
+    notificationPrefs,
   ] = await Promise.all([
     fetchAttorneys(),
     fetchLostReasonsAdmin(),
@@ -56,6 +59,7 @@ export default async function SettingsPage() {
     fetchResearchTemplates(),
     fetchMyEmailAccounts(),
     fetchOrgCustomRoles(),
+    fetchMyNotificationPrefs(),
   ]);
   const [
     defaults,
@@ -93,6 +97,7 @@ export default async function SettingsPage() {
           isAdmin={isAdmin}
         />
         <ChangePasswordSection />
+        <NotificationsSection initial={notificationPrefs} />
         {isAdmin && <BillingSection orgId={profile.orgId} />}
         <EmailAccountsSection initial={emailAccounts} />
         {isAdmin && <CompanyInfoSection initial={orgInfo!} />}
