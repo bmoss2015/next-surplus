@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
+import { SavePillProvider } from "@/components/SavePillProvider";
 
 type RailItem = {
   key: string;
@@ -60,6 +61,7 @@ export function SettingsLayout({
   }
 
   return (
+    <SavePillProvider>
     <div className="flex" style={{ minHeight: "calc(100vh - 56px)" }}>
       {/* Sub-rail */}
       <aside
@@ -111,5 +113,6 @@ export function SettingsLayout({
         </div>
       </div>
     </div>
+    </SavePillProvider>
   );
 }

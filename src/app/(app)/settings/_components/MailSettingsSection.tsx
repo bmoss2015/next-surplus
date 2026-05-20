@@ -7,6 +7,7 @@ import {
   updateMailSettings,
   uploadSignatureImage,
 } from "../_actions";
+import { useSavePill } from "@/components/SavePillProvider";
 import type { MailSettings } from "@/lib/settings/fetch";
 
 const MAIL_CLASS_OPTIONS: {
@@ -25,9 +26,7 @@ const MAIL_CLASS_OPTIONS: {
 export function MailSettingsSection({ initial }: { initial: MailSettings }) {
   const router = useRouter();
   const [form, setForm] = useState(initial);
-  const [pending, startTransition] = useTransition();
   const [sigPending, startSigTransition] = useTransition();
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [sigMsg, setSigMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,23 +81,20 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
 
   const dirty = JSON.stringify(form) !== JSON.stringify(initial);
 
-  function save(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
-    startTransition(async () => {
+  useSavePill({
+    key: "mail-settings",
+    dirty,
+    save: async () => {
       const res = await updateMailSettings({
         signer_name: form.signer_name,
         signer_title: form.signer_title,
         default_mail_class: form.default_mail_class,
       });
-      if (res.ok) {
-        setMsg({ kind: "ok", text: "Mail settings saved." });
-        router.refresh();
-      } else {
-        setMsg({ kind: "err", text: res.error });
-      }
-    });
-  }
+      if (!res.ok) throw new Error(res.error);
+      router.refresh();
+    },
+    discard: () => setForm(initial),
+  });
 
   const inputClass =
     "rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500";
@@ -173,7 +169,7 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
         </div>
       </div>
 
-      <form onSubmit={save}>
+      <div>
         <div className="pref-section-h">Signer</div>
         <div className="pref-row">
           <div className="min-w-0 flex-1">
@@ -229,21 +225,7 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
           ))}
         </div>
 
-        {msg && (
-          <div className={`mt-3 text-[12px] ${msg.kind === "ok" ? "text-success" : "text-danger"}`}>
-            {msg.text}
-          </div>
-        )}
-        <div className="mt-4 flex justify-end pt-4 border-t border-gray-200">
-          <button
-            type="submit"
-            disabled={pending || !dirty}
-            className="cursor-pointer rounded-md btn-primary px-3 py-[7px] text-[13px] font-medium text-white disabled:opacity-50"
-          >
-            {pending ? "Saving" : "Save Changes"}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

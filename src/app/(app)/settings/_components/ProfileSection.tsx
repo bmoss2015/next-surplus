@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateMyProfile } from "../_actions";
+import { useSavePill } from "@/components/SavePillProvider";
 
 function splitName(fullName: string): { first: string; last: string } {
   const parts = fullName.trim().split(/\s+/);
@@ -37,10 +38,6 @@ export function ProfileSection({
   const [firstName, setFirstName] = useState(seed.first);
   const [lastName, setLastName] = useState(seed.last);
   const [email, setEmail] = useState(initialEmail);
-  const [pending, startTransition] = useTransition();
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
-    null
-  );
 
   const ready =
     firstName.trim().length > 0 &&
@@ -50,24 +47,21 @@ export function ProfileSection({
     `${firstName.trim()} ${lastName.trim()}`.trim() !== initialFullName.trim() ||
     email.trim().toLowerCase() !== (initialEmail ?? "").toLowerCase();
 
-  function save(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
-    if (!ready) {
-      setMsg({ kind: "err", text: "Name and email are required." });
-      return;
-    }
-    const fullName = `${firstName.trim()} ${lastName.trim()}`;
-    startTransition(async () => {
+  useSavePill({
+    key: "profile",
+    dirty: dirty && ready,
+    save: async () => {
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
       const res = await updateMyProfile(fullName, email.trim());
-      if (res.ok) {
-        setMsg({ kind: "ok", text: "Profile updated." });
-        router.refresh();
-      } else {
-        setMsg({ kind: "err", text: res.error });
-      }
-    });
-  }
+      if (!res.ok) throw new Error(res.error);
+      router.refresh();
+    },
+    discard: () => {
+      setFirstName(seed.first);
+      setLastName(seed.last);
+      setEmail(initialEmail);
+    },
+  });
 
   const inputClass =
     "rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500";
@@ -96,7 +90,7 @@ export function ProfileSection({
         </button>
       </div>
 
-      <form onSubmit={save}>
+      <div>
         <div className="pref-row">
           <div className="min-w-0 flex-1">
             <div className="pref-row-title">First Name</div>
@@ -156,25 +150,7 @@ export function ProfileSection({
           </select>
         </div>
 
-        {msg && (
-          <div
-            className={`mt-3 text-[12px] ${
-              msg.kind === "ok" ? "text-success" : "text-danger"
-            }`}
-          >
-            {msg.text}
-          </div>
-        )}
-        <div className="mt-4 flex justify-end pt-4 border-t border-gray-200">
-          <button
-            type="submit"
-            disabled={pending || !ready || !dirty}
-            className="cursor-pointer rounded-md btn-primary px-3 py-[7px] text-[13px] font-medium text-white disabled:opacity-50"
-          >
-            {pending ? "Saving" : "Save Changes"}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

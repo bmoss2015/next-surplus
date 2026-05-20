@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateOrgInfo } from "../_actions";
+import { useSavePill } from "@/components/SavePillProvider";
 import type { OrgInfo } from "@/lib/settings/fetch";
 
 // Settings redesign — Company Profile panel (was Company Info).
@@ -11,8 +12,6 @@ import type { OrgInfo } from "@/lib/settings/fetch";
 export function CompanyInfoSection({ initial }: { initial: OrgInfo }) {
   const router = useRouter();
   const [form, setForm] = useState<OrgInfo>(initial);
-  const [pending, startTransition] = useTransition();
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   function set<K extends keyof OrgInfo>(key: K, value: OrgInfo[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -25,14 +24,10 @@ export function CompanyInfoSection({ initial }: { initial: OrgInfo }) {
   const dirty = JSON.stringify(form) !== JSON.stringify(initial);
   const ready = form.name.trim().length > 0;
 
-  function save(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
-    if (!ready) {
-      setMsg({ kind: "err", text: "Company name is required." });
-      return;
-    }
-    startTransition(async () => {
+  useSavePill({
+    key: "company",
+    dirty: dirty && ready,
+    save: async () => {
       const res = await updateOrgInfo({
         name: form.name.trim(),
         legal_name: form.legal_name,
@@ -46,14 +41,11 @@ export function CompanyInfoSection({ initial }: { initial: OrgInfo }) {
         postal_code: form.postal_code,
         country: form.country,
       });
-      if (res.ok) {
-        setMsg({ kind: "ok", text: "Company information updated." });
-        router.refresh();
-      } else {
-        setMsg({ kind: "err", text: res.error });
-      }
-    });
-  }
+      if (!res.ok) throw new Error(res.error);
+      router.refresh();
+    },
+    discard: () => setForm(initial),
+  });
 
   const inputClass =
     "rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500";
@@ -94,7 +86,7 @@ export function CompanyInfoSection({ initial }: { initial: OrgInfo }) {
         </button>
       </div>
 
-      <form onSubmit={save}>
+      <div>
         <div className="pref-section-h">Identity</div>
         <div className="pref-row">
           <div className="min-w-0 flex-1">
@@ -233,25 +225,7 @@ export function CompanyInfoSection({ initial }: { initial: OrgInfo }) {
           />
         </div>
 
-        {msg && (
-          <div
-            className={`mt-3 text-[12px] ${
-              msg.kind === "ok" ? "text-success" : "text-danger"
-            }`}
-          >
-            {msg.text}
-          </div>
-        )}
-        <div className="mt-4 flex justify-end pt-4 border-t border-gray-200">
-          <button
-            type="submit"
-            disabled={pending || !ready || !dirty}
-            className="cursor-pointer rounded-md btn-primary px-3 py-[7px] text-[13px] font-medium text-white disabled:opacity-50"
-          >
-            {pending ? "Saving" : "Save Changes"}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }
