@@ -27,7 +27,7 @@ import { useRef, useState, useTransition } from "react";
 import { fieldsByGroup, MERGE_GROUP_LABELS } from "@/lib/mail/merge";
 import { convertDocxToHtml } from "../_actions";
 
-const PETROL_COLORS = ["#0f1729", "#0a3d4a", "#0d6c7d", "#1a8a9c", "#dc2626"];
+const PETROL_COLORS = ["#0f1729", "#04261c", "#0d4b3a", "#13644e", "#dc2626"];
 
 export function MailTemplateEditor({
   value,
@@ -322,11 +322,11 @@ export function MailTemplateEditor({
         .ProseMirror td, .ProseMirror th { border: 1px solid #d1d5db; padding: 6px 8px; vertical-align: top; min-width: 1em; position: relative; }
         .ProseMirror th { background: #f3f4f6; font-weight: 600; }
         .ProseMirror img { max-width: 100%; height: auto; }
-        .ProseMirror h1 { font-size: 20px; font-weight: 600; margin: 12px 0 8px; color: #0a3d4a; }
-        .ProseMirror h2 { font-size: 16px; font-weight: 600; margin: 10px 0 6px; color: #0a3d4a; }
+        .ProseMirror h1 { font-size: 20px; font-weight: 600; margin: 12px 0 8px; color: #04261c; }
+        .ProseMirror h2 { font-size: 16px; font-weight: 600; margin: 10px 0 6px; color: #04261c; }
         .ProseMirror p { margin: 0 0 8px; }
         .ProseMirror ul, .ProseMirror ol { padding-left: 1.5em; margin: 0 0 8px; }
-        .ProseMirror a { color: #0d6c7d; text-decoration: underline; }
+        .ProseMirror a { color: #0d4b3a; text-decoration: underline; }
       `}</style>
       <EditorContent editor={editor} />
     </div>

@@ -374,7 +374,7 @@ export function SendMailModal({
                             {c.relation}
                           </span>
                           {c.mailed ? (
-                            <span className="rounded-full bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-2 py-[1px] text-[10px] font-medium text-white">
+                            <span className="rounded-full bg-gradient-to-br from-[#04261c] to-[#0d4b3a] px-2 py-[1px] text-[10px] font-medium text-white">
                               Mailed
                               {c.mailed_at
                                 ? ` ${new Date(c.mailed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`

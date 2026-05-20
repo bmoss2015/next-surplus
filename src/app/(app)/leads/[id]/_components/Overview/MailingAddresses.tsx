@@ -331,7 +331,7 @@ export function MailingAddresses({
                       className={cn(
                         "inline-flex w-fit cursor-pointer items-center gap-1 rounded-full px-2.5 py-[3px] text-[10px] font-medium transition-colors",
                         row.mailed
-                          ? "border-none bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] text-white"
+                          ? "border-none bg-gradient-to-br from-[#04261c] to-[#0d4b3a] text-white"
                           : "border border-[#e2e8f0] bg-[#f1f5f9] text-[#64748b] hover:border-petrol-200"
                       )}
                       title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}

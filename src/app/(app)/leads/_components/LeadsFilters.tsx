@@ -107,11 +107,11 @@ export function LeadsFilters({ states }: { states: string[] }) {
   // color, so text-ink (#0f1729) gives a dark-gray chevron. The bar itself
   // keeps its dark petrol background.
   const selectClass =
-    "rounded-md border border-[#e2e8f0] bg-white px-2.5 py-[6px] text-xs text-ink outline-none transition-colors focus:border-[#0d6c7d] cursor-pointer";
+    "rounded-md border border-[#e2e8f0] bg-white px-2.5 py-[6px] text-xs text-ink outline-none transition-colors focus:border-[#0d4b3a] cursor-pointer";
   // Plain text inputs styled to match — no number spinners, light gray border,
   // white background, teal border on focus.
   const numberClass =
-    "w-20 rounded-md border border-[#e2e8f0] bg-white px-2.5 py-[6px] text-xs text-ink outline-none transition-colors placeholder:text-[#94a3b8] focus:border-[#0d6c7d]";
+    "w-20 rounded-md border border-[#e2e8f0] bg-white px-2.5 py-[6px] text-xs text-ink outline-none transition-colors placeholder:text-[#94a3b8] focus:border-[#0d4b3a]";
 
   return (
     <div
@@ -185,7 +185,7 @@ export function LeadsFilters({ states }: { states: string[] }) {
           className={cn(
             "inline-flex cursor-pointer items-center gap-1 rounded-md px-2.5 py-[6px] text-xs transition-colors",
             archivedView
-              ? "border border-[#0d6c7d] bg-white text-ink"
+              ? "border border-[#0d4b3a] bg-white text-ink"
               : "border border-white/30 bg-white/5 text-white/80 hover:border-white/60 hover:text-white"
           )}
           aria-pressed={archivedView}

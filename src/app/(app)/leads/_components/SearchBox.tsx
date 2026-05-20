@@ -128,7 +128,7 @@ export function SearchBox() {
           }
         }}
         placeholder="Search by lead ID, address, or owner name..."
-        className="w-full rounded-md border border-[#e2e8f0] bg-white py-[6px] pl-8 pr-8 text-xs text-ink outline-none transition-colors placeholder:not-italic placeholder:text-[#94a3b8] focus:border-[#0d6c7d]"
+        className="w-full rounded-md border border-[#e2e8f0] bg-white py-[6px] pl-8 pr-8 text-xs text-ink outline-none transition-colors placeholder:not-italic placeholder:text-[#94a3b8] focus:border-[#0d4b3a]"
       />
       {value && (
         <button

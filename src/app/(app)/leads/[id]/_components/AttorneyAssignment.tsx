@@ -92,7 +92,7 @@ export function AttorneyAssignment({
         disabled={pending}
         className={cn(
           "flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border bg-white px-2.5 py-[7px] text-left text-[12.5px] outline-none transition-colors disabled:opacity-60",
-          open ? "border-[#0d6c7d]" : "border-[#e2e8f0] hover:border-[#0d6c7d]"
+          open ? "border-[#0d4b3a]" : "border-[#e2e8f0] hover:border-[#0d4b3a]"
         )}
       >
         <span className="min-w-0 truncate">

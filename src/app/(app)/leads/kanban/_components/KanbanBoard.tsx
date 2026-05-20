@@ -234,7 +234,7 @@ function KanbanCard({
   if (lead.below_floor)
     tags.push({ key: "below_floor", label: "Below Minimum", cls: "border-warn-border bg-warn-bg text-warn-strong" });
   if (lead.needs_action_flag)
-    tags.push({ key: "needs_action", label: "Needs Action", cls: "border-petrol-200 bg-[#e0f2f7] text-[#0a3d4a]" });
+    tags.push({ key: "needs_action", label: "Needs Action", cls: "border-petrol-200 bg-[#e0f2f7] text-[#04261c]" });
   const visibleTags = tags.slice(0, 2);
   const hiddenTagCount = tags.length - visibleTags.length;
 

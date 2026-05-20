@@ -1,14 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  /* Petrol palette — primary brand colors */
-  --color-petrol-50: #f0fafb;
-  --color-petrol-100: #cfe9ed;
-  --color-petrol-200: #9bd1d9;
-  --color-petrol-300: #1a8a9c;
-  --color-petrol-500: #0d6c7d;
-  --color-petrol-700: #0a3d4a;
-  --color-petrol-900: #062831;
+  /* Petrol palette — kept as token NAMES for backward-compat (455 inline refs
+     across 87 files would otherwise need renaming). VALUES now point at the
+     new emerald palette so all `petrol-*` Tailwind utilities, gradients, etc.
+     automatically render in the new brand color. Petrol teal is retired. */
+  --color-petrol-50: #f3faf6;
+  --color-petrol-100: #d6ecdf;
+  --color-petrol-200: #a0d4b8;
+  --color-petrol-300: #13644e;
+  --color-petrol-500: #0d4b3a;
+  --color-petrol-700: #04261c;
+  --color-petrol-900: #04261c;
 
   /* Emerald palette — settings redesign (Phase 1: additive only, not yet
      applied anywhere. Phase 2 swaps petrol references over to emerald). */
@@ -44,12 +47,12 @@
   --color-danger-bg: #fef2f2;
   --color-danger-border: #fecaca;
 
-  /* Fix K — "warn"/attention states use a teal variant, no amber/yellow. */
-  --color-warn: #0d6c7d;
-  --color-warn-strong: #0a3d4a;
-  --color-warn-bg: #e0f2f7;
-  --color-warn-border: #0d6c7d;
-  --color-warn-deep: #0a3d4a;
+  /* Fix K — "warn"/attention states use the emerald variant, no amber/yellow. */
+  --color-warn: #0d4b3a;
+  --color-warn-strong: #04261c;
+  --color-warn-bg: #d6ecdf;
+  --color-warn-border: #0d4b3a;
+  --color-warn-deep: #04261c;
 
   --color-success: #15803d;
   --color-success-strong: #065f46;
@@ -97,25 +100,25 @@ body {
 }
 
 .bg-sidebar-gradient {
-  background: linear-gradient(180deg, #0a3d4a 0%, #0d6c7d 100%);
+  background: linear-gradient(180deg, #04261c 0%, #0d4b3a 100%);
 }
 
 .bg-hero-gradient {
-  background: linear-gradient(135deg, #0a3d4a 0%, #0d6c7d 70%, #1a8a9c 100%);
+  background: linear-gradient(135deg, #04261c 0%, #0d4b3a 70%, #13644e 100%);
 }
 
-/* Fix 26 — universal action color. The petrol gradient from the Est. Net Surplus
-   bar is the one primary-action treatment. Use `btn-primary` on every primary
-   button, Next Stage, Add Relative / Add Mailing Address, and on the active
-   sidebar item / active stage step. */
+/* Fix 26 — universal action color. The emerald gradient is the one primary-
+   action treatment. Use `btn-primary` on every primary button, Next Stage,
+   Add Relative / Add Mailing Address, and on the active sidebar item / active
+   stage step. */
 .btn-primary {
-  background: linear-gradient(135deg, #0a3d4a 0%, #0d6c7d 100%);
+  background: linear-gradient(135deg, #0d4b3a 0%, #04261c 100%);
   color: #ffffff;
   border: none;
   cursor: pointer;
 }
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #093440 0%, #0b5d6c 100%);
+  background: linear-gradient(135deg, #0a3a2c 0%, #021810 100%);
 }
 .btn-primary:disabled {
   opacity: 0.5;
@@ -143,7 +146,7 @@ input[type="button"]:not(:disabled),
    board (the visible bottom track + the synced sticky mirror at the top). */
 .kanban-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #0d6c7d #f1f5f9;
+  scrollbar-color: #0d4b3a #f1f5f9;
 }
 .kanban-scroll::-webkit-scrollbar {
   height: 6px;
@@ -153,41 +156,41 @@ input[type="button"]:not(:disabled),
   border-radius: 3px;
 }
 .kanban-scroll::-webkit-scrollbar-thumb {
-  background: #0d6c7d;
+  background: #0d4b3a;
   border-radius: 3px;
 }
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
-  background: #0a3d4a;
+  background: #04261c;
 }
 
 /* Fix TT — one section-subheader treatment for the whole portal. */
 .section-subheader {
   font-size: 11px;
   font-weight: 700;
-  color: #0a3d4a;
+  color: #04261c;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin: 0 0 12px;
 }
 
 /* Fix GG — native date / time inputs: kill the browser-default (blue in Chrome)
-   calendar / clock picker indicator and recolor it to the portal petrol #0d6c7d.
-   The filter first forces the icon to solid black, then tints it teal. Applies
-   to every date and time input in the portal. */
+   calendar / clock picker indicator and recolor it to the portal emerald
+   #0d4b3a. The filter first forces the icon to solid black, then tints it
+   emerald. Applies to every date and time input in the portal. */
 input[type="date"],
 input[type="time"] {
   color-scheme: light;
   /* Fix PPPP — the time picker scroll-wheel (hour / minute / AM-PM columns) and
      the date picker's selected day use accent-color for their highlight; pin it
-     to the portal petrol so it never renders the browser-default blue. */
-  accent-color: #0d6c7d;
+     to the portal emerald so it never renders the browser-default blue. */
+  accent-color: #0d4b3a;
 }
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.8;
-  filter: brightness(0) saturate(100%) invert(33%) sepia(94%) saturate(380%)
-    hue-rotate(140deg) brightness(92%) contrast(90%);
+  filter: brightness(0) saturate(100%) invert(22%) sepia(60%) saturate(540%)
+    hue-rotate(110deg) brightness(85%) contrast(95%);
 }
 input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="time"]::-webkit-calendar-picker-indicator:hover {

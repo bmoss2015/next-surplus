@@ -268,7 +268,7 @@ export function LeadEditDrawer({
 }
 
 const inputCls =
-  "w-full rounded-md border border-[#e2e8f0] bg-white px-2.5 py-[7px] text-[13px] text-ink outline-none focus:border-[#0d6c7d]";
+  "w-full rounded-md border border-[#e2e8f0] bg-white px-2.5 py-[7px] text-[13px] text-ink outline-none focus:border-[#0d4b3a]";
 
 function Field({
   label,

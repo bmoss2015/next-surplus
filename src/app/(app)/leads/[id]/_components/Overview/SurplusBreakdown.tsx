@@ -68,7 +68,7 @@ export function SurplusBreakdown({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
-      <h3 className="mb-4 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
+      <h3 className="mb-4 text-[11px] font-bold uppercase tracking-[0.08em] text-[#04261c]">
         Surplus Breakdown
       </h3>
 
@@ -95,14 +95,14 @@ export function SurplusBreakdown({
               "uppercase tracking-wide",
               hasConfirmed
                 ? "text-xs font-normal text-[#9ca3af]"
-                : "text-sm font-semibold text-[#0d6c7d]"
+                : "text-sm font-semibold text-[#0d4b3a]"
             )}
           >
             Potential Surplus
           </span>
           <span
             className={cn(
-              hasConfirmed ? "text-base font-normal text-[#9ca3af]" : "text-xl font-bold text-[#0a3d4a]"
+              hasConfirmed ? "text-base font-normal text-[#9ca3af]" : "text-xl font-bold text-[#04261c]"
             )}
           >
             {potentialSurplus == null ? "—" : formatCurrency(potentialSurplus)}
@@ -119,13 +119,13 @@ export function SurplusBreakdown({
           <span
             className={cn(
               "text-sm uppercase tracking-wide",
-              hasConfirmed ? "font-semibold text-[#0d6c7d]" : "font-medium text-[#6b7280]"
+              hasConfirmed ? "font-semibold text-[#0d4b3a]" : "font-medium text-[#6b7280]"
             )}
           >
             Confirmed Surplus
           </span>
           {hasConfirmed && (
-            <span className="text-xl font-bold text-[#0a3d4a]">{formatCurrency(confirmedSurplus)}</span>
+            <span className="text-xl font-bold text-[#04261c]">{formatCurrency(confirmedSurplus)}</span>
           )}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -153,14 +153,14 @@ export function SurplusBreakdown({
         <span className="font-medium text-[#374151]">{formatCurrency(attorneyCost)}</span>
       </div>
 
-      <hr className="my-5 border-t-2 border-[#0d6c7d]" />
+      <hr className="my-5 border-t-2 border-[#0d4b3a]" />
 
       {/* EST. NET PAYOUT — the headline number */}
       <div className="flex items-center justify-between gap-4">
-        <span className="text-base font-bold tracking-wide text-[#0a3d4a]">
+        <span className="text-base font-bold tracking-wide text-[#04261c]">
           Estimated Net Payout
         </span>
-        <span className="text-xl font-bold text-[#0a3d4a]">{formatCurrency(netPayout)}</span>
+        <span className="text-xl font-bold text-[#04261c]">{formatCurrency(netPayout)}</span>
       </div>
       <div className="mt-1 text-xs text-[#6b7280]">
         Calculated Based On {hasConfirmed ? "Confirmed Surplus" : "Potential Surplus"}

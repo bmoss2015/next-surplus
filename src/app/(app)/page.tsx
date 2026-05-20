@@ -91,12 +91,12 @@ export default async function DashboardPage() {
               ? "text-[#16a34a]"
               : stage === "lost"
                 ? "text-[#64748b]"
-                : "text-[#0a3d4a]";
+                : "text-[#04261c]";
           return (
             <Link
               key={stage}
               href={`/leads?stage=${stage}`}
-              className="rounded-lg border border-[#e2e8f0] bg-white p-4 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-all hover:border-[#0d6c7d] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+              className="rounded-lg border border-[#e2e8f0] bg-white p-4 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-all hover:border-[#0d4b3a] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
             >
               <div className={`text-[28px] font-bold leading-none tracking-tight ${numColor}`}>
                 {data.stagesCounts[stage]}

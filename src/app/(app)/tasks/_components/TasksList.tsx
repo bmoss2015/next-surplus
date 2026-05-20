@@ -240,14 +240,14 @@ export function TasksList({
       </div>
 
       {showOverdueOnly && (
-        <div className="mb-3 flex items-center justify-between rounded-md border-l-4 border-l-[#0d6c7d] border border-[#0d6c7d] bg-[#e0f2f7] px-3 py-2 text-[#0a3d4a]">
+        <div className="mb-3 flex items-center justify-between rounded-md border-l-4 border-l-[#0d4b3a] border border-[#0d4b3a] bg-[#e0f2f7] px-3 py-2 text-[#04261c]">
           <div className="text-[12px] font-medium">
             Showing Overdue Tasks Only
           </div>
           <button
             type="button"
             onClick={() => setShowOverdueOnly(false)}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#0d6c7d] bg-surface px-2 py-[3px] text-[11px] text-[#0a3d4a] hover:bg-[#e0f2f7]"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#0d4b3a] bg-surface px-2 py-[3px] text-[11px] text-[#04261c] hover:bg-[#e0f2f7]"
           >
             <IconX size={11} stroke={2} />
             Show All Tasks
@@ -291,11 +291,11 @@ export function TasksList({
       <div className="space-y-5">
         {needsReviewTasks.length > 0 && (
           <div>
-            <div className="mb-2 flex items-baseline justify-between rounded-md border-l-4 border-l-[#0a3d4a] bg-[#e8f4f6] px-3 py-2">
-              <h2 className="m-0 text-[13px] font-semibold text-[#0a3d4a]">Needs Review</h2>
-              <span className="text-[11px] text-[#0a3d4a]">{needsReviewTasks.length}</span>
+            <div className="mb-2 flex items-baseline justify-between rounded-md border-l-4 border-l-[#04261c] bg-[#e8f4f6] px-3 py-2">
+              <h2 className="m-0 text-[13px] font-semibold text-[#04261c]">Needs Review</h2>
+              <span className="text-[11px] text-[#04261c]">{needsReviewTasks.length}</span>
             </div>
-            <div className="overflow-hidden rounded-lg border border-l-4 border-[#0a3d4a] border-l-[#0a3d4a] bg-surface shadow-card">
+            <div className="overflow-hidden rounded-lg border border-l-4 border-[#04261c] border-l-[#04261c] bg-surface shadow-card">
               {needsReviewTasks.map((task) => (
                 <TaskRowDisplay
                   key={task.id}
@@ -321,14 +321,14 @@ export function TasksList({
               className={cn(
                 "mb-2 flex items-baseline justify-between rounded-md",
                 section.warn
-                  ? "border-l-4 border-l-[#0d6c7d] bg-[#e0f2f7] px-3 py-2"
+                  ? "border-l-4 border-l-[#0d4b3a] bg-[#e0f2f7] px-3 py-2"
                   : ""
               )}
             >
               <h2
                 className={cn(
                   "m-0 text-[13px] font-medium",
-                  section.warn ? "text-[#0a3d4a]" : "text-ink"
+                  section.warn ? "text-[#04261c]" : "text-ink"
                 )}
               >
                 {section.label}
@@ -336,7 +336,7 @@ export function TasksList({
               <span
                 className={cn(
                   "text-[11px]",
-                  section.warn ? "text-[#0a3d4a]" : "text-gray-500"
+                  section.warn ? "text-[#04261c]" : "text-gray-500"
                 )}
               >
                 {section.tasks.length}
@@ -346,7 +346,7 @@ export function TasksList({
               className={cn(
                 "overflow-hidden rounded-lg border bg-surface shadow-card",
                 section.warn
-                  ? "border-[#0d6c7d] border-l-4 border-l-[#0d6c7d]"
+                  ? "border-[#0d4b3a] border-l-4 border-l-[#0d4b3a]"
                   : "border-gray-200"
               )}
             >
@@ -355,7 +355,7 @@ export function TasksList({
                   className={cn(
                     "px-4 py-3 text-center text-[12px]",
                     section.warn
-                      ? "bg-[#e0f2f7] text-[#0a3d4a]"
+                      ? "bg-[#e0f2f7] text-[#04261c]"
                       : "text-gray-500"
                   )}
                 >
@@ -509,7 +509,7 @@ function TaskRowDisplay({
           <div
             className={cn(
               "mt-[2px] text-[11px]",
-              warn && !task.completed ? "text-[#0a3d4a]" : "text-gray-500"
+              warn && !task.completed ? "text-[#04261c]" : "text-gray-500"
             )}
           >
             {task.due_date && (
