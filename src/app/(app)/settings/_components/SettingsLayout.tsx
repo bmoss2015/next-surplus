@@ -100,16 +100,21 @@ export function SettingsLayout({
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-8 py-7">
-          {/* Breadcrumb */}
-          <div className="mb-2 flex items-center gap-1.5 text-[11.5px] text-gray-400">
-            <span>Settings</span>
-            <span>·</span>
-            <span>{activeGroup}</span>
-          </div>
-          <h1 className="m-0 text-[24px] font-semibold tracking-tight text-ink">{activeLabel}</h1>
+          {/* Breadcrumb — Settings > Group > Active (chevrons match mockup) */}
+          <nav className="settings-breadcrumb">
+            <a>Settings</a>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+            <a>{activeGroup}</a>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+            <span style={{ color: "var(--color-ink)" }}>{activeLabel}</span>
+          </nav>
 
-          {/* Active panel — single-column inside the constrained max-w */}
-          <div className="mt-6">{panels[active]}</div>
+          {/* Active panel renders its own page-head (h1 + description) */}
+          <div>{panels[active]}</div>
         </div>
       </div>
     </div>

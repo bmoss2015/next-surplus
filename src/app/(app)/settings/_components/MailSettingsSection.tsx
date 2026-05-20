@@ -101,9 +101,11 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
 
   return (
     <div className="col-span-2">
-      
-      <div className="mt-1 text-[12.5px] text-gray-500">
-        Signer, signature, and default postal class applied to every outgoing letter.
+      <div className="page-head">
+        <div>
+          <h1 className="section-h1">Mail Configuration</h1>
+          <p className="section-desc">Signer, signature, and default postal class applied to every outgoing letter.</p>
+        </div>
       </div>
 
       {/* Signature preview hero */}

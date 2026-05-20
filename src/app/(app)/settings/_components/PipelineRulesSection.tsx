@@ -37,7 +37,12 @@ export function PipelineRulesSection({ initial }: { initial: number | null }) {
 
   return (
     <div className="col-span-2">
-      
+      <div className="page-head">
+        <div>
+          <h1 className="section-h1">Pipeline Rules</h1>
+          <p className="section-desc">Leads with no activity for this many days are automatically flagged Needs Action on the Daily Work board.</p>
+        </div>
+      </div>
 
       <div className="pref-row" style={{ paddingTop: 24 }}>
         <div className="min-w-0 flex-1">

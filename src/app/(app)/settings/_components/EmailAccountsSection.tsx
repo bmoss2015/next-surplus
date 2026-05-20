@@ -61,7 +61,12 @@ export function EmailAccountsSection({ initial }: { initial: EmailAccountRow[] }
 
   return (
     <div className="col-span-2">
-      
+      <div className="page-head">
+        <div>
+          <h1 className="section-h1">Email Accounts</h1>
+          <p className="section-desc">Connect Gmail so the portal can read and send email from this inbox.</p>
+        </div>
+      </div>
 
       {connectStatus === "success" && (
         <div className="mt-4 mb-2 flex items-center justify-between rounded-md border border-petrol-200 bg-petrol-50 px-3 py-2 text-[12px] text-petrol-700">

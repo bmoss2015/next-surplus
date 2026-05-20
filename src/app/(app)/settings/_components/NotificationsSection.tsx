@@ -41,9 +41,11 @@ export function NotificationsSection({
 
   return (
     <div className="col-span-2">
-      
-      <div className="mt-1 text-[12.5px] text-gray-500">
-        Choose which events email you. We never email you about your own actions.
+      <div className="page-head">
+        <div>
+          <h1 className="section-h1">Notifications</h1>
+          <p className="section-desc">Choose which events email you. We never email you about your own actions.</p>
+        </div>
       </div>
 
       <div className="pref-section-h">Activity</div>

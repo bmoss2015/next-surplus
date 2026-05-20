@@ -69,7 +69,12 @@ export function ChangePasswordSection() {
 
   return (
     <div className="col-span-2">
-      
+      <div className="page-head">
+        <div>
+          <h1 className="section-h1">Security</h1>
+          <p className="section-desc">Update your password and turn on two-factor authentication.</p>
+        </div>
+      </div>
 
       <form onSubmit={save} autoComplete="off">
         <div className="pref-section-h">Password</div>

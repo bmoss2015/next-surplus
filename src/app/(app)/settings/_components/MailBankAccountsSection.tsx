@@ -40,12 +40,10 @@ export function MailBankAccountsSection({
 
   return (
     <div className="col-span-2">
-      <div className="flex items-start justify-between gap-3">
+      <div className="page-head">
         <div>
-          
-          <div className="mt-1 text-[12.5px] text-gray-500">
-            Verified accounts available to draw outgoing checks from. Routing and account numbers are stored only by Lob.
-          </div>
+          <h1 className="section-h1">Bank Accounts</h1>
+          <p className="section-desc">Verified accounts available to draw outgoing checks from. Routing and account numbers are stored only by Lob.</p>
         </div>
         {!adding && (
           <button

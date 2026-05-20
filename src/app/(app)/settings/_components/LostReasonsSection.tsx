@@ -63,12 +63,10 @@ export function LostReasonsSection({
 
   return (
     <div className="col-span-2">
-      <div className="flex items-start justify-between gap-3">
+      <div className="page-head">
         <div>
-          
-          <div className="mt-1 text-[12.5px] text-gray-500">
-            Options that appear in the Mark Lost dropdown on a lead.
-          </div>
+          <h1 className="section-h1">Lost Reasons</h1>
+          <p className="section-desc">Options that appear in the Mark Lost dropdown on a lead.</p>
         </div>
         {!adding && (
           <button

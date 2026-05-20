@@ -121,8 +121,11 @@ export function TeamSection({
 
   return (
     <div className="col-span-2">
-      <div className="flex items-start justify-between gap-3">
-        
+      <div className="page-head">
+        <div>
+          <h1 className="section-h1">Members</h1>
+          <p className="section-desc">Invite teammates and manage their access to the workspace.</p>
+        </div>
         <button
           type="button"
           onClick={() => { setDrawerOpen(true); setMsg(null); }}

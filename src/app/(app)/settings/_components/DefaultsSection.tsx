@@ -40,7 +40,12 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
 
   return (
     <div className="col-span-2">
-      
+      <div className="page-head">
+        <div>
+          <h1 className="section-h1">Defaults</h1>
+          <p className="section-desc">Starting values applied to every new lead. Each lead can override these individually.</p>
+        </div>
+      </div>
 
       <div className="calc-hero" style={{ marginTop: 18 }}>
         <div className="plan-hero-eyebrow">Live Example · $50,000 Surplus</div>
