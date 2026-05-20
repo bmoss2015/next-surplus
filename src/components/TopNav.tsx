@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { IconLogout, IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconLogout, IconPlus } from "@tabler/icons-react";
 import { signOut } from "@/app/(auth)/_actions";
 import { NotificationBell } from "./NotificationBell";
+import { GlobalSearch } from "./GlobalSearch";
 import { cn } from "@/lib/cn";
 
 type NavItem = {
@@ -58,19 +59,6 @@ export function TopNav({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [menuOpen]);
 
-  // ⌘K (or Ctrl+K) opens the search input
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        const el = document.getElementById("topnav-search");
-        if (el) (el as HTMLInputElement).focus();
-      }
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
-
   function logout() {
     startTransition(async () => {
       await signOut();
@@ -105,17 +93,10 @@ export function TopNav({
           })}
         </nav>
 
-        {/* Search */}
-        <label className="hidden md:inline-flex h-8 cursor-text items-center gap-2 rounded-md border border-transparent bg-gray-100 px-3 text-[12.5px] text-gray-500 hover:bg-gray-150 focus-within:border-gray-200 focus-within:bg-surface">
-          <IconSearch size={13} stroke={1.75} />
-          <input
-            id="topnav-search"
-            type="search"
-            placeholder="Search"
-            className="w-44 bg-transparent text-ink outline-none placeholder:text-gray-500"
-          />
-          <kbd className="rounded border border-gray-200 bg-surface px-1.5 py-0.5 text-[10px] font-medium text-gray-500 font-mono">⌘K</kbd>
-        </label>
+        {/* Global search — leads, attorneys, members, templates */}
+        <div className="hidden md:block">
+          <GlobalSearch />
+        </div>
 
         <Link
           href="/imports"
