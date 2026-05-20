@@ -16,7 +16,7 @@ alter table public.profiles
 -- organizations.tax_id_ein  — EIN as string ("00-0000000")
 -- organizations.logo_url    — storage path inside the `org-logos` bucket
 -- ---------------------------------------------------------------
-alter table public.organizations
+alter table public.orgs
   add column if not exists tax_id_ein text,
   add column if not exists logo_url text;
 
@@ -110,7 +110,7 @@ create policy "org_logos_admin_upload"
     and exists (
       select 1 from public.profiles p
       where p.id = auth.uid()
-        and p.is_admin = true
+        and p.role = 'admin'
         and p.org_id::text = (storage.foldername(name))[1]
     )
   );
@@ -123,7 +123,7 @@ create policy "org_logos_admin_update"
     and exists (
       select 1 from public.profiles p
       where p.id = auth.uid()
-        and p.is_admin = true
+        and p.role = 'admin'
         and p.org_id::text = (storage.foldername(name))[1]
     )
   );
@@ -136,7 +136,7 @@ create policy "org_logos_admin_delete"
     and exists (
       select 1 from public.profiles p
       where p.id = auth.uid()
-        and p.is_admin = true
+        and p.role = 'admin'
         and p.org_id::text = (storage.foldername(name))[1]
     )
   );

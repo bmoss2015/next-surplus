@@ -99,7 +99,7 @@ export async function uploadOrgLogo(
   const publicUrl = pub.publicUrl;
 
   const { error: setErr } = await admin
-    .from("organizations")
+    .from("orgs")
     .update({ logo_url: publicUrl })
     .eq("id", profile.orgId);
   if (setErr) return { ok: false, error: setErr.message };
@@ -119,7 +119,7 @@ export async function removeOrgLogo(): Promise<{ ok: true } | { ok: false; error
     await admin.storage.from("org-logos").remove(paths);
   }
 
-  const { error } = await admin.from("organizations").update({ logo_url: null }).eq("id", profile.orgId);
+  const { error } = await admin.from("orgs").update({ logo_url: null }).eq("id", profile.orgId);
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/settings");
@@ -148,7 +148,7 @@ export async function setOrgTaxId(
   const cleaned = (ein ?? "").trim() || null;
   const admin = createServiceClient();
   const { error } = await admin
-    .from("organizations")
+    .from("orgs")
     .update({ tax_id_ein: cleaned })
     .eq("id", profile.orgId);
   if (error) return { ok: false, error: error.message };
