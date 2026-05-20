@@ -1,13 +1,24 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { IconPlus, IconX } from "@tabler/icons-react";
+import { IconPlus, IconX, IconTrash } from "@tabler/icons-react";
 import { inviteMember, setMemberRole, removeMember } from "../_actions";
+import { cn } from "@/lib/cn";
 import type { OrgMemberRow } from "@/lib/settings/fetch";
 
-// Fix 62 — team members rendered as cards, 3 per row. Invite button lives in
-// the section header and opens a modal with an email input + role selector.
+// Settings redesign — Members panel.
+// List rows use the new ribbon-tab role indicators (ADMIN = ink, MEMBER =
+// light gray, PENDING = brand outline). Invite Member opens a right-side
+// drawer (drawer-panel + drawer-backdrop classes from globals.css) instead
+// of an inline modal.
+
+function initials(s: string): string {
+  const parts = s.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 export function TeamSection({
   initial,
@@ -17,23 +28,33 @@ export function TeamSection({
   currentUserId: string;
 }) {
   const router = useRouter();
-  const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
-  // Fix JJ: a role dropdown change is staged here (userId -> pending value) and
-  // only written to the DB when the inline Save button is clicked.
   const [editedRoles, setEditedRoles] = useState<Record<string, "admin" | "member">>({});
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [members, setMembers] = useState<OrgMemberRow[]>(initial);
   const [pending, startTransition] = useTransition();
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
-    null
-  );
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   const inviteReady =
     email.trim().length > 0 && firstName.trim().length > 0 && lastName.trim().length > 0;
+
+  // Esc closes the drawer
+  useEffect(() => {
+    if (!drawerOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setDrawerOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [drawerOpen]);
 
   function sendInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -44,12 +65,9 @@ export function TeamSection({
     startTransition(async () => {
       const res = await inviteMember(target, role, fullName);
       if (res.ok) {
-        setMsg({ kind: "ok", text: `Invite Sent To ${target}.` });
-        setEmail("");
-        setFirstName("");
-        setLastName("");
-        setRole("member");
-        setModalOpen(false);
+        setMsg({ kind: "ok", text: `Invite sent to ${target}.` });
+        setEmail(""); setFirstName(""); setLastName(""); setRole("member");
+        setDrawerOpen(false);
         router.refresh();
       } else {
         setMsg({ kind: "err", text: res.error });
@@ -70,23 +88,11 @@ export function TeamSection({
     });
   }
 
-  function onSelectRole(
-    userId: string,
-    originalRole: string,
-    value: "admin" | "member"
-  ) {
+  function onSelectRole(userId: string, originalRole: string, value: "admin" | "member") {
     setEditedRoles((prev) => {
       const nextMap = { ...prev };
       if (value === originalRole) delete nextMap[userId];
       else nextMap[userId] = value;
-      return nextMap;
-    });
-  }
-
-  function clearEditedRole(userId: string) {
-    setEditedRoles((prev) => {
-      const nextMap = { ...prev };
-      delete nextMap[userId];
       return nextMap;
     });
   }
@@ -98,271 +104,294 @@ export function TeamSection({
     startTransition(async () => {
       const res = await setMemberRole(userId, next);
       if (res.ok) {
-        clearEditedRole(userId);
-        router.refresh();
+        setEditedRoles((prev) => {
+          const map = { ...prev };
+          delete map[userId];
+          return map;
+        });
+        setMembers((prev) => prev.map((m) => (m.id === userId ? { ...m, role: next } : m)));
       } else {
         setMsg({ kind: "err", text: res.error });
       }
     });
   }
 
+  const inputClass =
+    "rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500";
+
   return (
-    <div className="rounded-lg border border-gray-200 bg-surface p-5 shadow-card">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="section-subheader">Team</h2>
-          <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
-            Admins manage Settings and can delete records. Members can view and
-            edit leads, tasks, contacts, documents, notes, and imports.
-          </div>
-        </div>
+    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="section-subheader mb-0">Members</h2>
         <button
           type="button"
-          onClick={() => {
-            setModalOpen(true);
-            setMsg(null);
-          }}
+          onClick={() => { setDrawerOpen(true); setMsg(null); }}
           className="inline-flex cursor-pointer items-center gap-1 rounded-md btn-primary px-3 py-[7px] text-[13px] font-medium text-white"
         >
           <IconPlus size={14} stroke={2} />
-          Invite
+          Invite Member
         </button>
       </div>
 
-      {msg && (
-        <div
-          className={`mb-3 text-[12px] ${
-            msg.kind === "ok" ? "text-success" : "text-danger"
-          }`}
-        >
+      {msg && !drawerOpen && (
+        <div className={cn("mt-3 text-[12px]", msg.kind === "ok" ? "text-success" : "text-danger")}>
           {msg.text}
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="mt-5">
         {members.map((m) => {
           const isSelf = m.id === currentUserId;
           const editedRole = editedRoles[m.id];
           const roleDirty = editedRole !== undefined;
           const roleValue = editedRole ?? m.role;
-          const initialLetter = (m.full_name || m.email || "?")
-            .trim()
-            .charAt(0)
-            .toUpperCase();
+          const isPending = m.pending;
+          const meta = [
+            m.email,
+            isSelf ? "You" : null,
+            isPending ? "Invite pending" : null,
+          ].filter(Boolean).join(" · ");
           return (
-            <div
-              key={m.id}
-              className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-surface p-3.5"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-petrol-100 text-[14px] font-medium text-petrol-700">
-                  {initialLetter}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-[13px] font-medium text-ink">
-                      {m.full_name || m.email || "—"}
-                    </span>
-                    {isSelf && (
-                      <span className="shrink-0 text-[10px] font-normal text-gray-400">
-                        (You)
-                      </span>
-                    )}
-                    {m.pending && !isSelf && (
-                      <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-[1px] text-[10px] font-medium text-amber-700">
-                        Pending
-                      </span>
-                    )}
-                  </div>
-                  <div className="truncate text-[11px] text-gray-500">
-                    {m.email ?? "—"}
-                  </div>
-                </div>
+            <div key={m.id} className="flex items-center gap-4 py-4 border-b border-gray-200 last:border-b-0">
+              <div
+                className="flex-shrink-0 inline-flex items-center justify-center rounded-full text-white text-[12px] font-semibold"
+                style={{
+                  width: 36, height: 36,
+                  background: "linear-gradient(135deg, #0d4b3a 0%, #04261c 100%)",
+                }}
+              >
+                {initials(m.full_name || m.email || "?")}
               </div>
-              {confirmRemove === m.id ? (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] text-ink">
-                    Remove {m.full_name || m.email || "this member"} from the team?
-                  </span>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmRemove(null)}
-                      disabled={pending}
-                      className="flex-1 cursor-pointer rounded-md border border-gray-200 bg-white px-2 py-[3px] text-[11px] text-ink hover:border-petrol-500 disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => doRemoveMember(m.id)}
-                      disabled={pending}
-                      className="flex-1 cursor-pointer rounded-md bg-danger px-2 py-[3px] text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-50"
-                    >
-                      {pending ? "Removing" : "Confirm Remove"}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-2">
-                  {isSelf ? (
-                    <span className="rounded-full bg-petrol-50 px-2 py-[2px] text-[10.5px] font-medium text-petrol-700">
-                      {m.role === "admin" ? "Admin" : "Member"}
-                    </span>
-                  ) : (
-                    <div className="flex min-w-0 items-center gap-1.5">
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-medium text-ink">{m.full_name || m.email}</div>
+                {meta && <div className="text-[12px] text-gray-500 mt-0.5 truncate">{meta}</div>}
+              </div>
+
+              {/* Role tab / inline editor */}
+              {!isSelf && !isPending ? (
+                <div className="flex items-center gap-2">
+                  {roleDirty ? (
+                    <>
                       <select
                         value={roleValue}
-                        disabled={pending}
-                        onChange={(e) =>
-                          onSelectRole(m.id, m.role, e.target.value as "admin" | "member")
-                        }
-                        className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none focus:border-petrol-500 disabled:opacity-60"
+                        onChange={(e) => onSelectRole(m.id, m.role, e.target.value as "admin" | "member")}
+                        className={`${inputClass} cursor-pointer`}
+                        style={{ width: 110 }}
                       >
-                        <option value="admin">Admin</option>
                         <option value="member">Member</option>
+                        <option value="admin">Admin</option>
                       </select>
-                      {roleDirty && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => saveRole(m.id)}
-                            disabled={pending}
-                            className="btn-primary shrink-0 cursor-pointer rounded-md px-2 py-[3px] text-[11px] font-medium disabled:opacity-50"
-                          >
-                            {pending ? "Saving" : "Save"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => clearEditedRole(m.id)}
-                            disabled={pending}
-                            className="shrink-0 cursor-pointer text-[11px] text-gray-500 hover:text-ink disabled:opacity-50"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {!isSelf && !roleDirty && (
+                      <button
+                        type="button"
+                        onClick={() => saveRole(m.id)}
+                        disabled={pending}
+                        className="rounded-md btn-primary px-2.5 py-[5px] text-[12px] font-medium text-white"
+                      >
+                        Save
+                      </button>
+                    </>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => {
-                        setMsg(null);
-                        setConfirmRemove(m.id);
-                      }}
-                      disabled={pending}
-                      className="shrink-0 cursor-pointer text-[11px] text-gray-400 hover:text-danger disabled:opacity-50"
+                      onClick={() => onSelectRole(m.id, m.role, m.role === "admin" ? "member" : "admin")}
+                      title="Click to change role"
+                      className={cn(
+                        "role-tab cursor-pointer",
+                        m.role === "admin" ? "role-tab-admin" : "role-tab-member"
+                      )}
                     >
-                      Remove
+                      {m.role === "admin" ? "ADMIN" : "MEMBER"}
                     </button>
                   )}
                 </div>
+              ) : isPending ? (
+                <span className="role-tab role-tab-pending">PENDING</span>
+              ) : (
+                <span className={cn("role-tab", m.role === "admin" ? "role-tab-admin" : "role-tab-member")}>
+                  {m.role === "admin" ? "ADMIN" : "MEMBER"}
+                </span>
+              )}
+
+              {/* Remove */}
+              {!isSelf && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmRemove(m.id)}
+                  className="ml-2 text-gray-400 hover:text-danger"
+                  aria-label="Remove"
+                >
+                  <IconTrash size={14} stroke={1.75} />
+                </button>
               )}
             </div>
           );
         })}
-        {members.length === 0 && (
-          <div className="col-span-3 rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center text-[12px] text-gray-500">
-            No team members yet.
-          </div>
-        )}
       </div>
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
-          <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-surface p-5 shadow-card">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="m-0 text-[15px] font-medium text-ink">
-                Invite Teammate
-              </h3>
+      {/* Confirm remove modal — kept inline as a small overlay */}
+      {confirmRemove && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40"
+          onClick={() => setConfirmRemove(null)}
+        >
+          <div
+            className="w-[420px] rounded-lg border border-gray-200 bg-surface p-5 shadow-elevated"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-[15px] font-semibold text-ink">Remove this member?</div>
+            <div className="mt-1 text-[12.5px] text-gray-500">
+              They lose access immediately. Anything they own (leads, tasks, notes) stays on record.
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setModalOpen(false)}
-                className="cursor-pointer text-gray-400 hover:text-ink"
-                aria-label="Close"
+                onClick={() => setConfirmRemove(null)}
+                className="rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-[12.5px] text-ink hover:border-gray-300"
               >
-                <IconX size={16} stroke={1.75} />
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => doRemoveMember(confirmRemove)}
+                disabled={pending}
+                className="rounded-md bg-danger px-3 py-[6px] text-[12.5px] font-medium text-white hover:bg-danger-strong"
+              >
+                Remove
               </button>
             </div>
-            <form onSubmit={sendInvite} className="space-y-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-medium text-gray-500">
-                  Email
-                </label>
-                <input
-                  autoFocus
-                  type="email"
-                  placeholder="name@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-medium text-gray-500">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Jane"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-medium text-gray-500">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-medium text-gray-500">
-                  Role
-                </label>
-                <select
-                  value={role}
-                  onChange={(e) =>
-                    setRole(e.target.value as "admin" | "member")
-                  }
-                  className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500"
-                >
-                  <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              {msg && msg.kind === "err" && (
-                <div className="text-[12px] text-danger">{msg.text}</div>
-              )}
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[7px] text-[13px] text-ink hover:border-petrol-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending || !inviteReady}
-                  className="cursor-pointer rounded-md btn-primary px-3 py-[7px] text-[13px] font-medium text-white disabled:opacity-50"
-                >
-                  {pending ? "Sending" : "Invite"}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
+
+      {/* Invite drawer */}
+      <div
+        className={cn("drawer-backdrop", drawerOpen && "open")}
+        onClick={() => setDrawerOpen(false)}
+      />
+      <aside className={cn("drawer-panel", drawerOpen && "open")} aria-hidden={!drawerOpen}>
+        <header className="drawer-head">
+          <div>
+            <div className="drawer-eyebrow">Invite Member</div>
+            <h2 className="drawer-title">New Team Member</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(false)}
+            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-ink"
+            aria-label="Close"
+          >
+            <IconX size={16} stroke={1.75} />
+          </button>
+        </header>
+
+        <form onSubmit={sendInvite} className="drawer-body">
+          <div className="drawer-field">
+            <label className="drawer-label">First Name</label>
+            <input
+              type="text"
+              required
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className={inputClass + " w-full"}
+              placeholder="Jordan"
+              autoFocus
+            />
+          </div>
+          <div className="drawer-field">
+            <label className="drawer-label">Last Name</label>
+            <input
+              type="text"
+              required
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className={inputClass + " w-full"}
+              placeholder="Lee"
+            />
+          </div>
+          <div className="drawer-field">
+            <label className="drawer-label">Email</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass + " w-full"}
+              placeholder="jordan@yourdomain.com"
+            />
+          </div>
+
+          <div className="drawer-field">
+            <label className="drawer-label">Role</label>
+            <div className="flex flex-col gap-2">
+              <label className={cn(
+                "flex items-start gap-2.5 rounded-md border p-3 cursor-pointer transition-colors",
+                role === "admin" ? "border-ink bg-gray-50" : "border-gray-200 hover:border-gray-300"
+              )}>
+                <input
+                  type="radio"
+                  name="invite-role"
+                  value="admin"
+                  checked={role === "admin"}
+                  onChange={() => setRole("admin")}
+                  className="mt-1"
+                />
+                <div>
+                  <div className="text-[13px] font-semibold text-ink">Admin</div>
+                  <div className="text-[11.5px] text-gray-500 mt-0.5 leading-snug">
+                    Full access. Manage settings, invite teammates, delete records.
+                  </div>
+                </div>
+              </label>
+              <label className={cn(
+                "flex items-start gap-2.5 rounded-md border p-3 cursor-pointer transition-colors",
+                role === "member" ? "border-ink bg-gray-50" : "border-gray-200 hover:border-gray-300"
+              )}>
+                <input
+                  type="radio"
+                  name="invite-role"
+                  value="member"
+                  checked={role === "member"}
+                  onChange={() => setRole("member")}
+                  className="mt-1"
+                />
+                <div>
+                  <div className="text-[13px] font-semibold text-ink">Member</div>
+                  <div className="text-[11.5px] text-gray-500 mt-0.5 leading-snug">
+                    Standard access. View and edit leads, tasks, contacts, documents, imports.
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {msg && (
+            <div className={cn("text-[12px]", msg.kind === "ok" ? "text-success" : "text-danger")}>
+              {msg.text}
+            </div>
+          )}
+        </form>
+
+        <footer className="drawer-foot">
+          <span className="text-[11.5px] text-gray-400">Invite expires in 7 days.</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(false)}
+              className="rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-[12.5px] text-ink hover:border-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={(e) => sendInvite(e as unknown as React.FormEvent)}
+              disabled={!inviteReady || pending}
+              className="rounded-md btn-primary px-3 py-[6px] text-[12.5px] font-medium text-white disabled:opacity-50"
+            >
+              {pending ? "Sending…" : "Send Invite"}
+            </button>
+          </div>
+        </footer>
+      </aside>
     </div>
   );
 }
