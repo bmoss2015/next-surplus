@@ -149,7 +149,11 @@ export function ContactsTabClient({
   const [newOwnerPhoneLitigator, setNewOwnerPhoneLitigator] = useState(false);
   const [newOwnerEmail, setNewOwnerEmail] = useState("");
   const [newOwnerNotes, setNewOwnerNotes] = useState("");
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  // IDs of phone contacts currently being validated server-side. Drives the
+  // small "Verifying…" spinner shown on the row while the action awaits
+  // Veriphone. Cleared the moment the action returns with the real row.
+  const [verifyingIds, setVerifyingIds] = useState<Set<string>>(() => new Set());
 
   function resetOwnerForm() {
     setNewOwnerName("");
@@ -311,37 +315,57 @@ export function ContactsTabClient({
   ) {
     const trimmed = value.trim();
     if (!trimmed) return;
+    // Optimistic placeholder so the user sees "Verifying…" on the new phone
+    // row while the action awaits the Veriphone call (~500ms-1s). Real row
+    // replaces it when the action returns.
+    const placeholderId = `pending-${crypto.randomUUID()}`;
+    const placeholder: ContactRow = {
+      id: placeholderId,
+      owner_id: ownerId,
+      lead_id: leadId,
+      channel,
+      value: trimmed,
+      status: "untested",
+      connection_status: null,
+      source: null,
+      last_attempted: null,
+      is_primary: false,
+      phone_type: null,
+      is_dnc: false,
+      is_litigator: false,
+      mailed: false,
+      mailed_at: null,
+      recipient_label: null,
+      validation_checked_at: null,
+      validation_provider: null,
+    };
+    setContacts((prev) => [...prev, placeholder]);
+    setVerifyingIds((prev) => new Set(prev).add(placeholderId));
     startTransition(async () => {
       const result = await upsertContact(leadId, ownerId, null, {
         channel,
         value: trimmed,
         status: "untested",
       });
-      if (result.ok) {
-        setContacts((prev) => [
-          ...prev,
-          {
-            id: result.id,
-            owner_id: ownerId,
-            lead_id: leadId,
-            channel,
-            value: trimmed,
-            status: "untested",
-            connection_status: null,
-            source: null,
-            last_attempted: null,
-            is_primary: false,
-            phone_type: null,
-            is_dnc: false,
-            is_litigator: false,
-            mailed: false,
-            mailed_at: null,
-            recipient_label: null,
-            validation_checked_at: null,
-            validation_provider: null,
-          },
-        ]);
+      if (result.ok && result.row) {
+        const validated = result.row as ContactRow;
+        setContacts((prev) =>
+          prev.map((c) => (c.id === placeholderId ? validated : c))
+        );
+      } else if (result.ok) {
+        // Action succeeded but couldn't refetch — assign the real id at least.
+        setContacts((prev) =>
+          prev.map((c) => (c.id === placeholderId ? { ...c, id: result.id } : c))
+        );
+      } else {
+        // Action failed — drop the placeholder.
+        setContacts((prev) => prev.filter((c) => c.id !== placeholderId));
       }
+      setVerifyingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(placeholderId);
+        return next;
+      });
     });
   }
 
@@ -546,6 +570,7 @@ export function ContactsTabClient({
               onRemoveContact={removeContact}
               onSetContactStatus={setContactStatus}
               onSetPhoneMeta={setPhoneMeta}
+              verifyingIds={verifyingIds}
             />
           ))}
         </div>
@@ -566,6 +591,7 @@ function OwnerCard({
   onRemoveContact,
   onSetContactStatus,
   onSetPhoneMeta,
+  verifyingIds,
 }: {
   owner: OwnerRowFull;
   phones: ContactRow[];
@@ -578,6 +604,7 @@ function OwnerCard({
   onRemoveContact: (id: string) => void;
   onSetContactStatus: (id: string, s: ContactStatus) => void;
   onSetPhoneMeta: (id: string, patch: PhoneMetaPatch) => void;
+  verifyingIds: Set<string>;
 }) {
   const { isAdmin } = useRole();
   const [addingPhone, setAddingPhone] = useState(false);
@@ -656,6 +683,7 @@ function OwnerCard({
             onSetPhoneMeta={(patch) => onSetPhoneMeta(c.id, patch)}
             validationCheckedAt={c.validation_checked_at}
             validationProvider={c.validation_provider}
+            isVerifying={verifyingIds.has(c.id)}
           />
         ))}
         {addingPhone ? (
@@ -852,6 +880,7 @@ function ContactLine({
   breakAll,
   validationCheckedAt,
   validationProvider,
+  isVerifying,
 }: {
   kind: "phone" | "email";
   value: string;
@@ -866,6 +895,7 @@ function ContactLine({
   breakAll?: boolean;
   validationCheckedAt?: string | null;
   validationProvider?: string | null;
+  isVerifying?: boolean;
 }) {
   const isPhone = kind === "phone";
   const [editingType, setEditingType] = useState(false);
@@ -1011,14 +1041,21 @@ function ContactLine({
           ))
         ) : (
           <>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none",
-                statusClass(status)
-              )}
-            >
-              {CONTACT_STATUS_LABELS[status]}
-            </span>
+            {isVerifying ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-petrol-100 px-1.5 py-[1px] text-[9px] font-medium leading-none text-petrol-700">
+                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-petrol-500" />
+                Verifying…
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none",
+                  statusClass(status)
+                )}
+              >
+                {CONTACT_STATUS_LABELS[status]}
+              </span>
+            )}
             <button
               type="button"
               aria-label="Change status"

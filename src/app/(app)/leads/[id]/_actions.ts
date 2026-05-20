@@ -12,28 +12,27 @@ import { validateSpecificPhones, type RelativePhoneBase } from "@/lib/phone-vali
 // state when a slot's value changes.
 const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const satisfies readonly RelativePhoneBase[];
 
-// Fire-and-forget targeted validation — validates ONLY the row IDs passed in,
-// never touches other untested rows in the org. Runs after the response so
-// the user sees the save complete immediately; validation result lands on
-// next page refresh.
-function scheduleValidationFor(
+// Synchronous targeted validation for manual saves — validates ONLY the rows
+// passed in and AWAITS the result so the action response carries the final
+// status back to the client. ~500ms-1s per phone for Veriphone, fast enough
+// to feel like part of the save instead of needing a background sweep.
+// (Bulk imports stay async via after() since they can't block on N×500ms.)
+async function runValidationFor(
   orgId: string | null,
   targets: {
     contactIds?: string[];
     relativeSlots?: Array<{ relativeId: string; base: RelativePhoneBase }>;
   }
-) {
+): Promise<void> {
   if (!orgId) return;
   if ((!targets.contactIds || targets.contactIds.length === 0) && (!targets.relativeSlots || targets.relativeSlots.length === 0)) {
     return;
   }
-  after(async () => {
-    try {
-      await validateSpecificPhones(orgId, targets);
-    } catch (e) {
-      console.error("[upsert] phone validation failed:", e);
-    }
-  });
+  try {
+    await validateSpecificPhones(orgId, targets);
+  } catch (e) {
+    console.error("[upsert] phone validation failed:", e);
+  }
 }
 
 // Resolves the signed-in user's id for activity attribution (null when there is
@@ -587,6 +586,11 @@ export async function deleteContact(
   return { ok: true };
 }
 
+// Columns the client needs back to render the freshly-validated contact row
+// without re-fetching the whole page.
+const CONTACT_SELECT_COLUMNS =
+  "id, owner_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, recipient_label, validation_checked_at, validation_provider";
+
 export async function upsertContact(
   leadId: string,
   ownerId: string,
@@ -601,14 +605,16 @@ export async function upsertContact(
     is_litigator?: boolean;
     recipient_label?: string | null;
   }
-): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; id: string; row?: Record<string, unknown> | null } | { ok: false; error: string }
+> {
   const sb = await createClient();
   const profile = await getCurrentProfile();
   const orgId = profile?.orgId ?? null;
 
   // When the value of a phone-channel row changes, reset its validation
-  // state so the background sweep re-validates it. patch overrides reset so
-  // an explicit pencil-edit status='valid' still wins.
+  // state. patch overrides reset so an explicit pencil-edit status='valid'
+  // still wins.
   const valueChanged = patch.value !== undefined;
   const resetValidation = valueChanged
     ? {
@@ -619,17 +625,17 @@ export async function upsertContact(
       }
     : {};
 
+  let resolvedId: string;
   if (contactId) {
     const { error } = await sb
       .from("contacts")
       .update({ ...resetValidation, ...patch })
       .eq("id", contactId);
     if (error) return { ok: false, error: error.message };
-    revalidatePath(`/leads/${leadId}`);
-    // Validate only when the row's value changed — touching DNC/Litigator/type
-    // alone never re-validates.
-    if (valueChanged) scheduleValidationFor(orgId, { contactIds: [contactId] });
-    return { ok: true, id: contactId };
+    resolvedId = contactId;
+    if (valueChanged) {
+      await runValidationFor(orgId, { contactIds: [contactId] });
+    }
   } else {
     if (!patch.channel || !patch.value) {
       return { ok: false, error: "Channel and value are required" };
@@ -653,12 +659,22 @@ export async function upsertContact(
       .select("id")
       .single();
     if (error) return { ok: false, error: error.message };
-    revalidatePath(`/leads/${leadId}`);
+    resolvedId = data.id as string;
     if (patch.channel === "phone") {
-      scheduleValidationFor(orgId, { contactIds: [data.id as string] });
+      await runValidationFor(orgId, { contactIds: [resolvedId] });
     }
-    return { ok: true, id: data.id as string };
   }
+
+  // Fetch the row in its final state (post-validation) so the client can
+  // replace its optimistic placeholder with the real status / metadata.
+  const { data: refreshed } = await sb
+    .from("contacts")
+    .select(CONTACT_SELECT_COLUMNS)
+    .eq("id", resolvedId)
+    .maybeSingle();
+
+  revalidatePath(`/leads/${leadId}`);
+  return { ok: true, id: resolvedId, row: refreshed ?? null };
 }
 
 // -- Owners ------------------------------------------------------------------
@@ -772,18 +788,27 @@ export type RelativePatch = {
   zip?: string | null;
 };
 
+const RELATIVE_SELECT_COLUMNS =
+  "id, lead_id, full_name, relationship, age, " +
+  "phone, phone_type, phone_is_dnc, phone_is_litigator, phone_status, phone_validation_checked_at, phone_validation_provider, " +
+  "phone_2, phone_2_type, phone_2_is_dnc, phone_2_is_litigator, phone_2_status, phone_2_validation_checked_at, phone_2_validation_provider, " +
+  "phone_3, phone_3_type, phone_3_is_dnc, phone_3_is_litigator, phone_3_status, phone_3_validation_checked_at, phone_3_validation_provider, " +
+  "phone_4, phone_4_type, phone_4_is_dnc, phone_4_is_litigator, phone_4_status, phone_4_validation_checked_at, phone_4_validation_provider, " +
+  "phone_5, phone_5_type, phone_5_is_dnc, phone_5_is_litigator, phone_5_status, phone_5_validation_checked_at, phone_5_validation_provider, " +
+  "email, email_2, email_3, email_4, email_5, " +
+  "notes, street, city, state, zip";
+
 export async function upsertRelative(
   leadId: string,
   relativeId: string | null,
   patch: RelativePatch
-): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; id: string; row?: Record<string, unknown> | null } | { ok: false; error: string }
+> {
   const sb = await createClient();
   const profile = await getCurrentProfile();
   const orgId = profile?.orgId ?? null;
 
-  // Reset per-slot validation state for any phone slot whose value is in the
-  // patch — so the background sweep picks it up. Detect which slots are
-  // touched once and reuse the reset for both insert and update paths.
   const patchRecord = patch as Record<string, unknown>;
   const touchedPhoneSlots = RELATIVE_PHONE_BASES.filter(
     (base) => patchRecord[base] !== undefined
@@ -796,40 +821,50 @@ export async function upsertRelative(
     resetSlots[`${base}_validation_raw`] = null;
   }
 
+  let resolvedId: string;
   if (relativeId) {
     const { error } = await sb
       .from("relatives")
       .update({ ...resetSlots, ...patch })
       .eq("id", relativeId);
     if (error) return { ok: false, error: error.message };
-    revalidatePath(`/leads/${leadId}`);
-    // Only validate the specific slots whose value was changed in this update.
+    resolvedId = relativeId;
     const slotsToValidate = touchedPhoneSlots
       .filter((base) => typeof patchRecord[base] === "string" && (patchRecord[base] as string).trim().length > 0)
-      .map((base) => ({ relativeId, base }));
+      .map((base) => ({ relativeId: resolvedId, base }));
     if (slotsToValidate.length > 0) {
-      scheduleValidationFor(orgId, { relativeSlots: slotsToValidate });
+      await runValidationFor(orgId, { relativeSlots: slotsToValidate });
     }
-    return { ok: true, id: relativeId };
+  } else {
+    const fullName = (patch.full_name ?? "").trim();
+    if (!fullName) return { ok: false, error: "Name is required" };
+    const { data, error } = await sb
+      .from("relatives")
+      .insert({ ...resetSlots, ...patch, lead_id: leadId, full_name: fullName })
+      .select("id")
+      .single();
+    if (error) return { ok: false, error: error.message };
+    resolvedId = data.id as string;
+    const slotsToValidate = RELATIVE_PHONE_BASES.filter(
+      (base) => typeof patchRecord[base] === "string" && (patchRecord[base] as string).trim().length > 0
+    ).map((base) => ({ relativeId: resolvedId, base }));
+    if (slotsToValidate.length > 0) {
+      await runValidationFor(orgId, { relativeSlots: slotsToValidate });
+    }
   }
-  const fullName = (patch.full_name ?? "").trim();
-  if (!fullName) return { ok: false, error: "Name is required" };
-  const { data, error } = await sb
+
+  const { data: refreshed } = await sb
     .from("relatives")
-    .insert({ ...resetSlots, ...patch, lead_id: leadId, full_name: fullName })
-    .select("id")
-    .single();
-  if (error) return { ok: false, error: error.message };
+    .select(RELATIVE_SELECT_COLUMNS)
+    .eq("id", resolvedId)
+    .maybeSingle();
+
   revalidatePath(`/leads/${leadId}`);
-  const newId = data.id as string;
-  // Validate only slots that have a value on this brand-new relative.
-  const slotsToValidate = RELATIVE_PHONE_BASES.filter(
-    (base) => typeof patchRecord[base] === "string" && (patchRecord[base] as string).trim().length > 0
-  ).map((base) => ({ relativeId: newId, base }));
-  if (slotsToValidate.length > 0) {
-    scheduleValidationFor(orgId, { relativeSlots: slotsToValidate });
-  }
-  return { ok: true, id: newId };
+  return {
+    ok: true,
+    id: resolvedId,
+    row: (refreshed as Record<string, unknown> | null) ?? null,
+  };
 }
 
 export async function deleteRelative(
