@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -31,6 +31,7 @@ const MAX_PER_CHANNEL = 5;
 // Phone-line classification — a type pill (Mobile / Landline / Other) plus DNC
 // and Litigator flags, all stored on the contacts row.
 type PhoneMetaPatch = {
+  value?: string;
   phone_type?: string | null;
   is_dnc?: boolean;
   is_litigator?: boolean;
@@ -51,7 +52,7 @@ type ContactStatus = "untested" | "valid" | "invalid";
 
 const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {
   untested: "Not Verified",
-  valid: "Valid",
+  valid: "Verified",
   invalid: "Invalid",
 };
 
@@ -673,7 +674,7 @@ function OwnerCard({
           <ContactLine
             key={c.id}
             kind="phone"
-            value={formatPhone(c.value)}
+            value={c.value}
             status={c.status}
             phoneType={c.phone_type}
             isDnc={c.is_dnc}
@@ -742,6 +743,7 @@ function OwnerCard({
             canRemove={isAdmin}
             onRemove={() => onRemoveContact(c.id)}
             onSetStatus={(s) => onSetContactStatus(c.id, s)}
+            onSetPhoneMeta={(patch) => onSetPhoneMeta(c.id, patch)}
           />
         ))}
         {addingEmail ? (
@@ -900,8 +902,17 @@ function ContactLine({
 }) {
   const isPhone = kind === "phone";
   const [editingType, setEditingType] = useState(false);
-  const [editingStatus, setEditingStatus] = useState(false);
+  // Pencil now toggles VALUE editing (matches relative PhoneSlot exactly).
+  // Manual status override goes through a different path (the validator owns
+  // status), so we no longer expose an "edit status" pencil.
+  const [editingValue, setEditingValue] = useState(false);
+  const [val, setVal] = useState(value);
+  useEffect(() => {
+    setVal(value);
+    setEditingValue(false);
+  }, [value]);
   const ptype = phoneType ?? null;
+  const displayValue = isPhone ? formatPhone(value) : value;
   // For email contacts we surface a "Compose" affordance that hops to the
   // Conversation tab with the address pre-filled. Keeps the user inside the
   // lead instead of forcing them to navigate around to send a one-off email.
@@ -946,19 +957,47 @@ function ContactLine({
 
   return (
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">
-      {/* Row 1: value + action icons + trash. Same shape as Relative PhoneSlot. */}
+      {/* Row 1: value (or input when editing) + action icons + trash. */}
       <div className="flex items-center gap-1">
-        <span
-          title={validationTooltip}
-          className={cn(
-            "min-w-0 flex-1 text-[11.5px] font-medium",
-            status === "invalid" ? "text-gray-400 line-through" : "text-ink",
-            breakAll ? "break-all" : "whitespace-nowrap"
-          )}
-        >
-          {value}
-        </span>
-        {isPhone && (
+        {editingValue ? (
+          <input
+            autoFocus
+            value={val}
+            onChange={(e) =>
+              setVal(isPhone ? e.target.value.replace(/\D/g, "").slice(0, 10) : e.target.value)
+            }
+            onBlur={() => {
+              const t = val.trim();
+              if (t !== value && t.length > 0) onSetPhoneMeta?.({ value: t });
+              setEditingValue(false);
+              if (t.length === 0) setVal(value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+              }
+              if (e.key === "Escape") {
+                setVal(value);
+                setEditingValue(false);
+              }
+            }}
+            placeholder={isPhone ? "(555) 555-5555" : "name@example.com"}
+            className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+          />
+        ) : (
+          <span
+            title={validationTooltip}
+            className={cn(
+              "min-w-0 flex-1 text-[11.5px] font-medium",
+              status === "invalid" ? "text-gray-400 line-through" : "text-ink",
+              breakAll ? "break-all" : "whitespace-nowrap"
+            )}
+          >
+            {displayValue}
+          </span>
+        )}
+        {isPhone && !editingValue && (
           <a
             href={`tel:${toE164(value) ?? value}`}
             className="inline-flex shrink-0 cursor-pointer items-center justify-center text-petrol-500 hover:text-petrol-700"
@@ -968,27 +1007,29 @@ function ContactLine({
             <IconPhone size={12} stroke={1.75} />
           </a>
         )}
-        {composeHref && (
+        {composeHref && !editingValue && (
           <Link
             href={composeHref}
             className="inline-flex shrink-0 cursor-pointer items-center justify-center text-gray-400 hover:text-petrol-700"
             aria-label="Compose Email"
-            title={`Compose to ${value}`}
+            title={`Compose to ${displayValue}`}
           >
             <IconMail size={12} stroke={1.75} />
           </Link>
         )}
-        <button
-          type="button"
-          aria-label="Change status"
-          onClick={() => {
-            setEditingStatus((v) => !v);
-            setEditingType(false);
-          }}
-          className="inline-flex shrink-0 cursor-pointer items-center justify-center text-gray-300 hover:text-petrol-500"
-        >
-          <IconPencil size={12} stroke={1.75} />
-        </button>
+        {!editingValue && onSetPhoneMeta && (
+          <button
+            type="button"
+            aria-label="Edit"
+            onClick={() => {
+              setEditingValue(true);
+              setEditingType(false);
+            }}
+            className="inline-flex shrink-0 cursor-pointer items-center justify-center text-gray-300 hover:text-petrol-500"
+          >
+            <IconPencil size={12} stroke={1.75} />
+          </button>
+        )}
         {canRemove && (
           <button
             type="button"
@@ -1004,13 +1045,12 @@ function ContactLine({
       {/* Row 2: type pill + status pill + DNC + Litigator. Mirrors PhoneSlot. */}
       <div className="mt-1 flex flex-wrap items-center gap-1">
         {isPhone && (
-          <div className="relative shrink-0">
+          <div className="relative inline-flex shrink-0 items-center">
             <button
               type="button"
               aria-label="Phone type"
               onClick={() => {
                 setEditingType((v) => !v);
-                setEditingStatus(false);
               }}
               className={cn(
                 "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
@@ -1043,32 +1083,14 @@ function ContactLine({
             )}
           </div>
         )}
-        {editingStatus ? (
-          CONTACT_STATUS_ORDER.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => {
-                onSetStatus(s);
-                setEditingStatus(false);
-              }}
-              className={cn(
-                "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium transition-colors",
-                status === s
-                  ? statusClass(s)
-                  : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
-              )}
-            >
-              {CONTACT_STATUS_LABELS[s]}
-            </button>
-          ))
-        ) : isVerifying ? (
+        {isVerifying ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-petrol-100 px-1.5 py-[1px] text-[9px] font-medium leading-none text-petrol-700">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-petrol-500" />
             Verifying…
           </span>
         ) : (
           <span
+            title={validationTooltip}
             className={cn(
               "rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none",
               statusClass(status)

@@ -640,7 +640,7 @@ function NotesEditor({
 // identical (single source of truth would be nicer; for now we mirror).
 const RELATIVE_PHONE_STATUS_LABELS: Record<"untested" | "valid" | "invalid", string> = {
   untested: "Not Verified",
-  valid: "Valid",
+  valid: "Verified",
   invalid: "Invalid",
 };
 
