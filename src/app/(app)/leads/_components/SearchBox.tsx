@@ -160,7 +160,7 @@ export function SearchBox() {
                   key={h.id}
                   type="button"
                   onClick={() => go(h.id)}
-                  className="block w-full cursor-pointer truncate px-3 py-2 text-left text-[12px] text-ink hover:bg-[#e0f2f7]"
+                  className="block w-full cursor-pointer truncate px-3 py-2 text-left text-[12px] text-ink hover:bg-[#d6ecdf]"
                 >
                   <span className="font-mono text-[11px] text-gray-500">{h.lead_id}</span>
                   {" · "}

@@ -113,8 +113,8 @@ export function AttorneyAssignment({
             type="button"
             onClick={() => pick("")}
             className={cn(
-              "flex w-full cursor-pointer items-center justify-between px-2.5 py-2 text-left text-[12.5px] hover:bg-[#e0f2f7]",
-              value === "" ? "bg-[#e0f2f7] text-petrol-700" : "text-gray-500"
+              "flex w-full cursor-pointer items-center justify-between px-2.5 py-2 text-left text-[12.5px] hover:bg-[#d6ecdf]",
+              value === "" ? "bg-[#d6ecdf] text-petrol-700" : "text-gray-500"
             )}
           >
             Not Assigned
@@ -129,8 +129,8 @@ export function AttorneyAssignment({
                 type="button"
                 onClick={() => pick(a.id)}
                 className={cn(
-                  "flex w-full cursor-pointer items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-[#e0f2f7]",
-                  isSel && "bg-[#e0f2f7]"
+                  "flex w-full cursor-pointer items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-[#d6ecdf]",
+                  isSel && "bg-[#d6ecdf]"
                 )}
               >
                 <span className="min-w-0">

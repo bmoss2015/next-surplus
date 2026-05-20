@@ -73,7 +73,7 @@ export function SurplusBreakdown({
       </h3>
 
       {/* SALE DATA — reference only */}
-      <div className="rounded-md bg-[#f0f7f8] px-4 py-[14px]">
+      <div className="rounded-md bg-[#f3faf6] px-4 py-[14px]">
         <div className="mb-[12px] text-[10px] uppercase tracking-widest text-[#9ca3af]">
           Sale Data — For Reference Only
         </div>
