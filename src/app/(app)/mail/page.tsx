@@ -3,6 +3,7 @@ import Link from "next/link";
 import { IconExternalLink } from "@tabler/icons-react";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { fetchMailDashboard, type MailJobListRow } from "@/lib/mail/fetch";
+import { MailSectionTabs } from "./_components/MailSectionTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -51,13 +52,14 @@ export default async function MailDashboardPage() {
 
   return (
     <div className="px-7 py-6">
+      <MailSectionTabs />
       <div className="mb-[22px]">
         <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-          Mail
+          Sent Mail
         </h1>
         <div className="mt-1 text-[13px] text-gray-500">
-          Physical mail sent through the portal. Returned items appear first
-          so you can re-verify addresses and resend.
+          Status of physical mail sent through the portal. Returned items
+          appear first so you can re-verify addresses and resend.
         </div>
       </div>
 

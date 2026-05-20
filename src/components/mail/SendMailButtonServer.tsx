@@ -38,12 +38,21 @@ export async function SendMailButtonServer(props: Props) {
   const mailReady = Boolean(
     org.address_line1 && org.city && org.region && org.postal_code
   );
+  const fromAddress = {
+    name: org.name || "",
+    line1: org.address_line1 ?? "",
+    line2: org.address_line2 ?? null,
+    city: org.city ?? "",
+    region: org.region ?? "",
+    postal_code: org.postal_code ?? "",
+  };
   return (
     <SendMailButton
       {...props}
       templates={templates}
       bankAccounts={banks}
       mailReady={mailReady}
+      fromAddress={fromAddress}
     />
   );
 }

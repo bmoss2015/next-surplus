@@ -22,46 +22,63 @@ export function renderMerge(body: string, context: MergeContext): string {
 export type MergeField = {
   key: string;
   label: string;
-  group: "contact" | "lead" | "sender" | "system";
+  example: string;
+  // "recipient" covers any addressable party on the lead — Owner, Relative,
+  // or Other Contact rows roll up here, since per-piece mail can go to any
+  // of them. The merge keys themselves still use the `contact.` prefix for
+  // backward compatibility with templates already authored.
+  group: "recipient" | "lead" | "sender" | "system";
 };
 
 export const MERGE_FIELDS: MergeField[] = [
-  // Contact (recipient) — populated from relative / lead_party / lead
-  { key: "contact.first_name", label: "First Name", group: "contact" },
-  { key: "contact.last_name", label: "Last Name", group: "contact" },
-  { key: "contact.full_name", label: "Full Name", group: "contact" },
-  { key: "contact.address", label: "Mailing Address (full)", group: "contact" },
-  { key: "contact.city", label: "City", group: "contact" },
-  { key: "contact.state", label: "State", group: "contact" },
-  { key: "contact.zip", label: "ZIP", group: "contact" },
+  // Recipient — whoever the letter is addressed to. Pulled from the lead's
+  // Owner mailing-address rows, Relatives, or Other Contacts (lead_parties).
+  // Examples use California to contrast with the Texas-based lead/property
+  // examples below: the recipient often lives in a different state than
+  // the property that generated the surplus.
+  { key: "contact.first_name", label: "First Name", example: "Jane", group: "recipient" },
+  { key: "contact.last_name", label: "Last Name", example: "Smith", group: "recipient" },
+  { key: "contact.full_name", label: "Full Name", example: "Jane Smith", group: "recipient" },
+  { key: "contact.address", label: "Mailing Address", example: "123 Main St, Los Angeles, CA 90001", group: "recipient" },
+  { key: "contact.city", label: "City", example: "Los Angeles", group: "recipient" },
+  { key: "contact.state", label: "State", example: "CA", group: "recipient" },
+  { key: "contact.zip", label: "ZIP", example: "90001", group: "recipient" },
 
-  // Lead — surplus funds case context
-  { key: "lead.id", label: "Lead ID", group: "lead" },
-  { key: "lead.property_address", label: "Property Address", group: "lead" },
-  { key: "lead.county", label: "County", group: "lead" },
-  { key: "lead.state", label: "State", group: "lead" },
-  { key: "lead.case_number", label: "Case Number", group: "lead" },
-  { key: "lead.parcel_number", label: "Parcel Number", group: "lead" },
-  { key: "lead.sale_date", label: "Sale Date", group: "lead" },
-  { key: "lead.estimated_surplus", label: "Estimated Surplus", group: "lead" },
-  { key: "lead.owner_range", label: "Estimated Range To Owner", group: "lead" },
+  // Lead — the surplus funds case itself (property, court case, sale).
+  { key: "lead.id", label: "Lead ID", example: "L-2026-0042", group: "lead" },
+  { key: "lead.property_address", label: "Property Address", example: "456 Oak Ave, Dallas, TX 75201", group: "lead" },
+  { key: "lead.county", label: "County", example: "Dallas", group: "lead" },
+  { key: "lead.state", label: "Property State", example: "TX", group: "lead" },
+  { key: "lead.case_number", label: "Case Number", example: "DC-25-04321", group: "lead" },
+  { key: "lead.parcel_number", label: "Parcel Number", example: "00000123456", group: "lead" },
+  { key: "lead.sale_date", label: "Sale Date", example: "March 15, 2025", group: "lead" },
+  { key: "lead.closing_bid", label: "Sale Price (Closing Bid)", example: "$185,000.00", group: "lead" },
+  { key: "lead.estimated_surplus", label: "Estimated Surplus", example: "$42,500.00", group: "lead" },
+  { key: "lead.owner_range", label: "Estimated Range To Owner", example: "$18,000 – $24,000", group: "lead" },
 
   // Sender — from org settings
-  { key: "sender.company_name", label: "Company Name", group: "sender" },
-  { key: "sender.legal_name", label: "Legal Name", group: "sender" },
-  { key: "sender.signer_name", label: "Signer Name", group: "sender" },
-  { key: "sender.signer_title", label: "Signer Title", group: "sender" },
-  { key: "sender.signature_image", label: "Signature Image", group: "sender" },
-  { key: "sender.address", label: "Return Address (full)", group: "sender" },
+  { key: "sender.company_name", label: "Company Name", example: "Moss Equity Partners", group: "sender" },
+  { key: "sender.legal_name", label: "Legal Name", example: "Moss Equity Partners, LLC", group: "sender" },
+  { key: "sender.signer_name", label: "Signer Name", example: "Bree Moss", group: "sender" },
+  { key: "sender.signer_title", label: "Signer Title", example: "Managing Partner", group: "sender" },
+  { key: "sender.signature_image", label: "Signature Image", example: "[signature image]", group: "sender" },
+  { key: "sender.address", label: "Return Address (full)", example: "789 Business Blvd, Suite 100, Dallas, TX 75201", group: "sender" },
 
   // System
-  { key: "system.today", label: "Today's Date", group: "system" },
-  { key: "system.today_long", label: "Today's Date (long)", group: "system" },
+  { key: "system.today", label: "Today's Date", example: "5/19/2026", group: "system" },
+  { key: "system.today_long", label: "Today's Date (long)", example: "May 19, 2026", group: "system" },
 ];
+
+export const MERGE_GROUP_LABELS: Record<MergeField["group"], string> = {
+  recipient: "Recipient",
+  lead: "Property",
+  sender: "Sender",
+  system: "System",
+};
 
 export function fieldsByGroup(): Record<MergeField["group"], MergeField[]> {
   const out: Record<MergeField["group"], MergeField[]> = {
-    contact: [],
+    recipient: [],
     lead: [],
     sender: [],
     system: [],

@@ -6,7 +6,12 @@ import type {
   MailClass,
   MailProvider,
 } from "./types";
-import { click2mailSendLetter, isClick2MailConfigured } from "./click2mail";
+import {
+  click2mailSendLetter,
+  click2mailCreateMergedDocument,
+  click2mailSendFromDocumentId,
+  isClick2MailConfigured,
+} from "./click2mail";
 import { lobSendCheck, isLobConfigured } from "./lob";
 import { stubSendLetter, stubSendCheck } from "./stub";
 
@@ -45,7 +50,12 @@ export function activeCheckProvider(): MailProvider {
   return "stub";
 }
 
-export { isClick2MailConfigured, isLobConfigured };
+export {
+  isClick2MailConfigured,
+  isLobConfigured,
+  click2mailCreateMergedDocument,
+  click2mailSendFromDocumentId,
+};
 export { lobCreateBankAccount, lobVerifyBankAccount } from "./lob";
 export type {
   LobBankAccountInput,

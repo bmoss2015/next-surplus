@@ -70,6 +70,10 @@ export async function buildLeadSendMailCandidates(
     "lead.case_number": (lead?.case_number as string | null) ?? null,
     "lead.parcel_number": (lead?.parcel_number as string | null) ?? null,
     "lead.sale_date": (lead?.sale_date as string | null) ?? null,
+    "lead.closing_bid":
+      lead?.closing_bid != null
+        ? `$${Number(lead.closing_bid).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : null,
     "lead.estimated_surplus":
       lead?.estimated_surplus != null
         ? `$${Number(lead.estimated_surplus).toLocaleString()}`

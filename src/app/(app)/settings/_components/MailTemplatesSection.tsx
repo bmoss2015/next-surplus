@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   IconPlus,
@@ -8,7 +8,6 @@ import {
   IconEdit,
   IconFolder,
   IconFolderPlus,
-  IconUpload,
 } from "@tabler/icons-react";
 import {
   upsertMailTemplate,
@@ -16,9 +15,13 @@ import {
   createMailTemplateFolder,
   renameMailTemplateFolder,
   deleteMailTemplateFolder,
-  convertDocxToHtml,
+  uploadMailTemplateDocx,
+  getMailTemplateDocxUrl,
 } from "../_actions";
-import { MERGE_FIELDS } from "@/lib/mail/merge";
+import { MailTemplateEditor } from "./MailTemplateEditor";
+import { SuperDocEditor, type SuperDocSource } from "./SuperDocEditor";
+import { PdfPreview } from "./PdfPreview";
+import { MERGE_FIELDS, MERGE_GROUP_LABELS } from "@/lib/mail/merge";
 import type {
   MailTemplateRow,
   MailTemplateFolderRow,
@@ -59,6 +62,8 @@ export function MailTemplatesSection({
     name: string;
     folder_id: string | null;
     body_html: string;
+    docx_path: string | null;
+    attachment_paths: string[];
     default_mail_class: MailTemplateRow["default_mail_class"];
   }) {
     startTransition(async () => {
@@ -67,6 +72,8 @@ export function MailTemplatesSection({
         name: form.name,
         folder_id: form.folder_id,
         body_html: form.body_html,
+        docx_path: form.docx_path,
+        attachment_paths: form.attachment_paths,
         default_mail_class: form.default_mail_class,
       });
       if (result.ok) {
@@ -79,6 +86,8 @@ export function MailTemplatesSection({
                     name: form.name,
                     folder_id: form.folder_id,
                     body_html: form.body_html,
+                    docx_path: form.docx_path,
+                    attachment_paths: form.attachment_paths,
                     default_mail_class: form.default_mail_class,
                   }
                 : r
@@ -92,6 +101,8 @@ export function MailTemplatesSection({
               name: form.name,
               folder_id: form.folder_id,
               body_html: form.body_html,
+              docx_path: form.docx_path,
+              attachment_paths: form.attachment_paths,
               default_mail_class: form.default_mail_class,
               updated_at: new Date().toISOString(),
             },
@@ -276,11 +287,14 @@ export function MailTemplatesSection({
         />
       )}
 
-      {rows.length === 0 && folders.length === 0 && !editing ? (
+      {/* Hide the folder/template list while the form is open — the
+          user is focused on editing a single template, not browsing
+          siblings. Empty state still shows when nothing is loaded. */}
+      {!editing && rows.length === 0 && folders.length === 0 ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center text-[12px] text-gray-500">
           No mail templates yet. Create a folder first to organize them.
         </div>
-      ) : (
+      ) : !editing ? (
         <div className="space-y-3">
           {groups.map((g) => (
             <div
@@ -385,7 +399,7 @@ export function MailTemplatesSection({
             </div>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -404,6 +418,8 @@ function MailTemplateForm({
     name: string;
     folder_id: string | null;
     body_html: string;
+    docx_path: string | null;
+    attachment_paths: string[];
     default_mail_class: MailTemplateRow["default_mail_class"];
   }) => void;
 }) {
@@ -415,53 +431,223 @@ function MailTemplateForm({
   const [mailClass, setMailClass] = useState<
     MailTemplateRow["default_mail_class"]
   >(initial?.default_mail_class ?? "first_class");
-  const [bodyRef, setBodyRef] = useState<HTMLTextAreaElement | null>(null);
-  const [docxPending, startDocxTransition] = useTransition();
-  const [docxMsg, setDocxMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
-    null
+  // Mode: 'html' uses the TipTap editor and stores body_html. 'file' uses
+  // an uploaded .docx (edited in SuperDoc) or .pdf (preview only, prints
+  // as-is). Stored in docx_path; the file_type is inferred from the
+  // extension at runtime so we don't need a separate column.
+  const [mode, setMode] = useState<"html" | "file">(
+    initial?.docx_path ? "file" : "html"
   );
+  const [docxPath, setDocxPath] = useState<string | null>(
+    initial?.docx_path ?? null
+  );
+  const [fileType, setFileType] = useState<"docx" | "pdf" | null>(
+    initial?.docx_path?.toLowerCase().endsWith(".pdf") ? "pdf" :
+    initial?.docx_path ? "docx" : null
+  );
+  // Live source for SuperDoc / PDF preview: a freshly uploaded File
+  // (before it's been saved to storage), or a signed URL fetched for an
+  // already-stored path.
+  const [docxSource, setDocxSource] = useState<SuperDocSource | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [docxBusy, startDocxBusy] = useTransition();
+  const [docxErr, setDocxErr] = useState<string | null>(null);
+  const exportRef = useRef<(() => Promise<Blob>) | null>(null);
+  const insertTextRef = useRef<((text: string) => void) | null>(null);
+  const mainFileRef = useRef<HTMLInputElement | null>(null);
+  const [popoutOpen, setPopoutOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
 
-  function uploadDocx(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-    setDocxMsg(null);
+  // Attachments (extra .docx/.pdf files that ride along with the main
+  // letter in the same envelope). The paths array mirrors the storage
+  // bucket paths; the parallel labels array is just display metadata
+  // so we can show the original filename in the UI.
+  const [attachmentPaths, setAttachmentPaths] = useState<string[]>(
+    initial?.attachment_paths ?? []
+  );
+  const [attachmentLabels, setAttachmentLabels] = useState<string[]>(
+    (initial?.attachment_paths ?? []).map((p) => p.split("/").pop() ?? p)
+  );
+  const [attachBusy, startAttachBusy] = useTransition();
+  const [attachErr, setAttachErr] = useState<string | null>(null);
+  const attachInputRef = useRef<HTMLInputElement | null>(null);
+  // Unified preview modal — open / closed. When open, every document
+  // in the envelope (main file + attachments) is loaded and rendered
+  // stacked vertically inside a scrollable container. No carousel, no
+  // arrows; just scroll through everything that's going in the envelope.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrls, setPreviewUrls] = useState<(string | null)[]>([]);
+
+  const previewItems = (() => {
+    const items: { path: string; label: string; type: "docx" | "pdf" }[] = [];
+    if (docxPath && fileType) {
+      items.push({
+        path: docxPath,
+        label: `Main · ${docxPath.split("/").pop() ?? docxPath}`,
+        type: fileType,
+      });
+    }
+    attachmentPaths.forEach((p, i) => {
+      items.push({
+        path: p,
+        label: attachmentLabels[i] ?? p,
+        type: p.toLowerCase().endsWith(".pdf") ? "pdf" : "docx",
+      });
+    });
+    return items;
+  })();
+
+  useEffect(() => {
+    if (!previewOpen) {
+      setPreviewUrls([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const urls = await Promise.all(
+        previewItems.map(async (item) => {
+          const res = await getMailTemplateDocxUrl(item.path);
+          return res.ok ? res.url : null;
+        })
+      );
+      if (!cancelled) setPreviewUrls(urls);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewOpen, docxPath, attachmentPaths.join(",")]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPreviewOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [previewOpen]);
+
+  // When we load an existing file template, fetch a signed URL so the
+  // viewer/editor can stream the bytes without exposing the bucket.
+  useEffect(() => {
+    if (mode !== "file" || !docxPath) return;
+    let cancelled = false;
+    (async () => {
+      const res = await getMailTemplateDocxUrl(docxPath);
+      if (cancelled) return;
+      if (!res.ok) {
+        setDocxErr(res.error);
+        return;
+      }
+      if (fileType === "pdf") setPdfUrl(res.url);
+      else setDocxSource(res.url);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, docxPath, fileType]);
+
+  function handleFileUpload(file: File) {
+    setDocxErr(null);
+    const isPdf = file.name.toLowerCase().endsWith(".pdf");
+    const inferredType: "docx" | "pdf" = isPdf ? "pdf" : "docx";
+    setFileType(inferredType);
+    setMode("file");
+    if (isPdf) {
+      // Show the local file immediately via object URL while the upload
+      // happens in the background — no editing means we can preview the
+      // raw bytes directly.
+      setPdfUrl(URL.createObjectURL(file));
+      setDocxSource(null);
+    } else {
+      setDocxSource(file);
+      setPdfUrl(null);
+    }
     const fd = new FormData();
     fd.append("file", file);
-    startDocxTransition(async () => {
-      const res = await convertDocxToHtml(fd);
+    startDocxBusy(async () => {
+      const res = await uploadMailTemplateDocx(fd);
       if (res.ok) {
-        // Replace the body wholesale — user can then add merge fields.
-        setBody(res.html);
-        setDocxMsg({
-          kind: "ok",
-          text: "Imported. Add {{merge_fields}} where you want personalization.",
-        });
+        setDocxPath(res.path);
+        setFileType(res.file_type);
       } else {
-        setDocxMsg({ kind: "err", text: res.error });
+        setDocxErr(res.error);
       }
     });
   }
 
-  const inputClass =
-    "rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
-
-  function insertField(key: string) {
-    if (!bodyRef) {
-      setBody((prev) => prev + `{{${key}}}`);
-      return;
+  async function handleSave() {
+    let nextDocxPath: string | null = null;
+    if (mode === "file") {
+      // For DOCX: export SuperDoc state and upload as a fresh file so
+      // edits persist. For PDF: nothing to export — the original upload
+      // is what prints, so just keep the path that uploadMailTemplateDocx
+      // returned.
+      if (fileType === "docx" && exportRef.current) {
+        try {
+          const blob = await exportRef.current();
+          const file = new File([blob], `${name || "template"}.docx`, {
+            type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          });
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await uploadMailTemplateDocx(fd);
+          if (res.ok) nextDocxPath = res.path;
+          else {
+            setDocxErr(res.error);
+            return;
+          }
+        } catch (e) {
+          setDocxErr(
+            e instanceof Error ? e.message : "Could not export the edited document"
+          );
+          return;
+        }
+      } else {
+        nextDocxPath = docxPath;
+      }
     }
-    const start = bodyRef.selectionStart ?? body.length;
-    const end = bodyRef.selectionEnd ?? body.length;
-    const token = `{{${key}}}`;
-    const next = body.slice(0, start) + token + body.slice(end);
-    setBody(next);
-    requestAnimationFrame(() => {
-      bodyRef.focus();
-      const cursor = start + token.length;
-      bodyRef.setSelectionRange(cursor, cursor);
+    onSave({
+      id: initial?.id ?? null,
+      name,
+      folder_id: folderId || null,
+      body_html: mode === "html" ? body : "",
+      docx_path: mode === "file" ? nextDocxPath : null,
+      attachment_paths: attachmentPaths,
+      default_mail_class: mailClass,
     });
   }
+
+  function handleAttachmentUpload(files: FileList) {
+    setAttachErr(null);
+    startAttachBusy(async () => {
+      const newPaths: string[] = [];
+      const newLabels: string[] = [];
+      for (const file of Array.from(files)) {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await uploadMailTemplateDocx(fd);
+        if (res.ok) {
+          newPaths.push(res.path);
+          newLabels.push(file.name);
+        } else {
+          setAttachErr(`${file.name}: ${res.error}`);
+        }
+      }
+      if (newPaths.length > 0) {
+        setAttachmentPaths((prev) => [...prev, ...newPaths]);
+        setAttachmentLabels((prev) => [...prev, ...newLabels]);
+      }
+    });
+  }
+
+  function removeAttachment(idx: number) {
+    setAttachmentPaths((prev) => prev.filter((_, i) => i !== idx));
+    setAttachmentLabels((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  const inputClass =
+    "rounded-md border border-gray-200 bg-surface px-2 py-[6px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
 
   return (
     <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3 space-y-2">
@@ -503,43 +689,347 @@ function MailTemplateForm({
         </select>
       </div>
 
-      <div className="flex items-center gap-2">
-        <MergeFieldPicker onInsert={insertField} />
-        <label
-          className={`inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-[11px] font-medium text-ink hover:border-petrol-500 ${docxPending ? "opacity-50" : ""}`}
-        >
-          <IconUpload size={12} stroke={2} />
-          {docxPending ? "Importing..." : "Import .docx"}
-          <input
-            type="file"
-            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            onChange={uploadDocx}
-            disabled={docxPending}
-            className="hidden"
-          />
-        </label>
-        {docxMsg && (
-          <span
-            className={`text-[11px] ${docxMsg.kind === "ok" ? "text-success" : "text-danger"}`}
+      <input
+        ref={mainFileRef}
+        type="file"
+        accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFileUpload(f);
+          e.target.value = "";
+        }}
+        disabled={docxBusy}
+      />
+
+      {/* Empty state: ask once, up front. Build-from-scratch and
+          file-upload are the only two paths; everything else flows
+          from this choice. */}
+      {mode === "html" && !body.trim() && (
+        <div className="flex items-center justify-center gap-3 rounded-md border border-dashed border-gray-200 bg-gray-50 p-6">
+          <button
+            type="button"
+            onClick={() => setMode("html")}
+            className="cursor-pointer rounded-md border border-petrol-200 bg-petrol-50 px-4 py-2 text-[12px] font-medium text-petrol-700 hover:bg-petrol-100"
           >
-            {docxMsg.text}
-          </span>
+            Build From Scratch
+          </button>
+          <span className="text-[11px] text-gray-400">or</span>
+          <button
+            type="button"
+            onClick={() => mainFileRef.current?.click()}
+            disabled={docxBusy}
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-4 py-2 text-[12px] font-medium text-ink hover:border-petrol-500 disabled:opacity-50"
+          >
+            {docxBusy ? "Uploading..." : "Upload .docx or .pdf"}
+          </button>
+        </div>
+      )}
+
+      {/* Active TipTap editor — once the user has typed something, the
+          empty state goes away and the editor takes over. Switching to
+          file mode is a button in the editor's own toolbar. */}
+      {mode === "html" && body.trim() && (
+        <MailTemplateEditor value={body} onChange={setBody} />
+      )}
+
+      {/* Active file editor with the action bar pinned to its top.
+          Replace / Merge / Full Screen all live next to the filename
+          so the controls are in context — not in a separate row above. */}
+      {mode === "file" && (docxSource || pdfUrl) && (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-surface px-3 py-[6px]">
+            <span className="text-[11px] font-medium text-ink">
+              {fileType === "pdf" ? "PDF" : "Word"} ·{" "}
+              {docxPath ? docxPath.split("/").pop() : "Uploading..."}
+            </span>
+            <span className="flex-1" />
+            {(docxSource || pdfUrl) && (
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(true)}
+                className="cursor-pointer rounded border border-gray-200 bg-surface px-2 py-[3px] text-[11px] text-ink hover:border-petrol-500"
+                title="Preview the whole envelope (main file + attachments)"
+              >
+                Preview
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => mainFileRef.current?.click()}
+              disabled={docxBusy}
+              className="cursor-pointer rounded border border-gray-200 bg-surface px-2 py-[3px] text-[11px] text-ink hover:border-petrol-500 disabled:opacity-50"
+            >
+              {docxBusy ? "Uploading..." : "Replace"}
+            </button>
+            {fileType === "docx" && (
+              <>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMergeOpen((v) => !v)}
+                    className="cursor-pointer rounded border border-petrol-200 bg-petrol-50 px-2 py-[3px] text-[11px] font-medium text-petrol-700 hover:bg-petrol-100"
+                  >
+                    Merge Field ▾
+                  </button>
+                  {mergeOpen && (
+                    <div className="absolute right-0 top-full z-20 mt-1 max-h-[360px] w-[300px] overflow-auto rounded-md border border-gray-200 bg-white shadow-elevated">
+                      {(["recipient", "lead", "sender", "system"] as const).map((group) => {
+                        const fields = MERGE_FIELDS.filter((f) => f.group === group);
+                        if (fields.length === 0) return null;
+                        return (
+                          <div key={group}>
+                            <div className="border-b border-petrol-100 bg-petrol-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-petrol-700">
+                              {MERGE_GROUP_LABELS[group]}
+                            </div>
+                            {fields.map((f) => (
+                              <button
+                                key={f.key}
+                                type="button"
+                                title={`e.g. ${f.example}`}
+                                onClick={() => {
+                                  insertTextRef.current?.(`{${f.key}}`);
+                                  setMergeOpen(false);
+                                }}
+                                className="block w-full cursor-pointer px-2 py-1.5 text-left hover:bg-petrol-50"
+                              >
+                                <div className="text-[12px] leading-tight text-ink">{f.label}</div>
+                                <div className="truncate text-[10px] italic leading-tight text-gray-400">
+                                  e.g. {f.example}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPopoutOpen(true)}
+                  className="cursor-pointer rounded border border-gray-200 bg-surface px-2 py-[3px] text-[11px] text-ink hover:border-petrol-500"
+                >
+                  Full Screen
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setMode("html");
+                setDocxSource(null);
+                setPdfUrl(null);
+                setDocxPath(null);
+                setFileType(null);
+              }}
+              className="cursor-pointer rounded text-[11px] text-gray-400 hover:text-danger"
+              aria-label="Switch to build from scratch"
+              title="Remove file and build from scratch instead"
+            >
+              ✕
+            </button>
+          </div>
+
+          {fileType === "pdf" && pdfUrl ? (
+            <iframe
+              title="PDF preview"
+              src={pdfUrl}
+              className="rounded-md border border-gray-200 bg-white"
+              style={{ width: "100%", height: "min(700px, 75vh)" }}
+            />
+          ) : (
+            <SuperDocEditor
+              source={docxSource}
+              onReady={(ctrl) => {
+                exportRef.current = ctrl.export;
+                insertTextRef.current = ctrl.insertText;
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {docxErr && (
+        <div className="text-[11px] text-danger">{docxErr}</div>
+      )}
+
+      {popoutOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3"
+          onClick={() => setPopoutOpen(false)}
+        >
+          <div
+            className="flex h-[95vh] w-[95vw] flex-col overflow-hidden rounded-lg bg-white shadow-elevated"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
+              <div className="text-[13px] font-semibold text-ink">
+                {name || "Template"} — Full Screen Edit
+              </div>
+              <button
+                type="button"
+                onClick={() => setPopoutOpen(false)}
+                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-[11px] text-ink hover:border-petrol-500"
+              >
+                Done
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <SuperDocEditor
+                source={docxSource}
+                fullScreen
+                onReady={(ctrl) => {
+                  exportRef.current = ctrl.export;
+                  insertTextRef.current = ctrl.insertText;
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-md border border-gray-200 bg-surface p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <div>
+            <div className="text-[12px] font-medium text-ink">Attachments</div>
+            <div className="text-[10px] text-gray-500">
+              Extra .docx or .pdf files included in the same envelope, in order.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => attachInputRef.current?.click()}
+            disabled={attachBusy}
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[4px] text-[11px] font-medium text-ink hover:border-petrol-500 disabled:opacity-50"
+          >
+            {attachBusy ? "Uploading..." : "Add Attachment"}
+          </button>
+          <input
+            ref={attachInputRef}
+            type="file"
+            accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const files = e.target.files;
+              if (files && files.length > 0) handleAttachmentUpload(files);
+              e.target.value = "";
+            }}
+            disabled={attachBusy}
+          />
+        </div>
+        {attachmentPaths.length === 0 ? (
+          <div className="rounded border border-dashed border-gray-200 bg-gray-50 px-3 py-3 text-center text-[11px] text-gray-500">
+            No attachments. Use Add Attachment to include extra docs.
+          </div>
+        ) : (
+          <ul className="space-y-1">
+            {attachmentPaths.map((p, i) => (
+              <li
+                key={p}
+                className="flex items-center justify-between gap-2 rounded border border-gray-150 bg-gray-50 px-2 py-1 text-[11px]"
+              >
+                <span className="truncate text-ink">
+                  {i + 1}. {attachmentLabels[i] ?? p}
+                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewOpen(true)}
+                    className="cursor-pointer text-petrol-600 hover:text-petrol-800"
+                  >
+                    Preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(i)}
+                    className="cursor-pointer text-gray-400 hover:text-danger"
+                    aria-label="Remove attachment"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {attachErr && (
+          <div className="mt-1 text-[11px] text-danger">{attachErr}</div>
         )}
       </div>
 
-      <textarea
-        ref={setBodyRef}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        rows={14}
-        placeholder="Dear {{contact.first_name}},&#10;&#10;I am writing regarding..."
-        className={`${inputClass} w-full resize-y font-mono`}
-      />
+      {previewOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6"
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div
+            className="flex w-full max-w-[960px] flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+            style={{ maxHeight: "85vh" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="flex shrink-0 items-center justify-between border-b border-gray-150 px-5 py-3">
+              <div>
+                <div className="text-[14px] font-semibold text-ink">
+                  Envelope Preview
+                </div>
+                <div className="text-[11px] text-gray-500">
+                  {previewItems.length} document
+                  {previewItems.length === 1 ? "" : "s"} · scroll to view all
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-ink"
+                aria-label="Close preview"
+              >
+                ✕
+              </button>
+            </header>
 
-      <div className="text-[11px] text-gray-500">
-        Use {"{{contact.first_name}}"}, {"{{sender.company_name}}"}, etc. — see
-        the picker above for the full list.
-      </div>
+            <div className="flex-1 overflow-auto bg-gray-50">
+              <div className="mx-auto flex max-w-[820px] flex-col gap-4 p-5">
+                {previewItems.map((item, i) => {
+                  const url = previewUrls[i];
+                  return (
+                    <section
+                      key={item.path}
+                      className="overflow-hidden rounded-md border border-gray-200 bg-white"
+                    >
+                      <header className="border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] font-medium text-ink">
+                        {i + 1}. {item.label}
+                      </header>
+                      <div className="bg-gray-100">
+                        {url ? (
+                          item.type === "pdf" ? (
+                            <PdfPreview url={url} />
+                          ) : (
+                            <SuperDocEditor
+                              key={url}
+                              source={url}
+                              documentMode="viewing"
+                              autoHeight
+                            />
+                          )
+                        ) : (
+                          <div
+                            className="flex items-center justify-center text-[12px] text-gray-500"
+                            style={{ height: "300px" }}
+                          >
+                            Loading...
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-2 flex justify-end gap-2">
         <button
@@ -551,68 +1041,17 @@ function MailTemplateForm({
         </button>
         <button
           type="button"
-          onClick={() =>
-            onSave({
-              id: initial?.id ?? null,
-              name,
-              folder_id: folderId || null,
-              body_html: body,
-              default_mail_class: mailClass,
-            })
+          onClick={handleSave}
+          disabled={
+            !name.trim() ||
+            (mode === "html" ? !body.trim() : !docxPath && !docxSource)
           }
-          disabled={!name.trim() || !body.trim()}
           className="cursor-pointer rounded-md btn-primary px-3 py-[5px] text-xs font-medium text-white disabled:opacity-50"
         >
-          {initial ? "Save Changes" : "Add Template"}
+          {initial ? "Save Changes" : "Save Template"}
         </button>
       </div>
     </div>
   );
 }
 
-function MergeFieldPicker({ onInsert }: { onInsert: (key: string) => void }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-[11px] font-medium text-ink hover:border-petrol-500"
-      >
-        Insert Field {open ? "▴" : "▾"}
-      </button>
-      {open && (
-        <div className="absolute left-0 z-10 mt-1 max-h-72 w-72 overflow-y-auto rounded-md border border-gray-200 bg-surface shadow-card">
-          {(["contact", "lead", "sender", "system"] as const).map((group) => {
-            const fields = MERGE_FIELDS.filter((f) => f.group === group);
-            if (fields.length === 0) return null;
-            return (
-              <div key={group}>
-                <div className="bg-gray-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                  {group}
-                </div>
-                {fields.map((f) => (
-                  <button
-                    key={f.key}
-                    type="button"
-                    onClick={() => {
-                      onInsert(f.key);
-                      setOpen(false);
-                    }}
-                    className="block w-full cursor-pointer px-3 py-[5px] text-left text-[12px] text-ink hover:bg-gray-50"
-                  >
-                    <span className="font-medium">{f.label}</span>
-                    <span className="ml-2 font-mono text-[10px] text-gray-400">
-                      {`{{${f.key}}}`}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}

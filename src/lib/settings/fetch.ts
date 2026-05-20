@@ -183,6 +183,8 @@ export type MailTemplateRow = {
   name: string;
   folder_id: string | null;
   body_html: string | null;
+  docx_path: string | null;
+  attachment_paths: string[];
   default_mail_class: "standard" | "first_class" | "certified";
   updated_at: string;
 };
@@ -206,7 +208,7 @@ export async function fetchMailTemplates(): Promise<MailTemplateRow[]> {
   const sb = await createClient();
   const { data, error } = await sb
     .from("mail_templates")
-    .select("id, name, folder_id, body_html, default_mail_class, updated_at")
+    .select("id, name, folder_id, body_html, docx_path, attachment_paths, default_mail_class, updated_at")
     .order("name", { ascending: true });
   if (error) throw error;
   return (data ?? []).map((r) => {
@@ -216,6 +218,8 @@ export async function fetchMailTemplates(): Promise<MailTemplateRow[]> {
       name: (r.name as string | null) ?? "",
       folder_id: (r.folder_id as string | null) ?? null,
       body_html: (r.body_html as string | null) ?? null,
+      docx_path: (r.docx_path as string | null) ?? null,
+      attachment_paths: (r.attachment_paths as string[] | null) ?? [],
       default_mail_class:
         dmc === "standard" || dmc === "certified"
           ? (dmc as "standard" | "certified")

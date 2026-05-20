@@ -5,6 +5,15 @@ import { IconMail } from "@tabler/icons-react";
 import { SendMailModal, type SendMailModalRecipient } from "./SendMailModal";
 import type { MailTemplateRow } from "@/lib/settings/fetch";
 
+export type SendMailFromAddress = {
+  name: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  region: string;
+  postal_code: string;
+};
+
 export type SendMailButtonProps = {
   label?: string;
   candidates: SendMailModalRecipient[];
@@ -16,6 +25,7 @@ export type SendMailButtonProps = {
   // Org has a complete return address. Computed server-side so we can grey
   // out the button without the user needing to open the modal first.
   mailReady: boolean;
+  fromAddress: SendMailFromAddress;
 };
 
 export function SendMailButton({
@@ -27,6 +37,7 @@ export function SendMailButton({
   iconOnly,
   className,
   mailReady,
+  fromAddress,
 }: SendMailButtonProps) {
   const [open, setOpen] = useState(false);
   // Always render the button as clickable — the modal carries the
@@ -58,6 +69,7 @@ export function SendMailButton({
           bankAccounts={bankAccounts}
           defaultMailClass={defaultMailClass}
           mailReady={mailReady}
+          fromAddress={fromAddress}
         />
       )}
     </>

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
@@ -54,6 +55,55 @@ export async function updateMyProfile(
   if (profileErr) return { ok: false, error: profileErr.message };
 
   revalidatePath("/settings");
+  return { ok: true };
+}
+
+// Lets the signed-in user change their own password. We require the current
+// password (verified via a fresh, sessionless signInWithPassword against the
+// anon endpoint — does not touch the caller's cookie session) so a walk-up
+// attacker on an unlocked tab can't silently swap the credential. The actual
+// update goes through the service client so we never have to refresh the
+// user's session token.
+export async function changeMyPassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  if (!profile.email) return { ok: false, error: "Your account has no email on file" };
+
+  if (typeof currentPassword !== "string" || currentPassword.length === 0) {
+    return { ok: false, error: "Enter your current password" };
+  }
+  if (typeof newPassword !== "string" || newPassword.length < 8) {
+    return { ok: false, error: "New password must be at least 8 characters" };
+  }
+  if (newPassword === currentPassword) {
+    return { ok: false, error: "New password must be different from the current one" };
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !anon) {
+    return { ok: false, error: "Auth is not configured" };
+  }
+  const verifier = createSupabaseClient(url, anon, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { error: verifyErr } = await verifier.auth.signInWithPassword({
+    email: profile.email,
+    password: currentPassword,
+  });
+  if (verifyErr) {
+    return { ok: false, error: "Current password is incorrect" };
+  }
+
+  const admin = createServiceClient();
+  const { error: updateErr } = await admin.auth.admin.updateUserById(profile.id, {
+    password: newPassword,
+  });
+  if (updateErr) return { ok: false, error: updateErr.message };
+
   return { ok: true };
 }
 
@@ -580,7 +630,13 @@ export async function upsertMailTemplate(input: {
   id?: string | null;
   name: string;
   folder_id?: string | null;
+  // A template is either HTML-backed (built in TipTap) or file-backed
+  // (uploaded .docx edited in SuperDoc / uploaded .pdf used as-is).
+  // Exactly one of body_html / docx_path is set. attachment_paths is an
+  // ordered list of extra PDFs/DOCXs included in the same envelope.
   body_html: string;
+  docx_path?: string | null;
+  attachment_paths?: string[];
   default_mail_class: "standard" | "first_class" | "certified";
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const guard = await requireAdmin();
@@ -588,7 +644,12 @@ export async function upsertMailTemplate(input: {
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Template name is required" };
   const body = input.body_html.trim();
-  if (!body) return { ok: false, error: "Template body is required" };
+  const docxPath = input.docx_path?.trim() || null;
+  const attachmentPaths = (input.attachment_paths ?? []).filter(
+    (p) => typeof p === "string" && p.trim().length > 0
+  );
+  if (!body && !docxPath)
+    return { ok: false, error: "Template body or .docx is required" };
   const dmc =
     input.default_mail_class === "standard" ||
     input.default_mail_class === "certified"
@@ -603,6 +664,8 @@ export async function upsertMailTemplate(input: {
         name,
         folder_id: folderId,
         body_html: body,
+        docx_path: docxPath,
+        attachment_paths: attachmentPaths,
         default_mail_class: dmc,
       })
       .eq("id", input.id);
@@ -616,6 +679,8 @@ export async function upsertMailTemplate(input: {
       name,
       folder_id: folderId,
       body_html: body,
+      docx_path: docxPath,
+      attachment_paths: attachmentPaths,
       default_mail_class: dmc,
     })
     .select("id")
@@ -623,6 +688,105 @@ export async function upsertMailTemplate(input: {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
   return { ok: true, id: data.id as string };
+}
+
+// -- DOCX template storage --------------------------------------------------
+
+// Uploads a template file (.docx or .pdf) to the private `mail-templates`
+// bucket and returns the storage path plus inferred type. The path is
+// intentionally non-guessable (uuid prefix) so leaked URLs can't be
+// brute-forced. The type is inferred from the extension and drives the
+// send-time payload (DOCX gets merge-rendered, PDF prints as-is).
+export async function uploadMailTemplateDocx(
+  formData: FormData
+): Promise<
+  | { ok: true; path: string; file_type: "docx" | "pdf" }
+  | { ok: false; error: string }
+> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Pick a .docx or .pdf file" };
+  }
+  // No artificial size cap here — the real ceiling is whichever is
+  // tightest of: Next.js Server Action bodySizeLimit (configured in
+  // next.config.ts), Vercel's per-plan request body limit, and the
+  // mail-templates Supabase storage bucket policy. Letting the
+  // platform enforce its own limits avoids guessing what's reasonable.
+  const nameLower = (file.name ?? "").toLowerCase();
+  let fileType: "docx" | "pdf";
+  let contentType: string;
+  if (nameLower.endsWith(".docx")) {
+    fileType = "docx";
+    contentType =
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  } else if (nameLower.endsWith(".pdf")) {
+    fileType = "pdf";
+    contentType = "application/pdf";
+  } else {
+    return { ok: false, error: "Only .docx and .pdf files are supported" };
+  }
+  // For .docx, rewrite any "[OWNER FIRST NAME]"-style bracket
+  // placeholders into docxtemplater's single-brace syntax so the merge
+  // engine finds them at send time. PDFs are stored as-is.
+  let uploadBlob: Blob = file;
+  if (fileType === "docx") {
+    try {
+      const PizZip = (await import("pizzip")).default;
+      const buf = Buffer.from(await file.arrayBuffer());
+      const zip = new PizZip(buf);
+      let touched = false;
+      for (const xmlPath of ["word/document.xml", "word/header1.xml", "word/footer1.xml"]) {
+        const xml = zip.file(xmlPath)?.asText();
+        if (!xml) continue;
+        const updated = xml.replace(
+          /[\[\{]([A-Za-z][A-Za-z _]{1,40})[\]\}]/g,
+          (whole, inner: string) => {
+            const key = inner.replace(/[^a-z]/gi, "").toLowerCase();
+            const tokenKey = BRACKET_TOKEN_MAP[key];
+            return tokenKey ? `{${tokenKey}}` : whole;
+          }
+        );
+        if (updated !== xml) {
+          zip.file(xmlPath, updated);
+          touched = true;
+        }
+      }
+      if (touched) {
+        const newBuf = zip.generate({ type: "nodebuffer" });
+        uploadBlob = new Blob([newBuf], { type: contentType });
+      }
+    } catch {
+      // Best-effort — if the docx is malformed for any reason, fall
+      // back to storing the original. The user can fix brackets in
+      // the editor manually.
+    }
+  }
+  const sb = await createClient();
+  const path = `${crypto.randomUUID()}.${fileType}`;
+  const { error } = await sb.storage
+    .from("mail-templates")
+    .upload(path, uploadBlob, { contentType, upsert: false });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, path, file_type: fileType };
+}
+
+// Returns a short-lived signed URL the SuperDoc editor can fetch the
+// .docx bytes from. Bucket is private, so we can't hand out the public
+// URL — signed URLs scope access to the current admin session.
+export async function getMailTemplateDocxUrl(
+  path: string
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  if (!path) return { ok: false, error: "Missing template path" };
+  const sb = await createClient();
+  const { data, error } = await sb.storage
+    .from("mail-templates")
+    .createSignedUrl(path, 60 * 10);
+  if (error || !data) return { ok: false, error: error?.message ?? "No URL" };
+  return { ok: true, url: data.signedUrl };
 }
 
 export async function deleteMailTemplate(
@@ -638,6 +802,64 @@ export async function deleteMailTemplate(
 }
 
 // -- DOCX template import ----------------------------------------------------
+
+// Word docs typically use bracket placeholders ("Dear [OWNER FIRST NAME],").
+// Our merge engine uses {{contact.first_name}} syntax. Map common brackets
+// to the matching token so a fresh import already has clickable chips
+// instead of plain text. Keys are normalized to lowercase letters only so
+// "[OWNER FIRST NAME]", "[Owner first name]", and "[OWNERFIRSTNAME]" all
+// match the same entry.
+const BRACKET_TOKEN_MAP: Record<string, string> = {
+  date: "system.today_long",
+  today: "system.today",
+  todaylong: "system.today_long",
+  ownerfirstname: "contact.first_name",
+  ownerfirst: "contact.first_name",
+  firstname: "contact.first_name",
+  ownerlastname: "contact.last_name",
+  ownerlast: "contact.last_name",
+  lastname: "contact.last_name",
+  ownerfullname: "contact.full_name",
+  fullname: "contact.full_name",
+  recipient: "contact.full_name",
+  fulladdress: "contact.address",
+  mailingaddress: "contact.address",
+  address: "contact.address",
+  city: "contact.city",
+  zip: "contact.zip",
+  zipcode: "contact.zip",
+  postalcode: "contact.zip",
+  leadid: "lead.id",
+  propertyaddress: "lead.property_address",
+  county: "lead.county",
+  state: "lead.state",
+  casenumber: "lead.case_number",
+  caseno: "lead.case_number",
+  parcelnumber: "lead.parcel_number",
+  parcelno: "lead.parcel_number",
+  saledate: "lead.sale_date",
+  saleprice: "lead.estimated_surplus",
+  closingbid: "lead.estimated_surplus",
+  grosssurplus: "lead.estimated_surplus",
+  estimatedsurplus: "lead.estimated_surplus",
+  estimatedrange: "lead.owner_range",
+  estimatedrangetoowner: "lead.owner_range",
+  rangetoowner: "lead.owner_range",
+  companyname: "sender.company_name",
+  legalname: "sender.legal_name",
+  signername: "sender.signer_name",
+  signertitle: "sender.signer_title",
+  returnaddress: "sender.address",
+};
+
+function applyBracketTokenMap(html: string): string {
+  return html.replace(/\[([^\]]+)\]/g, (whole, inner: string) => {
+    const key = inner.replace(/[^a-z]/gi, "").toLowerCase();
+    const tokenKey = BRACKET_TOKEN_MAP[key];
+    return tokenKey ? `{{${tokenKey}}}` : whole;
+  });
+}
+
 
 // Admins upload a .docx with their letter design (logo headers, formatted
 // paragraphs, etc.); we convert it to HTML in-memory with mammoth and hand
@@ -664,7 +886,13 @@ export async function convertDocxToHtml(
     const mammoth = (await import("mammoth")) as typeof import("mammoth");
     const buffer = Buffer.from(await file.arrayBuffer());
     const result = await mammoth.convertToHtml({ buffer });
-    return { ok: true, html: result.value };
+    // Word templates almost always use bracket placeholders like
+    // "[OWNER FIRST NAME]" or "[DATE]". Convert the common variants to
+    // our {{merge_field}} tokens so they render as chips immediately
+    // instead of as literal text. Anything we can't match is left
+    // alone so the user can fix it manually in the editor.
+    const html = applyBracketTokenMap(result.value);
+    return { ok: true, html };
   } catch (err) {
     return {
       ok: false,
