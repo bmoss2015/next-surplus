@@ -947,7 +947,7 @@ function ContactLine({
   return (
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">
       {/* Row 1: value + action icons + trash. Same shape as Relative PhoneSlot. */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         <span
           title={validationTooltip}
           className={cn(
@@ -961,7 +961,7 @@ function ContactLine({
         {isPhone && (
           <a
             href={`tel:${toE164(value) ?? value}`}
-            className="shrink-0 cursor-pointer text-petrol-500 hover:text-petrol-700"
+            className="inline-flex shrink-0 cursor-pointer items-center justify-center text-petrol-500 hover:text-petrol-700"
             aria-label="Call this number"
             title="Call"
           >
@@ -971,11 +971,11 @@ function ContactLine({
         {composeHref && (
           <Link
             href={composeHref}
-            className="shrink-0 cursor-pointer rounded p-[2px] text-gray-400 hover:bg-petrol-50 hover:text-petrol-700"
+            className="inline-flex shrink-0 cursor-pointer items-center justify-center text-gray-400 hover:text-petrol-700"
             aria-label="Compose Email"
             title={`Compose to ${value}`}
           >
-            <IconMail size={11} stroke={1.75} />
+            <IconMail size={12} stroke={1.75} />
           </Link>
         )}
         <button
@@ -985,18 +985,18 @@ function ContactLine({
             setEditingStatus((v) => !v);
             setEditingType(false);
           }}
-          className="cursor-pointer text-gray-300 hover:text-petrol-500"
+          className="inline-flex shrink-0 cursor-pointer items-center justify-center text-gray-300 hover:text-petrol-500"
         >
-          <IconPencil size={11} stroke={1.75} />
+          <IconPencil size={12} stroke={1.75} />
         </button>
         {canRemove && (
           <button
             type="button"
             onClick={onRemove}
-            className="shrink-0 cursor-pointer text-gray-300 hover:text-danger"
+            className="inline-flex shrink-0 cursor-pointer items-center justify-center text-gray-300 hover:text-danger"
             aria-label="Remove"
           >
-            <IconTrash size={11} stroke={1.75} />
+            <IconTrash size={12} stroke={1.75} />
           </button>
         )}
       </div>

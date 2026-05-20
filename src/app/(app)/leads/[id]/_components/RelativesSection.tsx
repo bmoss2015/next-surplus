@@ -754,7 +754,7 @@ function PhoneSlot({
         {!showInput && stored && (
           <a
             href={`tel:${toE164(stored) ?? stored}`}
-            className="shrink-0 cursor-pointer text-petrol-500 hover:text-petrol-700"
+            className="inline-flex shrink-0 cursor-pointer items-center justify-center text-petrol-500 hover:text-petrol-700"
             aria-label="Call this number"
             title="Call"
           >
@@ -765,20 +765,20 @@ function PhoneSlot({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="cursor-pointer text-gray-300 hover:text-petrol-500"
+            className="inline-flex shrink-0 cursor-pointer items-center justify-center text-gray-300 hover:text-petrol-500"
             aria-label="Edit Phone"
           >
-            <IconPencil size={11} stroke={1.75} />
+            <IconPencil size={12} stroke={1.75} />
           </button>
         )}
         {stored && (
           <button
             type="button"
             onClick={() => onPatch({ [slot.value]: null } as RelativePatch)}
-            className="cursor-pointer text-gray-300 hover:text-danger"
+            className="inline-flex shrink-0 cursor-pointer items-center justify-center text-gray-300 hover:text-danger"
             aria-label="Clear Phone"
           >
-            <IconTrash size={11} stroke={1.75} />
+            <IconTrash size={12} stroke={1.75} />
           </button>
         )}
       </div>
