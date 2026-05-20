@@ -30,15 +30,16 @@ import { MailSettingsSection } from "./_components/MailSettingsSection";
 import { MailBankAccountsSection } from "./_components/MailBankAccountsSection";
 import { BillingSection } from "./_components/BillingSection";
 import { NotificationsSection } from "./_components/NotificationsSection";
+import { SettingsLayout } from "./_components/SettingsLayout";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
 
 export const dynamic = "force-dynamic";
 
-// Fix ZZZZ2 PART 4: Settings is no longer admin-only. Members see Lost Reasons,
-// Attorney Directory, Email Templates, SMS Templates, and Research Templates.
-// Team, Pipeline Rules, and Defaults stay admin-only (and their data is only
-// fetched for admins). Admins see everything, unchanged.
+// Settings redesign — sub-rail layout. Sections grouped Account / Workspace /
+// Leads / Mail / Templates. Member visibility unchanged: Lost Reasons,
+// Attorneys, Templates, Contact Roles, Profile, Security, Notifications,
+// Email Accounts are visible to all signed-in users; the rest are admin-only.
 export default async function SettingsPage() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/");
@@ -79,56 +80,95 @@ export default async function SettingsPage() {
       ])
     : [null, null, null, null, null, null];
 
-  return (
-    <div className="px-7 py-6">
-      <div className="mb-[22px]">
-        <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">Settings</h1>
-        <div className="mt-1 text-[13px] text-gray-500">
-          {isAdmin
-            ? "Team, defaults, attorneys, lost reasons, templates, and research templates."
-            : "Attorneys, lost reasons, templates, and research templates."}
-        </div>
-      </div>
+  // Available panels for the current user. Admin-only sections render to null
+  // for members and don't appear in the rail.
+  const panels: Record<string, React.ReactNode> = {
+    profile: (
+      <ProfileSection
+        initialFullName={profile.fullName}
+        initialEmail={profile.email ?? ""}
+        isAdmin={isAdmin}
+      />
+    ),
+    security: <ChangePasswordSection />,
+    notifications: <NotificationsSection initial={notificationPrefs} />,
+    "email-accounts": <EmailAccountsSection initial={emailAccounts} />,
+    attorneys: <AttorneysSection initial={attorneys} />,
+    "lost-reasons": <LostReasonsSection initial={lostReasons} />,
+    "contact-roles": <OtherContactRolesSection initial={customContactRoles} />,
+    "email-templates": <TemplatesSection initial={templates} />,
+    "sms-templates": <SmsTemplatesSection initial={templates} />,
+    "research-templates": <ResearchTemplatesSection initial={researchTemplates} />,
+  };
 
-      <div className="grid grid-cols-2 gap-[18px]">
-        <ProfileSection
-          initialFullName={profile.fullName}
-          initialEmail={profile.email ?? ""}
-          isAdmin={isAdmin}
-        />
-        <ChangePasswordSection />
-        <NotificationsSection initial={notificationPrefs} />
-        {isAdmin && <BillingSection orgId={profile.orgId} />}
-        <EmailAccountsSection initial={emailAccounts} />
-        {isAdmin && <CompanyInfoSection initial={orgInfo!} />}
-        {isAdmin && <MailSettingsSection initial={mailSettings!} />}
-        {isAdmin && (
-          <MailBankAccountsSection initial={mailBankAccounts!} />
-        )}
-        {/* Mail Templates moved to /mail/templates — settings now only
-            holds platform-level mail config (return address, bank
-            accounts, signatures). Template authoring belongs with the
-            rest of the mail workflow on the Mail tab. */}
-        {isAdmin && (
-          <div className="col-span-2">
-            <TeamSection initial={members!} currentUserId={profile.id} />
-          </div>
-        )}
-        {isAdmin && (
-          <div className="col-span-2">
-            <PipelineRulesSection initial={needsActionThreshold!} />
-          </div>
-        )}
-        {isAdmin && <DefaultsSection initial={defaults!} />}
-        <LostReasonsSection initial={lostReasons} />
-        <AttorneysSection initial={attorneys} />
-        <OtherContactRolesSection initial={customContactRoles} />
-        <TemplatesSection initial={templates} />
-        <SmsTemplatesSection initial={templates} />
-        <div className="col-span-2">
-          <ResearchTemplatesSection initial={researchTemplates} />
-        </div>
-      </div>
-    </div>
-  );
+  // Admin-only panels.
+  if (isAdmin) {
+    panels["company"] = <CompanyInfoSection initial={orgInfo!} />;
+    panels["billing"] = <BillingSection orgId={profile.orgId} />;
+    panels["team"] = <TeamSection initial={members!} currentUserId={profile.id} />;
+    panels["defaults"] = <DefaultsSection initial={defaults!} />;
+    panels["pipeline"] = <PipelineRulesSection initial={needsActionThreshold!} />;
+    panels["mail-settings"] = <MailSettingsSection initial={mailSettings!} />;
+    panels["mail-bank"] = <MailBankAccountsSection initial={mailBankAccounts!} />;
+  }
+
+  // Rail structure. Admin-only items omitted for members.
+  const groups = [
+    {
+      name: "Account",
+      items: [
+        { key: "profile", label: "Profile" },
+        { key: "security", label: "Security" },
+        { key: "notifications", label: "Notifications" },
+        { key: "email-accounts", label: "Email Accounts", count: emailAccounts.length },
+      ],
+    },
+    ...(isAdmin
+      ? [
+          {
+            name: "Workspace",
+            items: [
+              { key: "company", label: "Company Profile" },
+              { key: "team", label: "Members", count: members?.length ?? 0 },
+              { key: "billing", label: "Billing" },
+            ],
+          },
+        ]
+      : []),
+    {
+      name: "Leads",
+      items: [
+        ...(isAdmin
+          ? [
+              { key: "defaults", label: "Defaults" },
+              { key: "pipeline", label: "Pipeline Rules" },
+            ]
+          : []),
+        { key: "attorneys", label: "Attorneys", count: attorneys.length },
+        { key: "lost-reasons", label: "Lost Reasons" },
+        { key: "contact-roles", label: "Contact Roles" },
+      ],
+    },
+    ...(isAdmin
+      ? [
+          {
+            name: "Mail",
+            items: [
+              { key: "mail-settings", label: "Configuration" },
+              { key: "mail-bank", label: "Bank Accounts", count: mailBankAccounts?.length ?? 0 },
+            ],
+          },
+        ]
+      : []),
+    {
+      name: "Templates",
+      items: [
+        { key: "email-templates", label: "Email" },
+        { key: "sms-templates", label: "SMS" },
+        { key: "research-templates", label: "Research" },
+      ],
+    },
+  ];
+
+  return <SettingsLayout groups={groups} panels={panels} isAdmin={isAdmin} />;
 }
