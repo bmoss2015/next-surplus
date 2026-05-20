@@ -10,6 +10,16 @@
   --color-petrol-700: #0a3d4a;
   --color-petrol-900: #062831;
 
+  /* Emerald palette — settings redesign (Phase 1: additive only, not yet
+     applied anywhere. Phase 2 swaps petrol references over to emerald). */
+  --color-emerald-50: #f3faf6;
+  --color-emerald-100: #d6ecdf;
+  --color-emerald-200: #a0d4b8;
+  --color-emerald-300: #4a9c75;
+  --color-emerald-500: #13644e;
+  --color-emerald-700: #0d4b3a;
+  --color-emerald-900: #04261c;
+
   /* Charcoal — body text */
   --color-ink: #0f1729;
 
@@ -182,4 +192,379 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="time"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
+}
+
+/* ============================================================================
+   SETTINGS REDESIGN — Phase 1: component pattern library (additive only)
+
+   These classes are not yet applied in any rendered component. Phase 2 starts
+   swapping the existing settings panels over to use them. Defined here so they
+   compile and are ready for the rebuild, with zero visual impact on the rest
+   of the portal in the meantime.
+   ============================================================================ */
+
+/* --- Minimal pref-row pattern (Profile, Security, Notifications, etc.) --- */
+.pref-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+.pref-row:last-child { border-bottom: 0; }
+.pref-row-title {
+  font-size: 14px; font-weight: 500;
+  color: var(--color-ink); letter-spacing: -0.008em;
+  line-height: 1.3;
+}
+.pref-row-desc {
+  font-size: 12.5px; color: var(--color-gray-500);
+  margin-top: 3px; line-height: 1.5;
+}
+.pref-row-input { width: 320px; max-width: 100%; }
+.pref-section-h {
+  margin: 32px 0 4px;
+  padding-bottom: 10px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-gray-500);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+.pref-section-h:first-child { margin-top: 12px; }
+
+/* --- Hero blocks (Profile, Company Profile) --- */
+.clean-hero {
+  display: flex; align-items: center; gap: 18px;
+  padding: 24px 0;
+  margin-top: 4px;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+.clean-hero-avatar {
+  width: 64px; height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--color-emerald-700) 0%, var(--color-emerald-900) 100%);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 600; letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+.clean-hero-title {
+  font-size: 22px; font-weight: 600;
+  color: var(--color-ink); letter-spacing: -0.024em;
+  line-height: 1.2;
+}
+.clean-hero-meta {
+  margin-top: 4px;
+  font-size: 13px; color: var(--color-gray-500);
+}
+.clean-hero-upload { margin-left: auto; }
+
+/* --- Settings card (grouped block with head + body) --- */
+.settings-card {
+  margin-top: 22px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.settings-card-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
+  padding: 22px 24px;
+}
+.settings-card-head + * { border-top: 1px solid var(--color-gray-150); }
+.settings-card-eyebrow {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-gray-500);
+  margin-bottom: 6px;
+}
+.settings-card-title {
+  font-size: 16px; font-weight: 600;
+  color: var(--color-ink); letter-spacing: -0.018em;
+  line-height: 1.25;
+}
+.settings-card-desc {
+  font-size: 12.5px; color: var(--color-gray-500);
+  line-height: 1.55; margin-top: 6px;
+}
+.settings-card-control { flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
+
+/* --- Drawer (right-side slide-in for Attorney edit, Invite Member, etc.) --- */
+.drawer-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(12, 13, 16, 0.40);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease-out;
+  z-index: 50;
+}
+.drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+.drawer-panel {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: 480px; max-width: 92vw;
+  background: var(--color-surface);
+  box-shadow: -8px 0 32px -8px rgba(12, 13, 16, 0.20);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+  z-index: 51;
+  border-left: 1px solid var(--color-gray-200);
+}
+.drawer-panel.open { transform: translateX(0); }
+.drawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+.drawer-eyebrow {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-gray-500);
+  margin-bottom: 4px;
+}
+.drawer-title {
+  font-size: 17px; font-weight: 600;
+  color: var(--color-ink); letter-spacing: -0.018em;
+  line-height: 1.25;
+}
+.drawer-body { flex: 1; overflow-y: auto; padding: 22px 24px 28px; }
+.drawer-field { margin-bottom: 22px; }
+.drawer-field:last-child { margin-bottom: 0; }
+.drawer-label {
+  display: block;
+  font-size: 12.5px; font-weight: 500;
+  color: var(--color-ink); letter-spacing: -0.005em;
+  margin-bottom: 6px;
+}
+.drawer-textarea {
+  min-height: 140px; resize: vertical;
+  font-family: inherit; line-height: 1.5;
+}
+.drawer-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px;
+  border-top: 1px solid var(--color-gray-200);
+  background: var(--color-gray-50);
+}
+
+/* --- Role tab (Members admin/member/pending ribbon) --- */
+.role-tab {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.12em;
+  padding: 5px 10px;
+  border-radius: 4px;
+  line-height: 1;
+  text-align: center;
+  min-width: 76px;
+  box-sizing: border-box;
+}
+.role-tab.role-tab-admin   { background: var(--color-ink); color: #fff; }
+.role-tab.role-tab-member  { background: var(--color-gray-100); color: var(--color-gray-700); }
+.role-tab.role-tab-pending { background: transparent; color: var(--color-emerald-700); border: 1px solid var(--color-emerald-700); padding: 4px 9px; }
+
+/* --- Role chip grid (Contact Roles) --- */
+.role-chip-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.role-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px 8px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 999px;
+  font-size: 13px; font-weight: 500;
+  color: var(--color-ink);
+  transition: border-color 0.12s;
+}
+.role-chip:hover { border-color: var(--color-ink); }
+.role-chip-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: transparent; color: var(--color-gray-400);
+  cursor: pointer; font-size: 16px; line-height: 1;
+  transition: background 0.12s, color 0.12s;
+}
+.role-chip-x:hover { background: var(--color-danger); color: #fff; }
+.role-chip-add {
+  background: transparent;
+  border: 1px dashed var(--color-gray-200);
+  color: var(--color-gray-500);
+  cursor: pointer;
+  padding: 8px 14px;
+}
+.role-chip-add:hover { border-color: var(--color-ink); color: var(--color-ink); }
+
+/* --- Billing plan hero --- */
+.plan-hero {
+  display: flex; align-items: stretch; gap: 24px;
+  margin: 24px 0 4px;
+  padding: 28px 30px;
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(255,255,255,0.05) 0%, transparent 50%),
+    linear-gradient(135deg, var(--color-emerald-700) 0%, var(--color-emerald-900) 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(12,13,16,0.04), 0 12px 32px -16px rgba(13,75,58,0.30);
+}
+.plan-hero-eyebrow {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: rgba(255,255,255,0.6);
+}
+.plan-hero-name {
+  font-size: 30px; font-weight: 600;
+  letter-spacing: -0.028em; margin-top: 6px; color: #fff;
+}
+.plan-hero-line {
+  font-size: 13px; color: rgba(255,255,255,0.78);
+  margin-top: 8px; line-height: 1.5; max-width: 48ch;
+}
+.plan-hero-price {
+  font-size: 30px; font-weight: 600; color: #fff;
+  letter-spacing: -0.028em;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.plan-hero-price-suffix {
+  font-size: 14px; font-weight: 500;
+  color: rgba(255,255,255,0.6); letter-spacing: 0;
+}
+
+/* --- Add-On usage meter (Phone Validation / Veriphone) --- */
+.addon-meter { padding: 18px 0; border-bottom: 1px solid var(--color-gray-200); }
+.addon-meter-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
+}
+.addon-meter-title {
+  font-size: 14px; font-weight: 500;
+  color: var(--color-ink); letter-spacing: -0.008em;
+}
+.addon-meter-desc {
+  font-size: 12.5px; color: var(--color-gray-500);
+  margin-top: 3px; line-height: 1.5;
+}
+.addon-meter-num {
+  font-size: 16px; font-weight: 600;
+  color: var(--color-ink); letter-spacing: -0.014em;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.addon-meter-bar {
+  height: 6px; width: 100%;
+  background: var(--color-gray-150);
+  border-radius: 3px;
+  margin-top: 14px; overflow: hidden;
+}
+.addon-meter-bar-fill {
+  height: 100%; background: var(--color-emerald-700);
+  border-radius: 3px;
+  transition: width 0.4s ease-out;
+}
+.addon-meter-action {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--color-gray-200);
+}
+
+/* --- Defaults calc hero (visual flow of the recovery-fee math) --- */
+.calc-hero {
+  margin: 24px 0 4px;
+  padding: 24px 28px 26px;
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(255,255,255,0.05) 0%, transparent 50%),
+    linear-gradient(135deg, var(--color-emerald-700) 0%, var(--color-emerald-900) 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(12,13,16,0.04), 0 12px 32px -16px rgba(13,75,58,0.30);
+}
+.calc-hero-step {
+  flex: 1; min-width: 0;
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+}
+.calc-hero-step-total {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.24);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.10);
+}
+.calc-hero-arrow {
+  flex-shrink: 0; font-size: 20px;
+  color: rgba(255,255,255,0.4); line-height: 1;
+}
+
+/* --- Signature preview hero (Mail Configuration) --- */
+.sig-hero-paper {
+  background: var(--color-surface);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 12px;
+  padding: 32px 36px 28px;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(12,13,16,0.04), 0 8px 24px -16px rgba(12,13,16,0.08);
+  overflow: hidden;
+}
+.sig-hero-paper::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+  background: linear-gradient(90deg, var(--color-emerald-700) 0%, var(--color-emerald-900) 100%);
+}
+
+/* --- Bank account card grid --- */
+.bank-card {
+  position: relative;
+  padding: 20px 22px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 12px;
+  transition: border-color 0.12s;
+}
+.bank-card:hover { border-color: var(--color-ink); }
+
+/* --- Template tabs (sub-nav inside the All Templates panel) --- */
+.tpl-tabs {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: var(--color-gray-100);
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.tpl-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px;
+  background: transparent;
+  border: 0; border-radius: 6px;
+  font-size: 12.5px; font-weight: 500;
+  color: var(--color-gray-500);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.tpl-tab.active {
+  background: var(--color-surface); color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(12,13,16,0.06);
+}
+
+/* --- Universal Save Pill (replaces inline per-section save buttons) --- */
+.save-pill {
+  position: fixed; right: 32px; bottom: 32px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 8px 8px 16px;
+  background: var(--color-ink);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 12.5px;
+  box-shadow: 0 12px 32px -8px rgba(12,13,16,0.30), 0 4px 12px rgba(12,13,16,0.16);
+  opacity: 0; pointer-events: none; transform: translateY(6px);
+  transition: opacity 0.18s, transform 0.18s;
+  z-index: 40;
+}
+.save-pill.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.save-pill button {
+  background: transparent; border: 0;
+  font-size: 12px; font-weight: 500;
+  padding: 6px 12px; border-radius: 999px;
+  cursor: pointer;
+}
+.save-pill .save { background: #fff; color: var(--color-ink); }
+.save-pill .save:hover { background: var(--color-gray-150); }
+
+/* Live-pulse dot (used on Email Accounts active status) */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.6); opacity: 0.7; }
+  80%  { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
 }
