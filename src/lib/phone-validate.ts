@@ -274,20 +274,131 @@ export async function getValidationUsage(orgId: string): Promise<{ used: number;
   return { used, cap, period_month: currentPeriodMonth() };
 }
 
-// Sweep through all unvalidated phones for an org and validate them.
-// Called from after() in the import action so it runs after the response is
-// sent. Same function also powers the manual backfill route.
-//
-// Bounded by maxItems and concurrency so a runaway import never floods
-// Veriphone. Stops naturally when the quota cap is hit (validatePhone returns
-// status='untested' with checkedAt=null in that case — we just leave those
-// rows alone, they'll get picked up next time).
+// Phone slot column bases on the relatives table — one row per relative,
+// with up to 5 numbered phone slots.
 const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const;
+export type RelativePhoneBase = (typeof RELATIVE_PHONE_BASES)[number];
+
 type PendingTask =
   | { kind: "contact"; rowId: string; phone: string; existingType: string | null }
-  | { kind: "relative"; rowId: string; phone: string; base: (typeof RELATIVE_PHONE_BASES)[number]; existingType: string | null };
+  | { kind: "relative"; rowId: string; phone: string; base: RelativePhoneBase; existingType: string | null };
 
-export async function validatePendingForOrg(
+// Targeted validation: validate ONLY the contact/relative rows passed in.
+// This is the function the import wizard and manual phone-add server actions
+// call after inserting new rows — never sweeps existing untested rows.
+// A row whose status is no longer 'untested' (already validated, manually
+// overridden, etc.) is skipped, so calling this twice on the same ID is a
+// safe no-op rather than a double-charge.
+export async function validateSpecificPhones(
+  orgId: string,
+  targets: {
+    contactIds?: string[];
+    relativeSlots?: Array<{ relativeId: string; base: RelativePhoneBase }>;
+  },
+  opts: { concurrency?: number } = {}
+): Promise<{ processed: number }> {
+  const concurrency = opts.concurrency ?? 5;
+  const contactIds = targets.contactIds ?? [];
+  const relativeSlots = targets.relativeSlots ?? [];
+  if (contactIds.length === 0 && relativeSlots.length === 0) {
+    return { processed: 0 };
+  }
+
+  const sb = createServiceClient();
+  const tasks: PendingTask[] = [];
+
+  if (contactIds.length > 0) {
+    const { data, error } = await sb
+      .from("contacts")
+      .select("id, value, phone_type, status, channel")
+      .eq("org_id", orgId)
+      .in("id", contactIds);
+    if (error) console.error("[phone-validate] specific contacts query failed:", error);
+    for (const c of (data ?? []) as Array<{
+      id: string;
+      value: string | null;
+      phone_type: string | null;
+      status: string;
+      channel: string;
+    }>) {
+      if (c.channel === "phone" && c.status === "untested" && c.value) {
+        tasks.push({ kind: "contact", rowId: c.id, phone: c.value, existingType: c.phone_type });
+      }
+    }
+  }
+
+  if (relativeSlots.length > 0) {
+    const relativeIds = Array.from(new Set(relativeSlots.map((s) => s.relativeId)));
+    const { data, error } = await sb
+      .from("relatives")
+      .select(
+        "id, phone, phone_type, phone_status, phone_2, phone_2_type, phone_2_status, phone_3, phone_3_type, phone_3_status, phone_4, phone_4_type, phone_4_status, phone_5, phone_5_type, phone_5_status"
+      )
+      .eq("org_id", orgId)
+      .in("id", relativeIds);
+    if (error) console.error("[phone-validate] specific relatives query failed:", error);
+    const rowById = new Map<string, Record<string, unknown>>();
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      rowById.set(r.id as string, r);
+    }
+    for (const slot of relativeSlots) {
+      const r = rowById.get(slot.relativeId);
+      if (!r) continue;
+      const value = r[slot.base] as string | null;
+      const status = r[`${slot.base}_status`] as string | null;
+      const existingType = (r[`${slot.base}_type`] as string | null) ?? null;
+      if (value && status === "untested") {
+        tasks.push({ kind: "relative", rowId: slot.relativeId, phone: value, base: slot.base, existingType });
+      }
+    }
+  }
+
+  console.log(
+    `[phone-validate] specific org=${orgId}: ${tasks.length} phones (` +
+      `${tasks.filter((t) => t.kind === "contact").length} contacts, ` +
+      `${tasks.filter((t) => t.kind === "relative").length} relative slots)`
+  );
+
+  let processed = 0;
+  for (let i = 0; i < tasks.length; i += concurrency) {
+    const batch = tasks.slice(i, i + concurrency);
+    await Promise.all(
+      batch.map(async (task) => {
+        const result = await validatePhone(task.phone, orgId);
+        if (result.status === "untested" && result.checkedAt === null) return;
+        const shouldFillType = !task.existingType && result.phoneType;
+        if (task.kind === "contact") {
+          const update: Record<string, unknown> = {
+            status: result.status,
+            validation_checked_at: result.checkedAt,
+            validation_provider: result.provider,
+            validation_raw: result.raw as object,
+          };
+          if (shouldFillType) update.phone_type = result.phoneType;
+          await sb.from("contacts").update(update).eq("id", task.rowId);
+        } else {
+          const update: Record<string, unknown> = {
+            [`${task.base}_status`]: result.status,
+            [`${task.base}_validation_checked_at`]: result.checkedAt,
+            [`${task.base}_validation_provider`]: result.provider,
+            [`${task.base}_validation_raw`]: result.raw as object,
+          };
+          if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
+          await sb.from("relatives").update(update).eq("id", task.rowId);
+        }
+        processed += 1;
+      })
+    );
+  }
+
+  return { processed };
+}
+
+// DEPRECATED for auto-triggers — kept around so a future explicit "validate
+// all untested phones" backfill button can call it. Never call this from
+// the import or upsert paths; it sweeps the whole org's untested backlog
+// and would silently re-validate rows the user didn't ask to spend on.
+export async function validateAllUntestedForOrg(
   orgId: string,
   opts: { maxItems?: number; concurrency?: number } = {}
 ): Promise<{ processed: number; pending: number }> {

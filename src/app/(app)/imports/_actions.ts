@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile } from "@/lib/auth/current-user";
-import { validatePendingForOrg } from "@/lib/phone-validate";
+import { validateSpecificPhones, type RelativePhoneBase } from "@/lib/phone-validate";
 import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/imports/format-address";
 import {
   parseAddressString,
@@ -366,6 +366,12 @@ export async function importLeads(
   let firstError: string | null = null;
   const importRowsLog: Array<Record<string, unknown>> = [];
 
+  // Collect IDs of phones inserted during this run so the post-import
+  // validation only hits brand new rows — never the org's existing
+  // untested backlog.
+  const newPhoneContactIds: string[] = [];
+  const newRelativeSlots: Array<{ relativeId: string; base: RelativePhoneBase }> = [];
+
   const decisionByIndex = new Map<number, ImportRowDecision>();
   for (const d of decisions) decisionByIndex.set(d.index, d);
 
@@ -390,7 +396,7 @@ export async function importLeads(
     leadId: string,
     row: IncomingLead,
     updateExistingOwner: boolean
-  ): Promise<{ written: number; errors: string[] }> {
+  ): Promise<{ written: number; errors: string[]; newPhoneContactIds: string[] }> {
     const ownerName = (row.owner_full_name ?? "").trim();
     const phones = (row.phones ?? []).filter((p) => p.value.trim());
     const emails = (row.emails ?? []).map((e) => e.trim()).filter(Boolean);
@@ -400,6 +406,10 @@ export async function importLeads(
 
     const errors: string[] = [];
     let written = 0;
+    // Track newly-inserted phone-channel contacts so the post-import
+    // validation pass only hits brand new rows, not the org's whole untested
+    // backlog.
+    const newPhoneContactIds: string[] = [];
 
     if (
       !ownerName &&
@@ -409,7 +419,7 @@ export async function importLeads(
       !row.owner_deceased &&
       row.owner_age == null
     ) {
-      return { written, errors };
+      return { written, errors, newPhoneContactIds };
     }
 
     // PART 1: resolve the primary owner. If one already exists for this lead
@@ -444,7 +454,7 @@ export async function importLeads(
           .eq("id", existingOwner.id as string);
         if (updErr) {
           errors.push(`owner update failed (${updErr.message})`);
-          return { written, errors };
+          return { written, errors, newPhoneContactIds };
         }
       }
       ownerId = existingOwner.id as string;
@@ -458,7 +468,7 @@ export async function importLeads(
         errors.push(
           `owner insert failed (${ownerErr?.message ?? "no row returned"})`
         );
-        return { written, errors };
+        return { written, errors, newPhoneContactIds };
       }
       ownerId = ownerRow.id as string;
     }
@@ -516,24 +526,30 @@ export async function importLeads(
         }
       } else {
         const ownerHasPhone = phoneIndex.size > 0;
-        const { error } = await sb.from("contacts").insert({
-          owner_id: ownerId,
-          lead_id: leadId,
-          channel: "phone",
-          value: p.value.trim(),
-          status: "untested",
-          is_primary: i === 0 && !ownerHasPhone,
-          phone_type: p.phone_type ?? null,
-          is_dnc: p.is_dnc,
-          is_litigator: p.is_litigator,
-        });
+        const { data, error } = await sb
+          .from("contacts")
+          .insert({
+            owner_id: ownerId,
+            lead_id: leadId,
+            channel: "phone",
+            value: p.value.trim(),
+            status: "untested",
+            is_primary: i === 0 && !ownerHasPhone,
+            phone_type: p.phone_type ?? null,
+            is_dnc: p.is_dnc,
+            is_litigator: p.is_litigator,
+          })
+          .select("id")
+          .single();
         if (error) {
           errors.push(
             `phone insert failed for "${p.value.trim()}" (${error.message})`
           );
         } else {
           written += 1;
-          if (norm) phoneIndex.set(norm, "");
+          const insertedId = data?.id as string | undefined;
+          if (insertedId) newPhoneContactIds.push(insertedId);
+          if (norm) phoneIndex.set(norm, insertedId ?? "");
         }
       }
     }
@@ -627,7 +643,7 @@ export async function importLeads(
         }
       }
     }
-    return { written, errors };
+    return { written, errors, newPhoneContactIds };
   }
 
   // Fix NNNN3 PART 3: merge incoming relatives into the lead's existing
@@ -643,12 +659,13 @@ export async function importLeads(
     leadId: string,
     row: IncomingLead,
     updateExistingRelatives: boolean
-  ): Promise<{ errors: string[] }> {
+  ): Promise<{ errors: string[]; newRelativeSlots: Array<{ relativeId: string; base: RelativePhoneBase }> }> {
     const errors: string[] = [];
+    const newRelativeSlots: Array<{ relativeId: string; base: RelativePhoneBase }> = [];
     const incoming = (row.relatives ?? []).filter(
       (r) => r.full_name || r.phones.length > 0 || r.emails.length > 0
     );
-    if (incoming.length === 0) return { errors };
+    if (incoming.length === 0) return { errors, newRelativeSlots };
 
     const { data: existing } = await sb
       .from("relatives")
@@ -748,13 +765,28 @@ export async function importLeads(
         }
       } else {
         const newRow = relativeRowFromImport(leadId, rel);
-        const { error } = await sb.from("relatives").insert(newRow);
+        const { data, error } = await sb
+          .from("relatives")
+          .insert(newRow)
+          .select("id")
+          .single();
         if (error) {
           errors.push(`relative insert failed for "${name}" (${error.message})`);
+        } else {
+          const insertedId = data?.id as string | undefined;
+          if (insertedId) {
+            // Validate only the slots that actually have a phone number.
+            for (const base of RELATIVE_PHONE_COLUMNS) {
+              const value = (newRow as Record<string, unknown>)[base];
+              if (typeof value === "string" && value.trim().length > 0) {
+                newRelativeSlots.push({ relativeId: insertedId, base: base as RelativePhoneBase });
+              }
+            }
+          }
         }
       }
     }
-    return { errors };
+    return { errors, newRelativeSlots };
   }
 
   for (let i = 0; i < rows.length; i++) {
@@ -823,7 +855,9 @@ export async function importLeads(
         // "update existing" is moot. Pass true for symmetry with replace_all.
         const cw = await writeContactsForLead(leadRow.id as string, row, true);
         contactsWritten += cw.written;
+        newPhoneContactIds.push(...cw.newPhoneContactIds);
         const rw = await writeRelativesForLead(leadRow.id as string, row, true);
+        newRelativeSlots.push(...rw.newRelativeSlots);
         const rowErrors = [...cw.errors, ...rw.errors];
         if (rowErrors.length > 0) {
           warnings.push(
@@ -990,7 +1024,9 @@ export async function importLeads(
       const updateExisting = decision.action === "replace_all";
       const cw = await writeContactsForLead(leadId, row, updateExisting);
       contactsWritten += cw.written;
+      newPhoneContactIds.push(...cw.newPhoneContactIds);
       const rw = await writeRelativesForLead(leadId, row, updateExisting);
+      newRelativeSlots.push(...rw.newRelativeSlots);
       const rowErrors = [...cw.errors, ...rw.errors];
       if (rowErrors.length > 0) {
         warnings.push(
@@ -1046,16 +1082,19 @@ export async function importLeads(
     };
   }
 
-  // Validate freshly-inserted phone numbers in the background — runs after the
-  // response is sent so the user sees the import land immediately. Sweeps any
-  // row whose status is still 'untested', stops naturally when the org's
-  // monthly Veriphone quota is hit (untested rows stay until next sweep).
-  if (orgId) {
+  // Validate ONLY phones inserted during this run — runs after the response
+  // is sent so the user sees the import land immediately. Never sweeps the
+  // org's existing untested backlog: rows from prior imports stay as-is
+  // unless they get re-saved or the user explicitly triggers a backfill.
+  if (orgId && (newPhoneContactIds.length > 0 || newRelativeSlots.length > 0)) {
     after(async () => {
       try {
-        await validatePendingForOrg(orgId);
+        await validateSpecificPhones(orgId, {
+          contactIds: newPhoneContactIds,
+          relativeSlots: newRelativeSlots,
+        });
       } catch (e) {
-        console.error("[import] phone validation sweep failed:", e);
+        console.error("[import] phone validation failed:", e);
       }
     });
   }

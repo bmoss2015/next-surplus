@@ -6,23 +6,32 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, getCurrentProfile } from "@/lib/auth/current-user";
 import { STAGES, type Stage } from "@/lib/leads/types";
 import { toProperCase } from "@/lib/format/proper-case";
-import { validatePendingForOrg } from "@/lib/phone-validate";
+import { validateSpecificPhones, type RelativePhoneBase } from "@/lib/phone-validate";
 
 // Phone slots on the relatives table — used to reset per-slot validation
 // state when a slot's value changes.
-const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const;
+const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const satisfies readonly RelativePhoneBase[];
 
-// Fire-and-forget background sweep — picks up any contact / relative phone
-// whose status is 'untested' and validates it via Veriphone. Used after a
-// manual save touches a phone value so the row re-validates without
-// blocking the response.
-function scheduleValidationSweep(orgId: string | null) {
+// Fire-and-forget targeted validation — validates ONLY the row IDs passed in,
+// never touches other untested rows in the org. Runs after the response so
+// the user sees the save complete immediately; validation result lands on
+// next page refresh.
+function scheduleValidationFor(
+  orgId: string | null,
+  targets: {
+    contactIds?: string[];
+    relativeSlots?: Array<{ relativeId: string; base: RelativePhoneBase }>;
+  }
+) {
   if (!orgId) return;
+  if ((!targets.contactIds || targets.contactIds.length === 0) && (!targets.relativeSlots || targets.relativeSlots.length === 0)) {
+    return;
+  }
   after(async () => {
     try {
-      await validatePendingForOrg(orgId);
+      await validateSpecificPhones(orgId, targets);
     } catch (e) {
-      console.error("[upsert] phone validation sweep failed:", e);
+      console.error("[upsert] phone validation failed:", e);
     }
   });
 }
@@ -617,7 +626,9 @@ export async function upsertContact(
       .eq("id", contactId);
     if (error) return { ok: false, error: error.message };
     revalidatePath(`/leads/${leadId}`);
-    if (valueChanged) scheduleValidationSweep(orgId);
+    // Validate only when the row's value changed — touching DNC/Litigator/type
+    // alone never re-validates.
+    if (valueChanged) scheduleValidationFor(orgId, { contactIds: [contactId] });
     return { ok: true, id: contactId };
   } else {
     if (!patch.channel || !patch.value) {
@@ -643,7 +654,9 @@ export async function upsertContact(
       .single();
     if (error) return { ok: false, error: error.message };
     revalidatePath(`/leads/${leadId}`);
-    if (patch.channel === "phone") scheduleValidationSweep(orgId);
+    if (patch.channel === "phone") {
+      scheduleValidationFor(orgId, { contactIds: [data.id as string] });
+    }
     return { ok: true, id: data.id as string };
   }
 }
@@ -790,7 +803,13 @@ export async function upsertRelative(
       .eq("id", relativeId);
     if (error) return { ok: false, error: error.message };
     revalidatePath(`/leads/${leadId}`);
-    if (touchedPhoneSlots.length > 0) scheduleValidationSweep(orgId);
+    // Only validate the specific slots whose value was changed in this update.
+    const slotsToValidate = touchedPhoneSlots
+      .filter((base) => typeof patchRecord[base] === "string" && (patchRecord[base] as string).trim().length > 0)
+      .map((base) => ({ relativeId, base }));
+    if (slotsToValidate.length > 0) {
+      scheduleValidationFor(orgId, { relativeSlots: slotsToValidate });
+    }
     return { ok: true, id: relativeId };
   }
   const fullName = (patch.full_name ?? "").trim();
@@ -802,13 +821,15 @@ export async function upsertRelative(
     .single();
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/leads/${leadId}`);
-  // Inserts default phone_N_status to 'untested' already, so sweep picks
-  // them up automatically. Only fire if there's at least one populated slot.
-  const hasAnyPhone = RELATIVE_PHONE_BASES.some(
+  const newId = data.id as string;
+  // Validate only slots that have a value on this brand-new relative.
+  const slotsToValidate = RELATIVE_PHONE_BASES.filter(
     (base) => typeof patchRecord[base] === "string" && (patchRecord[base] as string).trim().length > 0
-  );
-  if (hasAnyPhone) scheduleValidationSweep(orgId);
-  return { ok: true, id: data.id as string };
+  ).map((base) => ({ relativeId: newId, base }));
+  if (slotsToValidate.length > 0) {
+    scheduleValidationFor(orgId, { relativeSlots: slotsToValidate });
+  }
+  return { ok: true, id: newId };
 }
 
 export async function deleteRelative(
