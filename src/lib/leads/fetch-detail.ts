@@ -30,6 +30,11 @@ export type ContactRow = {
   // label shown in the picker (e.g. "John Doe (Owner)"). Phone/email rows
   // write null. Renamed from `notes` in migration 0107.
   recipient_label: string | null;
+  // Phone validation audit fields (migration 0113). Populated by the Veriphone
+  // sweep so the UI can show "Checked May 18 via Veriphone" tooltips on dead
+  // phones.
+  validation_checked_at: string | null;
+  validation_provider: string | null;
 };
 
 export type OwnerRowFull = {
@@ -189,7 +194,7 @@ export async function fetchOwnersWithContacts(leadId: string): Promise<{
     sb
       .from("contacts")
       .select(
-        "id, owner_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, recipient_label"
+        "id, owner_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, recipient_label, validation_checked_at, validation_provider"
       )
       .eq("lead_id", leadId)
       .order("channel", { ascending: true })
@@ -203,6 +208,8 @@ export async function fetchOwnersWithContacts(leadId: string): Promise<{
   };
 }
 
+export type RelativePhoneSlotStatus = "untested" | "valid" | "invalid";
+
 export type RelativeRow = {
   id: string;
   lead_id: string;
@@ -213,22 +220,37 @@ export type RelativeRow = {
   phone_type: string | null;
   phone_is_dnc: boolean;
   phone_is_litigator: boolean;
+  phone_status: RelativePhoneSlotStatus;
+  phone_validation_checked_at: string | null;
+  phone_validation_provider: string | null;
   phone_2: string | null;
   phone_2_type: string | null;
   phone_2_is_dnc: boolean;
   phone_2_is_litigator: boolean;
+  phone_2_status: RelativePhoneSlotStatus;
+  phone_2_validation_checked_at: string | null;
+  phone_2_validation_provider: string | null;
   phone_3: string | null;
   phone_3_type: string | null;
   phone_3_is_dnc: boolean;
   phone_3_is_litigator: boolean;
+  phone_3_status: RelativePhoneSlotStatus;
+  phone_3_validation_checked_at: string | null;
+  phone_3_validation_provider: string | null;
   phone_4: string | null;
   phone_4_type: string | null;
   phone_4_is_dnc: boolean;
   phone_4_is_litigator: boolean;
+  phone_4_status: RelativePhoneSlotStatus;
+  phone_4_validation_checked_at: string | null;
+  phone_4_validation_provider: string | null;
   phone_5: string | null;
   phone_5_type: string | null;
   phone_5_is_dnc: boolean;
   phone_5_is_litigator: boolean;
+  phone_5_status: RelativePhoneSlotStatus;
+  phone_5_validation_checked_at: string | null;
+  phone_5_validation_provider: string | null;
   email: string | null;
   email_2: string | null;
   email_3: string | null;
@@ -243,11 +265,11 @@ export type RelativeRow = {
 
 const RELATIVE_COLUMNS =
   "id, lead_id, full_name, relationship, age, " +
-  "phone, phone_type, phone_is_dnc, phone_is_litigator, " +
-  "phone_2, phone_2_type, phone_2_is_dnc, phone_2_is_litigator, " +
-  "phone_3, phone_3_type, phone_3_is_dnc, phone_3_is_litigator, " +
-  "phone_4, phone_4_type, phone_4_is_dnc, phone_4_is_litigator, " +
-  "phone_5, phone_5_type, phone_5_is_dnc, phone_5_is_litigator, " +
+  "phone, phone_type, phone_is_dnc, phone_is_litigator, phone_status, phone_validation_checked_at, phone_validation_provider, " +
+  "phone_2, phone_2_type, phone_2_is_dnc, phone_2_is_litigator, phone_2_status, phone_2_validation_checked_at, phone_2_validation_provider, " +
+  "phone_3, phone_3_type, phone_3_is_dnc, phone_3_is_litigator, phone_3_status, phone_3_validation_checked_at, phone_3_validation_provider, " +
+  "phone_4, phone_4_type, phone_4_is_dnc, phone_4_is_litigator, phone_4_status, phone_4_validation_checked_at, phone_4_validation_provider, " +
+  "phone_5, phone_5_type, phone_5_is_dnc, phone_5_is_litigator, phone_5_status, phone_5_validation_checked_at, phone_5_validation_provider, " +
   "email, email_2, email_3, email_4, email_5, " +
   "notes, street, city, state, zip";
 

@@ -28,11 +28,11 @@ const RELATIONSHIP_OPTIONS = [
 // Phone slot column names. Phone 1 lives in the bare `phone` / `phone_type` /
 // `phone_is_dnc` / `phone_is_litigator` columns; phones 2..5 are numbered.
 const PHONE_SLOTS = [
-  { value: "phone", type: "phone_type", dnc: "phone_is_dnc", lit: "phone_is_litigator" },
-  { value: "phone_2", type: "phone_2_type", dnc: "phone_2_is_dnc", lit: "phone_2_is_litigator" },
-  { value: "phone_3", type: "phone_3_type", dnc: "phone_3_is_dnc", lit: "phone_3_is_litigator" },
-  { value: "phone_4", type: "phone_4_type", dnc: "phone_4_is_dnc", lit: "phone_4_is_litigator" },
-  { value: "phone_5", type: "phone_5_type", dnc: "phone_5_is_dnc", lit: "phone_5_is_litigator" },
+  { value: "phone", type: "phone_type", dnc: "phone_is_dnc", lit: "phone_is_litigator", status: "phone_status", checkedAt: "phone_validation_checked_at", provider: "phone_validation_provider" },
+  { value: "phone_2", type: "phone_2_type", dnc: "phone_2_is_dnc", lit: "phone_2_is_litigator", status: "phone_2_status", checkedAt: "phone_2_validation_checked_at", provider: "phone_2_validation_provider" },
+  { value: "phone_3", type: "phone_3_type", dnc: "phone_3_is_dnc", lit: "phone_3_is_litigator", status: "phone_3_status", checkedAt: "phone_3_validation_checked_at", provider: "phone_3_validation_provider" },
+  { value: "phone_4", type: "phone_4_type", dnc: "phone_4_is_dnc", lit: "phone_4_is_litigator", status: "phone_4_status", checkedAt: "phone_4_validation_checked_at", provider: "phone_4_validation_provider" },
+  { value: "phone_5", type: "phone_5_type", dnc: "phone_5_is_dnc", lit: "phone_5_is_litigator", status: "phone_5_status", checkedAt: "phone_5_validation_checked_at", provider: "phone_5_validation_provider" },
 ] as const;
 
 const EMAIL_SLOTS = ["email", "email_2", "email_3", "email_4", "email_5"] as const;
@@ -70,22 +70,37 @@ function makeRelativeRow(
     phone_type: null,
     phone_is_dnc: false,
     phone_is_litigator: false,
+    phone_status: "untested",
+    phone_validation_checked_at: null,
+    phone_validation_provider: null,
     phone_2: null,
     phone_2_type: null,
     phone_2_is_dnc: false,
     phone_2_is_litigator: false,
+    phone_2_status: "untested",
+    phone_2_validation_checked_at: null,
+    phone_2_validation_provider: null,
     phone_3: null,
     phone_3_type: null,
     phone_3_is_dnc: false,
     phone_3_is_litigator: false,
+    phone_3_status: "untested",
+    phone_3_validation_checked_at: null,
+    phone_3_validation_provider: null,
     phone_4: null,
     phone_4_type: null,
     phone_4_is_dnc: false,
     phone_4_is_litigator: false,
+    phone_4_status: "untested",
+    phone_4_validation_checked_at: null,
+    phone_4_validation_provider: null,
     phone_5: null,
     phone_5_type: null,
     phone_5_is_dnc: false,
     phone_5_is_litigator: false,
+    phone_5_status: "untested",
+    phone_5_validation_checked_at: null,
+    phone_5_validation_provider: null,
     email: null,
     email_2: null,
     email_3: null,
@@ -605,6 +620,16 @@ function PhoneSlot({
   const type = relative[slot.type] as string | null;
   const isDnc = relative[slot.dnc] as boolean;
   const isLit = relative[slot.lit] as boolean;
+  const status = (relative[slot.status] as string | null) ?? "untested";
+  const checkedAt = relative[slot.checkedAt] as string | null;
+  const provider = relative[slot.provider] as string | null;
+  const isDead = status === "invalid";
+  const deadTooltip =
+    isDead && checkedAt
+      ? `Marked invalid ${new Date(checkedAt).toLocaleDateString()}${
+          provider ? ` (${provider === "libphonenumber" ? "format check" : provider})` : ""
+        }`
+      : undefined;
 
   const pill = (active: boolean, activeClass: string) =>
     cn(
@@ -617,6 +642,7 @@ function PhoneSlot({
       <div className="flex items-center gap-1">
         <input
           value={focused ? val : formatPhone(val)}
+          title={!focused ? deadTooltip : undefined}
           onFocus={() => setFocused(true)}
           onChange={(e) => setVal(e.target.value.replace(/\D/g, "").slice(0, 10))}
           onBlur={() => {
@@ -625,7 +651,10 @@ function PhoneSlot({
             if (t !== stored) onPatch({ [slot.value]: t || null } as RelativePatch);
           }}
           placeholder="(555) 555-5555"
-          className="min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+          className={cn(
+            "min-w-0 flex-1 rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] outline-none placeholder:text-gray-400 focus:border-petrol-500",
+            isDead && !focused ? "text-gray-400 line-through" : "text-ink"
+          )}
         />
         {stored && (
           <button

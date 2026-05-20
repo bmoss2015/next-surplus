@@ -210,6 +210,8 @@ export function ContactsTabClient({
             mailed: false,
             mailed_at: null,
             recipient_label: null,
+            validation_checked_at: null,
+            validation_provider: null,
           });
         }
       }
@@ -238,6 +240,8 @@ export function ContactsTabClient({
             mailed: false,
             mailed_at: null,
             recipient_label: null,
+            validation_checked_at: null,
+            validation_provider: null,
           });
         }
       }
@@ -333,6 +337,8 @@ export function ContactsTabClient({
             mailed: false,
             mailed_at: null,
             recipient_label: null,
+            validation_checked_at: null,
+            validation_provider: null,
           },
         ]);
       }
@@ -648,6 +654,8 @@ function OwnerCard({
             onRemove={() => onRemoveContact(c.id)}
             onSetStatus={(s) => onSetContactStatus(c.id, s)}
             onSetPhoneMeta={(patch) => onSetPhoneMeta(c.id, patch)}
+            validationCheckedAt={c.validation_checked_at}
+            validationProvider={c.validation_provider}
           />
         ))}
         {addingPhone ? (
@@ -842,6 +850,8 @@ function ContactLine({
   onSetPhoneMeta,
   canRemove,
   breakAll,
+  validationCheckedAt,
+  validationProvider,
 }: {
   kind: "phone" | "email";
   value: string;
@@ -854,6 +864,8 @@ function ContactLine({
   onSetPhoneMeta?: (patch: PhoneMetaPatch) => void;
   canRemove: boolean;
   breakAll?: boolean;
+  validationCheckedAt?: string | null;
+  validationProvider?: string | null;
 }) {
   const isPhone = kind === "phone";
   const [editingType, setEditingType] = useState(false);
@@ -874,13 +886,24 @@ function ContactLine({
         ? "bg-danger text-white"
         : "bg-gray-200 text-gray-700";
 
+  // For phones marked dead by the validator, hover-tooltip shows when and how
+  // it was determined so Rik can decide whether to trust it or pencil-edit.
+  const validationTooltip =
+    status === "invalid" && validationCheckedAt
+      ? `Marked invalid ${new Date(validationCheckedAt).toLocaleDateString()}${
+          validationProvider ? ` (${validationProvider === "libphonenumber" ? "format check" : validationProvider})` : ""
+        }`
+      : undefined;
+
   return (
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">
       {/* Line 1: number + phone type pill (click to change), then remove. */}
       <div className="flex items-center gap-1.5">
         <span
+          title={validationTooltip}
           className={cn(
-            "min-w-0 text-[11.5px] font-medium text-ink",
+            "min-w-0 text-[11.5px] font-medium",
+            status === "invalid" ? "text-gray-400 line-through" : "text-ink",
             breakAll ? "break-all" : "whitespace-nowrap"
           )}
         >

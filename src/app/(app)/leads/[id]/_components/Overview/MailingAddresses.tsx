@@ -137,6 +137,8 @@ export function MailingAddresses({
             mailed: false,
             mailed_at: null,
             recipient_label: recipient.label,
+            validation_checked_at: null,
+            validation_provider: null,
           },
         ]);
         setAddr(EMPTY_ADDR);
