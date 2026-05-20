@@ -240,14 +240,14 @@ export function TasksList({
       </div>
 
       {showOverdueOnly && (
-        <div className="mb-3 flex items-center justify-between rounded-md border-l-4 border-l-[#0d4b3a] border border-[#0d4b3a] bg-[#d6ecdf] px-3 py-2 text-[#04261c]">
+        <div className="mb-3 flex items-center justify-between rounded-md border-l-4 border-l-[#0d4b3a] border border-[#0d4b3a] bg-[#f3f4f6] px-3 py-2 text-[#04261c]">
           <div className="text-[12px] font-medium">
             Showing Overdue Tasks Only
           </div>
           <button
             type="button"
             onClick={() => setShowOverdueOnly(false)}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#0d4b3a] bg-surface px-2 py-[3px] text-[11px] text-[#04261c] hover:bg-[#d6ecdf]"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#0d4b3a] bg-surface px-2 py-[3px] text-[11px] text-[#04261c] hover:bg-[#f3f4f6]"
           >
             <IconX size={11} stroke={2} />
             Show All Tasks
@@ -291,7 +291,7 @@ export function TasksList({
       <div className="space-y-5">
         {needsReviewTasks.length > 0 && (
           <div>
-            <div className="mb-2 flex items-baseline justify-between rounded-md border-l-4 border-l-[#04261c] bg-[#d6ecdf] px-3 py-2">
+            <div className="mb-2 flex items-baseline justify-between rounded-md border-l-4 border-l-[#04261c] bg-[#f3f4f6] px-3 py-2">
               <h2 className="m-0 text-[13px] font-semibold text-[#04261c]">Needs Review</h2>
               <span className="text-[11px] text-[#04261c]">{needsReviewTasks.length}</span>
             </div>
@@ -321,7 +321,7 @@ export function TasksList({
               className={cn(
                 "mb-2 flex items-baseline justify-between rounded-md",
                 section.warn
-                  ? "border-l-4 border-l-[#0d4b3a] bg-[#d6ecdf] px-3 py-2"
+                  ? "border-l-4 border-l-[#0d4b3a] bg-[#f3f4f6] px-3 py-2"
                   : ""
               )}
             >
@@ -355,7 +355,7 @@ export function TasksList({
                   className={cn(
                     "px-4 py-3 text-center text-[12px]",
                     section.warn
-                      ? "bg-[#d6ecdf] text-[#04261c]"
+                      ? "bg-[#f3f4f6] text-[#04261c]"
                       : "text-gray-500"
                   )}
                 >
@@ -459,7 +459,7 @@ function TaskRowDisplay({
       }}
       className={cn(
         "group flex cursor-pointer items-center gap-3 border-b border-gray-150 px-4 py-3 last:border-b-0",
-        selected && (warn ? "bg-[#d6ecdf]" : "bg-petrol-50")
+        selected && (warn ? "bg-[#f3f4f6]" : "bg-petrol-50")
       )}
     >
       <input

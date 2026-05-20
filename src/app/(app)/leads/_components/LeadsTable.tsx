@@ -142,7 +142,7 @@ export function LeadsTable({
                         Needs Action
                       </span>
                     ) : lead.stage === "new_leads" && !lead.has_activity ? (
-                      <span className="inline-block rounded bg-[#d6ecdf] px-2 py-[2px] text-[11px] font-medium text-[#04261c]">
+                      <span className="inline-block rounded bg-[#f3f4f6] px-2 py-[2px] text-[11px] font-medium text-[#04261c]">
                         New
                       </span>
                     ) : (
