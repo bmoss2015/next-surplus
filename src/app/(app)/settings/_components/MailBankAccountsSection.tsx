@@ -39,13 +39,12 @@ export function MailBankAccountsSection({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-surface p-5 shadow-card">
-      <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="section-subheader">Check Bank Accounts</h2>
-          <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
-            Verified accounts used to mail physical checks. Routing and account
-            numbers are stored only by Lob.
+          <h2 className="section-subheader mb-0">Bank Accounts</h2>
+          <div className="mt-1 text-[12.5px] text-gray-500">
+            Verified accounts available to draw outgoing checks from. Routing and account numbers are stored only by Lob.
           </div>
         </div>
         {!adding && (
@@ -71,56 +70,54 @@ export function MailBankAccountsSection({
       )}
 
       {rows.length === 0 && !adding ? (
-        <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center text-[12px] text-gray-500">
+        <div className="mt-5 rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-[12px] text-gray-500">
           No bank accounts yet. Add one to enable check sending.
         </div>
       ) : (
-        <div className="divide-y divide-gray-150">
+        <div className="mt-5 grid grid-cols-2 gap-4">
           {rows.map((row) => {
-            const masked = row.account_last_four
-              ? `**** ${row.account_last_four}`
-              : "****";
-            const routing = row.routing_last_four
-              ? ` · routing **** ${row.routing_last_four}`
-              : "";
+            const masked = row.account_last_four ? `**** ${row.account_last_four}` : "****";
+            const routing = row.routing_last_four ? `**** ${row.routing_last_four}` : "—";
             return (
-              <div
-                key={row.id}
-                className="grid grid-cols-[1fr_auto_auto] items-center gap-3 py-3 first:pt-0 last:pb-0"
-              >
-                <div>
-                  <div className="text-[13px] font-medium text-ink">
-                    {row.bank_name || row.account_holder_name}
+              <div key={row.id} className="bank-card">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-semibold text-ink" style={{ letterSpacing: "-0.014em" }}>
+                      {row.bank_name || row.account_holder_name}
+                    </div>
+                    <div className="text-[12px] text-gray-500 mt-0.5 truncate">{row.account_holder_name}</div>
                   </div>
-                  <div className="text-[11px] text-gray-500">
-                    {row.account_holder_name} · {masked}
-                    {routing}
-                  </div>
-                </div>
-                <div>
                   {row.status === "verified" ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-success/10 px-2 py-[3px] text-[11px] font-medium text-success">
-                      <IconCheck size={12} stroke={2} />
-                      Verified
+                    <span className="role-tab role-tab-pending" style={{ background: "#0d4b3a", color: "#fff", border: 0, padding: "5px 10px" }}>
+                      VERIFIED
                     </span>
+                  ) : (
+                    <span className="role-tab role-tab-pending">PENDING</span>
+                  )}
+                </div>
+                <div className="flex justify-between py-1 text-[12px] tabular-nums"><span className="text-gray-400">Account</span><span className="text-ink">{masked}</span></div>
+                <div className="flex justify-between py-1 text-[12px] tabular-nums"><span className="text-gray-400">Routing</span><span className="text-ink">{routing}</span></div>
+                <div className="mt-3 flex items-center justify-between pt-3 border-t border-gray-150">
+                  {row.status === "verified" ? (
+                    <span className="text-[11px] text-gray-400">Ready for outgoing checks</span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setVerifyingId(row.id)}
-                      className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11px] font-medium text-petrol-500 hover:border-petrol-500"
+                      className="rounded-md border border-gray-200 bg-surface px-3 py-[5px] text-[11.5px] font-medium text-ink hover:border-gray-300"
                     >
-                      Verify
+                      Enter Test Deposits
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => remove(row.id)}
+                    className="cursor-pointer text-gray-400 hover:text-danger"
+                    aria-label="Remove"
+                  >
+                    <IconTrash size={14} stroke={1.75} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => remove(row.id)}
-                  className="cursor-pointer text-gray-400 hover:text-danger"
-                  aria-label="Remove"
-                >
-                  <IconTrash size={14} stroke={1.75} />
-                </button>
               </div>
             );
           })}

@@ -14,36 +14,22 @@ const MAIL_CLASS_OPTIONS: {
   label: string;
   description: string;
 }[] = [
-  {
-    value: "standard",
-    label: "Standard",
-    description: "Cheapest, 3-10 days, basic tracking",
-  },
-  {
-    value: "first_class",
-    label: "First Class",
-    description: "Default, 1-5 days, USPS tracking",
-  },
-  {
-    value: "certified",
-    label: "Certified",
-    description: "Tracked with proof of receipt",
-  },
+  { value: "standard",    label: "Standard",    description: "Cheapest · 3–10 days · basic tracking" },
+  { value: "first_class", label: "First Class", description: "1–5 days · USPS tracking" },
+  { value: "certified",   label: "Certified",   description: "Tracked · proof of receipt" },
 ];
 
+// Settings redesign — Mail Configuration panel.
+// Signature preview hero + minimal pref-rows. Functional drag-and-drop image
+// upload preserved; visual chrome rewritten to match the new design language.
 export function MailSettingsSection({ initial }: { initial: MailSettings }) {
   const router = useRouter();
   const [form, setForm] = useState(initial);
   const [pending, startTransition] = useTransition();
   const [sigPending, startSigTransition] = useTransition();
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
-    null
-  );
-  const [sigMsg, setSigMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
-    null
-  );
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [sigMsg, setSigMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
 
   function uploadFile(file: File) {
     if (file.size === 0) return;
@@ -76,14 +62,6 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
     uploadFile(file);
   }
 
-  function onDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) uploadFile(file);
-  }
-
-
   function onRemoveSignature() {
     setSigMsg(null);
     startSigTransition(async () => {
@@ -100,10 +78,7 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
   function set<K extends keyof MailSettings>(key: K, value: MailSettings[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
-
-  function s(v: string | null) {
-    return v ?? "";
-  }
+  function s(v: string | null) { return v ?? ""; }
 
   const dirty = JSON.stringify(form) !== JSON.stringify(initial);
 
@@ -127,164 +102,139 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
 
   const inputClass =
     "rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500";
-  const labelClass = "text-[11px] font-medium text-gray-500";
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-surface p-5 shadow-card">
-      <div className="mb-4">
-        <h2 className="section-subheader">Mail Settings</h2>
-        <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
-          Signer details and default postal class for outgoing letters.
-        </div>
+    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+      <h2 className="section-subheader mb-0">Mail Configuration</h2>
+      <div className="mt-1 text-[12.5px] text-gray-500">
+        Signer, signature, and default postal class applied to every outgoing letter.
       </div>
-      <form onSubmit={save} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Signer Name</label>
-            <input
-              type="text"
-              value={s(form.signer_name)}
-              onChange={(e) => set("signer_name", e.target.value || null)}
-              className={inputClass}
-              placeholder="Bree Moss"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Signer Title</label>
-            <input
-              type="text"
-              value={s(form.signer_title)}
-              onChange={(e) => set("signer_title", e.target.value || null)}
-              className={inputClass}
-              placeholder="Managing Partner"
-            />
-          </div>
-        </div>
 
-        <div className="flex flex-col gap-2">
-          <label className={labelClass}>Signature Image</label>
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              if (!dragOver) setDragOver(true);
-            }}
-            onDragEnter={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={(e) => {
-              // Only clear when leaving the outer wrapper, not when crossing
-              // into a child element.
-              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-              setDragOver(false);
-            }}
-            onDrop={onDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`flex cursor-pointer items-center gap-3 rounded-md border-2 border-dashed p-3 transition-colors ${
-              dragOver
-                ? "border-petrol-500 bg-petrol-500/5"
-                : "border-gray-300 hover:border-petrol-500/50"
-            }`}
-          >
-            <div className="flex h-16 w-40 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white">
-              {initial.signature_image_url ? (
-                // Inline preview using the signed URL resolved on the server.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={initial.signature_image_url}
-                  alt="Signature preview"
-                  className="max-h-14 max-w-[140px] object-contain"
-                />
-              ) : (
-                <span className="text-[11px] text-gray-400">No signature</span>
-              )}
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="text-[12px] font-medium text-ink">
-                {dragOver
-                  ? "Drop to upload"
-                  : "Drag and drop an image, or click to browse"}
-              </div>
-              <div className="text-[11px] text-gray-500">
-                PNG or JPEG, 5 MB max. Transparent PNG works best.
-              </div>
-              {initial.signature_image_path && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveSignature();
-                  }}
-                  disabled={sigPending}
-                  className="mt-1 w-fit cursor-pointer text-[11px] text-danger hover:underline disabled:opacity-50"
-                >
-                  Remove signature
-                </button>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg"
-              onChange={onPickFile}
-              disabled={sigPending}
-              className="hidden"
-            />
+      {/* Signature preview hero */}
+      <div className="mt-5 grid gap-6" style={{ gridTemplateColumns: "1fr 240px", alignItems: "stretch" }}>
+        <div className="sig-hero-paper">
+          <div style={{ minHeight: 60, marginBottom: 8 }}>
+            {initial.signature_image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={initial.signature_image_url} alt="Signature preview" style={{ maxHeight: 60, maxWidth: 220, objectFit: "contain" }} />
+            ) : (
+              <span style={{ fontFamily: "'Brush Script MT', cursive", fontSize: 40, color: "#0a0d14", display: "inline-block", transform: "rotate(-3deg)" }}>
+                {s(form.signer_name) || "Your Signature"}
+              </span>
+            )}
           </div>
-          {sigMsg && (
-            <div
-              className={`text-[12px] ${
-                sigMsg.kind === "ok" ? "text-success" : "text-danger"
-              }`}
+          <div style={{ fontSize: 16, fontWeight: 600, color: "#0a0d14", letterSpacing: "-0.01em" }}>
+            {s(form.signer_name) || "Signer Name"}
+          </div>
+          {s(form.signer_title) && (
+            <div style={{ fontSize: 12.5, color: "#5b606a", marginTop: 2 }}>{form.signer_title}</div>
+          )}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9298a3", marginBottom: 6 }}>
+            Signature Preview
+          </div>
+          <div style={{ fontSize: 12.5, color: "#5b606a", lineHeight: 1.5 }}>
+            Inserted wherever your letter template uses the <code>{`{{signature}}`}</code> merge field.
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sigPending}
+              className="rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-[12px] font-medium text-ink hover:border-gray-300 disabled:opacity-50"
             >
+              {initial.signature_image_path ? "Replace Image" : "Upload Image"}
+            </button>
+            {initial.signature_image_path && (
+              <button
+                type="button"
+                onClick={onRemoveSignature}
+                disabled={sigPending}
+                className="rounded-md bg-transparent px-3 py-[6px] text-[12px] font-medium text-danger hover:underline disabled:opacity-50"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            onChange={onPickFile}
+            disabled={sigPending}
+            className="hidden"
+          />
+          {sigMsg && (
+            <div className={`mt-2 text-[11px] ${sigMsg.kind === "ok" ? "text-success" : "text-danger"}`}>
               {sigMsg.text}
             </div>
           )}
         </div>
+      </div>
 
-        <div className="flex flex-col gap-2">
-          <label className={labelClass}>Default Mail Class</label>
-          <div className="grid grid-cols-3 gap-2">
-            {MAIL_CLASS_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className={`flex cursor-pointer flex-col gap-1 rounded-md border px-3 py-2 transition-colors ${
-                  form.default_mail_class === opt.value
-                    ? "border-petrol-500 bg-petrol-500/5"
-                    : "border-gray-200 bg-surface hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="default_mail_class"
-                    value={opt.value}
-                    checked={form.default_mail_class === opt.value}
-                    onChange={() => set("default_mail_class", opt.value)}
-                    className="cursor-pointer"
-                  />
-                  <span className="text-[13px] font-medium text-ink">
-                    {opt.label}
-                  </span>
-                </div>
-                <div className="text-[11px] text-gray-500">
-                  {opt.description}
-                </div>
-              </label>
-            ))}
+      <form onSubmit={save}>
+        <div className="pref-section-h">Signer</div>
+        <div className="pref-row">
+          <div className="min-w-0 flex-1">
+            <div className="pref-row-title">Signer Name</div>
+            <div className="pref-row-desc">Available in every letter template as the <code>{`{{signer_name}}`}</code> merge field.</div>
           </div>
+          <input
+            type="text"
+            value={s(form.signer_name)}
+            onChange={(e) => set("signer_name", e.target.value || null)}
+            className={`pref-row-input ${inputClass}`}
+            placeholder="Bree Moss"
+          />
+        </div>
+        <div className="pref-row">
+          <div className="min-w-0 flex-1">
+            <div className="pref-row-title">Signer Title</div>
+            <div className="pref-row-desc">Available as the <code>{`{{signer_title}}`}</code> merge field. Leave blank to omit.</div>
+          </div>
+          <input
+            type="text"
+            value={s(form.signer_title)}
+            onChange={(e) => set("signer_title", e.target.value || null)}
+            className={`pref-row-input ${inputClass}`}
+            placeholder="Managing Partner"
+          />
+        </div>
+
+        <div className="pref-section-h">Default Mail Class</div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {MAIL_CLASS_OPTIONS.map((opt) => (
+            <label
+              key={opt.value}
+              className={`flex cursor-pointer flex-col gap-1 rounded-md border px-3 py-2 transition-colors ${
+                form.default_mail_class === opt.value
+                  ? "border-ink bg-gray-50"
+                  : "border-gray-200 bg-surface hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="default_mail_class"
+                  value={opt.value}
+                  checked={form.default_mail_class === opt.value}
+                  onChange={() => set("default_mail_class", opt.value)}
+                  className="cursor-pointer"
+                />
+                <span className="text-[13px] font-medium text-ink">{opt.label}</span>
+              </div>
+              <div className="text-[11px] text-gray-500">{opt.description}</div>
+            </label>
+          ))}
         </div>
 
         {msg && (
-          <div
-            className={`text-[12px] ${
-              msg.kind === "ok" ? "text-success" : "text-danger"
-            }`}
-          >
+          <div className={`mt-3 text-[12px] ${msg.kind === "ok" ? "text-success" : "text-danger"}`}>
             {msg.text}
           </div>
         )}
-        <div className="flex justify-end pt-1">
+        <div className="mt-4 flex justify-end pt-4 border-t border-gray-200">
           <button
             type="submit"
             disabled={pending || !dirty}
@@ -294,7 +244,6 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
           </button>
         </div>
       </form>
-
     </div>
   );
 }
