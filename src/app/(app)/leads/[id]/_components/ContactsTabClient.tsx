@@ -46,20 +46,18 @@ function phoneTypeShort(t: string | null): string {
   return "Type";
 }
 
-type ContactStatus = "untested" | "valid" | "invalid" | "dnc";
+type ContactStatus = "untested" | "valid" | "invalid";
 
 const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {
   untested: "Untested",
   valid: "Valid",
   invalid: "Invalid",
-  dnc: "DNC",
 };
 
 const CONTACT_STATUS_ORDER: ContactStatus[] = [
   "untested",
   "valid",
   "invalid",
-  "dnc",
 ];
 
 // Fix BBBBB PART 3: a tiny inline age editor used on owner *and* relative cards
@@ -874,9 +872,7 @@ function ContactLine({
       ? "bg-petrol-500 text-white"
       : s === "invalid"
         ? "bg-danger text-white"
-        : s === "dnc"
-          ? "bg-[#0f1729] text-white"
-          : "bg-gray-200 text-gray-700";
+        : "bg-gray-200 text-gray-700";
 
   return (
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">

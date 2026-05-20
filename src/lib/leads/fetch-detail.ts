@@ -16,7 +16,7 @@ export type ContactRow = {
   lead_id: string;
   channel: "phone" | "email" | "mailing_address";
   value: string;
-  status: "untested" | "valid" | "invalid" | "dnc";
+  status: "untested" | "valid" | "invalid";
   connection_status: string | null;
   source: string | null;
   last_attempted: string | null;

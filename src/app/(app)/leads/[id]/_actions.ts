@@ -1,10 +1,31 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, getCurrentProfile } from "@/lib/auth/current-user";
 import { STAGES, type Stage } from "@/lib/leads/types";
 import { toProperCase } from "@/lib/format/proper-case";
+import { validatePendingForOrg } from "@/lib/phone-validate";
+
+// Phone slots on the relatives table — used to reset per-slot validation
+// state when a slot's value changes.
+const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const;
+
+// Fire-and-forget background sweep — picks up any contact / relative phone
+// whose status is 'untested' and validates it via Veriphone. Used after a
+// manual save touches a phone value so the row re-validates without
+// blocking the response.
+function scheduleValidationSweep(orgId: string | null) {
+  if (!orgId) return;
+  after(async () => {
+    try {
+      await validatePendingForOrg(orgId);
+    } catch (e) {
+      console.error("[upsert] phone validation sweep failed:", e);
+    }
+  });
+}
 
 // Resolves the signed-in user's id for activity attribution (null when there is
 // no session — those rows render as "System").
@@ -564,7 +585,7 @@ export async function upsertContact(
   patch: {
     channel?: "phone" | "email" | "mailing_address";
     value?: string;
-    status?: "untested" | "valid" | "invalid" | "dnc";
+    status?: "untested" | "valid" | "invalid";
     is_primary?: boolean;
     phone_type?: string | null;
     is_dnc?: boolean;
@@ -573,10 +594,30 @@ export async function upsertContact(
   }
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const sb = await createClient();
+  const profile = await getCurrentProfile();
+  const orgId = profile?.orgId ?? null;
+
+  // When the value of a phone-channel row changes, reset its validation
+  // state so the background sweep re-validates it. patch overrides reset so
+  // an explicit pencil-edit status='valid' still wins.
+  const valueChanged = patch.value !== undefined;
+  const resetValidation = valueChanged
+    ? {
+        status: "untested" as const,
+        validation_checked_at: null,
+        validation_provider: null,
+        validation_raw: null,
+      }
+    : {};
+
   if (contactId) {
-    const { error } = await sb.from("contacts").update(patch).eq("id", contactId);
+    const { error } = await sb
+      .from("contacts")
+      .update({ ...resetValidation, ...patch })
+      .eq("id", contactId);
     if (error) return { ok: false, error: error.message };
     revalidatePath(`/leads/${leadId}`);
+    if (valueChanged) scheduleValidationSweep(orgId);
     return { ok: true, id: contactId };
   } else {
     if (!patch.channel || !patch.value) {
@@ -602,6 +643,7 @@ export async function upsertContact(
       .single();
     if (error) return { ok: false, error: error.message };
     revalidatePath(`/leads/${leadId}`);
+    if (patch.channel === "phone") scheduleValidationSweep(orgId);
     return { ok: true, id: data.id as string };
   }
 }
@@ -723,24 +765,49 @@ export async function upsertRelative(
   patch: RelativePatch
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const sb = await createClient();
+  const profile = await getCurrentProfile();
+  const orgId = profile?.orgId ?? null;
+
+  // Reset per-slot validation state for any phone slot whose value is in the
+  // patch — so the background sweep picks it up. Detect which slots are
+  // touched once and reuse the reset for both insert and update paths.
+  const patchRecord = patch as Record<string, unknown>;
+  const touchedPhoneSlots = RELATIVE_PHONE_BASES.filter(
+    (base) => patchRecord[base] !== undefined
+  );
+  const resetSlots: Record<string, string | null> = {};
+  for (const base of touchedPhoneSlots) {
+    resetSlots[`${base}_status`] = "untested";
+    resetSlots[`${base}_validation_checked_at`] = null;
+    resetSlots[`${base}_validation_provider`] = null;
+    resetSlots[`${base}_validation_raw`] = null;
+  }
+
   if (relativeId) {
     const { error } = await sb
       .from("relatives")
-      .update(patch)
+      .update({ ...resetSlots, ...patch })
       .eq("id", relativeId);
     if (error) return { ok: false, error: error.message };
     revalidatePath(`/leads/${leadId}`);
+    if (touchedPhoneSlots.length > 0) scheduleValidationSweep(orgId);
     return { ok: true, id: relativeId };
   }
   const fullName = (patch.full_name ?? "").trim();
   if (!fullName) return { ok: false, error: "Name is required" };
   const { data, error } = await sb
     .from("relatives")
-    .insert({ ...patch, lead_id: leadId, full_name: fullName })
+    .insert({ ...resetSlots, ...patch, lead_id: leadId, full_name: fullName })
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/leads/${leadId}`);
+  // Inserts default phone_N_status to 'untested' already, so sweep picks
+  // them up automatically. Only fire if there's at least one populated slot.
+  const hasAnyPhone = RELATIVE_PHONE_BASES.some(
+    (base) => typeof patchRecord[base] === "string" && (patchRecord[base] as string).trim().length > 0
+  );
+  if (hasAnyPhone) scheduleValidationSweep(orgId);
   return { ok: true, id: data.id as string };
 }
 
