@@ -2,13 +2,12 @@ import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { Resend } from "resend";
 import { createServiceClient } from "./supabase/service";
 
-// Veriphone Free tier is 1,000 requests/month — that's the cap. If Veriphone
-// returns 429 on the very last call, the validator just treats it as
-// 'untested' and the next sweep retries next month. Override per-org by
-// inserting a row into app_settings with key='phone_validation_quota_cap'
-// (e.g., 5000 once on Veriphone Starter at $6.99/mo).
+// IPQS free tier is 1,000 lookups/month with a 35/day cap. Unlike Veriphone,
+// IPQS does real HLR-grade line-status detection (their `active` field), so
+// 'disconnected' is caught reliably. Override the cap per-org via
+// app_settings key='phone_validation_quota_cap' if you move to a paid tier.
 const DEFAULT_QUOTA_CAP = 1000;
-const VERIPHONE_ENDPOINT = "https://api.veriphone.io/v2/verify";
+const IPQS_ENDPOINT_PREFIX = "https://www.ipqualityscore.com/api/json/phone/";
 const ADDON_KEY = "phone_validation";
 
 export type ValidationStatus = "valid" | "invalid" | "untested";
@@ -18,19 +17,27 @@ export type ValidationResult = {
   provider: string | null;
   checkedAt: string | null;
   raw: unknown;
-  // Mapped from Veriphone's phone_type — caller decides whether to overwrite
-  // an existing phone_type on the row. Null when Veriphone didn't return one
-  // (libphonenumber failure, quota exhaustion, or syntax-error response).
+  // Mapped from IPQS's line_type — caller decides whether to overwrite an
+  // existing phone_type on the row. Null when the provider didn't return a
+  // usable line type (libphonenumber failure, quota exhaustion, etc.).
   phoneType: string | null;
+  // IPQS also returns DNC + TCPA-litigator flags inline; surface them so the
+  // sweep can auto-update is_dnc / is_litigator on the row without needing a
+  // separate API call.
+  isDnc: boolean | null;
+  isLitigator: boolean | null;
 };
 
-// Map Veriphone's phone_type strings to the portal's display values. Anything
-// unmapped (toll_free, premium_rate, shared_cost, unknown) returns null so we
+// Map IPQS's `line_type` string to the portal's display value. IPQS returns
+// strings like "Mobile", "Landline", "VOIP", "Toll Free", "Prepaid". We only
+// auto-fill when we have a clear answer; ambiguous types return null so we
 // leave the existing phone_type column alone.
-function mapVeriphoneType(t: unknown): string | null {
-  if (t === "mobile") return "Mobile";
-  if (t === "fixed_line") return "Landline";
-  if (t === "voip" || t === "non_fixed_voip") return "Mobile";
+function mapIpqsLineType(t: unknown): string | null {
+  if (typeof t !== "string") return null;
+  const norm = t.trim().toLowerCase();
+  if (norm === "mobile" || norm === "wireless" || norm === "prepaid") return "Mobile";
+  if (norm === "landline" || norm === "fixed line") return "Landline";
+  if (norm === "voip") return "Mobile";
   return null;
 }
 
@@ -170,7 +177,7 @@ export async function validatePhone(
   orgId: string
 ): Promise<ValidationResult> {
   if (!phoneRaw || !phoneRaw.trim()) {
-    return { status: "untested", provider: null, checkedAt: null, raw: null, phoneType: null };
+    return { status: "untested", provider: null, checkedAt: null, raw: null, phoneType: null, isDnc: null, isLitigator: null };
   }
 
   const parsed = parsePhoneNumberFromString(phoneRaw.trim(), "US");
@@ -181,6 +188,8 @@ export async function validatePhone(
       checkedAt: new Date().toISOString(),
       raw: { reason: "failed_libphonenumber" },
       phoneType: null,
+      isDnc: null,
+      isLitigator: null,
     };
   }
   const e164 = parsed.number;
@@ -197,70 +206,98 @@ export async function validatePhone(
       checkedAt: null,
       raw: { reason: "quota_exhausted", cap, used },
       phoneType: null,
+      isDnc: null,
+      isLitigator: null,
     };
   }
 
-  const apiKey = process.env.VERIPHONE_API_KEY;
+  const apiKey = process.env.IPQS_API_KEY;
   if (!apiKey) {
     return {
       status: "untested",
       provider: null,
       checkedAt: null,
-      raw: { reason: "missing_veriphone_key" },
+      raw: { reason: "missing_ipqs_key" },
       phoneType: null,
+      isDnc: null,
+      isLitigator: null,
     };
   }
 
-  type VeriphoneBody = { status?: string; phone_valid?: boolean; phone_type?: string; [k: string]: unknown };
-  let body: VeriphoneBody | null = null;
+  // IPQS Phone Validation API. URL format puts API key and phone in the path:
+  // https://www.ipqualityscore.com/api/json/phone/<KEY>/<PHONE>
+  // Strip the leading + from e164 since IPQS expects digits-only in the path.
+  type IpqsBody = {
+    success?: boolean;
+    valid?: boolean;
+    active?: boolean;
+    active_status?: string;
+    line_type?: string;
+    carrier?: string;
+    do_not_call?: boolean;
+    tcpa_blacklist?: boolean;
+    fraud_score?: number;
+    message?: string;
+    [k: string]: unknown;
+  };
+  let body: IpqsBody | null = null;
   let httpOk = false;
   let networkError: string | null = null;
   try {
-    const url = new URL(VERIPHONE_ENDPOINT);
-    url.searchParams.set("phone", e164);
-    url.searchParams.set("default_country", "US");
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+    const phoneDigits = e164.replace(/^\+/, "");
+    const url = `${IPQS_ENDPOINT_PREFIX}${apiKey}/${phoneDigits}`;
+    const res = await fetch(url);
     httpOk = res.ok;
-    body = (await res.json()) as VeriphoneBody;
+    body = (await res.json()) as IpqsBody;
   } catch (e) {
     networkError = e instanceof Error ? e.message : String(e);
   }
 
   const checkedAt = new Date().toISOString();
-  const phoneType = mapVeriphoneType(body?.phone_type);
+  const phoneType = mapIpqsLineType(body?.line_type);
+  const isDnc = typeof body?.do_not_call === "boolean" ? body.do_not_call : null;
+  const isLitigator = typeof body?.tcpa_blacklist === "boolean" ? body.tcpa_blacklist : null;
 
-  // For "tried but couldn't verify" cases (network error, non-2xx, weird
-  // response shape), we set checkedAt so the row reflects that we attempted
-  // validation — that gives the UI something to show ("Checked [date],
-  // couldn't verify") rather than leaving it indistinguishable from
-  // "never tried". The sweep only skips rows when checkedAt is genuinely null.
+  // For "tried but couldn't verify" cases (network error, non-2xx, missing
+  // fields), we set checkedAt so the row reflects that we attempted
+  // validation — gives the UI something to show ("Checked [date], couldn't
+  // verify") rather than indistinguishable from "never tried". The sweep
+  // only skips rows when checkedAt is genuinely null.
 
   if (networkError) {
     return {
       status: "untested",
-      provider: "veriphone",
+      provider: "ipqs",
       checkedAt,
       raw: { error: networkError },
       phoneType: null,
+      isDnc: null,
+      isLitigator: null,
     };
   }
-  if (body?.status === "syntax-error") {
-    return { status: "invalid", provider: "veriphone", checkedAt, raw: body, phoneType: null };
+  if (!httpOk || body?.success === false) {
+    // 4xx/5xx, or IPQS returned success=false (e.g., quota exhausted on their
+    // side, invalid key, or non-existent number).
+    return { status: "untested", provider: "ipqs", checkedAt, raw: body, phoneType: null, isDnc: null, isLitigator: null };
   }
-  if (!httpOk) {
-    return { status: "untested", provider: "veriphone", checkedAt, raw: body, phoneType: null };
+  // Format-level invalid: IPQS knows the number isn't real before we even
+  // consider line status. Cheaper signal than line-status, so check first.
+  if (body?.valid === false) {
+    await logUsage(sb, orgId, { phone_e164: e164, result: "invalid_format" });
+    return { status: "invalid", provider: "ipqs", checkedAt, raw: body, phoneType: null, isDnc, isLitigator };
   }
-  if (body?.status === "success" && body?.phone_valid === true) {
-    await logUsage(sb, orgId, { phone_e164: e164, result: "valid" });
-    return { status: "valid", provider: "veriphone", checkedAt, raw: body, phoneType };
+  // Line-status answer: `active` is the HLR-grade signal.
+  if (body?.valid === true && body?.active === false) {
+    await logUsage(sb, orgId, { phone_e164: e164, result: "invalid_inactive" });
+    return { status: "invalid", provider: "ipqs", checkedAt, raw: body, phoneType, isDnc, isLitigator };
   }
-  if (body?.status === "success" && body?.phone_valid === false) {
-    await logUsage(sb, orgId, { phone_e164: e164, result: "invalid" });
-    return { status: "invalid", provider: "veriphone", checkedAt, raw: body, phoneType };
+  if (body?.valid === true && body?.active === true) {
+    await logUsage(sb, orgId, { phone_e164: e164, result: "valid_active" });
+    return { status: "valid", provider: "ipqs", checkedAt, raw: body, phoneType, isDnc, isLitigator };
   }
-  return { status: "untested", provider: "veriphone", checkedAt, raw: body, phoneType: null };
+  // `active` came back null/undefined — IPQS couldn't determine the line
+  // state. Don't claim valid or invalid; record we tried.
+  return { status: "untested", provider: "ipqs", checkedAt, raw: body, phoneType, isDnc, isLitigator };
 }
 
 // Helpers for callers that need quota/usage info without performing validation
