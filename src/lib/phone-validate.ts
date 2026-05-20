@@ -394,49 +394,67 @@ export async function validateSpecificPhones(
   return { processed };
 }
 
-// DEPRECATED for auto-triggers — kept around so a future explicit "validate
-// all untested phones" backfill button can call it. Never call this from
-// the import or upsert paths; it sweeps the whole org's untested backlog
-// and would silently re-validate rows the user didn't ask to spend on.
+// Explicit backfill — sweeps every untested phone in the org. Never called
+// from import or upsert paths (those use validateSpecificPhones for the IDs
+// they just inserted). Wire this to a dedicated "Run Backfill" button so the
+// spend is always intentional. excludeLostLeads is on by default — skip
+// phones on leads the user has already given up on.
 export async function validateAllUntestedForOrg(
   orgId: string,
-  opts: { maxItems?: number; concurrency?: number } = {}
+  opts: { maxItems?: number; concurrency?: number; excludeLostLeads?: boolean } = {}
 ): Promise<{ processed: number; pending: number }> {
-  const maxItems = opts.maxItems ?? 500;
+  const maxItems = opts.maxItems ?? 10000;
   const concurrency = opts.concurrency ?? 5;
+  const excludeLostLeads = opts.excludeLostLeads ?? true;
   const sb = createServiceClient();
 
-  const contactsRes = await sb
+  // For the non-lost filter we use a Postgres-style embedded join: ask for
+  // leads!inner(stage) and filter on the joined stage column. PostgREST does
+  // the join server-side, so we avoid round-tripping a giant lead-id list.
+  let contactsQuery = sb
     .from("contacts")
-    .select("id, value, phone_type")
+    .select(
+      excludeLostLeads
+        ? "id, value, phone_type, leads!inner(stage)"
+        : "id, value, phone_type"
+    )
     .eq("org_id", orgId)
     .eq("channel", "phone")
     .eq("status", "untested")
     .not("value", "is", null)
     .limit(maxItems);
+  if (excludeLostLeads) contactsQuery = contactsQuery.neq("leads.stage", "lost");
+  const contactsRes = await contactsQuery;
   if (contactsRes.error) {
     console.error("[phone-validate] contacts query failed:", contactsRes.error);
   }
 
-  const relativesRes = await sb
+  let relativesQuery = sb
     .from("relatives")
     .select(
-      "id, phone, phone_type, phone_status, phone_2, phone_2_type, phone_2_status, phone_3, phone_3_type, phone_3_status, phone_4, phone_4_type, phone_4_status, phone_5, phone_5_type, phone_5_status"
+      excludeLostLeads
+        ? "id, phone, phone_type, phone_status, phone_2, phone_2_type, phone_2_status, phone_3, phone_3_type, phone_3_status, phone_4, phone_4_type, phone_4_status, phone_5, phone_5_type, phone_5_status, leads!inner(stage)"
+        : "id, phone, phone_type, phone_status, phone_2, phone_2_type, phone_2_status, phone_3, phone_3_type, phone_3_status, phone_4, phone_4_type, phone_4_status, phone_5, phone_5_type, phone_5_status"
     )
     .eq("org_id", orgId)
     .or(
       "phone_status.eq.untested,phone_2_status.eq.untested,phone_3_status.eq.untested,phone_4_status.eq.untested,phone_5_status.eq.untested"
     )
     .limit(maxItems);
+  if (excludeLostLeads) relativesQuery = relativesQuery.neq("leads.stage", "lost");
+  const relativesRes = await relativesQuery;
   if (relativesRes.error) {
     console.error("[phone-validate] relatives query failed:", relativesRes.error);
   }
 
   const tasks: PendingTask[] = [];
-  for (const c of (contactsRes.data ?? []) as Array<{ id: string; value: string | null; phone_type: string | null }>) {
+  // The leads!inner(stage) join confuses the supabase-js generic type
+  // inference; cast through unknown so the runtime shape we expect is what
+  // we get.
+  for (const c of ((contactsRes.data ?? []) as unknown) as Array<{ id: string; value: string | null; phone_type: string | null }>) {
     if (c.value) tasks.push({ kind: "contact", rowId: c.id, phone: c.value, existingType: c.phone_type });
   }
-  for (const r of (relativesRes.data ?? []) as Record<string, unknown>[]) {
+  for (const r of ((relativesRes.data ?? []) as unknown) as Record<string, unknown>[]) {
     const rowId = r.id as string;
     for (const base of RELATIVE_PHONE_BASES) {
       const value = r[base] as string | null;

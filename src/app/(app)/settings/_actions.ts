@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { Resend } from "resend";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
+import { validateAllUntestedForOrg } from "@/lib/phone-validate";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
@@ -1362,3 +1364,34 @@ export async function deleteResearchTemplate(
   revalidatePath("/settings");
   return { ok: true };
 }
+
+// -- Phone validation backfill (Billing section) ----------------------------
+
+// Admin-only one-shot: validates every phone in the org with status='untested'
+// on leads that aren't marked lost. Runs in after() so the UI returns
+// immediately; progress shows up in the Billing meter as validations complete.
+// Whatever VERIPHONE_API_KEY is set in the runtime env at trigger time is what
+// gets charged — swap it in Vercel before clicking if you want a different
+// account to absorb the cost.
+export async function runPhoneValidationBackfill(): Promise<
+  { ok: true } | { ok: false; error: string }
+> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const profile = await getCurrentProfile();
+  if (!profile?.orgId) return { ok: false, error: "No org" };
+  const orgId = profile.orgId;
+  after(async () => {
+    try {
+      const result = await validateAllUntestedForOrg(orgId, { excludeLostLeads: true });
+      console.log(
+        `[phone-validate] backfill complete for org=${orgId}: ` +
+          `processed=${result.processed}, pending=${result.pending}`
+      );
+    } catch (e) {
+      console.error("[phone-validate] backfill failed:", e);
+    }
+  });
+  return { ok: true };
+}
+

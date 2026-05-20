@@ -1,4 +1,5 @@
 import { getValidationUsage } from "@/lib/phone-validate";
+import { BackfillButton } from "./BackfillButton";
 
 // Billing & Add-ons — usage meters for any feature whose cost scales with use.
 // Right now there's one add-on (Phone Validation via Veriphone); future add-ons
@@ -65,6 +66,7 @@ export async function BillingSection({ orgId }: { orgId: string }) {
             Approaching the monthly cap. Phones will keep validating until {phone.cap.toLocaleString()}.
           </div>
         )}
+        <BackfillButton />
       </div>
     </div>
   );
