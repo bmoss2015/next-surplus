@@ -1000,7 +1000,12 @@ function ContactLine({
         {isPhone && !editingValue && (
           <a
             href={`tel:${toE164(value) ?? value}`}
-            className="inline-flex shrink-0 cursor-pointer items-center justify-center text-petrol-500 hover:text-petrol-700"
+            className={cn(
+              "inline-flex shrink-0 cursor-pointer items-center justify-center",
+              status === "invalid"
+                ? "text-gray-300 hover:text-gray-500"
+                : "text-petrol-500 hover:text-petrol-700"
+            )}
             aria-label="Call this number"
             title="Call"
           >
