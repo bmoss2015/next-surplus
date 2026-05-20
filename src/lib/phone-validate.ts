@@ -2,12 +2,15 @@ import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { Resend } from "resend";
 import { createServiceClient } from "./supabase/service";
 
-// IPQS free tier is 1,000 lookups/month with a 35/day cap. Unlike Veriphone,
-// IPQS does real HLR-grade line-status detection (their `active` field), so
-// 'disconnected' is caught reliably. Override the cap per-org via
-// app_settings key='phone_validation_quota_cap' if you move to a paid tier.
+// HLR Lookup (hlrlookup.com). Real-time HLR queries against the mobile
+// network — definitively answers "is this mobile line currently active?".
+// 200 free credits on signup; $0.006/lookup at 5k volume after that.
+// Landline numbers come back as ineligible (HLR is mobile-only); we mark
+// those untested-with-checkedAt so the UI shows we tried.
+// Per-org cap default 1,000 lookups/month so we never silently blow past
+// budget. Override via app_settings key='phone_validation_quota_cap'.
 const DEFAULT_QUOTA_CAP = 1000;
-const IPQS_ENDPOINT_PREFIX = "https://www.ipqualityscore.com/api/json/phone/";
+const HLR_LOOKUP_ENDPOINT = "https://api.hlrlookup.com/apiv2/hlr";
 const ADDON_KEY = "phone_validation";
 
 export type ValidationStatus = "valid" | "invalid" | "untested";
@@ -17,27 +20,18 @@ export type ValidationResult = {
   provider: string | null;
   checkedAt: string | null;
   raw: unknown;
-  // Mapped from IPQS's line_type — caller decides whether to overwrite an
-  // existing phone_type on the row. Null when the provider didn't return a
-  // usable line type (libphonenumber failure, quota exhaustion, etc.).
+  // Mapped from the provider's line-type / carrier hint. Caller decides
+  // whether to overwrite an existing phone_type on the row.
   phoneType: string | null;
-  // IPQS also returns DNC + TCPA-litigator flags inline; surface them so the
-  // sweep can auto-update is_dnc / is_litigator on the row without needing a
-  // separate API call.
-  isDnc: boolean | null;
-  isLitigator: boolean | null;
 };
 
-// Map IPQS's `line_type` string to the portal's display value. IPQS returns
-// strings like "Mobile", "Landline", "VOIP", "Toll Free", "Prepaid". We only
-// auto-fill when we have a clear answer; ambiguous types return null so we
-// leave the existing phone_type column alone.
-function mapIpqsLineType(t: unknown): string | null {
-  if (typeof t !== "string") return null;
-  const norm = t.trim().toLowerCase();
-  if (norm === "mobile" || norm === "wireless" || norm === "prepaid") return "Mobile";
-  if (norm === "landline" || norm === "fixed line") return "Landline";
-  if (norm === "voip") return "Mobile";
+// HLR Lookup itself doesn't return a string like "Mobile" — successful HLR
+// responses imply the number is on a mobile carrier (HLR is mobile-only).
+// Map "data_source: LIVE_HLR" to "Mobile" so the UI auto-fills the type pill
+// for confirmed-active mobiles. Anything else returns null so existing
+// values are left untouched.
+function mapHlrLineType(dataSource: unknown, connectivityStatus: unknown): string | null {
+  if (dataSource === "LIVE_HLR" && connectivityStatus === "CONNECTED") return "Mobile";
   return null;
 }
 
@@ -146,14 +140,14 @@ async function sendThresholdEmail(
 
   const bodyIntro =
     threshold === 100
-      ? "Your Phone Validation add-on has used 100% of this month's quota. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened against Veriphone until the cap is raised or the month resets."
+      ? "Your Phone Validation add-on has used 100% of this month's quota. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened against HLR Lookup until the cap is raised or the month resets."
       : `Your Phone Validation add-on has crossed <strong>${threshold}%</strong> of this month's quota. Validation continues normally — this is a heads-up so you can raise the cap before reaching it.`;
 
   const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
   <h1 style="margin:0;font-size:20px;font-weight:600;color:#04261c;">${subject}</h1>
   <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">${bodyIntro}</p>
   <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Used this month: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
-  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Settings &rarr; Billing &amp; Add-ons in the portal shows the live meter and lets you raise the cap or move to a paid Veriphone plan.</p>
+  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Settings &rarr; Billing &amp; Add-ons in the portal shows the live meter and lets you raise the cap or move to a paid HLR Lookup plan.</p>
 </div>`;
 
   try {
@@ -170,14 +164,14 @@ async function sendThresholdEmail(
 }
 
 // Validate a single phone for a given org. Pre-filters obvious junk via
-// libphonenumber (free), then calls Veriphone if quota allows. Logs to
-// org_addon_usage only when Veriphone actually consumed a credit.
+// libphonenumber (free), then calls HLR Lookup if quota allows. Logs to
+// org_addon_usage only when HLR Lookup actually consumed a credit.
 export async function validatePhone(
   phoneRaw: string | null | undefined,
   orgId: string
 ): Promise<ValidationResult> {
   if (!phoneRaw || !phoneRaw.trim()) {
-    return { status: "untested", provider: null, checkedAt: null, raw: null, phoneType: null, isDnc: null, isLitigator: null };
+    return { status: "untested", provider: null, checkedAt: null, raw: null, phoneType: null };
   }
 
   const parsed = parsePhoneNumberFromString(phoneRaw.trim(), "US");
@@ -188,8 +182,6 @@ export async function validatePhone(
       checkedAt: new Date().toISOString(),
       raw: { reason: "failed_libphonenumber" },
       phoneType: null,
-      isDnc: null,
-      isLitigator: null,
     };
   }
   const e164 = parsed.number;
@@ -206,98 +198,110 @@ export async function validatePhone(
       checkedAt: null,
       raw: { reason: "quota_exhausted", cap, used },
       phoneType: null,
-      isDnc: null,
-      isLitigator: null,
     };
   }
 
-  const apiKey = process.env.IPQS_API_KEY;
-  if (!apiKey) {
+  const apiKey = process.env.HLR_LOOKUP_API_KEY;
+  const apiSecret = process.env.HLR_LOOKUP_API_SECRET;
+  if (!apiKey || !apiSecret) {
     return {
       status: "untested",
       provider: null,
       checkedAt: null,
-      raw: { reason: "missing_ipqs_key" },
+      raw: { reason: "missing_hlrlookup_credentials" },
       phoneType: null,
-      isDnc: null,
-      isLitigator: null,
     };
   }
 
-  // IPQS Phone Validation API. URL format puts API key and phone in the path:
-  // https://www.ipqualityscore.com/api/json/phone/<KEY>/<PHONE>
-  // Strip the leading + from e164 since IPQS expects digits-only in the path.
-  type IpqsBody = {
-    success?: boolean;
-    valid?: boolean;
-    active?: boolean;
-    active_status?: string;
-    line_type?: string;
-    carrier?: string;
-    do_not_call?: boolean;
-    tcpa_blacklist?: boolean;
-    fraud_score?: number;
-    message?: string;
+  // HLR Lookup APIv2 — POST { api_key, api_secret, requests: [{ telephone_number }] }
+  // Endpoint expects digits-only (no leading +) per their docs.
+  type HlrResponseItem = {
+    connectivity_status?: string;
+    processing_status?: string;
+    error_code?: string | null;
+    original_network_name?: string | null;
+    ported_network_name?: string | null;
+    is_ported?: boolean;
+    data_source?: string;
     [k: string]: unknown;
   };
-  let body: IpqsBody | null = null;
+  type HlrBody = {
+    success?: boolean;
+    results?: HlrResponseItem[];
+    [k: string]: unknown;
+  };
+  let body: HlrBody | null = null;
   let httpOk = false;
   let networkError: string | null = null;
   try {
     const phoneDigits = e164.replace(/^\+/, "");
-    const url = `${IPQS_ENDPOINT_PREFIX}${apiKey}/${phoneDigits}`;
-    const res = await fetch(url);
+    const res = await fetch(HLR_LOOKUP_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: apiKey,
+        api_secret: apiSecret,
+        requests: [{ telephone_number: phoneDigits }],
+      }),
+    });
     httpOk = res.ok;
-    body = (await res.json()) as IpqsBody;
+    body = (await res.json()) as HlrBody;
   } catch (e) {
     networkError = e instanceof Error ? e.message : String(e);
   }
 
   const checkedAt = new Date().toISOString();
-  const phoneType = mapIpqsLineType(body?.line_type);
-  const isDnc = typeof body?.do_not_call === "boolean" ? body.do_not_call : null;
-  const isLitigator = typeof body?.tcpa_blacklist === "boolean" ? body.tcpa_blacklist : null;
-
-  // For "tried but couldn't verify" cases (network error, non-2xx, missing
-  // fields), we set checkedAt so the row reflects that we attempted
-  // validation — gives the UI something to show ("Checked [date], couldn't
-  // verify") rather than indistinguishable from "never tried". The sweep
-  // only skips rows when checkedAt is genuinely null.
+  const result = body?.results?.[0];
+  const phoneType = mapHlrLineType(result?.data_source, result?.connectivity_status);
 
   if (networkError) {
     return {
       status: "untested",
-      provider: "ipqs",
+      provider: "hlrlookup",
       checkedAt,
       raw: { error: networkError },
       phoneType: null,
-      isDnc: null,
-      isLitigator: null,
     };
   }
-  if (!httpOk || body?.success === false) {
-    // 4xx/5xx, or IPQS returned success=false (e.g., quota exhausted on their
-    // side, invalid key, or non-existent number).
-    return { status: "untested", provider: "ipqs", checkedAt, raw: body, phoneType: null, isDnc: null, isLitigator: null };
+  if (!httpOk || !result) {
+    return { status: "untested", provider: "hlrlookup", checkedAt, raw: body, phoneType: null };
   }
-  // Format-level invalid: IPQS knows the number isn't real before we even
-  // consider line status. Cheaper signal than line-status, so check first.
-  if (body?.valid === false) {
-    await logUsage(sb, orgId, { phone_e164: e164, result: "invalid_format" });
-    return { status: "invalid", provider: "ipqs", checkedAt, raw: body, phoneType: null, isDnc, isLitigator };
+
+  // connectivity_status interpretation:
+  // CONNECTED                 → line is active and reachable → valid
+  // ABSENT_SUBSCRIBER         → phone is off / temporarily out of network. Line
+  //                             still exists; treat as valid (we don't want to
+  //                             mark a customer's switched-off phone as dead).
+  // UNKNOWN_SUBSCRIBER        → number is not registered → invalid
+  // INVALID_DESTINATION_ADDRESS → bogus number → invalid
+  // REJECTED_BY_NETWORK / TELEPHONE_NUMBER_NOT_FOUND → invalid
+  // Anything else / processing_status != COMPLETED → untested (we tried, no clear answer)
+  const status = (result.connectivity_status ?? "").toUpperCase();
+  const processing = (result.processing_status ?? "").toUpperCase();
+
+  if (processing !== "COMPLETED") {
+    return { status: "untested", provider: "hlrlookup", checkedAt, raw: body, phoneType: null };
   }
-  // Line-status answer: `active` is the HLR-grade signal.
-  if (body?.valid === true && body?.active === false) {
-    await logUsage(sb, orgId, { phone_e164: e164, result: "invalid_inactive" });
-    return { status: "invalid", provider: "ipqs", checkedAt, raw: body, phoneType, isDnc, isLitigator };
+
+  const validStatuses = new Set(["CONNECTED", "ABSENT_SUBSCRIBER"]);
+  const invalidStatuses = new Set([
+    "UNKNOWN_SUBSCRIBER",
+    "INVALID_DESTINATION_ADDRESS",
+    "REJECTED_BY_NETWORK",
+    "TELEPHONE_NUMBER_NOT_FOUND",
+    "DEAD",
+  ]);
+
+  if (validStatuses.has(status)) {
+    await logUsage(sb, orgId, { phone_e164: e164, connectivity_status: status });
+    return { status: "valid", provider: "hlrlookup", checkedAt, raw: body, phoneType };
   }
-  if (body?.valid === true && body?.active === true) {
-    await logUsage(sb, orgId, { phone_e164: e164, result: "valid_active" });
-    return { status: "valid", provider: "ipqs", checkedAt, raw: body, phoneType, isDnc, isLitigator };
+  if (invalidStatuses.has(status)) {
+    await logUsage(sb, orgId, { phone_e164: e164, connectivity_status: status });
+    return { status: "invalid", provider: "hlrlookup", checkedAt, raw: body, phoneType };
   }
-  // `active` came back null/undefined — IPQS couldn't determine the line
-  // state. Don't claim valid or invalid; record we tried.
-  return { status: "untested", provider: "ipqs", checkedAt, raw: body, phoneType, isDnc, isLitigator };
+  // Unknown connectivity_status — log so we can audit, but mark untested.
+  return { status: "untested", provider: "hlrlookup", checkedAt, raw: body, phoneType: null };
 }
 
 // Helpers for callers that need quota/usage info without performing validation
@@ -519,7 +523,7 @@ export async function validateAllUntestedForOrg(
         // Transient errors / quota-exhausted come back as untested w/ null
         // checkedAt; leave those rows alone so the next sweep retries them.
         if (result.status === "untested" && result.checkedAt === null) return;
-        // Auto-fill phone type from Veriphone IFF the row doesn't already have
+        // Auto-fill phone type from HLR Lookup IFF the row doesn't already have
         // one — never override a manual choice.
         const shouldFillType = !task.existingType && result.phoneType;
         if (task.kind === "contact") {
