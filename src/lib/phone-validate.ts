@@ -1,4 +1,5 @@
 import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { Resend } from "resend";
 import { createServiceClient } from "./supabase/service";
 
 // Veriphone Free tier is 1,000 requests/month. We cap 50 below to keep a
@@ -62,6 +63,87 @@ async function logUsage(
     period_month: currentPeriodMonth(),
     metadata,
   });
+  // Fire threshold alert check after logging the call. Awaited so a single
+  // request fully processes its own potential threshold crossing — concurrent
+  // requests rely on the usage_alerts unique constraint to dedupe.
+  try {
+    await checkAndAlertThresholds(sb, orgId);
+  } catch (e) {
+    console.error("[phone-validate] threshold check failed:", e);
+  }
+}
+
+// 80% — heads up, still room. 95% — about to cap. 100% — paused.
+const ALERT_THRESHOLDS = [80, 95, 100] as const;
+
+async function checkAndAlertThresholds(sb: ServiceClient, orgId: string): Promise<void> {
+  const [cap, used] = await Promise.all([getQuotaCap(sb, orgId), getMonthUsage(sb, orgId)]);
+  if (cap <= 0) return;
+  const pct = Math.round((used / cap) * 100);
+  const periodMonth = currentPeriodMonth();
+  for (const threshold of ALERT_THRESHOLDS) {
+    if (pct < threshold) continue;
+    // Try to claim this threshold for this month. Unique constraint on
+    // (org_id, addon_key, threshold_pct, period_month) means only one insert
+    // wins under concurrent calls — that's the one that emails.
+    const { error } = await sb.from("usage_alerts").insert({
+      org_id: orgId,
+      addon_key: ADDON_KEY,
+      threshold_pct: threshold,
+      period_month: periodMonth,
+    });
+    if (error) continue;
+    await sendThresholdEmail(sb, orgId, threshold, used, cap);
+  }
+}
+
+async function sendThresholdEmail(
+  sb: ServiceClient,
+  orgId: string,
+  threshold: number,
+  used: number,
+  cap: number
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+  const { data } = await sb
+    .from("profiles")
+    .select("email")
+    .eq("org_id", orgId)
+    .eq("role", "admin");
+  const recipients = ((data ?? []) as Array<{ email: string | null }>)
+    .map((r) => r.email)
+    .filter((e): e is string => !!e && e.trim().length > 0);
+  if (recipients.length === 0) return;
+
+  const subject =
+    threshold === 100
+      ? "Phone validation paused — monthly quota reached"
+      : `Phone validation: ${threshold}% of monthly quota used`;
+
+  const bodyIntro =
+    threshold === 100
+      ? "Your Phone Validation add-on has used 100% of this month's quota. New phone numbers added via import or contact-add will land as <strong>untested</strong> and will not be screened against Veriphone until the cap is raised or the month resets."
+      : `Your Phone Validation add-on has crossed <strong>${threshold}%</strong> of this month's quota. Validation continues normally — this is a heads-up so you can raise the cap before reaching it.`;
+
+  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
+  <h1 style="margin:0;font-size:20px;font-weight:600;color:#0a3d4a;">${subject}</h1>
+  <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">${bodyIntro}</p>
+  <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Used this month: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
+  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Settings &rarr; Billing &amp; Add-ons in the portal shows the live meter and lets you raise the cap or move to a paid Veriphone plan.</p>
+</div>`;
+
+  try {
+    const resend = new Resend(apiKey);
+    await resend.emails.send({
+      from: "bree@mossequitypartners.com",
+      to: recipients,
+      subject,
+      html,
+    });
+  } catch (e) {
+    console.error("[phone-validate] resend email failed:", e);
+  }
 }
 
 // Validate a single phone for a given org. Pre-filters obvious junk via
