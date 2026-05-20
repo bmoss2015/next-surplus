@@ -938,14 +938,20 @@ function ContactLine({
     return undefined;
   })();
 
+  const togglePill = (active: boolean, activeClass: string) =>
+    cn(
+      "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
+      active ? activeClass : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
+    );
+
   return (
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">
-      {/* Line 1: number + phone type pill (click to change), then remove. */}
+      {/* Row 1: value + action icons + trash. Same shape as Relative PhoneSlot. */}
       <div className="flex items-center gap-1.5">
         <span
           title={validationTooltip}
           className={cn(
-            "min-w-0 text-[11.5px] font-medium",
+            "min-w-0 flex-1 text-[11.5px] font-medium",
             status === "invalid" ? "text-gray-400 line-through" : "text-ink",
             breakAll ? "break-all" : "whitespace-nowrap"
           )}
@@ -962,6 +968,41 @@ function ContactLine({
             <IconPhone size={12} stroke={1.75} />
           </a>
         )}
+        {composeHref && (
+          <Link
+            href={composeHref}
+            className="shrink-0 cursor-pointer rounded p-[2px] text-gray-400 hover:bg-petrol-50 hover:text-petrol-700"
+            aria-label="Compose Email"
+            title={`Compose to ${value}`}
+          >
+            <IconMail size={11} stroke={1.75} />
+          </Link>
+        )}
+        <button
+          type="button"
+          aria-label="Change status"
+          onClick={() => {
+            setEditingStatus((v) => !v);
+            setEditingType(false);
+          }}
+          className="cursor-pointer text-gray-300 hover:text-petrol-500"
+        >
+          <IconPencil size={11} stroke={1.75} />
+        </button>
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="shrink-0 cursor-pointer text-gray-300 hover:text-danger"
+            aria-label="Remove"
+          >
+            <IconTrash size={11} stroke={1.75} />
+          </button>
+        )}
+      </div>
+
+      {/* Row 2: type pill + status pill + DNC + Litigator. Mirrors PhoneSlot. */}
+      <div className="mt-1 flex flex-wrap items-center gap-1">
         {isPhone && (
           <div className="relative shrink-0">
             <button
@@ -982,10 +1023,6 @@ function ContactLine({
             </button>
             {editingType && (
               <div className="absolute left-0 top-full z-20 mt-1 w-[100px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-elevated">
-                {/* Fix TTTT4: "Landline" is the canonical stored value going
-                    forward; "Residential" stays as a legacy alias so old rows
-                    still resolve in phoneTypeShort. New manual picks write
-                    "Landline". */}
                 {(["Mobile", "Landline", "Residential", "Other"] as const).map((t) => (
                   <button
                     key={t}
@@ -1006,31 +1043,6 @@ function ContactLine({
             )}
           </div>
         )}
-        <span className="flex-1" />
-        {composeHref && (
-          <Link
-            href={composeHref}
-            className="shrink-0 cursor-pointer rounded p-[2px] text-gray-400 hover:bg-petrol-50 hover:text-petrol-700"
-            aria-label="Compose Email"
-            title={`Compose to ${value}`}
-          >
-            <IconMail size={11} stroke={1.75} />
-          </Link>
-        )}
-        {canRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="shrink-0 cursor-pointer text-gray-300 hover:text-danger"
-            aria-label="Remove"
-          >
-            <IconTrash size={11} stroke={1.75} />
-          </button>
-        )}
-      </div>
-
-      {/* Line 2: the single selected status pill + a pencil to change it. */}
-      <div className="mt-1 flex flex-wrap items-center gap-1.5">
         {editingStatus ? (
           CONTACT_STATUS_ORDER.map((s) => (
             <button
@@ -1050,68 +1062,42 @@ function ContactLine({
               {CONTACT_STATUS_LABELS[s]}
             </button>
           ))
+        ) : isVerifying ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-petrol-100 px-1.5 py-[1px] text-[9px] font-medium leading-none text-petrol-700">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-petrol-500" />
+            Verifying…
+          </span>
         ) : (
-          <>
-            {isVerifying ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-petrol-100 px-1.5 py-[1px] text-[9px] font-medium leading-none text-petrol-700">
-                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-petrol-500" />
-                Verifying…
-              </span>
-            ) : (
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none",
-                  statusClass(status)
-                )}
-              >
-                {CONTACT_STATUS_LABELS[status]}
-              </span>
+          <span
+            className={cn(
+              "rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none",
+              statusClass(status)
             )}
+          >
+            {CONTACT_STATUS_LABELS[status]}
+          </span>
+        )}
+        {isPhone && (
+          <>
             <button
               type="button"
-              aria-label="Change status"
-              onClick={() => {
-                setEditingStatus(true);
-                setEditingType(false);
-              }}
-              className="cursor-pointer text-gray-300 hover:text-petrol-500"
+              onClick={() => onSetPhoneMeta?.({ is_dnc: !isDnc })}
+              className={togglePill(!!isDnc, "bg-danger-bg text-danger")}
+              aria-label="Do Not Call"
             >
-              <IconPencil size={10} stroke={1.75} />
+              DNC
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetPhoneMeta?.({ is_litigator: !isLitigator })}
+              className={togglePill(!!isLitigator, "bg-[#7f1d1d] text-white")}
+              aria-label="Litigator"
+            >
+              Litigator
             </button>
           </>
         )}
       </div>
-
-      {/* Line 3 (phones): DNC + Litigator toggle pills — always visible,
-          matching the Relatives layout. */}
-      {isPhone && (
-        <div className="mt-1 flex flex-wrap items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onSetPhoneMeta?.({ is_dnc: !isDnc })}
-            className={cn(
-              "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
-              isDnc ? "bg-danger-bg text-danger" : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
-            )}
-            aria-label="Do Not Call"
-          >
-            DNC
-          </button>
-          <button
-            type="button"
-            onClick={() => onSetPhoneMeta?.({ is_litigator: !isLitigator })}
-            className={cn(
-              "cursor-pointer rounded-full px-1.5 py-[1px] text-[9px] font-medium leading-none transition-colors",
-              isLitigator
-                ? "bg-[#ffedd5] text-[#9a3412]"
-                : "bg-[#f1f5f9] text-[#64748b] hover:bg-gray-150"
-            )}
-            aria-label="Litigator"
-          >
-            Litigator
-          </button>
-        </div>
-      )}
     </div>
   );
 }
