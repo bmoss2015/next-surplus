@@ -5,19 +5,22 @@
      across 87 files would otherwise need renaming). VALUES now point at the
      new emerald palette so all `petrol-*` Tailwind utilities, gradients, etc.
      automatically render in the new brand color. Petrol teal is retired. */
-  --color-petrol-50: #f3faf6;
+  /* petrol-50 / -100 / -200 are background tints (used heavily for hover +
+     selected indicators). Bree pulled them out of the green palette — they
+     read 'green-on-green AI dashboard' when applied this broadly. Now neutral
+     grays. The deeper petrol-300/500/700/900 stay emerald for brand. */
+  --color-petrol-50: #f8f9fa;
   --color-petrol-100: #f3f4f6;
-  --color-petrol-200: #a0d4b8;
+  --color-petrol-200: #e5e7eb;
   --color-petrol-300: #13644e;
   --color-petrol-500: #0d4b3a;
   --color-petrol-700: #04261c;
   --color-petrol-900: #04261c;
 
-  /* Emerald palette — settings redesign (Phase 1: additive only, not yet
-     applied anywhere. Phase 2 swaps petrol references over to emerald). */
-  --color-emerald-50: #f3faf6;
+  /* Emerald token palette — light tints also neutralized. */
+  --color-emerald-50: #f8f9fa;
   --color-emerald-100: #f3f4f6;
-  --color-emerald-200: #a0d4b8;
+  --color-emerald-200: #e5e7eb;
   --color-emerald-300: #4a9c75;
   --color-emerald-500: #13644e;
   --color-emerald-700: #0d4b3a;
