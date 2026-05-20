@@ -233,8 +233,6 @@ function KanbanCard({
   const tags: Array<{ key: string; label: string; cls: string }> = [];
   if (lead.below_floor)
     tags.push({ key: "below_floor", label: "Below Minimum", cls: "border-warn-border bg-warn-bg text-warn-strong" });
-  if (lead.has_litigator)
-    tags.push({ key: "litigator", label: "Litigator", cls: "border-[#fca5a5] bg-[#fef2f2] text-[#991b1b]" });
   if (lead.needs_action_flag)
     tags.push({ key: "needs_action", label: "Needs Action", cls: "border-petrol-200 bg-[#e0f2f7] text-[#0a3d4a]" });
   const visibleTags = tags.slice(0, 2);

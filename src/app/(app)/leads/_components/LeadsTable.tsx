@@ -6,7 +6,6 @@ import { formatCurrency, primaryOwner, ownerStatusOf } from "@/lib/leads/format"
 import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
 import { OWNER_STATUS_LABELS, SALE_TYPE_LABELS } from "@/lib/leads/types";
 import { BelowFloorIcon } from "@/components/BelowFloorIcon";
-import { LitigatorBadge } from "@/components/LitigatorBadge";
 import { SortHeader } from "./SortHeader";
 import { LeadActionsMenu } from "../[id]/_components/LeadActionsMenu";
 
@@ -142,15 +141,13 @@ export function LeadsTable({
                       <span className="inline-block rounded bg-danger-bg px-2 py-[2px] text-[11px] font-medium text-danger">
                         Needs Action
                       </span>
-                    ) : lead.has_litigator ? null : lead.stage === "new_leads" &&
-                      !lead.has_activity ? (
+                    ) : lead.stage === "new_leads" && !lead.has_activity ? (
                       <span className="inline-block rounded bg-[#e0f2f7] px-2 py-[2px] text-[11px] font-medium text-[#0a3d4a]">
                         New
                       </span>
                     ) : (
                       <span className="text-[11px] text-gray-400">—</span>
                     )}
-                    {lead.has_litigator && <LitigatorBadge />}
                   </div>
                 </td>
                 <td className="px-2 py-[10px] text-right">

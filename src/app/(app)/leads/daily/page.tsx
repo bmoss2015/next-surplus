@@ -3,7 +3,6 @@ import { IconCircleCheck } from "@tabler/icons-react";
 import { fetchDailyWork, type DailyWorkLead } from "@/lib/leads/fetch-daily-work";
 import { ViewToggle } from "../_components/ViewToggle";
 import { StagePill } from "@/components/StagePill";
-import { LitigatorBadge } from "@/components/LitigatorBadge";
 import { LeadActionsMenu } from "../[id]/_components/LeadActionsMenu";
 import { formatCurrency, primaryOwner } from "@/lib/leads/format";
 
@@ -102,7 +101,6 @@ function Section({
                       <span className="truncate text-[13px] font-medium text-ink">
                         {lead.address}
                       </span>
-                      {lead.has_litigator && <LitigatorBadge className="shrink-0" />}
                     </div>
                     <div className="truncate text-[11px] text-gray-500">
                       {primaryOwner(lead)} · {lead.city}, {lead.state}
