@@ -68,48 +68,35 @@ export function OtherContactRolesSection({
   }
 
   return (
-    <div className="col-span-2 rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <h2 className="section-subheader m-0">Other Contact Roles</h2>
-          <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
-            Custom labels used across your org&apos;s Other Contacts dropdown.
-            Roles are created when someone picks &quot;+ Add new role&quot; on
-            an Other Contact. Delete to retire one — affected contacts get
-            reassigned in one step.
-          </div>
-        </div>
+    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+      <h2 className="section-subheader mb-0">Contact Roles</h2>
+      <div className="mt-1 text-[12.5px] text-gray-500" style={{ maxWidth: "72ch" }}>
+        Custom labels for the extra people you track on a lead — anyone who isn&apos;t the owner or attorney.
+        Use these for parties like servicers, process servers, title researchers, or anyone else specific to your workflow.
       </div>
 
       {sortedRoles.length === 0 ? (
-        <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-[12px] text-gray-500">
+        <div className="mt-5 rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-[12px] text-gray-500">
           No custom roles yet. They appear here once a teammate adds one from a
           lead&apos;s Other Contacts section.
         </div>
       ) : (
-        <ul className="divide-y divide-gray-150">
+        <div className="role-chip-grid">
           {sortedRoles.map((label) => (
-            <li
-              key={label}
-              className="flex items-center gap-3 py-2.5"
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-petrol-50 text-petrol-500">
-                <IconBuildingBank size={13} stroke={1.75} />
-              </span>
-              <span className="flex-1 truncate text-[13px] text-ink">
-                {label}
-              </span>
+            <span key={label} className="role-chip">
+              {label}
               <button
                 type="button"
                 onClick={() => setDeleting(label)}
-                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-gray-200 bg-surface px-2.5 py-[5px] text-[11px] font-medium text-gray-600 hover:border-danger hover:text-danger"
+                className="role-chip-x"
+                title={`Delete "${label}"`}
+                aria-label={`Delete ${label}`}
               >
-                <IconTrash size={11} stroke={1.75} />
-                Delete
+                ×
               </button>
-            </li>
+            </span>
           ))}
-        </ul>
+        </div>
       )}
 
       <Modal

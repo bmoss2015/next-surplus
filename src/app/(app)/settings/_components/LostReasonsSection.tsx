@@ -5,9 +5,9 @@ import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { addLostReason, deleteLostReason } from "../_actions";
 import type { LostReasonAdminRow } from "@/lib/settings/fetch";
 
-// Fix 98 — each non-default lost reason gets a trash icon. Deleting asks for
-// confirmation and is blocked when leads still reference the reason (leads
-// store the reason as plain text, so the server matches on the label).
+// Settings redesign — Lost Reasons panel.
+// All reasons can be deleted (was: only user-added). The "Default / User Added"
+// subtext is gone; the row is just the label + delete icon.
 
 export function LostReasonsSection({
   initial,
@@ -62,12 +62,12 @@ export function LostReasonsSection({
     "rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
 
   return (
-    <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="section-subheader">Lost Reasons</h2>
-          <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
-            Options that appear in the Mark Lost dropdown.
+          <h2 className="section-subheader mb-0">Lost Reasons</h2>
+          <div className="mt-1 text-[12.5px] text-gray-500">
+            Options that appear in the Mark Lost dropdown on a lead.
           </div>
         </div>
         {!adding && (
@@ -86,7 +86,7 @@ export function LostReasonsSection({
       </div>
 
       {adding && (
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mt-4 flex items-center gap-2">
           <input
             autoFocus
             type="text"
@@ -118,41 +118,33 @@ export function LostReasonsSection({
               setDraft("");
               setError(null);
             }}
-            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+            className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-gray-300"
           >
             Cancel
           </button>
         </div>
       )}
-      {error && <div className="mb-2 text-[12px] text-danger">{error}</div>}
+      {error && <div className="mt-3 text-[12px] text-danger">{error}</div>}
 
-      <div className="divide-y divide-gray-150">
+      <div className="mt-2">
         {rows.map((row) => (
-          <div
-            key={row.id}
-            className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
-          >
-            <div className="flex-1">
-              <div className="text-[13px] text-ink">{row.label}</div>
-              <div className="text-[10.5px] text-gray-500">
-                {row.is_default ? "Default" : "User Added"}
-              </div>
+          <div key={row.id} className="pref-row">
+            <div className="min-w-0 flex-1">
+              <div className="pref-row-title">{row.label}</div>
             </div>
-            {!row.is_default && (
-              <button
-                type="button"
-                onClick={() => remove(row)}
-                className="cursor-pointer text-gray-400 hover:text-danger"
-                title="Delete"
-                aria-label="Delete"
-              >
-                <IconTrash size={14} stroke={1.75} />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => remove(row)}
+              className="cursor-pointer text-gray-400 hover:text-danger"
+              title="Delete"
+              aria-label="Delete"
+            >
+              <IconTrash size={14} stroke={1.75} />
+            </button>
           </div>
         ))}
-        {rows.length === 0 && (
-          <div className="py-4 text-center text-[12px] text-gray-500">
+        {rows.length === 0 && !adding && (
+          <div className="py-6 text-center text-[12px] text-gray-500">
             No reasons yet.
           </div>
         )}
