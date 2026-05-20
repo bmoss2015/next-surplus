@@ -7,6 +7,7 @@ import { IconLogout, IconPlus } from "@tabler/icons-react";
 import { signOut } from "@/app/(auth)/_actions";
 import { NotificationBell } from "./NotificationBell";
 import { GlobalSearch } from "./GlobalSearch";
+import { ThemeToggle } from "./ThemeToggle";
 import { cn } from "@/lib/cn";
 
 type NavItem = {
@@ -106,6 +107,7 @@ export function TopNav({
           Import Leads
         </Link>
 
+        <ThemeToggle />
         <NotificationBell />
 
         {/* User menu */}
