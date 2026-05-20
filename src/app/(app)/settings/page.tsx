@@ -10,8 +10,6 @@ import {
   fetchOrgInfo,
   fetchMailSettings,
   fetchMailBankAccounts,
-  fetchMailTemplates,
-  fetchMailTemplateFolders,
 } from "@/lib/settings/fetch";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { CompanyInfoSection } from "./_components/CompanyInfoSection";
@@ -24,11 +22,12 @@ import { SmsTemplatesSection } from "./_components/SmsTemplatesSection";
 import { ResearchTemplatesSection } from "./_components/ResearchTemplatesSection";
 import { TeamSection } from "./_components/TeamSection";
 import { ProfileSection } from "./_components/ProfileSection";
+import { ChangePasswordSection } from "./_components/ChangePasswordSection";
 import { EmailAccountsSection } from "./_components/EmailAccountsSection";
 import { OtherContactRolesSection } from "./_components/OtherContactRolesSection";
 import { MailSettingsSection } from "./_components/MailSettingsSection";
 import { MailBankAccountsSection } from "./_components/MailBankAccountsSection";
-import { MailTemplatesSection } from "./_components/MailTemplatesSection";
+import { BillingSection } from "./_components/BillingSection";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
 
@@ -50,8 +49,6 @@ export default async function SettingsPage() {
     researchTemplates,
     emailAccounts,
     customContactRoles,
-    mailTemplates,
-    mailTemplateFolders,
   ] = await Promise.all([
     fetchAttorneys(),
     fetchLostReasonsAdmin(),
@@ -59,8 +56,6 @@ export default async function SettingsPage() {
     fetchResearchTemplates(),
     fetchMyEmailAccounts(),
     fetchOrgCustomRoles(),
-    fetchMailTemplates(),
-    fetchMailTemplateFolders(),
   ]);
   const [
     defaults,
@@ -96,18 +91,18 @@ export default async function SettingsPage() {
           initialFullName={profile.fullName}
           initialEmail={profile.email ?? ""}
         />
+        <ChangePasswordSection />
+        {isAdmin && <BillingSection orgId={profile.orgId} />}
         <EmailAccountsSection initial={emailAccounts} />
         {isAdmin && <CompanyInfoSection initial={orgInfo!} />}
         {isAdmin && <MailSettingsSection initial={mailSettings!} />}
         {isAdmin && (
           <MailBankAccountsSection initial={mailBankAccounts!} />
         )}
-        {isAdmin && (
-          <MailTemplatesSection
-            initialTemplates={mailTemplates}
-            initialFolders={mailTemplateFolders}
-          />
-        )}
+        {/* Mail Templates moved to /mail/templates — settings now only
+            holds platform-level mail config (return address, bank
+            accounts, signatures). Template authoring belongs with the
+            rest of the mail workflow on the Mail tab. */}
         {isAdmin && (
           <div className="col-span-2">
             <TeamSection initial={members!} currentUserId={profile.id} />
