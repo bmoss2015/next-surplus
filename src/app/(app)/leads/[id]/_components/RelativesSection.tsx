@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { IconPlus, IconTrash, IconUsersGroup, IconPencil } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconUsersGroup, IconPencil, IconPhone } from "@tabler/icons-react";
 import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
 import { Modal } from "@/components/Modal";
 import { AgeEditField } from "./ContactsTabClient";
 import { formatPhone } from "@/lib/format/phone";
-import { formatPhoneInput } from "@/lib/phone";
+import { formatPhoneInput, toE164 } from "@/lib/phone";
 import { properCaseName } from "@/lib/format/proper-case-name";
 import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
@@ -750,6 +750,16 @@ function PhoneSlot({
           >
             {formatPhone(stored)}
           </span>
+        )}
+        {!showInput && stored && (
+          <a
+            href={`tel:${toE164(stored) ?? stored}`}
+            className="shrink-0 cursor-pointer text-petrol-500 hover:text-petrol-700"
+            aria-label="Call this number"
+            title="Call"
+          >
+            <IconPhone size={12} stroke={1.75} />
+          </a>
         )}
         {!showInput && (
           <button

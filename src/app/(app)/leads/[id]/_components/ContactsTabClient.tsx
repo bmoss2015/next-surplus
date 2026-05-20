@@ -8,6 +8,7 @@ import {
   IconTrash,
   IconPencil,
   IconMail,
+  IconPhone,
 } from "@tabler/icons-react";
 import {
   upsertContact,
@@ -21,7 +22,7 @@ import { useRole } from "@/components/RoleProvider";
 import { Modal } from "@/components/Modal";
 import { cn } from "@/lib/cn";
 import { formatPhone } from "@/lib/format/phone";
-import { formatPhoneInput } from "@/lib/phone";
+import { formatPhoneInput, toE164 } from "@/lib/phone";
 import { SectionSubheader } from "./SectionSubheader";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -951,6 +952,16 @@ function ContactLine({
         >
           {value}
         </span>
+        {isPhone && (
+          <a
+            href={`tel:${toE164(value) ?? value}`}
+            className="shrink-0 cursor-pointer text-petrol-500 hover:text-petrol-700"
+            aria-label="Call this number"
+            title="Call"
+          >
+            <IconPhone size={12} stroke={1.75} />
+          </a>
+        )}
         {isPhone && (
           <div className="relative shrink-0">
             <button
