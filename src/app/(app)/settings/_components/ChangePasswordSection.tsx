@@ -69,7 +69,7 @@ export function ChangePasswordSection() {
 
   return (
     <div className="col-span-2">
-      <h2 className="section-subheader mb-0">Security</h2>
+      
 
       <form onSubmit={save} autoComplete="off">
         <div className="pref-section-h">Password</div>

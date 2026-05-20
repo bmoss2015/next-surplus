@@ -119,7 +119,7 @@ export function AttorneysSection({ initial }: { initial: AttorneyRow[] }) {
     <div className="col-span-2">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="section-subheader mb-0">Attorneys</h2>
+          
           <div className="mt-1 text-[12.5px] text-gray-500">
             Attorneys you assign to leads filing claims. Their fee feeds into Estimated Net.
           </div>

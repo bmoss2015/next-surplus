@@ -520,7 +520,7 @@ function FieldPicker({
                       taken
                         ? "cursor-not-allowed text-gray-300"
                         : "cursor-pointer text-ink hover:bg-gray-50",
-                      f.key === value && "bg-petrol-300/10 font-medium"
+                      f.key === value && "bg-gray-100 font-medium"
                     )}
                   >
                     <span>

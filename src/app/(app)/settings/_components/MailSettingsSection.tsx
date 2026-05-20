@@ -101,7 +101,7 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
 
   return (
     <div className="col-span-2">
-      <h2 className="section-subheader mb-0">Mail Configuration</h2>
+      
       <div className="mt-1 text-[12.5px] text-gray-500">
         Signer, signature, and default postal class applied to every outgoing letter.
       </div>

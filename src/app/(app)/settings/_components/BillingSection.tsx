@@ -23,7 +23,7 @@ export async function BillingSection({ orgId }: { orgId: string }) {
 
   return (
     <div className="col-span-2">
-      <h2 className="section-subheader mb-0">Billing</h2>
+      
 
       {/* Plan hero (layout only — no Stripe yet) */}
       <div className="plan-hero" style={{ marginTop: 16 }}>

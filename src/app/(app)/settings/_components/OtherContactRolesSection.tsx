@@ -69,7 +69,7 @@ export function OtherContactRolesSection({
 
   return (
     <div className="col-span-2">
-      <h2 className="section-subheader mb-0">Contact Roles</h2>
+      
       <div className="mt-1 text-[12.5px] text-gray-500" style={{ maxWidth: "72ch" }}>
         Custom labels for the extra people you track on a lead — anyone who isn&apos;t the owner or attorney.
         Use these for parties like servicers, process servers, title researchers, or anyone else specific to your workflow.

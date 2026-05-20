@@ -24,7 +24,7 @@ const STATUS_LABEL: Record<MailJobListRow["status"], string> = {
 const STATUS_CLASS: Record<MailJobListRow["status"], string> = {
   queued: "bg-gray-100 text-gray-600",
   in_transit: "bg-petrol-50 text-petrol-700",
-  delivered: "bg-success/10 text-success",
+  delivered: "bg-gray-100 text-success",
   returned: "bg-danger-bg text-danger",
   failed: "bg-danger-bg text-danger",
 };

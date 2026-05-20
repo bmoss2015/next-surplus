@@ -14,7 +14,7 @@ export function BackfillButton() {
   function start() {
     if (
       !window.confirm(
-        "Validate every untested phone in this org (on non-lost leads)? Uses the Veriphone API key currently configured in env."
+        "Validate every untested phone in this org (on non-lost leads)? Uses the HLR Lookup API credentials currently configured in env."
       )
     ) {
       return;

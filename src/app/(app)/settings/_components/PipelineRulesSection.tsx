@@ -37,7 +37,7 @@ export function PipelineRulesSection({ initial }: { initial: number | null }) {
 
   return (
     <div className="col-span-2">
-      <h2 className="section-subheader mb-0">Pipeline Rules</h2>
+      
 
       <div className="pref-row" style={{ paddingTop: 24 }}>
         <div className="min-w-0 flex-1">

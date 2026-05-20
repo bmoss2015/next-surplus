@@ -122,7 +122,7 @@ export function TeamSection({
   return (
     <div className="col-span-2">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="section-subheader mb-0">Members</h2>
+        
         <button
           type="button"
           onClick={() => { setDrawerOpen(true); setMsg(null); }}

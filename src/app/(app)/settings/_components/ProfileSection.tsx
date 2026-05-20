@@ -68,7 +68,7 @@ export function ProfileSection({
 
   return (
     <div className="col-span-2">
-      <h2 className="section-subheader mb-0">Profile</h2>
+      
 
       <div className="clean-hero">
         <div className="clean-hero-avatar">{initials(firstName, lastName)}</div>

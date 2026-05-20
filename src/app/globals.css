@@ -59,7 +59,10 @@
 
   --color-success: #15803d;
   --color-success-strong: #065f46;
-  --color-success-bg: #d1fae5;
+  /* Was #d1fae5 (vivid mint). Bree consistently rejects tinted-green
+     background pillows — pulled the success-bg into the neutral gray scale
+     so 'active' status pills read as gray with green text, not green-on-green. */
+  --color-success-bg: #f3f4f6;
 
   --color-info-violet: #534ab7;
   --color-info-violet-deep: #3c3489;

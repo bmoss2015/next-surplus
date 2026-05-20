@@ -42,7 +42,7 @@ export function MailBankAccountsSection({
     <div className="col-span-2">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="section-subheader mb-0">Bank Accounts</h2>
+          
           <div className="mt-1 text-[12.5px] text-gray-500">
             Verified accounts available to draw outgoing checks from. Routing and account numbers are stored only by Lob.
           </div>

@@ -61,7 +61,7 @@ export function CompanyInfoSection({ initial }: { initial: OrgInfo }) {
 
   return (
     <div className="col-span-2">
-      <h2 className="section-subheader mb-0">Company Profile</h2>
+      
 
       <div className="clean-hero">
         <div

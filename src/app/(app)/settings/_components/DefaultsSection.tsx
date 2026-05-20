@@ -40,7 +40,7 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
 
   return (
     <div className="col-span-2">
-      <h2 className="section-subheader mb-0">Defaults</h2>
+      
 
       <div className="calc-hero" style={{ marginTop: 18 }}>
         <div className="plan-hero-eyebrow">Live Example · $50,000 Surplus</div>
