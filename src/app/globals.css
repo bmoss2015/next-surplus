@@ -84,126 +84,12 @@ body {
   height: 100%;
 }
 
-/* Light mode (default). Dark mode is opted in via html[data-theme="dark"]. */
+/* Pin the portal to a light color-scheme. Without this, browsers running
+   forced/auto dark mode (Chrome's "Auto Dark Mode for Web Contents", etc.)
+   invert the sidebar gradient and eat the white logo + user name. */
 :root {
   color-scheme: light;
 }
-
-/* ============================================================================
-   DARK THEME — overrides the @theme tokens defined above. Tailwind utilities
-   like `bg-surface`, `text-ink`, `border-gray-200` reference these vars, so
-   updating the values here cascades automatically through every utility.
-   Triggered by the inline script in layout.tsx setting data-theme="dark" on
-   <html>.
-   ============================================================================ */
-html[data-theme="dark"] {
-  color-scheme: dark;
-
-  /* Inverted neutrals. The token NAMES stay the same so utility classes work
-     across both themes — only the resolved hex flips. */
-  --color-ink:        #f5f6f8;
-  --color-canvas:     #0a0d14;
-  --color-surface:    #11141b;
-  --color-surface-muted: #161a22;
-
-  --color-gray-50:    #161a22;
-  --color-gray-100:   #1c2029;
-  --color-gray-150:   #232830;
-  --color-gray-200:   #2a2f3a;
-  --color-gray-300:   #3a4150;
-  --color-gray-400:   #6b7280;
-  --color-gray-500:   #9298a3;
-  --color-gray-700:   #c2c5cc;
-  --color-gray-900:   #f5f6f8;
-
-  /* Emerald palette — brighten one step for better contrast on dark bg. */
-  --color-petrol-50:  #14211a;
-  --color-petrol-100: #1e3329;
-  --color-petrol-200: #2e5443;
-  --color-petrol-300: #4a9c75;
-  --color-petrol-500: #1f8364;
-  --color-petrol-700: #2a9c79;
-  --color-petrol-900: #0d4b3a;
-
-  --color-warn:       #2a9c79;
-  --color-warn-strong: #1f8364;
-  --color-warn-bg:    #1e3329;
-  --color-warn-border: #2a9c79;
-  --color-warn-deep:  #1f8364;
-
-  --color-danger:     #f87171;
-  --color-danger-bg:  #2a1818;
-  --color-danger-border: #5a2222;
-
-  --color-success:    #4ade80;
-  --color-success-strong: #22c55e;
-  --color-success-bg: #142b1c;
-
-  /* Subtle shadows — darker shadows on dark surfaces are invisible. Use a
-     glow / faint highlight instead so cards still feel elevated. */
-  --shadow-card:        0 0 0 1px rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.40);
-  --shadow-card-hover:  0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 12px rgba(0, 0, 0, 0.50);
-  --shadow-elevated:    0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 32px rgba(0, 0, 0, 0.60);
-}
-
-/* Dark-mode tweaks for the inline-hex elements that can't go through tokens. */
-html[data-theme="dark"] .bg-sidebar-gradient {
-  background: linear-gradient(180deg, #0d4b3a 0%, #1f8364 100%);
-}
-html[data-theme="dark"] .bg-hero-gradient {
-  background: linear-gradient(135deg, #0d4b3a 0%, #1f8364 70%, #2a9c79 100%);
-}
-html[data-theme="dark"] .btn-primary {
-  background: linear-gradient(135deg, #1f8364 0%, #0d4b3a 100%);
-}
-html[data-theme="dark"] .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2a9c79 0%, #14705a 100%);
-}
-html[data-theme="dark"] .kanban-scroll {
-  scrollbar-color: #1f8364 #232830;
-}
-html[data-theme="dark"] .kanban-scroll::-webkit-scrollbar-track { background: #232830; }
-html[data-theme="dark"] .kanban-scroll::-webkit-scrollbar-thumb { background: #1f8364; }
-html[data-theme="dark"] .kanban-scroll::-webkit-scrollbar-thumb:hover { background: #2a9c79; }
-html[data-theme="dark"] .section-subheader { color: #4a9c75; }
-html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
-html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: brightness(0) invert(1) opacity(0.7);
-}
-html[data-theme="dark"] input[type="date"],
-html[data-theme="dark"] input[type="time"] {
-  accent-color: #1f8364;
-  color-scheme: dark;
-}
-
-/* Component overrides for dark mode where I had hardcoded backgrounds. */
-html[data-theme="dark"] .clean-hero-avatar,
-html[data-theme="dark"] .role-tab.role-tab-admin {
-  /* Use a brighter emerald gradient since the dark canvas swallows the dark one. */
-  background: linear-gradient(135deg, #1f8364 0%, #0d4b3a 100%);
-}
-html[data-theme="dark"] .role-tab.role-tab-member {
-  background: var(--color-gray-100);
-  color: var(--color-gray-700);
-}
-html[data-theme="dark"] .role-tab.role-tab-pending {
-  color: #4a9c75; border-color: #2e5443;
-}
-html[data-theme="dark"] .sig-hero-paper {
-  background: var(--color-surface-muted);
-}
-html[data-theme="dark"] .sig-hero-paper::before {
-  background: linear-gradient(90deg, #1f8364 0%, #0d4b3a 100%);
-}
-html[data-theme="dark"] .plan-hero,
-html[data-theme="dark"] .calc-hero {
-  background:
-    radial-gradient(120% 140% at 100% 0%, rgba(255,255,255,0.06) 0%, transparent 50%),
-    linear-gradient(135deg, #1f8364 0%, #0d4b3a 100%);
-}
-html[data-theme="dark"] .addon-meter-bar { background: var(--color-gray-100); }
-html[data-theme="dark"] .addon-meter-bar-fill { background: #1f8364; }
-html[data-theme="dark"] .drawer-backdrop { background: rgba(0, 0, 0, 0.60); }
 
 body {
   background: var(--color-canvas);
