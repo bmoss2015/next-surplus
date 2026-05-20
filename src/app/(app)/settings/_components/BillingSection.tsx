@@ -57,7 +57,7 @@ export async function BillingSection({ orgId }: { orgId: string }) {
         </div>
         {pct >= 100 && (
           <div className="mt-2 text-[11px] text-danger">
-            Monthly quota reached. New phones land as &lsquo;untested&rsquo; until the quota resets or the cap is raised.
+            Monthly quota reached. New phones land as &lsquo;Not Verified&rsquo; until the quota resets or the cap is raised.
           </div>
         )}
         {pct >= 80 && pct < 100 && (

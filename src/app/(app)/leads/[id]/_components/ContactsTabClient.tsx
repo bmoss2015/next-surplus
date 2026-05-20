@@ -49,7 +49,7 @@ function phoneTypeShort(t: string | null): string {
 type ContactStatus = "untested" | "valid" | "invalid";
 
 const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {
-  untested: "Untested",
+  untested: "Not Verified",
   valid: "Valid",
   invalid: "Invalid",
 };
@@ -886,14 +886,26 @@ function ContactLine({
         ? "bg-danger text-white"
         : "bg-gray-200 text-gray-700";
 
-  // For phones marked dead by the validator, hover-tooltip shows when and how
-  // it was determined so Rik can decide whether to trust it or pencil-edit.
-  const validationTooltip =
-    status === "invalid" && validationCheckedAt
-      ? `Marked invalid ${new Date(validationCheckedAt).toLocaleDateString()}${
-          validationProvider ? ` (${validationProvider === "libphonenumber" ? "format check" : validationProvider})` : ""
-        }`
-      : undefined;
+  // Tooltip surfaces the validation audit info on hover. Three cases:
+  //   - invalid + checked: API confirmed dead (or libphonenumber said malformed)
+  //   - not verified + checked: tried, no clear answer (network / quota / etc.)
+  //   - not verified + never checked: no tooltip (nothing to say)
+  const validationTooltip = (() => {
+    if (!validationCheckedAt) return undefined;
+    const when = new Date(validationCheckedAt).toLocaleDateString();
+    const providerLabel = validationProvider
+      ? validationProvider === "libphonenumber"
+        ? "format check"
+        : validationProvider
+      : null;
+    if (status === "invalid") {
+      return `Marked invalid ${when}${providerLabel ? ` (${providerLabel})` : ""}`;
+    }
+    if (status === "untested") {
+      return `Tried to verify ${when}${providerLabel ? ` (${providerLabel})` : ""} — result unclear, manual review may help`;
+    }
+    return undefined;
+  })();
 
   return (
     <div className="rounded-md border border-gray-150 bg-gray-50 p-1.5">

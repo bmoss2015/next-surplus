@@ -18,7 +18,21 @@ export type ValidationResult = {
   provider: string | null;
   checkedAt: string | null;
   raw: unknown;
+  // Mapped from Veriphone's phone_type — caller decides whether to overwrite
+  // an existing phone_type on the row. Null when Veriphone didn't return one
+  // (libphonenumber failure, quota exhaustion, or syntax-error response).
+  phoneType: string | null;
 };
+
+// Map Veriphone's phone_type strings to the portal's display values. Anything
+// unmapped (toll_free, premium_rate, shared_cost, unknown) returns null so we
+// leave the existing phone_type column alone.
+function mapVeriphoneType(t: unknown): string | null {
+  if (t === "mobile") return "Mobile";
+  if (t === "fixed_line") return "Landline";
+  if (t === "voip" || t === "non_fixed_voip") return "Mobile";
+  return null;
+}
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -125,7 +139,7 @@ async function sendThresholdEmail(
 
   const bodyIntro =
     threshold === 100
-      ? "Your Phone Validation add-on has used 100% of this month's quota. New phone numbers added via import or contact-add will land as <strong>untested</strong> and will not be screened against Veriphone until the cap is raised or the month resets."
+      ? "Your Phone Validation add-on has used 100% of this month's quota. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened against Veriphone until the cap is raised or the month resets."
       : `Your Phone Validation add-on has crossed <strong>${threshold}%</strong> of this month's quota. Validation continues normally — this is a heads-up so you can raise the cap before reaching it.`;
 
   const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
@@ -156,7 +170,7 @@ export async function validatePhone(
   orgId: string
 ): Promise<ValidationResult> {
   if (!phoneRaw || !phoneRaw.trim()) {
-    return { status: "untested", provider: null, checkedAt: null, raw: null };
+    return { status: "untested", provider: null, checkedAt: null, raw: null, phoneType: null };
   }
 
   const parsed = parsePhoneNumberFromString(phoneRaw.trim(), "US");
@@ -166,6 +180,7 @@ export async function validatePhone(
       provider: "libphonenumber",
       checkedAt: new Date().toISOString(),
       raw: { reason: "failed_libphonenumber" },
+      phoneType: null,
     };
   }
   const e164 = parsed.number;
@@ -181,6 +196,7 @@ export async function validatePhone(
       provider: null,
       checkedAt: null,
       raw: { reason: "quota_exhausted", cap, used },
+      phoneType: null,
     };
   }
 
@@ -191,10 +207,11 @@ export async function validatePhone(
       provider: null,
       checkedAt: null,
       raw: { reason: "missing_veriphone_key" },
+      phoneType: null,
     };
   }
 
-  type VeriphoneBody = { status?: string; phone_valid?: boolean; [k: string]: unknown };
+  type VeriphoneBody = { status?: string; phone_valid?: boolean; phone_type?: string; [k: string]: unknown };
   let body: VeriphoneBody | null = null;
   let httpOk = false;
   let networkError: string | null = null;
@@ -212,30 +229,38 @@ export async function validatePhone(
   }
 
   const checkedAt = new Date().toISOString();
+  const phoneType = mapVeriphoneType(body?.phone_type);
+
+  // For "tried but couldn't verify" cases (network error, non-2xx, weird
+  // response shape), we set checkedAt so the row reflects that we attempted
+  // validation — that gives the UI something to show ("Checked [date],
+  // couldn't verify") rather than leaving it indistinguishable from
+  // "never tried". The sweep only skips rows when checkedAt is genuinely null.
 
   if (networkError) {
     return {
       status: "untested",
       provider: "veriphone",
-      checkedAt: null,
+      checkedAt,
       raw: { error: networkError },
+      phoneType: null,
     };
   }
   if (body?.status === "syntax-error") {
-    return { status: "invalid", provider: "veriphone", checkedAt, raw: body };
+    return { status: "invalid", provider: "veriphone", checkedAt, raw: body, phoneType: null };
   }
   if (!httpOk) {
-    return { status: "untested", provider: "veriphone", checkedAt: null, raw: body };
+    return { status: "untested", provider: "veriphone", checkedAt, raw: body, phoneType: null };
   }
   if (body?.status === "success" && body?.phone_valid === true) {
     await logUsage(sb, orgId, { phone_e164: e164, result: "valid" });
-    return { status: "valid", provider: "veriphone", checkedAt, raw: body };
+    return { status: "valid", provider: "veriphone", checkedAt, raw: body, phoneType };
   }
   if (body?.status === "success" && body?.phone_valid === false) {
     await logUsage(sb, orgId, { phone_e164: e164, result: "invalid" });
-    return { status: "invalid", provider: "veriphone", checkedAt, raw: body };
+    return { status: "invalid", provider: "veriphone", checkedAt, raw: body, phoneType };
   }
-  return { status: "untested", provider: "veriphone", checkedAt: null, raw: body };
+  return { status: "untested", provider: "veriphone", checkedAt, raw: body, phoneType: null };
 }
 
 // Helpers for callers that need quota/usage info without performing validation
@@ -259,8 +284,8 @@ export async function getValidationUsage(orgId: string): Promise<{ used: number;
 // rows alone, they'll get picked up next time).
 const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const;
 type PendingTask =
-  | { kind: "contact"; rowId: string; phone: string }
-  | { kind: "relative"; rowId: string; phone: string; base: (typeof RELATIVE_PHONE_BASES)[number] };
+  | { kind: "contact"; rowId: string; phone: string; existingType: string | null }
+  | { kind: "relative"; rowId: string; phone: string; base: (typeof RELATIVE_PHONE_BASES)[number]; existingType: string | null };
 
 export async function validatePendingForOrg(
   orgId: string,
@@ -272,41 +297,53 @@ export async function validatePendingForOrg(
 
   const contactsRes = await sb
     .from("contacts")
-    .select("id, value")
+    .select("id, value, phone_type")
     .eq("org_id", orgId)
     .eq("channel", "phone")
     .eq("status", "untested")
     .not("value", "is", null)
     .limit(maxItems);
+  if (contactsRes.error) {
+    console.error("[phone-validate] contacts query failed:", contactsRes.error);
+  }
 
   const relativesRes = await sb
     .from("relatives")
     .select(
-      "id, phone, phone_status, phone_2, phone_2_status, phone_3, phone_3_status, phone_4, phone_4_status, phone_5, phone_5_status"
+      "id, phone, phone_type, phone_status, phone_2, phone_2_type, phone_2_status, phone_3, phone_3_type, phone_3_status, phone_4, phone_4_type, phone_4_status, phone_5, phone_5_type, phone_5_status"
     )
     .eq("org_id", orgId)
     .or(
       "phone_status.eq.untested,phone_2_status.eq.untested,phone_3_status.eq.untested,phone_4_status.eq.untested,phone_5_status.eq.untested"
     )
     .limit(maxItems);
+  if (relativesRes.error) {
+    console.error("[phone-validate] relatives query failed:", relativesRes.error);
+  }
 
   const tasks: PendingTask[] = [];
-  for (const c of (contactsRes.data ?? []) as Array<{ id: string; value: string | null }>) {
-    if (c.value) tasks.push({ kind: "contact", rowId: c.id, phone: c.value });
+  for (const c of (contactsRes.data ?? []) as Array<{ id: string; value: string | null; phone_type: string | null }>) {
+    if (c.value) tasks.push({ kind: "contact", rowId: c.id, phone: c.value, existingType: c.phone_type });
   }
   for (const r of (relativesRes.data ?? []) as Record<string, unknown>[]) {
     const rowId = r.id as string;
     for (const base of RELATIVE_PHONE_BASES) {
       const value = r[base] as string | null;
       const status = r[`${base}_status`] as string | null;
+      const existingType = (r[`${base}_type`] as string | null) ?? null;
       if (value && status === "untested") {
-        tasks.push({ kind: "relative", rowId, phone: value, base });
+        tasks.push({ kind: "relative", rowId, phone: value, base, existingType });
       }
     }
   }
 
   const limited = tasks.slice(0, maxItems);
   let processed = 0;
+  console.log(
+    `[phone-validate] sweep org=${orgId}: ${tasks.length} pending phones ` +
+      `(${tasks.filter((t) => t.kind === "contact").length} contacts, ` +
+      `${tasks.filter((t) => t.kind === "relative").length} relative slots)`
+  );
 
   for (let i = 0; i < limited.length; i += concurrency) {
     const batch = limited.slice(i, i + concurrency);
@@ -316,26 +353,27 @@ export async function validatePendingForOrg(
         // Transient errors / quota-exhausted come back as untested w/ null
         // checkedAt; leave those rows alone so the next sweep retries them.
         if (result.status === "untested" && result.checkedAt === null) return;
+        // Auto-fill phone type from Veriphone IFF the row doesn't already have
+        // one — never override a manual choice.
+        const shouldFillType = !task.existingType && result.phoneType;
         if (task.kind === "contact") {
-          await sb
-            .from("contacts")
-            .update({
-              status: result.status,
-              validation_checked_at: result.checkedAt,
-              validation_provider: result.provider,
-              validation_raw: result.raw as object,
-            })
-            .eq("id", task.rowId);
+          const update: Record<string, unknown> = {
+            status: result.status,
+            validation_checked_at: result.checkedAt,
+            validation_provider: result.provider,
+            validation_raw: result.raw as object,
+          };
+          if (shouldFillType) update.phone_type = result.phoneType;
+          await sb.from("contacts").update(update).eq("id", task.rowId);
         } else {
-          await sb
-            .from("relatives")
-            .update({
-              [`${task.base}_status`]: result.status,
-              [`${task.base}_validation_checked_at`]: result.checkedAt,
-              [`${task.base}_validation_provider`]: result.provider,
-              [`${task.base}_validation_raw`]: result.raw as object,
-            })
-            .eq("id", task.rowId);
+          const update: Record<string, unknown> = {
+            [`${task.base}_status`]: result.status,
+            [`${task.base}_validation_checked_at`]: result.checkedAt,
+            [`${task.base}_validation_provider`]: result.provider,
+            [`${task.base}_validation_raw`]: result.raw as object,
+          };
+          if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
+          await sb.from("relatives").update(update).eq("id", task.rowId);
         }
         processed += 1;
       })

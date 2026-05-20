@@ -624,12 +624,22 @@ function PhoneSlot({
   const checkedAt = relative[slot.checkedAt] as string | null;
   const provider = relative[slot.provider] as string | null;
   const isDead = status === "invalid";
-  const deadTooltip =
-    isDead && checkedAt
-      ? `Marked invalid ${new Date(checkedAt).toLocaleDateString()}${
-          provider ? ` (${provider === "libphonenumber" ? "format check" : provider})` : ""
-        }`
-      : undefined;
+  const deadTooltip = (() => {
+    if (!checkedAt) return undefined;
+    const when = new Date(checkedAt).toLocaleDateString();
+    const providerLabel = provider
+      ? provider === "libphonenumber"
+        ? "format check"
+        : provider
+      : null;
+    if (isDead) {
+      return `Marked invalid ${when}${providerLabel ? ` (${providerLabel})` : ""}`;
+    }
+    if (status === "untested") {
+      return `Tried to verify ${when}${providerLabel ? ` (${providerLabel})` : ""} — result unclear, manual review may help`;
+    }
+    return undefined;
+  })();
 
   const pill = (active: boolean, activeClass: string) =>
     cn(
