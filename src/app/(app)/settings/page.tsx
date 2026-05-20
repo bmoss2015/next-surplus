@@ -90,6 +90,7 @@ export default async function SettingsPage() {
         <ProfileSection
           initialFullName={profile.fullName}
           initialEmail={profile.email ?? ""}
+          isAdmin={isAdmin}
         />
         <ChangePasswordSection />
         {isAdmin && <BillingSection orgId={profile.orgId} />}
