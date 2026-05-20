@@ -5,101 +5,219 @@ import { updateAppSetting } from "../_actions";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import type { AppSettings } from "@/lib/settings/fetch";
 
-// Fix 60 — description text removed. % sits inside the input border, right
-// aligned; $ sits inside the input border, left aligned with comma formatting.
-// All three inputs are visually consistent. Each saves on blur.
+// Settings redesign — Defaults panel with a brand-gradient calc-hero showing
+// the math flow (Surplus → Fee → Attorney → Net), then minimal pref-rows.
 
 export function DefaultsSection({ initial }: { initial: AppSettings }) {
   const [feePct, setFeePct] = useState(
     String(initial.default_recovery_fee_percent)
   );
+  const [attCost, setAttCost] = useState(initial.default_attorney_cost);
+  const [, startTransition] = useTransition();
   const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
   function save(
     key: "default_recovery_fee_percent" | "default_attorney_cost" | "surplus_floor",
     value: number | null
   ) {
     if (value == null || !Number.isFinite(value)) return;
+    setPending(true);
     startTransition(async () => {
       const result = await updateAppSetting(key, value);
       if (result.ok) setSavedAt(new Date().toLocaleTimeString());
+      setPending(false);
     });
   }
 
+  // Live preview values for the calc-hero ($50K surplus example).
+  const surplus = 50000;
+  const feeAmt = Math.round((surplus * (Number(feePct) || 0)) / 100);
+  const net = feeAmt - (Number(attCost) || 0);
+
+  const inputClass =
+    "rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500 tabular-nums text-right";
+
   return (
-    <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
-      <h2 className="section-subheader">Defaults</h2>
-      <div className="mt-4 space-y-3">
-        <Row label="Default Recovery Fee">
-          {/* % inside the border, right aligned — CurrencyInput isn't ideal
-              for percentages, so this is a small inline-adornment wrapper. */}
-          <div className="inline-flex w-32 items-center gap-1 rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] focus-within:border-petrol-500">
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={0.5}
-              value={feePct}
-              onChange={(e) => setFeePct(e.target.value)}
-              onBlur={(e) => {
-                const n = Number(e.target.value);
-                save("default_recovery_fee_percent", Number.isFinite(n) ? n : null);
+    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+      <h2 className="section-subheader mb-0">Defaults</h2>
+
+      <div className="calc-hero" style={{ marginTop: 18 }}>
+        <div className="plan-hero-eyebrow">Live Example · $50,000 Surplus</div>
+        <div className="mt-3 flex items-center gap-3 flex-wrap">
+          <div className="calc-hero-step">
+            <div
+              style={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.62)",
+                marginBottom: 6,
               }}
-              className="w-full bg-transparent text-right text-[12.5px] text-ink outline-none"
-            />
-            <span className="select-none text-[12.5px] text-gray-500">%</span>
+            >
+              Estimated Surplus
+            </div>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                color: "#fff",
+                letterSpacing: "-0.022em",
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1.1,
+              }}
+            >
+              $50,000
+            </div>
           </div>
-        </Row>
-        <Row label="Default Attorney Cost">
-          <CurrencyInput
-            value={initial.default_attorney_cost}
-            onCommit={(n) => save("default_attorney_cost", n)}
-            prefix="$"
-            align="left"
-            className="w-32"
-          />
-        </Row>
-        <Row
-          label="Minimum Threshold"
-          hint="Leads with a surplus under this amount are tagged Below Minimum. Soft warning only — they can still be pursued."
-        >
-          <CurrencyInput
-            value={initial.surplus_floor}
-            onCommit={(n) => save("surplus_floor", n)}
-            prefix="$"
-            align="left"
-            className="w-32"
-          />
-        </Row>
+          <div className="calc-hero-arrow">→</div>
+          <div className="calc-hero-step">
+            <div
+              style={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.62)",
+                marginBottom: 6,
+              }}
+            >
+              Recovery Fee ({feePct}%)
+            </div>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                color: "#fff",
+                letterSpacing: "-0.022em",
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1.1,
+              }}
+            >
+              ${feeAmt.toLocaleString()}
+            </div>
+          </div>
+          <div className="calc-hero-arrow">−</div>
+          <div className="calc-hero-step">
+            <div
+              style={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.62)",
+                marginBottom: 6,
+              }}
+            >
+              Attorney Fee
+            </div>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                color: "#fff",
+                letterSpacing: "-0.022em",
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1.1,
+              }}
+            >
+              ${(Number(attCost) || 0).toLocaleString()}
+            </div>
+          </div>
+          <div className="calc-hero-arrow">=</div>
+          <div className="calc-hero-step calc-hero-step-total">
+            <div
+              style={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.62)",
+                marginBottom: 6,
+              }}
+            >
+              Estimated Net
+            </div>
+            <div
+              style={{
+                fontSize: 26,
+                fontWeight: 600,
+                color: "#fff",
+                letterSpacing: "-0.022em",
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1.1,
+              }}
+            >
+              ${net.toLocaleString()}
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="mt-2 text-right text-[11px] text-gray-500">
+
+      <div className="pref-row">
+        <div className="min-w-0 flex-1">
+          <div className="pref-row-title">Default Recovery Fee</div>
+          <div className="pref-row-desc">Percentage of the estimated surplus charged as the recovery fee on a new lead.</div>
+        </div>
+        <div className="inline-flex w-32 items-center gap-1 rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] focus-within:border-petrol-500">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={0.5}
+            value={feePct}
+            onChange={(e) => setFeePct(e.target.value)}
+            onBlur={(e) => {
+              const n = Number(e.target.value);
+              save("default_recovery_fee_percent", Number.isFinite(n) ? n : null);
+            }}
+            className="w-full bg-transparent text-right text-[12.5px] text-ink outline-none tabular-nums"
+          />
+          <span className="select-none text-[12.5px] text-gray-500">%</span>
+        </div>
+      </div>
+
+      <div className="pref-row">
+        <div className="min-w-0 flex-1">
+          <div className="pref-row-title">Default Attorney Fee</div>
+          <div className="pref-row-desc">Subtracted from the recovery fee when computing Estimated Net.</div>
+        </div>
+        <CurrencyInput
+          value={attCost}
+          onCommit={(n) => {
+            setAttCost(n ?? 0);
+            save("default_attorney_cost", n);
+          }}
+          prefix="$"
+          align="left"
+          className="w-32"
+        />
+      </div>
+
+      <div className="pref-row">
+        <div className="min-w-0 flex-1">
+          <div className="pref-row-title">Minimum Surplus Threshold</div>
+          <div className="pref-row-desc">
+            Leads with an estimated surplus under this amount are tagged Below Minimum. Soft warning only — you can still pursue them.
+          </div>
+        </div>
+        <CurrencyInput
+          value={initial.surplus_floor}
+          onCommit={(n) => save("surplus_floor", n)}
+          prefix="$"
+          align="left"
+          className="w-32"
+        />
+      </div>
+
+      <div className="mt-4 text-right text-[11px] text-gray-500">
         {pending
           ? "Saving"
           : savedAt
-            ? `Saved At ${savedAt}`
-            : "Click Outside A Field To Save"}
+            ? `Saved at ${savedAt}`
+            : "Click outside a field to save"}
       </div>
-    </div>
-  );
-}
-
-function Row({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex-1">
-        <div className="text-[13px] text-ink">{label}</div>
-        {hint && <div className="text-[11px] text-gray-500">{hint}</div>}
-      </div>
-      {children}
     </div>
   );
 }
