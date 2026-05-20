@@ -62,7 +62,7 @@ export function LostReasonsSection({
     "rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
 
   return (
-    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+    <div className="col-span-2">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="section-subheader mb-0">Lost Reasons</h2>

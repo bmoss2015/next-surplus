@@ -67,7 +67,7 @@ export function ProfileSection({
     "rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500";
 
   return (
-    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+    <div className="col-span-2">
       <h2 className="section-subheader mb-0">Profile</h2>
 
       <div className="clean-hero">

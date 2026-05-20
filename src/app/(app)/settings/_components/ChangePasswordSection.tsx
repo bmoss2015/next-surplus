@@ -68,7 +68,7 @@ export function ChangePasswordSection() {
   const inputType = show ? "text" : "password";
 
   return (
-    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+    <div className="col-span-2">
       <h2 className="section-subheader mb-0">Security</h2>
 
       <form onSubmit={save} autoComplete="off">
@@ -140,7 +140,7 @@ export function ChangePasswordSection() {
           <button
             type="button"
             disabled
-            className="rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-[12.5px] font-medium text-gray-500"
+            className="rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-[12.5px] font-medium text-ink hover:border-gray-300 disabled:opacity-100"
             title="Coming soon"
           >
             Set Up
@@ -156,7 +156,7 @@ export function ChangePasswordSection() {
           <button
             type="button"
             disabled
-            className="rounded-md border border-transparent bg-transparent px-3 py-[6px] text-[12.5px] font-medium text-gray-400"
+            className="rounded-md border border-transparent bg-transparent px-3 py-[6px] text-[12.5px] font-medium text-gray-500"
           >
             Generate Codes
           </button>

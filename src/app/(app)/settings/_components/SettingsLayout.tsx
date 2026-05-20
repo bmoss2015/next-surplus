@@ -63,10 +63,10 @@ export function SettingsLayout({
   return (
     <SavePillProvider>
     <div className="flex" style={{ minHeight: "calc(100vh - 56px)" }}>
-      {/* Sub-rail */}
+      {/* Sub-rail — tinted background so the content area reads as the primary surface */}
       <aside
-        className="sticky shrink-0 overflow-y-auto border-r border-gray-200 bg-surface"
-        style={{ top: 56, height: "calc(100vh - 56px)", width: 224 }}
+        className="sticky shrink-0 overflow-y-auto border-r border-gray-200"
+        style={{ top: 56, height: "calc(100vh - 56px)", width: 224, background: "#fafbfc" }}
       >
         <div className="py-5 pl-5 pr-3">
           {groups.map((g) => (
@@ -82,8 +82,8 @@ export function SettingsLayout({
                   className={cn(
                     "mb-0.5 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors",
                     active === i.key
-                      ? "bg-gray-100 font-medium text-ink"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-ink"
+                      ? "bg-gray-200 font-medium text-ink"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-ink"
                   )}
                 >
                   <span>{i.label}</span>
@@ -99,7 +99,7 @@ export function SettingsLayout({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-8 py-7">
+        <div className="mx-auto max-w-4xl px-8 py-7">
           {/* Breadcrumb */}
           <div className="mb-2 flex items-center gap-1.5 text-[11.5px] text-gray-400">
             <span>Settings</span>

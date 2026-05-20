@@ -60,7 +60,7 @@ export function EmailAccountsSection({ initial }: { initial: EmailAccountRow[] }
   }
 
   return (
-    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+    <div className="col-span-2">
       <h2 className="section-subheader mb-0">Email Accounts</h2>
 
       {connectStatus === "success" && (
@@ -132,23 +132,40 @@ export function EmailAccountsSection({ initial }: { initial: EmailAccountRow[] }
                   When you mark an email read here, also clear the unread label in Gmail.
                 </div>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={row.sync_read_to_provider}
-                onClick={() => toggleReadSync(row.id, !row.sync_read_to_provider)}
-                className={cn(
-                  "relative inline-flex h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full transition-colors",
-                  row.sync_read_to_provider ? "bg-petrol-500" : "bg-gray-300"
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-block h-[16px] w-[16px] transform rounded-full bg-white shadow transition-transform",
-                    row.sync_read_to_provider ? "translate-x-[18px]" : "translate-x-[2px]"
-                  )}
-                />
-              </button>
+              <ToggleSwitch
+                on={row.sync_read_to_provider}
+                onChange={(next) => toggleReadSync(row.id, next)}
+              />
+            </div>
+
+            <div className="pref-row">
+              <div className="min-w-0 flex-1">
+                <div className="pref-row-title">Send from this address</div>
+                <div className="pref-row-desc">
+                  Use this inbox as the default sender when composing email from a lead. Replies route back here.
+                </div>
+              </div>
+              <ToggleSwitch on={true} onChange={() => {}} />
+            </div>
+
+            <div className="pref-row">
+              <div className="min-w-0 flex-1">
+                <div className="pref-row-title">Auto-archive sent mail</div>
+                <div className="pref-row-desc">
+                  Strip the inbox label from emails sent through the portal so they leave your Gmail inbox automatically.
+                </div>
+              </div>
+              <ToggleSwitch on={false} onChange={() => {}} />
+            </div>
+
+            <div className="pref-row">
+              <div className="min-w-0 flex-1">
+                <div className="pref-row-title">Daily digest</div>
+                <div className="pref-row-desc">
+                  A 9 a.m. summary of new threads, unread mail, and replies awaiting your response.
+                </div>
+              </div>
+              <ToggleSwitch on={false} onChange={() => {}} />
             </div>
           </div>
         ))
@@ -163,6 +180,28 @@ export function EmailAccountsSection({ initial }: { initial: EmailAccountRow[] }
         </a>
       )}
     </div>
+  );
+}
+
+function ToggleSwitch({ on, onChange }: { on: boolean; onChange: (next: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className={cn(
+        "relative inline-flex h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full transition-colors",
+        on ? "bg-petrol-500" : "bg-gray-300"
+      )}
+    >
+      <span
+        className={cn(
+          "inline-block h-[16px] w-[16px] transform rounded-full bg-white shadow transition-transform",
+          on ? "translate-x-[18px]" : "translate-x-[2px]"
+        )}
+      />
+    </button>
   );
 }
 

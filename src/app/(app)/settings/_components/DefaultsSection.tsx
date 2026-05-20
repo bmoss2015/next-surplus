@@ -39,7 +39,7 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
     "rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500 tabular-nums text-right";
 
   return (
-    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+    <div className="col-span-2">
       <h2 className="section-subheader mb-0">Defaults</h2>
 
       <div className="calc-hero" style={{ marginTop: 18 }}>

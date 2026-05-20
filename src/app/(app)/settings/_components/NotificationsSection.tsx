@@ -4,9 +4,9 @@ import { useState, useTransition } from "react";
 import { cn } from "@/lib/cn";
 import {
   NOTIFICATION_PREFS,
-  setMyNotificationPref,
   type NotificationPrefKey,
-} from "../_notification-actions";
+} from "../_notification-prefs";
+import { setMyNotificationPref } from "../_notification-actions";
 
 // Settings redesign — Notifications panel.
 // New: per-event email toggles. Backed by user_notification_prefs table
@@ -40,7 +40,7 @@ export function NotificationsSection({
   const digest = NOTIFICATION_PREFS.filter((p) => p.group === "digest");
 
   return (
-    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+    <div className="col-span-2">
       <h2 className="section-subheader mb-0">Notifications</h2>
       <div className="mt-1 text-[12.5px] text-gray-500">
         Choose which events email you. We never email you about your own actions.

@@ -22,7 +22,7 @@ export async function BillingSection({ orgId }: { orgId: string }) {
   const barColor = pct >= 95 ? "#b91c1c" : "#0d4b3a";
 
   return (
-    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+    <div className="col-span-2">
       <h2 className="section-subheader mb-0">Billing</h2>
 
       {/* Plan hero (layout only — no Stripe yet) */}

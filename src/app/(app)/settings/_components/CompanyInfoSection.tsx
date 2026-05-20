@@ -60,7 +60,7 @@ export function CompanyInfoSection({ initial }: { initial: OrgInfo }) {
   const cityLine = [form.city, form.region].filter((x) => x && x.trim()).join(", ");
 
   return (
-    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+    <div className="col-span-2">
       <h2 className="section-subheader mb-0">Company Profile</h2>
 
       <div className="clean-hero">

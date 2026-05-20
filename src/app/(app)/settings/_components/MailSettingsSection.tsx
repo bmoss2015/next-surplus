@@ -100,7 +100,7 @@ export function MailSettingsSection({ initial }: { initial: MailSettings }) {
     "rounded-md border border-gray-200 bg-surface px-3 py-[8px] text-[13px] text-ink outline-none focus:border-petrol-500";
 
   return (
-    <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-6 shadow-card">
+    <div className="col-span-2">
       <h2 className="section-subheader mb-0">Mail Configuration</h2>
       <div className="mt-1 text-[12.5px] text-gray-500">
         Signer, signature, and default postal class applied to every outgoing letter.
