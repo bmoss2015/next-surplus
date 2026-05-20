@@ -110,7 +110,8 @@ export async function validatePhone(
     };
   }
 
-  let body: { status?: string; phone_valid?: boolean } | null = null;
+  type VeriphoneBody = { status?: string; phone_valid?: boolean; [k: string]: unknown };
+  let body: VeriphoneBody | null = null;
   let httpOk = false;
   let networkError: string | null = null;
   try {
@@ -121,7 +122,7 @@ export async function validatePhone(
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     httpOk = res.ok;
-    body = (await res.json()) as typeof body;
+    body = (await res.json()) as VeriphoneBody;
   } catch (e) {
     networkError = e instanceof Error ? e.message : String(e);
   }
@@ -162,4 +163,100 @@ export async function getValidationUsage(orgId: string): Promise<{ used: number;
     getMonthUsage(sb, orgId),
   ]);
   return { used, cap, period_month: currentPeriodMonth() };
+}
+
+// Sweep through all unvalidated phones for an org and validate them.
+// Called from after() in the import action so it runs after the response is
+// sent. Same function also powers the manual backfill route.
+//
+// Bounded by maxItems and concurrency so a runaway import never floods
+// Veriphone. Stops naturally when the quota cap is hit (validatePhone returns
+// status='untested' with checkedAt=null in that case — we just leave those
+// rows alone, they'll get picked up next time).
+const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const;
+type PendingTask =
+  | { kind: "contact"; rowId: string; phone: string }
+  | { kind: "relative"; rowId: string; phone: string; base: (typeof RELATIVE_PHONE_BASES)[number] };
+
+export async function validatePendingForOrg(
+  orgId: string,
+  opts: { maxItems?: number; concurrency?: number } = {}
+): Promise<{ processed: number; pending: number }> {
+  const maxItems = opts.maxItems ?? 500;
+  const concurrency = opts.concurrency ?? 5;
+  const sb = createServiceClient();
+
+  const contactsRes = await sb
+    .from("contacts")
+    .select("id, value")
+    .eq("org_id", orgId)
+    .eq("channel", "phone")
+    .eq("status", "untested")
+    .not("value", "is", null)
+    .limit(maxItems);
+
+  const relativesRes = await sb
+    .from("relatives")
+    .select(
+      "id, phone, phone_status, phone_2, phone_2_status, phone_3, phone_3_status, phone_4, phone_4_status, phone_5, phone_5_status"
+    )
+    .eq("org_id", orgId)
+    .or(
+      "phone_status.eq.untested,phone_2_status.eq.untested,phone_3_status.eq.untested,phone_4_status.eq.untested,phone_5_status.eq.untested"
+    )
+    .limit(maxItems);
+
+  const tasks: PendingTask[] = [];
+  for (const c of (contactsRes.data ?? []) as Array<{ id: string; value: string | null }>) {
+    if (c.value) tasks.push({ kind: "contact", rowId: c.id, phone: c.value });
+  }
+  for (const r of (relativesRes.data ?? []) as Record<string, unknown>[]) {
+    const rowId = r.id as string;
+    for (const base of RELATIVE_PHONE_BASES) {
+      const value = r[base] as string | null;
+      const status = r[`${base}_status`] as string | null;
+      if (value && status === "untested") {
+        tasks.push({ kind: "relative", rowId, phone: value, base });
+      }
+    }
+  }
+
+  const limited = tasks.slice(0, maxItems);
+  let processed = 0;
+
+  for (let i = 0; i < limited.length; i += concurrency) {
+    const batch = limited.slice(i, i + concurrency);
+    await Promise.all(
+      batch.map(async (task) => {
+        const result = await validatePhone(task.phone, orgId);
+        // Transient errors / quota-exhausted come back as untested w/ null
+        // checkedAt; leave those rows alone so the next sweep retries them.
+        if (result.status === "untested" && result.checkedAt === null) return;
+        if (task.kind === "contact") {
+          await sb
+            .from("contacts")
+            .update({
+              status: result.status,
+              validation_checked_at: result.checkedAt,
+              validation_provider: result.provider,
+              validation_raw: result.raw as object,
+            })
+            .eq("id", task.rowId);
+        } else {
+          await sb
+            .from("relatives")
+            .update({
+              [`${task.base}_status`]: result.status,
+              [`${task.base}_validation_checked_at`]: result.checkedAt,
+              [`${task.base}_validation_provider`]: result.provider,
+              [`${task.base}_validation_raw`]: result.raw as object,
+            })
+            .eq("id", task.rowId);
+        }
+        processed += 1;
+      })
+    );
+  }
+
+  return { processed, pending: tasks.length - processed };
 }

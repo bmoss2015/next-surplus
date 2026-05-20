@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile } from "@/lib/auth/current-user";
+import { validatePendingForOrg } from "@/lib/phone-validate";
 import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/imports/format-address";
 import {
   parseAddressString,
@@ -317,7 +319,9 @@ export async function importLeads(
   const sb = await createClient();
 
   // Fix BB: imported leads are assigned to whoever ran the import.
-  const actorId = (await getCurrentProfile())?.id ?? null;
+  const profile = await getCurrentProfile();
+  const actorId = profile?.id ?? null;
+  const orgId = profile?.orgId ?? null;
 
   const fallback = (fallbackSource && fallbackSource.trim()) || null;
   // "force" always needs a concrete source; if one wasn't supplied, fall back
@@ -1040,6 +1044,20 @@ export async function importLeads(
         firstError ? ` (first error: ${firstError})` : ""
       }. Check the server console for details.`,
     };
+  }
+
+  // Validate freshly-inserted phone numbers in the background — runs after the
+  // response is sent so the user sees the import land immediately. Sweeps any
+  // row whose status is still 'untested', stops naturally when the org's
+  // monthly Veriphone quota is hit (untested rows stay until next sweep).
+  if (orgId) {
+    after(async () => {
+      try {
+        await validatePendingForOrg(orgId);
+      } catch (e) {
+        console.error("[import] phone validation sweep failed:", e);
+      }
+    });
   }
 
   return {
