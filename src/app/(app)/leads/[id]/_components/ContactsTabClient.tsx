@@ -15,6 +15,7 @@ import {
   upsertOwner,
   deleteOwner,
   deleteContact,
+  addMailingAddress,
 } from "../_actions";
 import type { ContactRow, OwnerRowFull } from "@/lib/leads/fetch-detail";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
@@ -436,11 +437,55 @@ export function ContactsTabClient({
 
   function addContact(
     ownerId: string,
-    channel: "phone" | "email",
-    value: string
+    channel: "phone" | "email" | "mailing_address",
+    value: string,
+    recipientLabel?: string | null
   ) {
     const trimmed = value.trim();
     if (!trimmed) return;
+    // Mailing addresses go through addMailingAddress so the
+    // recipient_label gets stamped (used by the SendMailModal candidate
+    // builder to render "Owner" vs the owner's full name). Phones and
+    // emails go through upsertContact which also runs Veriphone-style
+    // post-insert validation hooks.
+    if (channel === "mailing_address") {
+      const owner = owners.find((o) => o.id === ownerId);
+      const label = (recipientLabel ?? owner?.full_name ?? "Owner")
+        .toString()
+        .trim();
+      const placeholderId = `pending-${crypto.randomUUID()}`;
+      const placeholder: ContactRow = {
+        id: placeholderId,
+        owner_id: ownerId,
+        lead_id: leadId,
+        channel: "mailing_address",
+        value: trimmed,
+        status: "untested",
+        connection_status: null,
+        source: null,
+        last_attempted: null,
+        is_primary: false,
+        phone_type: null,
+        is_dnc: false,
+        is_litigator: false,
+        mailed: false,
+        mailed_at: null,
+        recipient_label: label || null,
+        validation_checked_at: null,
+        validation_provider: null,
+      };
+      setContacts((prev) => [...prev, placeholder]);
+      startTransition(async () => {
+        const res = await addMailingAddress(leadId, ownerId, trimmed, label);
+        if (!res.ok) {
+          setContacts((prev) => prev.filter((c) => c.id !== placeholderId));
+        }
+        // The server action revalidates the path; the parent server
+        // component will re-render with the persisted row. Until then
+        // the optimistic placeholder is fine — same shape.
+      });
+      return;
+    }
     // Optimistic placeholder so the user sees "Verifying…" on the new phone
     // row while the action awaits the Veriphone call (~500ms-1s). Real row
     // replaces it when the action returns.
@@ -686,6 +731,9 @@ export function ContactsTabClient({
               emails={contacts.filter(
                 (c) => c.owner_id === owner.id && c.channel === "email"
               )}
+              addresses={contacts.filter(
+                (c) => c.owner_id === owner.id && c.channel === "mailing_address"
+              )}
               onChangeStatus={(s) => changeOwnerStatus(owner.id, s)}
               onChangeAge={(n) => changeOwnerAge(owner.id, n)}
               onChangeName={(n) => changeOwnerName(owner.id, n)}
@@ -710,6 +758,7 @@ function OwnerCard({
   owner,
   phones,
   emails,
+  addresses,
   onChangeStatus,
   onChangeAge,
   onChangeName,
@@ -724,12 +773,16 @@ function OwnerCard({
   owner: OwnerRowFull;
   phones: ContactRow[];
   emails: ContactRow[];
+  addresses: ContactRow[];
   onChangeStatus: (s: OwnerStatus) => void;
   onChangeAge: (n: number | null) => void;
   onChangeName: (fullName: string) => void;
   onChangeNotes: (n: string | null) => void;
   onRemoveOwner: () => void;
-  onAddContact: (channel: "phone" | "email", value: string) => void;
+  onAddContact: (
+    channel: "phone" | "email" | "mailing_address",
+    value: string
+  ) => void;
   onRemoveContact: (id: string) => void;
   onSetContactStatus: (id: string, s: ContactStatus) => void;
   onSetPhoneMeta: (id: string, patch: PhoneMetaPatch) => void;
@@ -738,9 +791,38 @@ function OwnerCard({
   const { isAdmin } = useRole();
   const [addingPhone, setAddingPhone] = useState(false);
   const [addingEmail, setAddingEmail] = useState(false);
+  const [addingAddress, setAddingAddress] = useState(false);
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
+  // Structured address fields — combined with commas on submit so the
+  // server-side addMailingAddress action gets a single string that
+  // matches the format used by the Overview MailingAddresses panel.
+  const [addrStreet, setAddrStreet] = useState("");
+  const [addrCity, setAddrCity] = useState("");
+  const [addrState, setAddrState] = useState("");
+  const [addrZip, setAddrZip] = useState("");
+
+  function submitAddress() {
+    const street = addrStreet.trim();
+    const city = addrCity.trim();
+    const stateCode = addrState.trim().toUpperCase().slice(0, 2);
+    const zip = addrZip.trim();
+    if (!street) return;
+    // Same join format the Overview MailingAddresses panel uses:
+    // "line1, city, STATE ZIP". Keeps parsing consistent across the
+    // two add-paths so lead-candidates.ts handles both identically.
+    const tail = [city, [stateCode, zip].filter(Boolean).join(" ")]
+      .filter(Boolean)
+      .join(", ");
+    const value = [street, tail].filter(Boolean).join(", ");
+    onAddContact("mailing_address", value);
+    setAddrStreet("");
+    setAddrCity("");
+    setAddrState("");
+    setAddrZip("");
+    setAddingAddress(false);
+  }
 
   function submitPhone() {
     const v = newPhone.trim();
@@ -929,6 +1011,116 @@ function OwnerCard({
               className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
             >
               + Add Email
+            </button>
+          )
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
+        <SectionSubheader className="mb-0">Mailing Address</SectionSubheader>
+        {addresses.map((c) => (
+          <div
+            key={c.id}
+            className="flex items-start gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[11.5px] text-ink"
+          >
+            <span className="mt-[1px] flex-shrink-0 text-gray-400">
+              <IconMail size={11} stroke={2} />
+            </span>
+            <span className="min-w-0 flex-1 whitespace-pre-wrap break-words leading-snug">
+              {c.value}
+            </span>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => onRemoveContact(c.id)}
+                className="cursor-pointer text-gray-400 hover:text-danger"
+                aria-label="Remove Mailing Address"
+              >
+                <IconTrash size={11} stroke={1.75} />
+              </button>
+            )}
+          </div>
+        ))}
+        {addingAddress ? (
+          <div className="flex flex-col gap-1">
+            <input
+              type="text"
+              autoFocus
+              value={addrStreet}
+              onChange={(e) => setAddrStreet(e.target.value)}
+              placeholder="Street address"
+              className="rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+            />
+            <div className="grid grid-cols-[1fr_60px_80px] gap-1">
+              <input
+                type="text"
+                value={addrCity}
+                onChange={(e) => setAddrCity(e.target.value)}
+                placeholder="City"
+                className="rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+              />
+              <input
+                type="text"
+                value={addrState}
+                onChange={(e) => setAddrState(e.target.value.toUpperCase().slice(0, 2))}
+                placeholder="ST"
+                maxLength={2}
+                className="rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] uppercase text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+              />
+              <input
+                type="text"
+                value={addrZip}
+                onChange={(e) => setAddrZip(e.target.value.replace(/[^\d-]/g, "").slice(0, 10))}
+                placeholder="ZIP"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitAddress();
+                  }
+                  if (e.key === "Escape") {
+                    setAddingAddress(false);
+                    setAddrStreet("");
+                    setAddrCity("");
+                    setAddrState("");
+                    setAddrZip("");
+                  }
+                }}
+                className="rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+              />
+            </div>
+            <div className="flex justify-end gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingAddress(false);
+                  setAddrStreet("");
+                  setAddrCity("");
+                  setAddrState("");
+                  setAddrZip("");
+                }}
+                className="cursor-pointer rounded-md px-1.5 py-[2px] text-[11px] text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitAddress}
+                disabled={!addrStreet.trim()}
+                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-1.5 py-[3px] text-gray-500 hover:border-petrol-500 hover:text-petrol-500 disabled:opacity-50"
+                aria-label="Save Mailing Address"
+              >
+                <IconPlus size={11} stroke={2} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          addresses.length < MAX_PER_CHANNEL && (
+            <button
+              type="button"
+              onClick={() => setAddingAddress(true)}
+              className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
+            >
+              + Add Mailing Address
             </button>
           )
         )}
