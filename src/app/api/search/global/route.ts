@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/current-user";
+import { US_STATE_NAMES } from "@/lib/leads/types";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,22 @@ export async function GET(req: NextRequest) {
   const sanitized = q.replace(/[%*"'(),\\]/g, "").trim();
   if (!sanitized) return NextResponse.json([]);
   const v = `*${sanitized}*`;
+
+  // Map full state names → 2-letter codes for the query. Storage is the
+  // 2-letter code so 'maryland' would otherwise miss every MD lead. If the
+  // user types a substring of any state name, include those codes as an
+  // additional state.in.(...) filter wherever a state column exists.
+  const sanitizedLower = sanitized.toLowerCase();
+  const stateCodesFromName: string[] = [];
+  for (const [code, name] of Object.entries(US_STATE_NAMES)) {
+    if (name.toLowerCase().includes(sanitizedLower)) stateCodesFromName.push(code);
+  }
+  const stateInFilter =
+    stateCodesFromName.length > 0 ? `state.in.(${stateCodesFromName.join(",")})` : null;
+  const recipientStateInFilter =
+    stateCodesFromName.length > 0
+      ? `recipient_state.in.(${stateCodesFromName.join(",")})`
+      : null;
 
   const sb = await createClient();
   const leadIdSet = new Set<string>();
@@ -101,7 +118,10 @@ export async function GET(req: NextRequest) {
         `zip.ilike.${v}`,
         `county.ilike.${v}`,
         `case_number.ilike.${v}`,
-      ].join(",")
+        stateInFilter,
+      ]
+        .filter(Boolean)
+        .join(",")
     )
     .eq("archived", false)
     .limit(10);
@@ -120,7 +140,7 @@ export async function GET(req: NextRequest) {
     .ilike("value", v)
     .limit(8);
 
-  // 4) Relatives — match full_name, phone (1-5), email (1-5), street, city → lead.
+  // 4) Relatives — match full_name, phone (1-5), email (1-5), street, city, state → lead.
   const relativesQ = sb
     .from("relatives")
     .select("id, full_name, phone, phone_2, phone_3, phone_4, phone_5, email, email_2, email_3, email_4, email_5, street, city, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
@@ -139,7 +159,11 @@ export async function GET(req: NextRequest) {
         `email_5.ilike.${v}`,
         `street.ilike.${v}`,
         `city.ilike.${v}`,
-      ].join(",")
+        `state.ilike.${v}`,
+        stateInFilter,
+      ]
+        .filter(Boolean)
+        .join(",")
     )
     .limit(8);
 
@@ -185,7 +209,10 @@ export async function GET(req: NextRequest) {
         `recipient_city.ilike.${v}`,
         `recipient_state.ilike.${v}`,
         `recipient_postal_code.ilike.${v}`,
-      ].join(",")
+        recipientStateInFilter,
+      ]
+        .filter(Boolean)
+        .join(",")
     )
     .limit(6);
 
@@ -222,11 +249,13 @@ export async function GET(req: NextRequest) {
     .or(`name.ilike.${v},subject.ilike.${v}`)
     .limit(5);
 
-  // 13) Research templates.
+  // 13) Research templates — match name OR state (code or full name).
   const researchQ = sb
     .from("research_templates")
     .select("id, name, state, sale_type")
-    .ilike("name", v)
+    .or(
+      [`name.ilike.${v}`, `state.ilike.${v}`, stateInFilter].filter(Boolean).join(",")
+    )
     .limit(5);
 
   // 14) Mail templates.
