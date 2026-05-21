@@ -1,10 +1,9 @@
-// Settings clone · Phase C.1 — wire Profile to real data.
+// Settings clone · Phase C — Settings JSX preview wired to real data.
 //
-// page.tsx is now a Server Component. It runs the same auth check as the
-// (app) layout (getCurrentProfile → redirect /login if not signed in) and
-// fetches the slice of data Profile needs. Phase C.2+ will batch in the
-// remaining fetchers (attorneys, members, defaults, etc.) and pass them
-// through to the corresponding panels.
+// Server Component. Runs the same auth check the (app) layout uses, fetches
+// every panel's slice of data in parallel, and passes the bundle to the
+// client wrapper. Admin-only fetches are gated behind isAdmin so non-admins
+// don't trigger RLS denials on data they can't see.
 //
 // Route still lives outside the (app) group so it bypasses AppShell — the
 // mockup ships its own top bar. Phase D will swap /settings over to this.
@@ -13,6 +12,11 @@ import { readFileSync } from "fs";
 import path from "path";
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/current-user";
+import {
+  fetchAppSettings,
+  fetchNeedsActionThreshold,
+  fetchLostReasonsAdmin,
+} from "@/lib/settings/fetch";
 import { SettingsPreviewJsx } from "./_components/SettingsPreviewJsx";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +24,19 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPreviewJsxPage() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
+  const isAdmin = profile.isAdmin;
+
+  // Member-visible data (Lost Reasons admin includes archived rows, which is
+  // why it's behind isAdmin even though the panel itself is admin-only).
+  const [lostReasons] = await Promise.all([
+    isAdmin ? fetchLostReasonsAdmin() : Promise.resolve([]),
+  ]);
+
+  // Admin-only data. Promise.all keeps the wait time bounded by the slowest
+  // single fetcher rather than summed.
+  const [defaults, needsActionThreshold] = isAdmin
+    ? await Promise.all([fetchAppSettings(), fetchNeedsActionThreshold()])
+    : [null, null];
 
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "settings-preview", "preview.css"),
@@ -51,7 +68,12 @@ export default async function SettingsPreviewJsxPage() {
         currentUser={{
           fullName: profile.fullName,
           email: profile.email ?? "",
-          isAdmin: profile.isAdmin,
+          isAdmin,
+        }}
+        data={{
+          defaults,
+          needsActionThreshold,
+          lostReasons,
         }}
       />
     </>

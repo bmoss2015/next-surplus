@@ -3,10 +3,9 @@
 // Settings clone · Phase C — client wrapper for the JSX preview.
 //
 // Owns the active-panel state, syncs it to the URL hash, and routes the
-// fetched server-data slices to the corresponding panel components. Phase
-// C.1 wires the Profile data only; Phase C.2+ adds the other panel data
-// props (attorneys, members, defaults, etc.) and the panels that consume
-// them. Until then the remaining panels render their static mockup JSX.
+// fetched server-data slices to the corresponding panel components. Panels
+// that have been wired to real data take their data from `data`. Panels
+// still on static mockup JSX are rendered without props.
 
 import { useEffect, useState } from "react";
 import { Topbar } from "./Topbar";
@@ -32,18 +31,28 @@ import { SmsTemplatesSection } from "./SmsTemplatesSection";
 import { ResearchTemplatesSection } from "./ResearchTemplatesSection";
 import { LostReasonsSection } from "./LostReasonsSection";
 
+import type { AppSettings, LostReasonAdminRow } from "@/lib/settings/fetch";
+
 export type CurrentUser = {
   fullName: string;
   email: string;
   isAdmin: boolean;
 };
 
+export type SettingsData = {
+  defaults: AppSettings | null;
+  needsActionThreshold: number | null;
+  lostReasons: LostReasonAdminRow[];
+};
+
 const RAIL_KEYS = new Set(GROUPS.flatMap((g) => g.items.map((i) => i.key)));
 
 export function SettingsPreviewJsx({
   currentUser,
+  data,
 }: {
   currentUser: CurrentUser;
+  data: SettingsData;
 }) {
   const [active, setActive] = useState<string>("profile");
 
@@ -70,17 +79,36 @@ export function SettingsPreviewJsx({
       <div className="flex" style={{ minHeight: "calc(100vh - 56px)" }}>
         <SubRail active={railActive} onSelect={pick} />
         <main className="flex-1 overflow-y-auto scroll-area">
-          <div className="content">{renderPanel(active, currentUser)}</div>
+          <div className="content">{renderPanel(active, currentUser, data)}</div>
         </main>
       </div>
     </>
   );
 }
 
-function renderPanel(active: string, currentUser: CurrentUser) {
+function renderPanel(
+  active: string,
+  currentUser: CurrentUser,
+  data: SettingsData
+) {
   switch (active) {
     case "profile":
       return <ProfileSection initial={currentUser} />;
+    case "defaults":
+      return data.defaults ? (
+        <DefaultsSection initial={data.defaults} />
+      ) : (
+        <AdminGate />
+      );
+    case "pipeline":
+      return data.defaults != null ? (
+        <PipelineSection
+          initialNeedsActionThreshold={data.needsActionThreshold}
+          initialLostReasons={data.lostReasons}
+        />
+      ) : (
+        <AdminGate />
+      );
     case "password":
       return <SecuritySection />;
     case "notifications":
@@ -93,10 +121,6 @@ function renderPanel(active: string, currentUser: CurrentUser) {
       return <TeamSection />;
     case "billing":
       return <BillingSection />;
-    case "defaults":
-      return <DefaultsSection />;
-    case "pipeline":
-      return <PipelineSection />;
     case "attorneys":
       return <AttorneysSection />;
     case "contact-roles":
@@ -118,4 +142,15 @@ function renderPanel(active: string, currentUser: CurrentUser) {
     default:
       return <Placeholder panelKey={active} />;
   }
+}
+
+function AdminGate() {
+  return (
+    <section className="panel active">
+      <h1 className="section-h1">Admin only</h1>
+      <p className="section-desc">
+        This panel is restricted to org admins. Ask your admin for access.
+      </p>
+    </section>
+  );
 }
