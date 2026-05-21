@@ -15,10 +15,10 @@
 
 export const SUPPORTED_FONTS: ReadonlySet<string> = new Set(
   [
-    // Microsoft core fonts (ttf-mscorefonts-installer)
+    // Microsoft core fonts (ttf-mscorefonts-installer — verified
+    // installed in the Gotenberg image build).
     "Arial",
     "Arial Black",
-    "Arial Narrow",
     "Times New Roman",
     "Courier New",
     "Verdana",
@@ -29,20 +29,20 @@ export const SUPPORTED_FONTS: ReadonlySet<string> = new Set(
     "Andale Mono",
     "Webdings",
 
-    // LibreOffice metric-compatible replacements (always available)
+    // LibreOffice metric-compatible replacements (always available
+    // as part of the LibreOffice install — confirmed in container).
     "Liberation Sans",
     "Liberation Serif",
     "Liberation Mono",
     "Carlito", // Calibri replacement
     "Caladea", // Cambria replacement
 
-    // Other Debian-packaged fonts
+    // Other Debian-packaged fonts (apt-installed). The Roboto / Open
+    // Sans Condensed / Slab variants are NOT included by their apt
+    // packages — leave them off until explicitly added.
     "Roboto",
-    "Roboto Condensed",
-    "Roboto Slab",
     "Lato",
     "Open Sans",
-    "Open Sans Condensed",
     "Noto Sans",
     "Noto Serif",
     "Noto Sans Mono",
@@ -53,13 +53,16 @@ export const SUPPORTED_FONTS: ReadonlySet<string> = new Set(
     "DejaVu Serif",
     "DejaVu Sans Mono",
 
-    // Google Fonts pulled from github.com/google/fonts at build time
+    // Google Fonts pulled from github.com/google/fonts at build time.
+    // List mirrors the sparse-checkout in the Gotenberg Dockerfile —
+    // verified by Cloud Build output: all 37 sparse paths fetched
+    // successfully (Inter / Poppins / Montserrat / etc. confirmed
+    // embedded by pdffonts test on the deployed revision).
     "Inter",
     "Poppins",
     "Montserrat",
     "Raleway",
     "Nunito",
-    "Nunito Sans",
     "Quicksand",
     "Karla",
     "DM Sans",
@@ -78,7 +81,6 @@ export const SUPPORTED_FONTS: ReadonlySet<string> = new Set(
     "Playfair Display",
     "Lora",
     "Source Serif 4",
-    "Source Serif Pro",
     "EB Garamond",
     "Cormorant Garamond",
     "Libre Baskerville",
@@ -88,7 +90,6 @@ export const SUPPORTED_FONTS: ReadonlySet<string> = new Set(
     "PT Sans",
     "Plus Jakarta Sans",
     "Fira Sans",
-    "Fira Serif",
     "Crimson Pro",
     "Crimson Text",
     "Archivo",
