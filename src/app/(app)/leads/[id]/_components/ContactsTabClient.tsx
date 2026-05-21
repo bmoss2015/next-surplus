@@ -1134,15 +1134,16 @@ function OwnerCard({
             </div>
           </div>
         ) : (
-          addresses.length < MAX_PER_CHANNEL && (
-            <button
-              type="button"
-              onClick={() => setAddingAddress(true)}
-              className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
-            >
-              + Add Mailing Address
-            </button>
-          )
+          // No cap on mailing addresses — owners can have many
+          // (heirs / forwarding addresses / etc.). Dropping the
+          // previous MAX_PER_CHANNEL guard that was hiding this button.
+          <button
+            type="button"
+            onClick={() => setAddingAddress(true)}
+            className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
+          >
+            + Add Mailing Address
+          </button>
         )}
       </div>
 
