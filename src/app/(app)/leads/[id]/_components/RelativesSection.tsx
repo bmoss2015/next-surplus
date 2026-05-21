@@ -448,7 +448,7 @@ function RelativeCard({
   const [extraEmails, setExtraEmails] = useState(0);
 
   const addrInputClass =
-    "w-full rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
+    "w-full min-w-0 rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
 
   const filledPhones = PHONE_SLOTS.filter(
     (s) => ((relative[s.value] as string | null) ?? "").trim()

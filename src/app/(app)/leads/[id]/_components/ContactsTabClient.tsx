@@ -1081,7 +1081,7 @@ function OwnerCard({
                 onChange={(e) => setAddrState(e.target.value.toUpperCase().slice(0, 2))}
                 placeholder="ST"
                 maxLength={2}
-                className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] uppercase text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                className="min-w-0 rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] uppercase text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
               />
               <input
                 type="text"
@@ -1101,7 +1101,7 @@ function OwnerCard({
                     setAddrZip("");
                   }
                 }}
-                className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                className="min-w-0 rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
               />
             </div>
             <div className="flex items-center justify-end gap-1.5 pt-0.5">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconPlus, IconTrash, IconCheck, IconPencil } from "@tabler/icons-react";
 import {
@@ -96,6 +96,13 @@ export function MailingAddresses({
   const [rows, setRows] = useState<ContactRow[]>(
     initialAddresses.filter((c) => c.channel === "mailing_address")
   );
+  // Sync rows when initialAddresses changes — fires after router.refresh()
+  // from sibling components (e.g. OwnerCard adding a new address). Without
+  // this the panel stayed stuck on whatever was loaded at mount, so newly
+  // added addresses didn't appear here until a full page reload.
+  useEffect(() => {
+    setRows(initialAddresses.filter((c) => c.channel === "mailing_address"));
+  }, [initialAddresses]);
   const [adding, setAdding] = useState(false);
   const [addr, setAddr] = useState<AddrDraft>(EMPTY_ADDR);
   const recipients = buildRecipients(owners, relatives);
