@@ -840,8 +840,14 @@ const BRACKET_TOKEN_MAP: Record<string, string> = {
   parcelnumber: "lead.parcel_number",
   parcelno: "lead.parcel_number",
   saledate: "lead.sale_date",
-  saleprice: "lead.estimated_surplus",
-  closingbid: "lead.estimated_surplus",
+  // Sale price / closing bid map to the actual final auction bid
+  // (lead.closing_bid). Gross / estimated surplus map to the surplus
+  // amount AFTER debt + liens are deducted (lead.estimated_surplus).
+  // Previously all four mapped to estimated_surplus which made
+  // "Final Sale Price" and "Gross Surplus" render the same number.
+  saleprice: "lead.closing_bid",
+  closingbid: "lead.closing_bid",
+  finalsaleprice: "lead.closing_bid",
   grosssurplus: "lead.estimated_surplus",
   estimatedsurplus: "lead.estimated_surplus",
   estimatedrange: "lead.owner_range",

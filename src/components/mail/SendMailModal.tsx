@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
@@ -722,6 +722,96 @@ function CostEstimate({
   );
 }
 
+// Renders every page of a PDF Blob to a stack of canvases via pdfjs-dist.
+// Used by the Send Mail preview pane to show the merged-and-PDF-rendered
+// letter exactly as Click2Mail will print it. pdfjs is already a project
+// dependency. Worker is configured via CDN so we don't need to bundle it.
+function PdfPreview({ blob }: { blob: Blob }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [pageCount, setPageCount] = useState(0);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const container = containerRef.current;
+    if (!container) return;
+    container.innerHTML = "";
+    setPageCount(0);
+    setErr(null);
+    (async () => {
+      try {
+        const pdfjs = await import("pdfjs-dist");
+        // Worker via CDN so we don't have to ship a copy. Version matches
+        // the installed pdfjs-dist build automatically.
+        (
+          pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: string } }
+        ).GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+        const data = new Uint8Array(await blob.arrayBuffer());
+        const doc = await (
+          pdfjs as unknown as {
+            getDocument: (opts: { data: Uint8Array }) => {
+              promise: Promise<{
+                numPages: number;
+                getPage: (n: number) => Promise<{
+                  getViewport: (o: { scale: number }) => {
+                    width: number;
+                    height: number;
+                  };
+                  render: (o: {
+                    canvasContext: CanvasRenderingContext2D;
+                    viewport: { width: number; height: number };
+                  }) => { promise: Promise<void> };
+                }>;
+              }>;
+            };
+          }
+        ).getDocument({ data }).promise;
+        if (cancelled) return;
+        setPageCount(doc.numPages);
+        for (let i = 1; i <= doc.numPages; i++) {
+          if (cancelled) return;
+          const page = await doc.getPage(i);
+          const viewport = page.getViewport({ scale: 1.5 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          canvas.style.width = "100%";
+          canvas.style.maxWidth = "850px";
+          canvas.style.height = "auto";
+          canvas.style.marginBottom = i === doc.numPages ? "0" : "16px";
+          canvas.style.boxShadow = "0 1px 3px rgba(0,0,0,0.12)";
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          if (cancelled) return;
+          container.appendChild(canvas);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setErr(e instanceof Error ? e.message : "Failed to render PDF");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [blob]);
+  return (
+    <div>
+      {err && (
+        <div className="mb-2 rounded-md border border-danger/40 bg-red-50 p-3 text-[11px] text-danger">
+          PDF render failed: {err}
+        </div>
+      )}
+      <div ref={containerRef} className="flex flex-col items-center" />
+      {pageCount > 1 && (
+        <div className="mt-2 text-center text-[10px] text-gray-500">
+          {pageCount} pages
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FieldPicker({ onInsert }: { onInsert: (key: string) => void }) {
   const [open, setOpen] = useState(false);
   return (
@@ -800,22 +890,24 @@ function PreviewPane({
       ? renderMerge(body, buildContext(recipient))
       : "";
 
-  // For file templates: fetch the merged .docx from the server (so the
-  // user sees the actual document with their data filled in, not just a
-  // table of merge values). Re-runs whenever the recipient or the
-  // template changes.
-  const [docxBlob, setDocxBlob] = useState<Blob | null>(null);
+  // For file templates: fetch the merged preview from the server. The
+  // server runs docxtemplater + sends the result to Gotenberg (LibreOffice
+  // headless) which converts to PDF. PDF preview is what the printer
+  // actually mails, so pixel accuracy here = pixel accuracy in the
+  // recipient's mailbox. Falls back to docx if Gotenberg isn't configured.
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewKind, setPreviewKind] = useState<"pdf" | "docx">("pdf");
   const [docxLoading, setDocxLoading] = useState(false);
   const [docxErr, setDocxErr] = useState<string | null>(null);
   useEffect(() => {
     if (!fileTemplate || !recipient || !templateId) {
-      setDocxBlob(null);
+      setPreviewBlob(null);
       return;
     }
     let cancelled = false;
     setDocxLoading(true);
     setDocxErr(null);
-    setDocxBlob(null);
+    setPreviewBlob(null);
     (async () => {
       const res = await previewMailMergeDocx({
         template_id: templateId,
@@ -828,9 +920,13 @@ function PreviewPane({
         return;
       }
       const bytes = Uint8Array.from(atob(res.base64), (c) => c.charCodeAt(0));
-      setDocxBlob(
+      setPreviewKind(res.kind);
+      setPreviewBlob(
         new Blob([bytes], {
-          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          type:
+            res.kind === "pdf"
+              ? "application/pdf"
+              : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         })
       );
       setDocxLoading(false);
@@ -952,12 +1048,16 @@ function PreviewPane({
               <div className="rounded-md border border-danger/40 bg-red-50 p-3 text-[11px] text-danger">
                 Preview failed: {docxErr}
               </div>
-            ) : docxBlob ? (
-              <SuperDocEditor
-                source={docxBlob}
-                autoHeight
-                documentMode="viewing"
-              />
+            ) : previewBlob ? (
+              previewKind === "pdf" ? (
+                <PdfPreview blob={previewBlob} />
+              ) : (
+                <SuperDocEditor
+                  source={previewBlob}
+                  autoHeight
+                  documentMode="viewing"
+                />
+              )
             ) : null}
           </div>
         ) : (
