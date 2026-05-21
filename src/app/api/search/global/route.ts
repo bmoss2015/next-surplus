@@ -80,24 +80,38 @@ export async function GET(req: NextRequest) {
     ownerStatusMatches.length > 0 ? `status.in.(${ownerStatusMatches.join(",")})` : null;
 
   // Numeric — if the query parses as a number (after stripping $/,/space),
-  // try to match every amount-style column.
+  // try to match every amount-style column. Currency in the UI is rounded
+  // to whole dollars (maximumFractionDigits: 0), so a typed integer like
+  // 96668 should match any stored value that displays as $96,668 — i.e.
+  // [96667.50, 96668.50). Decimals match exactly.
   const numericRaw = sanitized.replace(/[$,\s]/g, "");
   const numericValue = /^-?\d+(\.\d+)?$/.test(numericRaw) ? Number(numericRaw) : null;
+  const numericIsInteger = numericValue != null && Number.isInteger(numericValue);
+  function currencyFilter(col: string): string | null {
+    if (numericValue == null) return null;
+    if (numericIsInteger) {
+      const low = numericValue - 0.5;
+      const high = numericValue + 0.5;
+      return `and(${col}.gte.${low},${col}.lt.${high})`;
+    }
+    return `${col}.eq.${numericValue}`;
+  }
   const leadAmountFilters =
     numericValue != null && Number.isFinite(numericValue)
-      ? [
-          `closing_bid.eq.${numericValue}`,
-          `estimated_surplus.eq.${numericValue}`,
-          `confirmed_surplus.eq.${numericValue}`,
-          `source_surplus.eq.${numericValue}`,
-          `estimated_net_payout.eq.${numericValue}`,
-          `attorney_cost.eq.${numericValue}`,
+      ? ([
+          currencyFilter("closing_bid"),
+          currencyFilter("estimated_surplus"),
+          currencyFilter("confirmed_surplus"),
+          currencyFilter("source_surplus"),
+          currencyFilter("estimated_net_payout"),
+          currencyFilter("attorney_cost"),
+          // recovery_fee_percent is a percent, not currency — exact match only.
           `recovery_fee_percent.eq.${numericValue}`,
-        ]
+        ].filter(Boolean) as string[])
       : [];
   const lienAmountFilter =
     numericValue != null && Number.isFinite(numericValue)
-      ? `amount.eq.${numericValue}`
+      ? currencyFilter("amount")
       : null;
 
   // Phone normalization — phones are stored in mixed formats
