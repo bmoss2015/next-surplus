@@ -35,6 +35,8 @@ import type {
   AppSettings,
   AttorneyRow,
   LostReasonAdminRow,
+  MailSettings,
+  OrgInfo,
   OrgMemberRow,
 } from "@/lib/settings/fetch";
 import type { EmailAccountRow } from "@/lib/email/types";
@@ -52,8 +54,10 @@ export type SettingsData = {
   attorneys: AttorneyRow[];
   customContactRoles: string[];
   members: OrgMemberRow[];
+  orgInfo: OrgInfo | null;
   orgName: string;
   emailAccounts: EmailAccountRow[];
+  mailSettings: MailSettings | null;
 };
 
 const RAIL_KEYS = new Set(GROUPS.flatMap((g) => g.items.map((i) => i.key)));
@@ -127,7 +131,11 @@ function renderPanel(
     case "email-accounts":
       return <EmailAccountsSection initial={data.emailAccounts} />;
     case "company":
-      return <CompanyProfileSection />;
+      return data.orgInfo ? (
+        <CompanyProfileSection initial={data.orgInfo} />
+      ) : (
+        <AdminGate />
+      );
     case "team":
       return data.members.length > 0 || currentUser.isAdmin ? (
         <TeamSection initial={data.members} orgName={data.orgName} />
@@ -141,7 +149,11 @@ function renderPanel(
     case "contact-roles":
       return <ContactRolesSection initial={data.customContactRoles} />;
     case "mail-settings":
-      return <MailSettingsSection />;
+      return data.mailSettings ? (
+        <MailSettingsSection initial={data.mailSettings} />
+      ) : (
+        <AdminGate />
+      );
     case "mail-bank":
       return <MailBankAccountsSection />;
     case "templates":

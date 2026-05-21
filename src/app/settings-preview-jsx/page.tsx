@@ -19,6 +19,7 @@ import {
   fetchAttorneys,
   fetchOrgMembers,
   fetchOrgInfo,
+  fetchMailSettings,
 } from "@/lib/settings/fetch";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
@@ -40,15 +41,16 @@ export default async function SettingsPreviewJsxPage() {
   ]);
 
   // Admin-only data.
-  const [defaults, needsActionThreshold, lostReasons, members, orgInfo] = isAdmin
+  const [defaults, needsActionThreshold, lostReasons, members, orgInfo, mailSettings] = isAdmin
     ? await Promise.all([
         fetchAppSettings(),
         fetchNeedsActionThreshold(),
         fetchLostReasonsAdmin(),
         fetchOrgMembers(),
         fetchOrgInfo(),
+        fetchMailSettings(),
       ])
-    : [null, null, [], [], null];
+    : [null, null, [], [], null, null];
 
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "settings-preview", "preview.css"),
@@ -89,8 +91,10 @@ export default async function SettingsPreviewJsxPage() {
           attorneys,
           customContactRoles,
           members,
+          orgInfo,
           orgName: orgInfo?.name ?? "Your Organization",
           emailAccounts,
+          mailSettings,
         }}
       />
     </>
