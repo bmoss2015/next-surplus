@@ -1133,18 +1133,21 @@ function OwnerCard({
               </button>
             </div>
           </div>
-        ) : (
-          // No cap on mailing addresses — owners can have many
-          // (heirs / forwarding addresses / etc.). Dropping the
-          // previous MAX_PER_CHANNEL guard that was hiding this button.
-          <button
-            type="button"
-            onClick={() => setAddingAddress(true)}
-            className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
-          >
-            + Add Mailing Address
-          </button>
-        )}
+        ) : null}
+        {/* Always-rendered +Add button. Bree was hitting a consistent
+            perception that the button disappeared after saving one
+            address — even with the cap removed. Putting the button
+            OUTSIDE the addingAddress ternary guarantees it's always
+            in the DOM, just disabled while the form is open so the
+            user can't double-add. */}
+        <button
+          type="button"
+          onClick={() => setAddingAddress(true)}
+          disabled={addingAddress}
+          className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          + Add Mailing Address
+        </button>
       </div>
 
       <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
