@@ -22,7 +22,6 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  ChevronsRight,
   ChevronsLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -98,23 +97,41 @@ export function IconSidebar({
           "linear-gradient(180deg, #04261c 0%, #0d4b3a 100%)",
       }}
     >
-      {/* Brand — full company name, single line. Truncates with ellipsis
-          if it overflows the expanded sidebar width (long org names). The
-          title attribute shows the full name on hover. */}
+      {/* Brand row — collapse toggle lives here at the top instead of buried
+          near the account menu. Collapsed: the ME monogram is the expand
+          button (one tap to expand). Expanded: full wordmark on the left,
+          dedicated collapse chevron on the right. Two states, never both
+          monogram + wordmark together. */}
       <div className="flex h-14 shrink-0 items-center gap-2.5 px-[18px]">
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[11.5px] font-bold tracking-tight text-white"
-          style={{ background: "rgba(255,255,255,0.10)" }}
-        >
-          ME
-        </div>
-        {expanded && (
-          <div
-            className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-tight"
-            title="Moss Equity Partners"
+        {expanded ? (
+          <>
+            <div
+              className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-tight"
+              title="Moss Equity Partners"
+            >
+              Moss Equity Partners
+            </div>
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label="Collapse sidebar"
+              title="Collapse"
+              className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <ChevronsLeft size={15} strokeWidth={2} />
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label="Expand sidebar"
+            title="Expand"
+            className="mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-[11.5px] font-bold tracking-tight text-white transition-all hover:brightness-125"
+            style={{ background: "rgba(255,255,255,0.10)" }}
           >
-            Moss Equity Partners
-          </div>
+            ME
+          </button>
         )}
       </div>
 
@@ -140,20 +157,22 @@ export function IconSidebar({
               )}
               style={
                 isActive
-                  ? { background: "rgba(255,255,255,0.12)" }
+                  ? { background: "rgba(255,255,255,0.16)" }
                   : undefined
               }
             >
               {/* Active brand bar on left edge — reads at a glance even when
-                  the rail is collapsed (the icon alone could be ambiguous). */}
+                  the rail is collapsed (the icon alone could be ambiguous).
+                  Brighter brand emerald + taller bar so the active row pops
+                  against the dark chrome. */}
               {isActive && (
                 <span
                   aria-hidden
                   className="absolute left-0 top-1/2 -translate-y-1/2"
                   style={{
                     width: 3,
-                    height: 18,
-                    background: "#4a9c75",
+                    height: 22,
+                    background: "#5db98a",
                     borderRadius: "0 2px 2px 0",
                   }}
                 />
@@ -171,22 +190,9 @@ export function IconSidebar({
 
       <div className="mx-3 h-px bg-white/[0.08]" />
 
-      {/* Expand/collapse toggle + account */}
+      {/* Account menu — collapse toggle is now in the brand row up top, so
+          the bottom of the rail is reserved for identity / sign-out only. */}
       <div className="shrink-0 px-3 py-3">
-        <button
-          type="button"
-          onClick={toggle}
-          className="mb-2 flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-md text-white/55 hover:bg-white/10 hover:text-white"
-          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-          title={expanded ? "Collapse" : "Expand"}
-        >
-          {expanded ? (
-            <ChevronsLeft size={16} strokeWidth={1.75} />
-          ) : (
-            <ChevronsRight size={16} strokeWidth={1.75} />
-          )}
-          {expanded && <span className="text-[12px]">Collapse</span>}
-        </button>
         <AccountMenu
           userName={userName}
           userEmail={userEmail}

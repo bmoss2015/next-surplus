@@ -21,12 +21,29 @@ export default async function DashboardPage() {
 
   return (
     <div className="px-7 py-6">
-      <div className="mb-[22px]">
-        <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
+      {/* Hero — anchors Dashboard in the brand vocabulary. Subtle emerald
+          gradient (lighter than the sidebar chrome so it reads as content,
+          not chrome). Date + title + a one-line glance summary. Specific
+          numbers live in the metric row below; the hero is greeting, not
+          dashboard-in-miniature. */}
+      <div
+        className="mb-[22px] overflow-hidden rounded-xl border border-petrol-300/30 px-7 py-7 text-white shadow-card"
+        style={{
+          background:
+            "linear-gradient(135deg, #0d4b3a 0%, #2d7a5e 55%, #4a9c75 100%)",
+        }}
+      >
+        <div className="text-[11px] font-medium uppercase tracking-[0.5px] text-white/75">
+          {today}
+        </div>
+        <h1 className="m-0 mt-2 text-[26px] font-semibold tracking-tight">
           Dashboard
         </h1>
-        <div className="mt-1 text-[13px] text-gray-500">
-          {today} · {data.totalActive} active leads
+        <div className="mt-1.5 text-[13px] text-white/80">
+          {data.totalActive} active leads
+          {data.newThisWeekCount > 0
+            ? ` · ${data.newThisWeekCount} new this week`
+            : ""}
         </div>
       </div>
 
