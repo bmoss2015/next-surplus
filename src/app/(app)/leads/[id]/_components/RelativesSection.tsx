@@ -3,7 +3,8 @@
 import { useEffect, useState, useTransition } from "react";
 import { IconPlus, IconTrash, IconUsersGroup, IconPencil, IconPhone } from "@tabler/icons-react";
 import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
-import type { RelativeRow } from "@/lib/leads/fetch-detail";
+import type { ContactRow, RelativeRow } from "@/lib/leads/fetch-detail";
+import { MailingAddressSubsection } from "./MailingAddressSubsection";
 import { useRole } from "@/components/RoleProvider";
 import { Modal } from "@/components/Modal";
 import { AgeEditField, NameEditField } from "./ContactsTabClient";
@@ -113,9 +114,11 @@ function makeRelativeRow(
 export function RelativesSection({
   leadId,
   initial,
+  contacts,
 }: {
   leadId: string;
   initial: RelativeRow[];
+  contacts: ContactRow[];
 }) {
   const { isAdmin } = useRole();
   const [relatives, setRelatives] = useState<RelativeRow[]>(initial);
@@ -265,6 +268,11 @@ export function RelativesSection({
             <RelativeCard
               key={r.id}
               relative={r}
+              leadId={leadId}
+              addresses={contacts.filter(
+                (c) =>
+                  c.relative_id === r.id && c.channel === "mailing_address"
+              )}
               canRemove={isAdmin}
               onPatch={(fields) => patch(r.id, fields)}
               onRemove={() => remove(r.id)}
@@ -410,12 +418,16 @@ export function RelativesSection({
 
 function RelativeCard({
   relative,
+  leadId,
+  addresses,
   canRemove,
   onPatch,
   onRemove,
   verifyingSlots,
 }: {
   relative: RelativeRow;
+  leadId: string;
+  addresses: ContactRow[];
   canRemove: boolean;
   onPatch: (fields: RelativePatch) => void;
   onRemove: () => void;
@@ -507,6 +519,14 @@ function RelativeCard({
           </button>
         )}
       </div>
+
+      <MailingAddressSubsection
+        leadId={leadId}
+        target={{ kind: "relative", relativeId: relative.id }}
+        recipientLabel={`${(relative.full_name ?? "Unknown").trim()} (${(relative.relationship ?? "Relative").trim() || "Relative"})`}
+        addresses={addresses}
+        canRemove={canRemove}
+      />
 
       {relative.notes && (
         <div className="border-t border-gray-150 pt-2">

@@ -24,6 +24,7 @@ import { cn } from "@/lib/cn";
 import { formatPhone } from "@/lib/format/phone";
 import { formatPhoneInput, toE164 } from "@/lib/phone";
 import { SectionSubheader } from "./SectionSubheader";
+import { MailingAddressSubsection } from "./MailingAddressSubsection";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_PER_CHANNEL = 5;
@@ -692,6 +693,10 @@ export function ContactsTabClient({
               emails={contacts.filter(
                 (c) => c.owner_id === owner.id && c.channel === "email"
               )}
+              mailingAddresses={contacts.filter(
+                (c) => c.owner_id === owner.id && c.channel === "mailing_address"
+              )}
+              leadId={leadId}
               onChangeStatus={(s) => changeOwnerStatus(owner.id, s)}
               onChangeAge={(n) => changeOwnerAge(owner.id, n)}
               onChangeName={(n) => changeOwnerName(owner.id, n)}
@@ -714,8 +719,10 @@ export function ContactsTabClient({
 
 function OwnerCard({
   owner,
+  leadId,
   phones,
   emails,
+  mailingAddresses,
   onChangeStatus,
   onChangeAge,
   onChangeName,
@@ -728,8 +735,10 @@ function OwnerCard({
   verifyingIds,
 }: {
   owner: OwnerRowFull;
+  leadId: string;
   phones: ContactRow[];
   emails: ContactRow[];
+  mailingAddresses: ContactRow[];
   onChangeStatus: (s: OwnerStatus) => void;
   onChangeAge: (n: number | null) => void;
   onChangeName: (fullName: string) => void;
@@ -939,6 +948,14 @@ function OwnerCard({
           )
         )}
       </div>
+
+      <MailingAddressSubsection
+        leadId={leadId}
+        target={{ kind: "owner", ownerId: owner.id }}
+        recipientLabel={`${owner.full_name} (Owner)`}
+        addresses={mailingAddresses}
+        canRemove={isAdmin}
+      />
 
       <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
         <SectionSubheader className="mb-0">Notes</SectionSubheader>
