@@ -429,19 +429,12 @@ function RelativeCard({
   const [city, setCity] = useState(relative.city ?? "");
   const [stateCode, setStateCode] = useState(relative.state ?? "");
   const [zip, setZip] = useState(relative.zip ?? "");
-  // Address section follows the same +Add pattern as the OwnerCard's
-  // Mailing Address (consistency Bree called out). Hidden behind the
-  // button when empty; revealed inline once the user clicks Add OR if
-  // the relative already has any address data on load (so existing
-  // rows stay visible without a click).
-  const [addingAddress, setAddingAddress] = useState(
-    Boolean(
-      (relative.street ?? "").trim() ||
-        (relative.city ?? "").trim() ||
-        (relative.state ?? "").trim() ||
-        (relative.zip ?? "").trim()
-    )
-  );
+  // Always default to FALSE — when a relative already has an address
+  // on load, show the compact saved row first; open the form only via
+  // +Add or pencil. Earlier default was true-if-data-exists, which
+  // auto-opened edit mode on every render and made the stored value
+  // look unsaved.
+  const [addingAddress, setAddingAddress] = useState(false);
   // Fix III: a discrete "+ Add Phone" / "+ Add Email" link reveals the next
   // empty slot (capped at 5 each); hidden once all five are showing.
   const [extraPhones, setExtraPhones] = useState(0);
