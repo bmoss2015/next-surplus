@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconPencil, IconTrash } from "@tabler/icons-react";
 import {
@@ -51,9 +51,9 @@ function isComplete(d: AddrDraft): boolean {
 
 /**
  * Inline "Mailing Addresses" section for OwnerCard / RelativeCard / LeadParty
- * row. Lists existing addresses, +Add stays visible after save, pencil/trash
- * per row. Errors from the server actions are surfaced inline (never
- * swallowed) so the user always knows when a save didn't take.
+ * row. Simple model: rows are derived from the addresses prop (no optimistic
+ * state). Save → await action → if ok router.refresh and the prop drives the
+ * re-render; if not ok show the error inline with the draft preserved.
  */
 export function MailingAddressSubsection({
   leadId,
@@ -69,81 +69,41 @@ export function MailingAddressSubsection({
   canRemove: boolean;
 }) {
   const router = useRouter();
-  const [rows, setRows] = useState<ContactRow[]>(addresses);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<AddrDraft>(EMPTY_ADDR);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<AddrDraft>(EMPTY_ADDR);
   const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
-  // Count of in-flight server writes. While > 0, we ignore prop updates so
-  // optimistic rows aren't clobbered mid-save. Once it drops back to 0 the
-  // next effect run adopts whatever the server-component re-fetch produced.
-  const pendingRef = useRef(0);
-  const [propsEpoch, setPropsEpoch] = useState(0);
-
+  // Clear stale error when the address list updates (e.g. after a successful
+  // save that re-rendered the parent).
   useEffect(() => {
-    // Adopt the prop unless we're mid-write. Effect fires on every addresses
-    // identity change; bumping propsEpoch from finish handlers also re-runs
-    // it so post-save adoption happens reliably.
-    if (pendingRef.current === 0) {
-      setRows(addresses);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addresses, propsEpoch]);
+    setError(null);
+  }, [addresses]);
 
   function add() {
     if (!isComplete(draft)) return;
     setError(null);
     const value = joinAddress(draft);
-    const tempId = `pending-${crypto.randomUUID()}`;
-    const optimistic: ContactRow = {
-      id: tempId,
-      owner_id: target.kind === "owner" ? target.ownerId : null,
-      relative_id: target.kind === "relative" ? target.relativeId : null,
-      lead_party_id:
-        target.kind === "leadParty" ? target.leadPartyId : null,
-      lead_id: leadId,
-      channel: "mailing_address",
-      value,
-      status: "untested",
-      connection_status: null,
-      source: null,
-      last_attempted: null,
-      is_primary: rows.length === 0,
-      phone_type: null,
-      is_dnc: false,
-      is_litigator: false,
-      mailed: false,
-      mailed_at: null,
-      recipient_label: recipientLabel,
-      validation_checked_at: null,
-      validation_provider: null,
-    };
-    setRows((prev) => [...prev, optimistic]);
-    pendingRef.current += 1;
     startTransition(async () => {
-      const result = await addMailingAddress(
-        leadId,
-        target,
-        value,
-        recipientLabel
-      );
-      pendingRef.current -= 1;
-      if (!result.ok) {
-        // Roll back optimistic row, keep the form open with the draft so the
-        // user can fix and retry.
-        setRows((prev) => prev.filter((r) => r.id !== tempId));
-        setError(result.error || "Could not save address.");
-        return;
+      try {
+        const result = await addMailingAddress(
+          leadId,
+          target,
+          value,
+          recipientLabel
+        );
+        if (!result.ok) {
+          setError(result.error || "Could not save address.");
+          return;
+        }
+        setDraft(EMPTY_ADDR);
+        setAdding(false);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not save address.");
       }
-      setDraft(EMPTY_ADDR);
-      setAdding(false);
-      router.refresh();
-      // Bump the epoch so the effect re-runs after pendingRef has dropped
-      // to 0 and adopts the freshly-fetched address list.
-      setPropsEpoch((n) => n + 1);
     });
   }
 
@@ -162,49 +122,39 @@ export function MailingAddressSubsection({
     if (!isComplete(editDraft)) return;
     setError(null);
     const value = joinAddress(editDraft);
-    const previousValue = row.value;
-    setRows((prev) =>
-      prev.map((r) => (r.id === row.id ? { ...r, value } : r))
-    );
-    cancelEdit();
-    pendingRef.current += 1;
     startTransition(async () => {
-      const res = await upsertContact(
-        leadId,
-        row.owner_id ?? "",
-        row.id,
-        { value }
-      );
-      pendingRef.current -= 1;
-      if (!res.ok) {
-        setRows((prev) =>
-          prev.map((r) =>
-            r.id === row.id ? { ...r, value: previousValue } : r
-          )
+      try {
+        const res = await upsertContact(
+          leadId,
+          row.owner_id ?? "",
+          row.id,
+          { value }
         );
-        setError(res.error || "Could not save address.");
-        return;
+        if (!res.ok) {
+          setError(res.error || "Could not save address.");
+          return;
+        }
+        cancelEdit();
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not save address.");
       }
-      router.refresh();
-      setPropsEpoch((n) => n + 1);
     });
   }
 
   function remove(row: ContactRow) {
     setError(null);
-    const snapshot = rows;
-    setRows((prev) => prev.filter((r) => r.id !== row.id));
-    pendingRef.current += 1;
     startTransition(async () => {
-      const res = await deleteContact(row.id, leadId);
-      pendingRef.current -= 1;
-      if (!res.ok) {
-        setRows(snapshot);
-        setError(res.error || "Could not remove address.");
-        return;
+      try {
+        const res = await deleteContact(row.id, leadId);
+        if (!res.ok) {
+          setError(res.error || "Could not remove address.");
+          return;
+        }
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not remove address.");
       }
-      router.refresh();
-      setPropsEpoch((n) => n + 1);
     });
   }
 
@@ -215,7 +165,7 @@ export function MailingAddressSubsection({
     <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
       <SectionSubheader className="mb-0">Mailing Addresses</SectionSubheader>
 
-      {rows.map((row) => {
+      {addresses.map((row) => {
         const isEditing = editingId === row.id;
         if (isEditing) {
           return (
@@ -263,17 +213,18 @@ export function MailingAddressSubsection({
                 <button
                   type="button"
                   onClick={cancelEdit}
-                  className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[2px] text-[10.5px] text-ink hover:border-gray-300"
+                  disabled={isPending}
+                  className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[2px] text-[10.5px] text-ink hover:border-gray-300 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => saveEdit(row)}
-                  disabled={!isComplete(editDraft)}
+                  disabled={!isComplete(editDraft) || isPending}
                   className="btn-primary cursor-pointer rounded-md px-2 py-[2px] text-[10.5px] font-medium disabled:opacity-50"
                 >
-                  Save
+                  {isPending ? "Saving…" : "Save"}
                 </button>
               </div>
             </div>
@@ -354,17 +305,18 @@ export function MailingAddressSubsection({
                 setDraft(EMPTY_ADDR);
                 setError(null);
               }}
-              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[2px] text-[10.5px] text-ink hover:border-gray-300"
+              disabled={isPending}
+              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[2px] text-[10.5px] text-ink hover:border-gray-300 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={add}
-              disabled={!isComplete(draft)}
+              disabled={!isComplete(draft) || isPending}
               className="btn-primary cursor-pointer rounded-md px-2 py-[2px] text-[10.5px] font-medium disabled:opacity-50"
             >
-              Save
+              {isPending ? "Saving…" : "Save"}
             </button>
           </div>
         </div>
