@@ -15,25 +15,30 @@ import { cn } from "@/lib/cn";
 // Nothing on the pill scale uses black; the strongest stage is the
 // brand-emerald mid, never deep/ink.
 //
-// Progression (light → mid → vivid):
+// Progression — all greens are emerald-family (no off-palette success
+// greens, no near-black). On the Claims page the three relevant stages
+// (with_attorney / claim_filed / won) deliberately step OUTLINE → SOLID
+// MID → SOLID BRIGHT so they're visually obvious as their own claims
+// pipeline:
 //   new_leads      gray pillow (hasn't started)
-//   qualifying     emerald outline (early — owning the lead)
-//   outreach       emerald outline (still cold-touch)
-//   in_conversation brand emerald solid (#0d4b3a — engagement)
-//   contract       brand emerald solid
-//   with_attorney  brand emerald solid (claim in-flight)
-//   claim_filed    success-strong green (#065f46 — distinct deeper green)
-//   won            success vivid green (#15803d — celebratory bright)
-//   lost           danger red (terminal loss)
+//   qualifying     emerald outline — early, owning the lead
+//   outreach       emerald outline
+//   in_conversation brand emerald SOLID MID (#0d4b3a)
+//   contract       brand emerald SOLID MID
+//   with_attorney  emerald OUTLINE — claim just starting at attorney
+//   claim_filed    brand emerald SOLID MID (#0d4b3a) — committed
+//   won            BRIGHT emerald (#4a9c75) + ink text — celebratory
+//                  but still on-brand
+//   lost           danger red
 const STAGE_CLASSES: Record<Stage, string> = {
   new_leads:       "bg-gray-150 text-gray-600",
   qualifying:      "border border-petrol-500 text-petrol-500 bg-transparent",
   outreach:        "border border-petrol-500 text-petrol-500 bg-transparent",
   in_conversation: "bg-petrol-500 text-white",
   contract:        "bg-petrol-500 text-white",
-  with_attorney:   "bg-petrol-500 text-white",
-  claim_filed:     "bg-success-strong text-white",
-  won:             "bg-success text-white",
+  with_attorney:   "border border-petrol-500 text-petrol-500 bg-transparent",
+  claim_filed:     "bg-petrol-500 text-white",
+  won:             "bg-petrol-300 text-ink",
   lost:            "bg-danger text-white",
 };
 
