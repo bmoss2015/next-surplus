@@ -1,11 +1,10 @@
 "use client";
 
-// Settings clone · Phase C — client wrapper for the JSX preview.
+// Client wrapper for the Settings page.
 //
-// Owns the active-panel state, syncs it to the URL hash, and routes the
-// fetched server-data slices to the corresponding panel components. Panels
-// that have been wired to real data take their data from `data`. Panels
-// still on static mockup JSX are rendered without props.
+// Owns the active-panel state, syncs it to the URL hash so reloads land
+// back on the same panel, and routes the fetched server-data slices to the
+// corresponding panel components.
 
 import { useEffect, useState } from "react";
 import { Topbar } from "./Topbar";
@@ -26,10 +25,6 @@ import { ContactRolesSection } from "./ContactRolesSection";
 import { MailSettingsSection } from "./MailSettingsSection";
 import { MailBankAccountsSection } from "./MailBankAccountsSection";
 import { TemplatesSection } from "./TemplatesSection";
-import { EmailTemplatesSection } from "./EmailTemplatesSection";
-import { SmsTemplatesSection } from "./SmsTemplatesSection";
-import { ResearchTemplatesSection } from "./ResearchTemplatesSection";
-import { LostReasonsSection } from "./LostReasonsSection";
 
 import type {
   AppSettings,
@@ -184,14 +179,6 @@ function renderPanel(
           research={data.research}
         />
       );
-    case "email-templates":
-      return <EmailTemplatesSection />;
-    case "sms-templates":
-      return <SmsTemplatesSection />;
-    case "research-templates":
-      return <ResearchTemplatesSection />;
-    case "lost-reasons":
-      return <LostReasonsSection />;
     default:
       return <Placeholder panelKey={active} />;
   }

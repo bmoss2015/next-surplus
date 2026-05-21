@@ -80,7 +80,7 @@ export default async function SettingsPreviewJsxPage() {
     : [null, null, [], [], null, null, [], null];
 
   const cssText = readFileSync(
-    path.join(process.cwd(), "src", "app", "settings-preview", "preview.css"),
+    path.join(process.cwd(), "src", "app", "settings", "preview.css"),
     "utf-8"
   );
 

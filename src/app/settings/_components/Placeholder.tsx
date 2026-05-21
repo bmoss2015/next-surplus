@@ -1,6 +1,6 @@
-// Settings clone · Phase B.3 — placeholder shown for rail items that haven't
-// been converted to real JSX yet. Renders the mockup's breadcrumb pattern and
-// a short note pointing back to the static reference at /settings-preview.
+// Fallback panel rendered when the URL hash points at a key that isn't a
+// real rail item. Shouldn't happen in normal use; included as a safety net
+// for old bookmarks or typos in hash links.
 
 import { findItem } from "./SubRail";
 
@@ -25,8 +25,7 @@ export function Placeholder({ panelKey }: { panelKey: string }) {
 
       <h1 className="section-h1">{label}</h1>
       <p className="section-desc">
-        Phase B will rebuild this panel as real JSX. The static reference
-        still lives at <a href="/settings-preview">/settings-preview</a>.
+        Pick a section from the rail on the left.
       </p>
     </section>
   );
