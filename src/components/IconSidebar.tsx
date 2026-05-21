@@ -98,7 +98,9 @@ export function IconSidebar({
           "linear-gradient(180deg, #04261c 0%, #0d4b3a 100%)",
       }}
     >
-      {/* Brand */}
+      {/* Brand — full company name, single line. Truncates with ellipsis
+          if it overflows the expanded sidebar width (long org names). The
+          title attribute shows the full name on hover. */}
       <div className="flex h-14 shrink-0 items-center gap-2.5 px-[18px]">
         <div
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[11.5px] font-bold tracking-tight text-white"
@@ -107,11 +109,11 @@ export function IconSidebar({
           ME
         </div>
         {expanded && (
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-semibold leading-tight tracking-tight">
-              Moss Equity
-            </div>
-            <div className="truncate text-[10px] text-white/60">Partners</div>
+          <div
+            className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-tight"
+            title="Moss Equity Partners"
+          >
+            Moss Equity Partners
           </div>
         )}
       </div>
