@@ -187,7 +187,7 @@ function InlineStateField({
   }
   return (
     <button type="button" onClick={() => setEditing(true)} title="Click To Edit" className={value ? DISPLAY_SET : DISPLAY_UNSET}>
-      {value || NOT_SET}
+      {value ? US_STATE_NAMES[value] ?? value : NOT_SET}
     </button>
   );
 }
