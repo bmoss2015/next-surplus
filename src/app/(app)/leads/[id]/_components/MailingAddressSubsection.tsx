@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconPencil, IconTrash } from "@tabler/icons-react";
 import {
@@ -43,11 +43,17 @@ function addressLines(value: string): { street: string; rest: string } {
   return { street: parts[0], rest: parts.slice(1).join(", ") };
 }
 
+function isComplete(d: AddrDraft): boolean {
+  return Boolean(
+    d.line1.trim() && d.city.trim() && d.state.trim() && d.zip.trim()
+  );
+}
+
 /**
  * Inline "Mailing Addresses" section for OwnerCard / RelativeCard / LeadParty
- * row. Lists existing addresses for the target (owner/relative/lead_party),
- * with pencil + trash on each row and a + Add button at the bottom. Multi-
- * address: the +Add stays visible after each save.
+ * row. Lists existing addresses, +Add stays visible after save, pencil/trash
+ * per row. Errors from the server actions are surfaced inline (never
+ * swallowed) so the user always knows when a save didn't take.
  */
 export function MailingAddressSubsection({
   leadId,
@@ -58,10 +64,7 @@ export function MailingAddressSubsection({
 }: {
   leadId: string;
   target: MailingAddressTarget;
-  // Used as contacts.recipient_label on insert so legacy readers without
-  // the join still get a sensible label.
   recipientLabel: string;
-  // Pre-filtered to addresses owned by this target.
   addresses: ContactRow[];
   canRemove: boolean;
 }) {
@@ -71,25 +74,29 @@ export function MailingAddressSubsection({
   const [draft, setDraft] = useState<AddrDraft>(EMPTY_ADDR);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<AddrDraft>(EMPTY_ADDR);
+  const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  // If the parent re-renders with a different address list (e.g. after a
-  // server refresh), keep local state in sync — but only when not actively
-  // editing, so the user's in-flight typing isn't clobbered.
-  const incomingIds = addresses.map((a) => a.id).join("|");
-  const currentIds = rows.map((r) => r.id).join("|");
-  if (
-    !adding &&
-    editingId === null &&
-    incomingIds !== currentIds &&
-    addresses.length !== rows.length
-  ) {
-    setRows(addresses);
-  }
+  // Count of in-flight server writes. While > 0, we ignore prop updates so
+  // optimistic rows aren't clobbered mid-save. Once it drops back to 0 the
+  // next effect run adopts whatever the server-component re-fetch produced.
+  const pendingRef = useRef(0);
+  const [propsEpoch, setPropsEpoch] = useState(0);
+
+  useEffect(() => {
+    // Adopt the prop unless we're mid-write. Effect fires on every addresses
+    // identity change; bumping propsEpoch from finish handlers also re-runs
+    // it so post-save adoption happens reliably.
+    if (pendingRef.current === 0) {
+      setRows(addresses);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addresses, propsEpoch]);
 
   function add() {
-    const value = joinAddress(draft);
     if (!isComplete(draft)) return;
+    setError(null);
+    const value = joinAddress(draft);
     const tempId = `pending-${crypto.randomUUID()}`;
     const optimistic: ContactRow = {
       id: tempId,
@@ -115,19 +122,33 @@ export function MailingAddressSubsection({
       validation_provider: null,
     };
     setRows((prev) => [...prev, optimistic]);
-    setDraft(EMPTY_ADDR);
-    setAdding(false);
+    pendingRef.current += 1;
     startTransition(async () => {
-      const result = await addMailingAddress(leadId, target, value, recipientLabel);
+      const result = await addMailingAddress(
+        leadId,
+        target,
+        value,
+        recipientLabel
+      );
+      pendingRef.current -= 1;
       if (!result.ok) {
-        // Roll back the optimistic insert on failure.
+        // Roll back optimistic row, keep the form open with the draft so the
+        // user can fix and retry.
         setRows((prev) => prev.filter((r) => r.id !== tempId));
+        setError(result.error || "Could not save address.");
+        return;
       }
+      setDraft(EMPTY_ADDR);
+      setAdding(false);
       router.refresh();
+      // Bump the epoch so the effect re-runs after pendingRef has dropped
+      // to 0 and adopts the freshly-fetched address list.
+      setPropsEpoch((n) => n + 1);
     });
   }
 
   function startEdit(row: ContactRow) {
+    setError(null);
     setEditingId(row.id);
     setEditDraft(splitAddress(row.value));
   }
@@ -138,23 +159,52 @@ export function MailingAddressSubsection({
   }
 
   function saveEdit(row: ContactRow) {
-    const value = joinAddress(editDraft);
     if (!isComplete(editDraft)) return;
+    setError(null);
+    const value = joinAddress(editDraft);
+    const previousValue = row.value;
     setRows((prev) =>
       prev.map((r) => (r.id === row.id ? { ...r, value } : r))
     );
     cancelEdit();
+    pendingRef.current += 1;
     startTransition(async () => {
-      await upsertContact(leadId, row.owner_id ?? "", row.id, { value });
+      const res = await upsertContact(
+        leadId,
+        row.owner_id ?? "",
+        row.id,
+        { value }
+      );
+      pendingRef.current -= 1;
+      if (!res.ok) {
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === row.id ? { ...r, value: previousValue } : r
+          )
+        );
+        setError(res.error || "Could not save address.");
+        return;
+      }
       router.refresh();
+      setPropsEpoch((n) => n + 1);
     });
   }
 
   function remove(row: ContactRow) {
+    setError(null);
+    const snapshot = rows;
     setRows((prev) => prev.filter((r) => r.id !== row.id));
+    pendingRef.current += 1;
     startTransition(async () => {
-      await deleteContact(row.id, leadId);
+      const res = await deleteContact(row.id, leadId);
+      pendingRef.current -= 1;
+      if (!res.ok) {
+        setRows(snapshot);
+        setError(res.error || "Could not remove address.");
+        return;
+      }
       router.refresh();
+      setPropsEpoch((n) => n + 1);
     });
   }
 
@@ -302,6 +352,7 @@ export function MailingAddressSubsection({
               onClick={() => {
                 setAdding(false);
                 setDraft(EMPTY_ADDR);
+                setError(null);
               }}
               className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[2px] text-[10.5px] text-ink hover:border-gray-300"
             >
@@ -320,18 +371,21 @@ export function MailingAddressSubsection({
       ) : (
         <button
           type="button"
-          onClick={() => setAdding(true)}
+          onClick={() => {
+            setError(null);
+            setAdding(true);
+          }}
           className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
         >
           + Add Mailing Address
         </button>
       )}
-    </div>
-  );
-}
 
-function isComplete(d: AddrDraft): boolean {
-  return Boolean(
-    d.line1.trim() && d.city.trim() && d.state.trim() && d.zip.trim()
+      {error && (
+        <div className="rounded border border-danger/40 bg-danger/5 px-2 py-[5px] text-[11px] leading-snug text-danger">
+          {error}
+        </div>
+      )}
+    </div>
   );
 }
