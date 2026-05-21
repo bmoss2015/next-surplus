@@ -107,7 +107,6 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
           initialAddresses={contacts}
           owners={owners}
           relatives={relatives}
-          leadParties={leadParties}
         />
       </div>
     </>

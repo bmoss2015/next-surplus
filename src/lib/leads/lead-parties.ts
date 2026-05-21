@@ -7,7 +7,7 @@ export async function fetchLeadParties(leadId: string): Promise<LeadPartyRow[]> 
   const { data, error } = await sb
     .from("lead_parties")
     .select(
-      "id, lead_id, role, custom_role_label, name, organization, email, phone, street, city, state, zip, notes, created_at"
+      "id, lead_id, role, custom_role_label, name, organization, email, phone, notes, created_at"
     )
     .eq("lead_id", leadId)
     .order("created_at", { ascending: true });
