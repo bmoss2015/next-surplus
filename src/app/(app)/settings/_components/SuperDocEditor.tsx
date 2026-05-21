@@ -60,7 +60,12 @@ export function SuperDocEditor({
     };
   };
   type SDInstance = {
-    export: (opts?: { isFinalDoc?: boolean }) => Promise<Blob>;
+    export: (opts?: {
+      isFinalDoc?: boolean;
+      triggerDownload?: boolean;
+      exportType?: string[];
+      exportedName?: string;
+    }) => Promise<Blob | void>;
     activeEditor?: Editor | null;
   };
   const superdocRef = useRef<SDInstance | null>(null);
@@ -77,7 +82,12 @@ export function SuperDocEditor({
     const cb = onReadyRef.current;
     if (!sd || !cb) return;
     cb({
-      export: () => sd.export({ isFinalDoc: true }),
+      // CRITICAL: triggerDownload MUST be false. SuperDoc's export()
+      // defaults to triggerDownload=true, which fires a browser Save As
+      // dialog via FileSaver — that's the "file explorer pops up when
+      // I click Save Template" bug. We just want the Blob; the parent
+      // uploads it to Supabase storage itself.
+      export: () => sd.export({ triggerDownload: false }) as Promise<Blob>,
       insertText: (text: string) => {
         const live = editor ?? sd.activeEditor ?? null;
         if (!live) {
