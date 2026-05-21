@@ -61,11 +61,27 @@ C:\\Users\\info\\moss-equity-portal
 
 \- URL: moss-equity-portal.vercel.app
 
-\- Deploy: npx vercel --prod
-
 \- DB changes: npx supabase db push --linked
 
 \- Only after Bree confirms fix on localhost:3000
+
+\#### Deploy flow — GitHub first, never `vercel --prod` from local
+
+1. Branch off main: `git checkout -b fix/<short-name>` (never commit directly to main from local)
+
+2. Commit the change with the Fix [number]: [name] format
+
+3. Push the branch: `git push -u origin fix/<short-name>` — Vercel auto-builds a preview URL on every branch push
+
+4. Open a PR to main (gh CLI if available, otherwise the URL GitHub returns)
+
+5. Wait for the Vercel preview deploy to land. Confirm the fix on the preview URL before merging
+
+6. Bree merges the PR → Vercel auto-deploys main to production
+
+7. After merge, monitor the prod deploy and report the final status — do not assume "merged" means "shipped". If the deploy fails, surface the actual error from the build log
+
+`vercel --prod` from local is only an emergency path (broken auto-deploy integration). Default workflow is git push → PR → merge → auto-deploy, so prod always matches what's on GitHub main and nothing drifts
 
 
 
