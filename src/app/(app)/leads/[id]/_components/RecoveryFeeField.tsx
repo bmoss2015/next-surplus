@@ -55,12 +55,12 @@ export function RecoveryFeeField({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
+      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
         Recovery Fee
       </span>
       <div className="group flex items-center gap-1.5">
         {editing ? (
-          <span className="inline-flex items-center rounded-md bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] py-[4px] pl-[14px] pr-[11px] text-[14px] font-semibold text-white ring-2 ring-[#0d6c7d]/45">
+          <span className="inline-flex items-center rounded-md bg-gradient-to-br from-[#0d4b3a] to-[#13644e] py-[4px] pl-[14px] pr-[11px] text-[14px] font-semibold text-white ring-2 ring-[#13644e]/45">
             <input
               type="text"
               inputMode="decimal"
@@ -89,7 +89,7 @@ export function RecoveryFeeField({
             type="button"
             onClick={startEdit}
             title="Edit recovery fee"
-            className="inline-flex cursor-text items-center rounded-md bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-[14px] py-[4px] text-[14px] font-semibold text-white transition-colors hover:from-[#0d6c7d] hover:to-[#1a8a9c]"
+            className="inline-flex cursor-text items-center rounded-md bg-gradient-to-br from-[#0d4b3a] to-[#13644e] px-[14px] py-[4px] text-[14px] font-semibold text-white transition-colors hover:from-[#13644e] hover:to-[#4a9c75]"
           >
             {saved}%
           </button>

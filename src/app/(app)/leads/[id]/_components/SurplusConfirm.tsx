@@ -124,7 +124,7 @@ export function SurplusConfirmControl({
     <button
       type="button"
       onClick={open}
-      className="cursor-pointer rounded border border-[#0d6c7d] px-3 py-1 text-xs text-[#0d6c7d] transition-colors hover:bg-[#0d6c7d] hover:text-white"
+      className="cursor-pointer rounded border border-[#13644e] px-3 py-1 text-xs text-[#13644e] transition-colors hover:bg-[#13644e] hover:text-white"
     >
       {confirmLabel}
     </button>

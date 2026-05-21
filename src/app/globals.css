@@ -1,14 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  /* Petrol palette — primary brand colors */
-  --color-petrol-50: #f0fafb;
-  --color-petrol-100: #cfe9ed;
-  --color-petrol-200: #9bd1d9;
-  --color-petrol-300: #1a8a9c;
-  --color-petrol-500: #0d6c7d;
-  --color-petrol-700: #0a3d4a;
-  --color-petrol-900: #062831;
+  /* Petrol palette — token NAMES preserved (455 inline refs across 87
+     files), VALUES split into two layers:
+       - 50 / 100 / 200 are NEUTRAL GRAY. They're used as hover + selected
+         background pillows portal-wide; any green tint reads green-on-green
+         / "AI dashboard" when applied that broadly. Bree consistently
+         rejects tinted-green backgrounds — keeping these neutral on
+         purpose.
+       - 300 / 500 / 700 / 900 carry the brand emerald for buttons,
+         gradients, active states, and brand chrome. */
+  --color-petrol-50: #f8f9fa;
+  --color-petrol-100: #f3f4f6;
+  --color-petrol-200: #e5e7eb;
+  --color-petrol-300: #4a9c75;
+  --color-petrol-500: #13644e;
+  --color-petrol-700: #0d4b3a;
+  --color-petrol-900: #04261c;
 
   /* Charcoal — body text */
   --color-ink: #0f1729;
@@ -24,7 +32,10 @@
   --color-gray-700: #374151;
   --color-gray-900: #0f1729;
 
-  /* Surface backgrounds */
+  /* Surface backgrounds — pure neutral. Brand color shows up via the deeper
+     petrol tones (active items, gradients, buttons), NOT via the
+     background. Tinted-green canvases read as AI-dashboard / pillowed and
+     get rejected. */
   --color-canvas: #f0f3f7;
   --color-surface: #ffffff;
   --color-surface-muted: #fafbfc;
@@ -34,16 +45,19 @@
   --color-danger-bg: #fef2f2;
   --color-danger-border: #fecaca;
 
-  /* Fix K — "warn"/attention states use a teal variant, no amber/yellow. */
-  --color-warn: #0d6c7d;
-  --color-warn-strong: #0a3d4a;
-  --color-warn-bg: #e0f2f7;
-  --color-warn-border: #0d6c7d;
-  --color-warn-deep: #0a3d4a;
+  /* "Warn"/attention states use the brand emerald for text + border, NOT
+     a tinted-green background. The bg sits on the neutral gray scale so
+     status pills read as gray with green text, not green-on-green. */
+  --color-warn: #13644e;
+  --color-warn-strong: #0d4b3a;
+  --color-warn-bg: #f3f4f6;
+  --color-warn-border: #13644e;
+  --color-warn-deep: #04261c;
 
+  /* Same pattern for success — green text, neutral pill background. */
   --color-success: #15803d;
   --color-success-strong: #065f46;
-  --color-success-bg: #d1fae5;
+  --color-success-bg: #f3f4f6;
 
   --color-info-violet: #534ab7;
   --color-info-violet-deep: #3c3489;
@@ -60,10 +74,11 @@
   --radius-xl: 10px;
   --radius-2xl: 12px;
 
-  /* Shadows from portal */
+  /* Shadows — elevated picks up the emerald tint so hovered/active cards
+     read as "lifted toward the brand color" instead of neutral gray. */
   --shadow-card: 0 1px 2px rgba(15, 23, 41, 0.03);
   --shadow-card-hover: 0 1px 2px rgba(15, 23, 41, 0.08);
-  --shadow-elevated: 0 4px 24px rgba(10, 61, 74, 0.18);
+  --shadow-elevated: 0 4px 24px rgba(13, 75, 58, 0.20);
 }
 
 html,
@@ -84,32 +99,96 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Inter OpenType variants — the same set the Settings page uses, lifted
+     portal-wide so typography reads as tight and refined on every page,
+     not just /settings. cv11 = alt 1/2/3/4, ss03 = curl-l/q, ss01 = single-
+     story a/g, cv02 = open-4. */
+  font-feature-settings: "cv11", "ss03", "ss01", "cv02";
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.008em;
 }
 
 .bg-sidebar-gradient {
-  background: linear-gradient(180deg, #0a3d4a 0%, #0d6c7d 100%);
+  background: linear-gradient(180deg, #04261c 0%, #0d4b3a 100%);
 }
 
 .bg-hero-gradient {
-  background: linear-gradient(135deg, #0a3d4a 0%, #0d6c7d 70%, #1a8a9c 100%);
+  background: linear-gradient(135deg, #04261c 0%, #0d4b3a 70%, #13644e 100%);
 }
 
-/* Fix 26 — universal action color. The petrol gradient from the Est. Net Surplus
-   bar is the one primary-action treatment. Use `btn-primary` on every primary
-   button, Next Stage, Add Relative / Add Mailing Address, and on the active
-   sidebar item / active stage step. */
-.btn-primary {
-  background: linear-gradient(135deg, #0a3d4a 0%, #0d6c7d 100%);
-  color: #ffffff;
-  border: none;
+/* Portal-wide button system. Same look + behavior the Settings page +
+   Members section use — solid emerald primary (no gradient — the gradient
+   reads dated), hairline outline, ghost, light. Sizes via .btn-sm. The
+   primary action shows a subtle lift via brand-tinted box-shadows so it
+   reads as the click target on every page. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.008em;
   cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.12s, color 0.12s, border-color 0.12s,
+    transform 0.06s, box-shadow 0.12s;
 }
-.btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #093440 0%, #0b5d6c 100%);
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
 }
-.btn-primary:disabled {
+.btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.btn-primary,
+.btn-brand {
+  background: #0d4b3a;
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 1px 2px rgba(13, 75, 58, 0.20),
+    0 6px 16px -4px rgba(13, 75, 58, 0.30);
+}
+.btn-primary:hover:not(:disabled),
+.btn-brand:hover:not(:disabled) {
+  background: #13644e;
+}
+.btn-outline {
+  background: #ffffff;
+  color: var(--color-ink);
+  border: 1px solid var(--color-gray-200);
+  box-shadow: 0 1px 1px rgba(12, 13, 16, 0.02);
+}
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--color-gray-300);
+  background: var(--color-gray-50);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--color-gray-500);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(12, 13, 16, 0.05);
+  color: var(--color-ink);
+}
+.btn-light {
+  background: #ffffff;
+  color: #0d4b3a;
+  box-shadow:
+    0 1px 2px rgba(12, 13, 16, 0.06),
+    0 2px 8px -2px rgba(12, 13, 16, 0.12);
+}
+.btn-light:hover:not(:disabled) {
+  background: var(--color-gray-50);
+}
+.btn-sm {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12.25px;
 }
 
 /* Fix 25 — pointer cursor on everything interactive. */
@@ -129,11 +208,55 @@ input[type="button"]:not(:disabled),
   cursor: pointer;
 }
 
+/* Portal-wide status/role pill system. Same vocabulary as the Settings
+   Members panel — black ink for admin-tier, neutral gray for default
+   members, emerald (solid or outline) for in-progress / branded states,
+   danger red for destructive flags. Use .role-tab as the base + a
+   modifier for the color scheme. Tiny uppercase letters, fixed
+   min-width so a row of mixed pills aligns. */
+.role-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 4px;
+  line-height: 1;
+  text-align: center;
+  min-width: 76px;
+  box-sizing: border-box;
+}
+.role-tab-admin {
+  background: var(--color-ink);
+  color: #ffffff;
+}
+.role-tab-member {
+  background: var(--color-petrol-100);
+  color: var(--color-gray-700);
+}
+.role-tab-pending {
+  background: var(--color-petrol-500);
+  color: #ffffff;
+}
+.role-tab-outline {
+  background: transparent;
+  color: var(--color-petrol-500);
+  border: 1px solid var(--color-petrol-500);
+  padding: 4px 9px;
+}
+.role-tab-danger {
+  background: var(--color-danger);
+  color: #ffffff;
+}
+
 /* Fix V — pill-shaped, always-visible horizontal scrollbar for the Kanban
    board (the visible bottom track + the synced sticky mirror at the top). */
 .kanban-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #0d6c7d #f1f5f9;
+  scrollbar-color: #13644e #f1f5f9;
 }
 .kanban-scroll::-webkit-scrollbar {
   height: 6px;
@@ -143,34 +266,33 @@ input[type="button"]:not(:disabled),
   border-radius: 3px;
 }
 .kanban-scroll::-webkit-scrollbar-thumb {
-  background: #0d6c7d;
+  background: #13644e;
   border-radius: 3px;
 }
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
-  background: #0a3d4a;
+  background: #0d4b3a;
 }
 
 /* Fix TT — one section-subheader treatment for the whole portal. */
 .section-subheader {
   font-size: 11px;
   font-weight: 700;
-  color: #0a3d4a;
+  color: #0d4b3a;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin: 0 0 12px;
 }
 
-/* Fix GG — native date / time inputs: kill the browser-default (blue in Chrome)
-   calendar / clock picker indicator and recolor it to the portal petrol #0d6c7d.
-   The filter first forces the icon to solid black, then tints it teal. Applies
-   to every date and time input in the portal. */
+/* Native date / time inputs: kill the browser-default (blue in Chrome)
+   calendar / clock picker indicator and recolor it to the portal emerald.
+   Applies to every date and time input in the portal. */
 input[type="date"],
 input[type="time"] {
   color-scheme: light;
-  /* Fix PPPP — the time picker scroll-wheel (hour / minute / AM-PM columns) and
-     the date picker's selected day use accent-color for their highlight; pin it
-     to the portal petrol so it never renders the browser-default blue. */
-  accent-color: #0d6c7d;
+  /* The time picker scroll-wheel + date picker's selected day use
+     accent-color for their highlight; pin it to the portal emerald so it
+     never renders the browser-default blue. */
+  accent-color: #13644e;
 }
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {

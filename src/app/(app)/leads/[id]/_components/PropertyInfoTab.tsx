@@ -443,7 +443,7 @@ function InlineListField({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="mb-3 border-b border-[#0d6c7d] pb-1 text-xs font-semibold uppercase tracking-widest text-[#0d6c7d]">
+      <h4 className="mb-3 border-b border-[#13644e] pb-1 text-xs font-semibold uppercase tracking-widest text-[#13644e]">
         {title}
       </h4>
       <div>{children}</div>

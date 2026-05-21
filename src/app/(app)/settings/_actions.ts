@@ -234,11 +234,11 @@ export async function inviteMember(
     to: cleanEmail,
     subject: "You have been invited to Moss Equity Partners",
     html: `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
-  <h1 style="margin:0;font-size:20px;font-weight:600;color:#0a3d4a;">You Have Been Invited</h1>
+  <h1 style="margin:0;font-size:20px;font-weight:600;color:#0d4b3a;">You Have Been Invited</h1>
   <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">Hello ${cleanName},</p>
   <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">An account has been created for you on the Moss Equity Partners portal using <strong>${cleanEmail}</strong>. Click the button below to set your password and finish signing in.</p>
   <p style="margin:24px 0 0;">
-    <a href="${inviteUrl}" style="display:inline-block;background:linear-gradient(90deg,#0a3d4a,#0d6c7d);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 20px;border-radius:6px;">Accept Invite</a>
+    <a href="${inviteUrl}" style="display:inline-block;background:linear-gradient(90deg,#0d4b3a,#13644e);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 20px;border-radius:6px;">Accept Invite</a>
   </p>
   <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#64748b;">If the button does not work, copy and paste this link into your browser:<br>${inviteUrl}</p>
 </div>`,

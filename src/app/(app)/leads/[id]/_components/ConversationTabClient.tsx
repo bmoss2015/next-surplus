@@ -40,9 +40,9 @@ function initialsOf(name: string): string {
 }
 
 const AVATAR_PALETTE: { bg: string; text: string }[] = [
-  { bg: "#0d6c7d", text: "#ffffff" },
-  { bg: "#0a3d4a", text: "#ffffff" },
-  { bg: "#1a8a9c", text: "#ffffff" },
+  { bg: "#13644e", text: "#ffffff" },
+  { bg: "#0d4b3a", text: "#ffffff" },
+  { bg: "#4a9c75", text: "#ffffff" },
   { bg: "#374151", text: "#ffffff" },
   { bg: "#7c3aed", text: "#ffffff" },
   { bg: "#b45309", text: "#ffffff" },
@@ -1430,7 +1430,7 @@ function Message({
     ? "You"
     : message.from_name || nameByAddress.get(message.from_address.toLowerCase()) || message.from_address;
   const senderColor = outbound
-    ? { bg: "#0d6c7d", text: "#ffffff" }
+    ? { bg: "#13644e", text: "#ffffff" }
     : avatarColorFor(senderName);
 
   const recipients = message.to_addresses

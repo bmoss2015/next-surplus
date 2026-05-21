@@ -143,7 +143,7 @@ async function sendThresholdEmail(
       : `Your Phone Validation add-on has crossed <strong>${threshold}%</strong> of this month's quota. Validation continues normally — this is a heads-up so you can raise the cap before reaching it.`;
 
   const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
-  <h1 style="margin:0;font-size:20px;font-weight:600;color:#0a3d4a;">${subject}</h1>
+  <h1 style="margin:0;font-size:20px;font-weight:600;color:#0d4b3a;">${subject}</h1>
   <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">${bodyIntro}</p>
   <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Used this month: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
   <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Settings &rarr; Billing &amp; Add-ons in the portal shows the live meter and lets you raise the cap or move to a paid Veriphone plan.</p>
