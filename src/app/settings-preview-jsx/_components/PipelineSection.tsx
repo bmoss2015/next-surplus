@@ -147,18 +147,26 @@ export function PipelineSection({
             </button>
           </div>
         </div>
+        {/* Inside-card list rows take 24px horizontal padding so each label
+            aligns with "Mark Lost Dropdown" up in the card head (which uses
+            settings-card-head's 22px 24px). The default .list-row 16px
+            would land them 8px further left of the head copy. */}
         <div className="list" style={{ border: 0, borderRadius: 0 }}>
           {liveReasons.length === 0 ? (
             <div
               className="list-row reason-row"
-              style={{ color: "var(--text-3)", fontSize: 13 }}
+              style={{ color: "var(--text-3)", fontSize: 13, padding: "13px 24px" }}
             >
               No lost reasons yet. Add one above to populate the Mark Lost
               dropdown.
             </div>
           ) : (
             liveReasons.map((r) => (
-              <div key={r.id} className="list-row reason-row">
+              <div
+                key={r.id}
+                className="list-row reason-row"
+                style={{ padding: "13px 24px" }}
+              >
                 <div className="flex-1 min-w-0">
                   <div className="text-[13.5px] font-medium">{r.label}</div>
                 </div>

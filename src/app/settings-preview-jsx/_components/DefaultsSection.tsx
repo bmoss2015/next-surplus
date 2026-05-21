@@ -51,13 +51,6 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
     });
   }
 
-  // Live calculator (mirrors the mockup hero).
-  const pct = Number(feePct) || 0;
-  const att = parseMoney(attorneyFee) ?? 0;
-  const surplus = 50000;
-  const feeAmt = (surplus * pct) / 100;
-  const net = feeAmt - att;
-
   return (
     <section id="panel-defaults" className="panel active">
       <div className="breadcrumb">
@@ -74,33 +67,6 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
             Starting values applied to every new lead. Each lead can override
             these individually.
           </p>
-        </div>
-      </div>
-
-      <div className="calc-hero">
-        <div className="calc-hero-eyebrow">Live Example · $50,000 Surplus</div>
-        <div className="calc-hero-flow">
-          <div className="calc-hero-step">
-            <div className="calc-hero-step-label">Estimated Surplus</div>
-            <div className="calc-hero-step-val">$50,000</div>
-          </div>
-          <div className="calc-hero-arrow">→</div>
-          <div className="calc-hero-step">
-            <div className="calc-hero-step-label">
-              Recovery Fee ({pct}%)
-            </div>
-            <div className="calc-hero-step-val">${fmtMoney(feeAmt)}</div>
-          </div>
-          <div className="calc-hero-arrow">−</div>
-          <div className="calc-hero-step">
-            <div className="calc-hero-step-label">Attorney Fee</div>
-            <div className="calc-hero-step-val">${fmtMoney(att)}</div>
-          </div>
-          <div className="calc-hero-arrow">=</div>
-          <div className="calc-hero-step calc-hero-step-total">
-            <div className="calc-hero-step-label">Estimated Net</div>
-            <div className="calc-hero-step-val">${fmtMoney(net)}</div>
-          </div>
         </div>
       </div>
 

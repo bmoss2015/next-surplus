@@ -24,8 +24,10 @@ export function ContactRolesSection({
         <div>
           <h1 className="section-h1">Contact Roles</h1>
           <p className="section-desc">
-            Custom labels you&apos;ve added to contacts beyond Owner and
-            Relative. Used in the lead-detail Contacts panel.
+            Custom labels for the extra people you track on a lead — anyone
+            who isn&apos;t the owner or attorney. Use these for parties like
+            servicers, process servers, title researchers, or anyone else
+            specific to your workflow.
           </p>
         </div>
       </div>
