@@ -1,11 +1,17 @@
-// Settings clone · Phase C.3 — Members (Team) wired to real data (display).
-//
-// Reads the org's member roster from OrgMemberRow[]. Hero stats are
-// computed from the roster. The Invite Member button and the per-row
-// overflow menu are visual-only — invite/role-change/remove flows ship
-// in Phase D.
+"use client";
 
+// Settings clone · Phase D.2 — Members (Team) with Invite drawer + per-row
+// role/remove menu.
+//
+// Reads OrgMemberRow[] + the current user's id. Invite Member opens the
+// InviteMemberDrawer. Per-row three-dot menu opens MemberOverflow which
+// supports flip-role + remove. Self-row gets a disabled trigger (server
+// also blocks self-edits).
+
+import { useState } from "react";
 import type { OrgMemberRow } from "@/lib/settings/fetch";
+import { InviteMemberDrawer } from "./InviteMemberDrawer";
+import { MemberOverflow } from "./MemberOverflow";
 
 function avatarInitials(name: string, email: string | null): string {
   const source = name?.trim() || email?.trim() || "?";
@@ -15,19 +21,17 @@ function avatarInitials(name: string, email: string | null): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function fmtJoined(_unused: OrgMemberRow): string {
-  // Member rows don't carry a join date in the public schema. Phase D will
-  // add it from the auth.users metadata pull.
-  return "";
-}
-
 export function TeamSection({
   initial,
   orgName,
+  currentUserId,
 }: {
   initial: OrgMemberRow[];
   orgName: string;
+  currentUserId: string;
 }) {
+  const [inviteOpen, setInviteOpen] = useState(false);
+
   const total = initial.length;
   const active = initial.filter((m) => !m.pending).length;
   const pending = initial.filter((m) => m.pending).length;
@@ -56,8 +60,7 @@ export function TeamSection({
           <button
             type="button"
             className="btn btn-light"
-            disabled
-            title="Invite drawer ships in Phase D"
+            onClick={() => setInviteOpen(true)}
           >
             <i className="icon icon-user-plus" /> Invite Member
           </button>
@@ -93,7 +96,7 @@ export function TeamSection({
           <>
             <div className="role-group-h">Admins</div>
             {adminRows.map((m) => (
-              <Row key={m.id} m={m} />
+              <Row key={m.id} m={m} isSelf={m.id === currentUserId} />
             ))}
           </>
         )}
@@ -101,7 +104,7 @@ export function TeamSection({
           <>
             <div className="role-group-h">Members</div>
             {memberRows.map((m) => (
-              <Row key={m.id} m={m} />
+              <Row key={m.id} m={m} isSelf={m.id === currentUserId} />
             ))}
           </>
         )}
@@ -109,16 +112,21 @@ export function TeamSection({
           <>
             <div className="role-group-h">Pending</div>
             {pendingRows.map((m) => (
-              <Row key={m.id} m={m} />
+              <Row key={m.id} m={m} isSelf={m.id === currentUserId} />
             ))}
           </>
         )}
       </div>
+
+      <InviteMemberDrawer
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+      />
     </section>
   );
 }
 
-function Row({ m }: { m: OrgMemberRow }) {
+function Row({ m, isSelf }: { m: OrgMemberRow; isSelf: boolean }) {
   const av =
     m.role === "admin" ? "av-self" : m.pending ? "av-5" : "av-1";
   const roleTab =
@@ -132,19 +140,10 @@ function Row({ m }: { m: OrgMemberRow }) {
         </div>
         <div className="row-meta text-[12px] text-2 mt-0.5 tabular">
           {m.email ?? ""}
-          {fmtJoined(m)}
         </div>
       </div>
       <span className="role-tab">{roleTab}</span>
-      <div className="overflow">
-        <div
-          className="icon-btn"
-          title="Manage (coming in Phase D)"
-          style={{ opacity: 0.4, pointerEvents: "none" }}
-        >
-          <i className="icon icon-more-horizontal" />
-        </div>
-      </div>
+      <MemberOverflow member={m} isSelf={isSelf} />
     </div>
   );
 }

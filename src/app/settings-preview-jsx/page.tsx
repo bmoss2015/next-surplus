@@ -130,6 +130,7 @@ export default async function SettingsPreviewJsxPage() {
 
       <SettingsPreviewJsx
         currentUser={{
+          id: profile.id,
           fullName: profile.fullName,
           email: profile.email ?? "",
           isAdmin,

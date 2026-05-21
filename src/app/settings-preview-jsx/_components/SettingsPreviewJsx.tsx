@@ -46,6 +46,7 @@ import type { EmailAccountRow } from "@/lib/email/types";
 import type { PhoneValidationUsage } from "./BillingSection";
 
 export type CurrentUser = {
+  id: string;
   fullName: string;
   email: string;
   isAdmin: boolean;
@@ -147,7 +148,11 @@ function renderPanel(
       );
     case "team":
       return data.members.length > 0 || currentUser.isAdmin ? (
-        <TeamSection initial={data.members} orgName={data.orgName} />
+        <TeamSection
+          initial={data.members}
+          orgName={data.orgName}
+          currentUserId={currentUser.id}
+        />
       ) : (
         <AdminGate />
       );
