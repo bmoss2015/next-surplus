@@ -1,11 +1,23 @@
-// Settings clone · Phase B.3 — top bar.
+// Settings clone · Phase C — top bar with real user identity.
 //
-// Lifts the mockup's <div class="topbar">…</div> markup verbatim into JSX.
-// Static for now: the top nav links are non-functional placeholders matching
-// the mockup, and the search box is a non-interactive visual. Phase B.X+
-// will wire these to the real portal navigation.
+// Lifts the mockup's <div class="topbar"> markup into JSX. Avatar initials
+// and the brand mark stay visual-only for now; the top nav links and search
+// box are non-functional placeholders that match the mockup. Phase D wires
+// nav to the real portal routes when /settings-preview-jsx moves to
+// /settings.
 
-export function Topbar() {
+import type { CurrentUser } from "./SettingsPreviewJsx";
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+export function Topbar({ currentUser }: { currentUser?: CurrentUser }) {
+  const av = currentUser ? initials(currentUser.fullName) : "BM";
+
   return (
     <div className="topbar sticky top-0 z-30 flex items-center justify-between px-8 h-14">
       <div className="flex items-center gap-8">
@@ -28,7 +40,7 @@ export function Topbar() {
             <span className="kbd">K</span>
           </span>
         </div>
-        <div className="avatar av-self">BM</div>
+        <div className="avatar av-self">{av}</div>
       </div>
     </div>
   );

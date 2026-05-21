@@ -1,25 +1,26 @@
-// Settings clone · Phase B.3 — JSX shell at /settings-preview-jsx.
+// Settings clone · Phase C.1 — wire Profile to real data.
 //
-// Real JSX replacement for the static mockup at /settings-preview. The
-// chrome (topbar, sub-rail, main scroll area) is component-based. The
-// Profile panel is the first to be converted to real JSX; every other rail
-// item shows a <Placeholder /> until later phases convert them.
+// page.tsx is now a Server Component. It runs the same auth check as the
+// (app) layout (getCurrentProfile → redirect /login if not signed in) and
+// fetches the slice of data Profile needs. Phase C.2+ will batch in the
+// remaining fetchers (attorneys, members, defaults, etc.) and pass them
+// through to the corresponding panels.
 //
-// CSS is still the lifted preview.css (shared with /settings-preview). The
-// Tailwind CDN is gone — the Tailwind v4 build in the app picks up the
-// utility classes inside this route's JSX automatically. Lucide icon font
-// stays for the <i class="icon icon-X"> glyphs the mockup uses (most of
-// which render empty at 3001 anyway).
-//
-// Lives outside the (app) group so it bypasses AppShell.
+// Route still lives outside the (app) group so it bypasses AppShell — the
+// mockup ships its own top bar. Phase D will swap /settings over to this.
 
 import { readFileSync } from "fs";
 import path from "path";
+import { redirect } from "next/navigation";
+import { getCurrentProfile } from "@/lib/auth/current-user";
 import { SettingsPreviewJsx } from "./_components/SettingsPreviewJsx";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
-export default function SettingsPreviewJsxPage() {
+export default async function SettingsPreviewJsxPage() {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
+
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "settings-preview", "preview.css"),
     "utf-8"
@@ -27,7 +28,6 @@ export default function SettingsPreviewJsxPage() {
 
   return (
     <>
-      {/* Fonts — match mockup: Inter 400-800 + JetBrains Mono 400/500. */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link
         rel="preconnect"
@@ -42,16 +42,18 @@ export default function SettingsPreviewJsxPage() {
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/lucide-static@0.460.0/font/lucide.css"
       />
-
-      {/* Lifted mockup CSS — same source file the static /settings-preview
-          uses. Injected as inline <style> so it's scoped to this route's
-          lifecycle and doesn't leak into other portal pages. */}
       <style
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: cssText }}
       />
 
-      <SettingsPreviewJsx />
+      <SettingsPreviewJsx
+        currentUser={{
+          fullName: profile.fullName,
+          email: profile.email ?? "",
+          isAdmin: profile.isAdmin,
+        }}
+      />
     </>
   );
 }
