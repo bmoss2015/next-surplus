@@ -99,7 +99,68 @@ export async function GET(req: NextRequest) {
     numericValue != null && Number.isFinite(numericValue)
       ? `amount.eq.${numericValue}`
       : null;
-  const taskAmountFilter = null; // tasks have no amount column
+
+  // Phone normalization — phones are stored in mixed formats
+  // ('(555) 123-4567' / '5551234567' / '+1 555-123-4567' / etc). Strip the
+  // query to digits and rebuild as a wildcarded ilike pattern that finds
+  // those digits in order with any non-digit punctuation between them.
+  const phoneDigits = sanitized.replace(/\D/g, "");
+  let phoneIlikeValue: string | null = null;
+  if (phoneDigits.length >= 7) {
+    let d = phoneDigits;
+    // Drop a leading country-code 1 if we have 11 digits — '+15551234567' should
+    // match '(555) 123-4567'.
+    if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+    if (d.length >= 10) {
+      const a = d.slice(0, 3);
+      const b = d.slice(3, 6);
+      const c = d.slice(6, 10);
+      phoneIlikeValue = `*${a}*${b}*${c}*`;
+    } else {
+      phoneIlikeValue = `*${d}*`;
+    }
+  }
+
+  // Date parsing — leads have several date columns (sale_date, redemption_ends,
+  // filing_deadline). Try to interpret the query as an ISO date / year-month /
+  // year / MM-DD-YY and translate to PostgREST .eq./range filters.
+  const dateLeadFilters: string[] = [];
+  const ymdMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(sanitized);
+  const ymMatch = /^(\d{4})-(\d{1,2})$/.exec(sanitized);
+  const yMatch = /^(\d{4})$/.exec(sanitized);
+  const slashMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(sanitized);
+  const dateLeadCols = ["sale_date", "redemption_ends", "filing_deadline"];
+  function pushExactDate(date: string) {
+    for (const col of dateLeadCols) dateLeadFilters.push(`${col}.eq.${date}`);
+  }
+  function pushRange(start: string, endExclusive: string) {
+    for (const col of dateLeadCols)
+      dateLeadFilters.push(`and(${col}.gte.${start},${col}.lt.${endExclusive})`);
+  }
+  if (ymdMatch) {
+    const date = `${ymdMatch[1]}-${ymdMatch[2].padStart(2, "0")}-${ymdMatch[3].padStart(2, "0")}`;
+    pushExactDate(date);
+  } else if (ymMatch) {
+    const yr = ymMatch[1];
+    const mo = ymMatch[2].padStart(2, "0");
+    const start = `${yr}-${mo}-01`;
+    const nextMo = Number(mo) === 12 ? `${Number(yr) + 1}-01-01` : `${yr}-${String(Number(mo) + 1).padStart(2, "0")}-01`;
+    pushRange(start, nextMo);
+  } else if (yMatch) {
+    // Only treat 4-digit as year if it's plausibly in our domain range — avoids
+    // a $2026 amount triggering a yearlong sale-date scan. Both still match
+    // because the numeric eq already handles 2026 as a number.
+    const yr = Number(yMatch[1]);
+    if (yr >= 1900 && yr <= 2100) {
+      pushRange(`${yr}-01-01`, `${yr + 1}-01-01`);
+    }
+  } else if (slashMatch) {
+    const m = slashMatch[1].padStart(2, "0");
+    const dd = slashMatch[2].padStart(2, "0");
+    let y = slashMatch[3];
+    if (y.length === 2) y = "20" + y;
+    pushExactDate(`${y}-${m}-${dd}`);
+  }
 
   const sb = await createClient();
   const leadIdSet = new Set<string>();
@@ -173,6 +234,7 @@ export async function GET(req: NextRequest) {
         stageInFilter,
         saleTypeInFilter,
         ...leadAmountFilters,
+        ...dateLeadFilters,
       ]
         .filter(Boolean)
         .join(",")
@@ -189,14 +251,32 @@ export async function GET(req: NextRequest) {
     )
     .limit(8);
 
-  // 3) Contacts (phone/email values) — match the value → lead.
+  // 3) Contacts (phone/email values) — match the value → lead. If the query
+  // looks like a phone number, also try a digit-wildcard pattern that ignores
+  // formatting differences.
   const contactsQ = sb
     .from("contacts")
     .select("value, channel, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
-    .ilike("value", v)
+    .or(
+      [
+        `value.ilike.${v}`,
+        phoneIlikeValue ? `value.ilike.${phoneIlikeValue}` : null,
+      ]
+        .filter(Boolean)
+        .join(",")
+    )
     .limit(8);
 
   // 4) Relatives — match full_name, phone (1-5), email (1-5), street, city, state → lead.
+  const phoneIlikeFilters = phoneIlikeValue
+    ? [
+        `phone.ilike.${phoneIlikeValue}`,
+        `phone_2.ilike.${phoneIlikeValue}`,
+        `phone_3.ilike.${phoneIlikeValue}`,
+        `phone_4.ilike.${phoneIlikeValue}`,
+        `phone_5.ilike.${phoneIlikeValue}`,
+      ]
+    : [];
   const relativesQ = sb
     .from("relatives")
     .select("id, full_name, phone, phone_2, phone_3, phone_4, phone_5, email, email_2, email_3, email_4, email_5, street, city, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
@@ -208,6 +288,7 @@ export async function GET(req: NextRequest) {
         `phone_3.ilike.${v}`,
         `phone_4.ilike.${v}`,
         `phone_5.ilike.${v}`,
+        ...phoneIlikeFilters,
         `email.ilike.${v}`,
         `email_2.ilike.${v}`,
         `email_3.ilike.${v}`,
@@ -233,8 +314,11 @@ export async function GET(req: NextRequest) {
         `organization.ilike.${v}`,
         `email.ilike.${v}`,
         `phone.ilike.${v}`,
+        phoneIlikeValue ? `phone.ilike.${phoneIlikeValue}` : null,
         `custom_role_label.ilike.${v}`,
-      ].join(",")
+      ]
+        .filter(Boolean)
+        .join(",")
     )
     .limit(8);
 
@@ -281,12 +365,20 @@ export async function GET(req: NextRequest) {
 
   // ─── NON-LEAD SURFACES ─────────────────────────────────────────────────
 
-  // 10) Attorneys — name, email, phone, notes.
+  // 10) Attorneys — name, email, phone (format-flexible), notes.
   const attorneysQ = sb
     .from("attorneys")
     .select("id, name, email, phone, notes")
     .or(
-      [`name.ilike.${v}`, `email.ilike.${v}`, `phone.ilike.${v}`, `notes.ilike.${v}`].join(",")
+      [
+        `name.ilike.${v}`,
+        `email.ilike.${v}`,
+        `phone.ilike.${v}`,
+        phoneIlikeValue ? `phone.ilike.${phoneIlikeValue}` : null,
+        `notes.ilike.${v}`,
+      ]
+        .filter(Boolean)
+        .join(",")
     )
     .limit(5);
 
