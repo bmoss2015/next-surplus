@@ -740,20 +740,21 @@ function PdfPreview({ blob }: { blob: Blob }) {
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
-        // Bundle the worker as a static asset via Next/Turbopack instead
-        // of pulling from a third-party CDN. cdnjs doesn't mirror every
-        // pdfjs-dist patch version (5.7.284 returned 404 against the
-        // bundled version), and a CDN dependency for something this
-        // core is fragile. `new URL(..., import.meta.url)` is pdf.js's
-        // documented bundler pattern — the worker file gets emitted to
-        // /_next/static and served from the same origin as the app.
-        const workerUrl = new URL(
-          "pdfjs-dist/build/pdf.worker.min.mjs",
-          import.meta.url
-        ).toString();
+        // Worker is served as a static file from /public so it works
+        // identically in dev and production with no bundler magic and
+        // no CDN dependency. Two prior approaches failed in prod:
+        //   - cdnjs URL: cdnjs doesn't mirror every pdfjs-dist patch
+        //     version, so 5.7.284 returned 404.
+        //   - new URL(..., import.meta.url): the documented bundler
+        //     pattern, but Turbopack in production didn't reliably
+        //     emit the worker chunk.
+        // The static-file approach is the most boring possible thing
+        // and never breaks. Keep public/pdf.worker.min.mjs in sync with
+        // node_modules/pdfjs-dist/build/pdf.worker.min.mjs (postinstall
+        // hook below in package.json handles this on npm install).
         (
           pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: string } }
-        ).GlobalWorkerOptions.workerSrc = workerUrl;
+        ).GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
         const data = new Uint8Array(await blob.arrayBuffer());
         const doc = await (
           pdfjs as unknown as {
