@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/current-user";
-import { US_STATE_NAMES } from "@/lib/leads/types";
+import {
+  US_STATE_NAMES,
+  STAGES,
+  STAGE_LABELS,
+  SALE_TYPES,
+  SALE_TYPE_LABELS,
+  OWNER_STATUSES,
+  OWNER_STATUS_LABELS,
+  type Stage,
+  type SaleType,
+  type OwnerStatus,
+} from "@/lib/leads/types";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +61,45 @@ export async function GET(req: NextRequest) {
     stateCodesFromName.length > 0
       ? `recipient_state.in.(${stateCodesFromName.join(",")})`
       : null;
+
+  // Enums — reverse-lookup display labels to storage values.
+  // 'Won' → stage.eq.won, 'Mortgage' → sale_type.eq.MTG, etc.
+  const stageMatches = STAGES.filter((s) =>
+    STAGE_LABELS[s].toLowerCase().includes(sanitizedLower)
+  );
+  const saleTypeMatches = SALE_TYPES.filter((s) =>
+    SALE_TYPE_LABELS[s].toLowerCase().includes(sanitizedLower)
+  );
+  const ownerStatusMatches = OWNER_STATUSES.filter((s) =>
+    OWNER_STATUS_LABELS[s].toLowerCase().includes(sanitizedLower)
+  );
+  const stageInFilter = stageMatches.length > 0 ? `stage.in.(${stageMatches.join(",")})` : null;
+  const saleTypeInFilter =
+    saleTypeMatches.length > 0 ? `sale_type.in.(${saleTypeMatches.join(",")})` : null;
+  const ownerStatusInFilter =
+    ownerStatusMatches.length > 0 ? `status.in.(${ownerStatusMatches.join(",")})` : null;
+
+  // Numeric — if the query parses as a number (after stripping $/,/space),
+  // try to match every amount-style column.
+  const numericRaw = sanitized.replace(/[$,\s]/g, "");
+  const numericValue = /^-?\d+(\.\d+)?$/.test(numericRaw) ? Number(numericRaw) : null;
+  const leadAmountFilters =
+    numericValue != null && Number.isFinite(numericValue)
+      ? [
+          `closing_bid.eq.${numericValue}`,
+          `estimated_surplus.eq.${numericValue}`,
+          `confirmed_surplus.eq.${numericValue}`,
+          `source_surplus.eq.${numericValue}`,
+          `estimated_net_payout.eq.${numericValue}`,
+          `attorney_cost.eq.${numericValue}`,
+          `recovery_fee_percent.eq.${numericValue}`,
+        ]
+      : [];
+  const lienAmountFilter =
+    numericValue != null && Number.isFinite(numericValue)
+      ? `amount.eq.${numericValue}`
+      : null;
+  const taskAmountFilter = null; // tasks have no amount column
 
   const sb = await createClient();
   const leadIdSet = new Set<string>();
@@ -108,7 +158,7 @@ export async function GET(req: NextRequest) {
   // 1) Leads — match against every lead-level column.
   const leadsQ = sb
     .from("leads")
-    .select("id, lead_id, address, city, state, zip, county, case_number")
+    .select("id, lead_id, address, city, state, zip, county, case_number, estimated_surplus, confirmed_surplus, closing_bid, attorney_cost, stage, sale_type")
     .or(
       [
         `lead_id.ilike.${v}`,
@@ -118,7 +168,11 @@ export async function GET(req: NextRequest) {
         `zip.ilike.${v}`,
         `county.ilike.${v}`,
         `case_number.ilike.${v}`,
+        `parcel_number.ilike.${v}`,
         stateInFilter,
+        stageInFilter,
+        saleTypeInFilter,
+        ...leadAmountFilters,
       ]
         .filter(Boolean)
         .join(",")
@@ -126,11 +180,13 @@ export async function GET(req: NextRequest) {
     .eq("archived", false)
     .limit(10);
 
-  // 2) Owners — name match → lead.
+  // 2) Owners — name OR status (Living/Deceased/etc.) → lead.
   const ownersQ = sb
     .from("owners")
-    .select("full_name, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
-    .ilike("full_name", v)
+    .select("full_name, status, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .or(
+      [`full_name.ilike.${v}`, ownerStatusInFilter].filter(Boolean).join(",")
+    )
     .limit(8);
 
   // 3) Contacts (phone/email values) — match the value → lead.
@@ -216,11 +272,11 @@ export async function GET(req: NextRequest) {
     )
     .limit(6);
 
-  // 9) Liens — name (the lien holder), bound to lead.
+  // 9) Liens — name OR amount, bound to lead.
   const liensQ = sb
     .from("liens")
     .select("id, name, amount, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
-    .ilike("name", v)
+    .or([`name.ilike.${v}`, lienAmountFilter].filter(Boolean).join(","))
     .limit(6);
 
   // ─── NON-LEAD SURFACES ─────────────────────────────────────────────────
