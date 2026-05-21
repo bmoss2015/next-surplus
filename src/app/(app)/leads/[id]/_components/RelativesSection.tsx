@@ -562,13 +562,17 @@ function RelativeCard({
                   placeholder="Street"
                   className={addrInputClass}
                 />
-                <div className="grid grid-cols-[1fr_56px_88px] gap-1.5">
-                  <input
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    placeholder="City"
-                    className={addrInputClass}
-                  />
+                <input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="City"
+                  className={addrInputClass}
+                />
+                {/* ST + ZIP stacked under City. Relatives sit in a
+                    lg:grid-cols-5 layout (each card ~200px wide) and
+                    a single-row City|ST|ZIP grid overflowed off the
+                    right edge. Stacking fits any card width. */}
+                <div className="grid grid-cols-[56px_1fr] gap-1.5">
                   <input
                     value={stateCode}
                     onChange={(e) =>
