@@ -2358,7 +2358,7 @@ function ImportSuccessModal({
         >
           <IconX size={16} stroke={1.75} />
         </button>
-        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#e8f4f6]">
+        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#f3f4f6]">
           <IconCheck size={24} stroke={2.5} className="text-[#13644e]" />
         </div>
         <h2 className="m-0 mb-6 text-lg font-semibold text-[#0d4b3a]">

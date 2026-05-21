@@ -204,7 +204,7 @@ export function ResearchTabClient({
                 className="overflow-hidden rounded-xl border border-gray-200 bg-surface"
               >
                 {/* Petrol-tinted section header — name · progress · collapse · X. */}
-                <div className="flex items-center gap-2 border-b border-gray-200 bg-[#e8f4f6] px-3 py-[10px]">
+                <div className="flex items-center gap-2 border-b border-gray-200 bg-[#f3f4f6] px-3 py-[10px]">
                   <button
                     type="button"
                     onClick={() => toggleCollapsed(tIdx, t.id)}

@@ -291,7 +291,7 @@ export function TasksList({
       <div className="space-y-5">
         {needsReviewTasks.length > 0 && (
           <div>
-            <div className="mb-2 flex items-baseline justify-between rounded-md border-l-4 border-l-[#0d4b3a] bg-[#e8f4f6] px-3 py-2">
+            <div className="mb-2 flex items-baseline justify-between rounded-md border-l-4 border-l-[#0d4b3a] bg-[#f3f4f6] px-3 py-2">
               <h2 className="m-0 text-[13px] font-semibold text-[#0d4b3a]">Needs Review</h2>
               <span className="text-[11px] text-[#0d4b3a]">{needsReviewTasks.length}</span>
             </div>
