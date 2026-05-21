@@ -102,23 +102,19 @@ export async function GET(req: NextRequest) {
 
   // Phone normalization — phones are stored in mixed formats
   // ('(555) 123-4567' / '5551234567' / '+1 555-123-4567' / etc). Strip the
-  // query to digits and rebuild as a wildcarded ilike pattern that finds
-  // those digits in order with any non-digit punctuation between them.
+  // query to digits and interleave with wildcards so any punctuation between
+  // any pair of digits still matches. "4567" → "*4*5*6*7*" finds the last
+  // four digits of a formatted phone; "5551234" → "*5*5*5*1*2*3*4*" finds
+  // a 7-digit partial regardless of formatting. Threshold lowered to 4 so
+  // typing a last-4 or area code starts working.
   const phoneDigits = sanitized.replace(/\D/g, "");
   let phoneIlikeValue: string | null = null;
-  if (phoneDigits.length >= 7) {
+  if (phoneDigits.length >= 4) {
     let d = phoneDigits;
     // Drop a leading country-code 1 if we have 11 digits — '+15551234567' should
     // match '(555) 123-4567'.
     if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
-    if (d.length >= 10) {
-      const a = d.slice(0, 3);
-      const b = d.slice(3, 6);
-      const c = d.slice(6, 10);
-      phoneIlikeValue = `*${a}*${b}*${c}*`;
-    } else {
-      phoneIlikeValue = `*${d}*`;
-    }
+    phoneIlikeValue = `*${d.split("").join("*")}*`;
   }
 
   // Date parsing — leads have several date columns (sale_date, redemption_ends,
@@ -363,6 +359,29 @@ export async function GET(req: NextRequest) {
     .or([`name.ilike.${v}`, lienAmountFilter].filter(Boolean).join(","))
     .limit(6);
 
+  // 9a) Discussion comments — flat text body tied to a lead.
+  const commentsQ = sb
+    .from("discussion_comments")
+    .select("id, body, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .ilike("body", v)
+    .limit(6);
+
+  // 9b) Activities — JSON payload search. Common note keys are payload.body
+  // and payload.text (review_pause uses `reason`). PostgREST supports
+  // `column->>field.ilike.*x*` for JSON-path text matching.
+  const activitiesQ = sb
+    .from("activities")
+    .select("id, activity_type, payload, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .or(
+      [
+        `payload->>body.ilike.${v}`,
+        `payload->>text.ilike.${v}`,
+        `payload->>reason.ilike.${v}`,
+        `payload->>note.ilike.${v}`,
+      ].join(",")
+    )
+    .limit(6);
+
   // ─── NON-LEAD SURFACES ─────────────────────────────────────────────────
 
   // 10) Attorneys — name, email, phone (format-flexible), notes.
@@ -423,6 +442,8 @@ export async function GET(req: NextRequest) {
     docsQ,
     mailJobsQ,
     liensQ,
+    commentsQ,
+    activitiesQ,
     attorneysQ,
     membersQ,
     tplsQ,
@@ -440,6 +461,8 @@ export async function GET(req: NextRequest) {
     docsR,
     mailJobsR,
     liensR,
+    commentsR,
+    activitiesR,
     attorneysR,
     membersR,
     tplsR,
@@ -454,17 +477,66 @@ export async function GET(req: NextRequest) {
     return j as LeadJoin;
   }
 
-  // 1) Leads
+  // snake_case / SCREAMING_CASE → "Title Case" so backend identifiers never
+  // surface in result text. `mailing_address_updated` → `Mailing Address
+  // Updated`, `MTG` left alone (caller decides), `email` → `Email`.
+  function humanize(s: string): string {
+    return s
+      .replace(/[_-]+/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  // 1) Leads — when the lead matched on a non-address field, surface that
+  // field in the subtitle so the user can see *why* this row came up.
+  // Otherwise the result reads as a plain address with no breadcrumb.
   if (leadsR.status === "fulfilled" && leadsR.value.data) {
-    for (const r of leadsR.value.data) {
-      leadCache.set(r.id as string, {
-        lead_id: r.lead_id as string,
-        address: r.address as string,
-        city: r.city as string | null,
-        state: r.state as string | null,
-        zip: r.zip as string | null,
+    const qLower = sanitized.toLowerCase();
+    type LeadRow = {
+      id: string; lead_id: string; address: string;
+      city: string | null; state: string | null; zip: string | null;
+      county: string | null; case_number: string | null;
+      stage: string | null; sale_type: string | null;
+    };
+    function leadMatchHint(r: LeadRow): string | null {
+      const addr = (r.address || "").toLowerCase();
+      // If the address itself contains the query, the title already shows it.
+      if (addr.includes(qLower)) return null;
+      const checks: Array<[string, string | null | undefined]> = [
+        ["County", r.county],
+        ["Case #", r.case_number],
+        ["Lead ID", r.lead_id],
+        ["City", r.city],
+        ["ZIP", r.zip],
+      ];
+      for (const [label, value] of checks) {
+        if (value && String(value).toLowerCase().includes(qLower)) {
+          return `${label}: ${value}`;
+        }
+      }
+      // State and enum matches don't contain the literal query — they came
+      // from reverse-lookup. Surface a Title-Case label.
+      if (r.state && stateCodesFromName.includes(r.state)) {
+        return `State: ${US_STATE_NAMES[r.state] ?? r.state}`;
+      }
+      if (r.stage && stageMatches.includes(r.stage as Stage)) {
+        return `Stage: ${STAGE_LABELS[r.stage as Stage]}`;
+      }
+      if (r.sale_type && saleTypeMatches.includes(r.sale_type as SaleType)) {
+        return `Sale Type: ${SALE_TYPE_LABELS[r.sale_type as SaleType]}`;
+      }
+      // Fall back to case_number if present (legacy behavior).
+      return r.case_number || null;
+    }
+    for (const r of leadsR.value.data as LeadRow[]) {
+      leadCache.set(r.id, {
+        lead_id: r.lead_id,
+        address: r.address,
+        city: r.city,
+        state: r.state,
+        zip: r.zip,
       });
-      pushLead(r.id as string, leadCache.get(r.id as string)!, (r as { case_number?: string | null }).case_number || null);
+      pushLead(r.id, leadCache.get(r.id)!, leadMatchHint(r));
     }
   }
 
@@ -485,7 +557,7 @@ export async function GET(req: NextRequest) {
   // 3) Contacts
   if (contactsR.status === "fulfilled" && contactsR.value.data) {
     for (const c of contactsR.value.data as Array<{ value: string; channel: string; lead_id: string; leads: unknown }>) {
-      pushFromJoin(c, `${c.channel}: ${c.value}`);
+      pushFromJoin(c, `${humanize(c.channel)}: ${c.value}`);
     }
   }
   // 4) Relatives
@@ -497,7 +569,7 @@ export async function GET(req: NextRequest) {
   // 5) Lead parties
   if (partiesR.status === "fulfilled" && partiesR.value.data) {
     for (const p of partiesR.value.data as Array<{ name: string; custom_role_label: string | null; lead_id: string; leads: unknown }>) {
-      const label = p.custom_role_label || "contact";
+      const label = humanize(p.custom_role_label || "contact");
       pushFromJoin(p, `${label}: ${p.name}`);
     }
   }
@@ -543,6 +615,30 @@ export async function GET(req: NextRequest) {
     for (const l of liensR.value.data as Array<{ name: string; amount: number | null; lead_id: string; leads: unknown }>) {
       const amount = l.amount != null ? `$${l.amount.toLocaleString()}` : null;
       pushFromJoin(l, `lien: ${l.name}${amount ? ` (${amount})` : ""}`);
+    }
+  }
+
+  // 9a) Discussion comments
+  if (commentsR.status === "fulfilled" && commentsR.value.data) {
+    for (const c of commentsR.value.data as Array<{ id: string; body: string; lead_id: string; leads: unknown }>) {
+      const snippet = (c.body || "").trim().slice(0, 80);
+      pushFromJoin(c, `comment: ${snippet}${(c.body?.length ?? 0) > 80 ? "…" : ""}`);
+    }
+  }
+
+  // 9b) Activities (note-style entries via JSON payload)
+  if (activitiesR.status === "fulfilled" && activitiesR.value.data) {
+    for (const a of activitiesR.value.data as Array<{ activity_type: string; payload: Record<string, unknown> | null; lead_id: string; leads: unknown }>) {
+      const p = a.payload || {};
+      const text =
+        (p.body as string | undefined) ||
+        (p.text as string | undefined) ||
+        (p.reason as string | undefined) ||
+        (p.note as string | undefined) ||
+        "";
+      const snippet = text.trim().slice(0, 80);
+      const label = humanize(a.activity_type);
+      pushFromJoin(a, snippet ? `${label}: ${snippet}${text.length > 80 ? "…" : ""}` : label);
     }
   }
 

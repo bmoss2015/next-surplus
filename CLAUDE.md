@@ -117,9 +117,15 @@ C:\\Users\\info\\moss-equity-portal
 
 \### Database
 
-\- Always write a migration file in supabase/migrations/
+\- Schema changes only via `supabase/migrations/*.sql` + `npx supabase db push --linked`. Never use Supabase MCP `apply_migration`, MCP `execute_sql` for DDL, or the dashboard SQL editor. If the file isn't in git, the change doesn't exist.
 
-\- Never edit the database directly
+\- Every migration file is committed in the same PR as the code that depends on it. Local file + remote tracking + git stay in lockstep.
+
+\- File naming: `NNNN_<short_name>.sql` where NNNN = max existing + 1. Never reuse a number.
+
+\- Before pushing: `cat supabase/.temp/project-ref` must read `sghfmudgnddybsayfqbd` (staging). Verify every time.
+
+\- Never edit the database directly through any UI or raw SQL tool.
 
 \- Never run migrations against hkubwxpyyejxffncxrez
 
