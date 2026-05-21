@@ -65,7 +65,7 @@ C:\\Users\\info\\moss-equity-portal
 
 \- Only after Bree confirms fix on localhost:3000
 
-\#### Deploy flow — GitHub first, never `vercel --prod` from local
+\#### Deploy flow — GitHub for mechanics, browser for review
 
 1. Branch off main: `git checkout -b fix/<short-name>` (never commit directly to main from local)
 
@@ -73,11 +73,11 @@ C:\\Users\\info\\moss-equity-portal
 
 3. Push the branch: `git push -u origin fix/<short-name>` — Vercel auto-builds a preview URL on every branch push
 
-4. Open a PR to main (gh CLI if available, otherwise the URL GitHub returns)
+4. Open a PR to main via gh CLI. The PR exists for the auto-deploy-on-merge mechanic, not for review
 
-5. Wait for the Vercel preview deploy to land. Confirm the fix on the preview URL before merging
+5. **Bree reviews ONLY in the browser.** Pass the Vercel preview URL directly in chat — never tell Bree to "open the PR" or "review on GitHub". She wants to see the live UI, not read a diff
 
-6. Bree merges the PR → Vercel auto-deploys main to production
+6. After Bree thumbs-up, merge the PR via gh — Vercel auto-deploys main to production
 
 7. After merge, monitor the prod deploy and report the final status — do not assume "merged" means "shipped". If the deploy fails, surface the actual error from the build log
 
