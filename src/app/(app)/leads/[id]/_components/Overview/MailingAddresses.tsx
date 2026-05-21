@@ -212,6 +212,26 @@ export function MailingAddresses({
     return { street: parts[0], rest: parts.slice(1).join(", ") };
   }
 
+  // Pull relatives that have an address stored directly on the relatives
+  // row (street/city/state/zip — separate from the contacts table where
+  // owner mailing addresses live). Read-only here; edit on the relative
+  // card itself. Closes the gap where addresses added on a relative
+  // card never surfaced in this panel.
+  const relativeAddressRows = (relatives ?? [])
+    .map((r) => {
+      const street = (r.street ?? "").trim();
+      const city = (r.city ?? "").trim();
+      const state = (r.state ?? "").trim();
+      const zip = (r.zip ?? "").trim();
+      if (!street && !city && !state && !zip) return null;
+      const tail = [city, [state, zip].filter(Boolean).join(" ")]
+        .filter(Boolean)
+        .join(", ");
+      const value = [street, tail].filter(Boolean).join(", ");
+      return { id: r.id, name: r.full_name, value };
+    })
+    .filter((x): x is { id: string; name: string; value: string } => x !== null);
+
   const inputClass =
     "w-full rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
   const labelClass = "mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500";
@@ -241,7 +261,7 @@ export function MailingAddresses({
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-7 text-center text-[12px] text-gray-500">
           Add an owner first to attach a mailing address.
         </div>
-      ) : rows.length === 0 && !adding ? (
+      ) : rows.length === 0 && relativeAddressRows.length === 0 && !adding ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-7 text-center text-[12px] text-gray-500">
           No Mailing Addresses Yet.
         </div>
@@ -371,6 +391,36 @@ export function MailingAddresses({
             })}
           </div>
         )
+      )}
+
+      {relativeAddressRows.length > 0 && (
+        <div className="mt-4">
+          <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.5px] text-gray-500">
+            From Relatives
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {relativeAddressRows.map((r) => {
+              const { street, rest } = addressLines(r.value);
+              return (
+                <div
+                  key={r.id}
+                  className="flex flex-col gap-2 rounded-md border border-gray-200 bg-gray-50 p-3"
+                >
+                  <div className="text-[11px] text-gray-500">
+                    {r.name} (Relative)
+                  </div>
+                  <div className="text-[12px] leading-snug text-ink">
+                    <div>{street}</div>
+                    {rest && <div className="text-gray-500">{rest}</div>}
+                  </div>
+                  <div className="text-[10px] italic text-gray-400">
+                    Edit on the Relatives section below.
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {adding && (

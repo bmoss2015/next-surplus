@@ -606,19 +606,32 @@ function RelativeCard({
                   <button
                     type="button"
                     onClick={() => {
-                      // Patch all four fields atomically + close the
-                      // form so the saved row appears immediately
-                      // (without this, the form stayed open and the
-                      // Save button felt "stuck").
+                      // Block save unless all four parts are present —
+                      // a partial address (just street) saves a row
+                      // SendMail can't actually use. Same rule on
+                      // the owner card form.
+                      if (
+                        !street.trim() ||
+                        !city.trim() ||
+                        !stateCode.trim() ||
+                        !zip.trim()
+                      ) {
+                        return;
+                      }
                       onPatch({
-                        street: street.trim() || null,
-                        city: city.trim() || null,
-                        state: stateCode.trim() || null,
-                        zip: zip.trim() || null,
+                        street: street.trim(),
+                        city: city.trim(),
+                        state: stateCode.trim(),
+                        zip: zip.trim(),
                       });
                       setAddingAddress(false);
                     }}
-                    disabled={!street.trim()}
+                    disabled={
+                      !street.trim() ||
+                      !city.trim() ||
+                      !stateCode.trim() ||
+                      !zip.trim()
+                    }
                     className="cursor-pointer rounded-md bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-3 py-[4px] text-[11px] font-medium text-white disabled:opacity-40"
                   >
                     Save Address

@@ -819,7 +819,10 @@ function OwnerCard({
     const city = addrCity.trim();
     const stateCode = addrState.trim().toUpperCase().slice(0, 2);
     const zip = addrZip.trim();
-    if (!street) return;
+    // All four parts required — a partial address (just street) silently
+    // saves a half-complete row that the SendMail flow can't actually use.
+    // Better to block save than ship a broken envelope.
+    if (!street || !city || !stateCode || !zip) return;
     // Same join format the Overview MailingAddresses panel uses:
     // "line1, city, STATE ZIP". Keeps parsing consistent across the
     // two add-paths so lead-candidates.ts handles both identically.
@@ -1118,7 +1121,12 @@ function OwnerCard({
               <button
                 type="button"
                 onClick={submitAddress}
-                disabled={!addrStreet.trim()}
+                disabled={
+                  !addrStreet.trim() ||
+                  !addrCity.trim() ||
+                  !addrState.trim() ||
+                  !addrZip.trim()
+                }
                 className="cursor-pointer rounded-md bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-3 py-[4px] text-[11px] font-medium text-white disabled:opacity-40"
               >
                 Save Address
