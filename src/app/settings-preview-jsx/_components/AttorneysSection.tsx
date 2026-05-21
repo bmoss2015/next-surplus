@@ -1,14 +1,15 @@
 "use client";
 
-// Settings clone · Phase C.3 — Attorneys wired to real data (display).
+// Settings clone · Phase D — Attorneys with edit drawer.
 //
-// Reads the org's attorneys from AttorneyRow[] and renders the mockup's
-// list. Search is wired client-side over name/email/states/fee. Edit
-// pencils and the Add Attorney button are visual-only — the upsert/delete
-// drawer ships in Phase D.
+// Reads the org's attorneys from AttorneyRow[]. Search is wired client-side
+// over name/email/states/fee. Add Attorney + per-row edit pencil both open
+// the shared <AttorneyDrawer />, which calls upsertAttorney/deleteAttorney
+// and refreshes the page on success.
 
 import { useMemo, useState } from "react";
 import type { AttorneyRow } from "@/lib/settings/fetch";
+import { AttorneyDrawer } from "./AttorneyDrawer";
 
 function avatarInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -24,8 +25,13 @@ function fmtMoney(n: number | null): string {
 
 const ALL_STATES = 50;
 
+// `editing` is "new" for the add drawer, an AttorneyRow for edit, or null
+// when the drawer is closed.
+type DrawerState = { kind: "closed" } | { kind: "new" } | { kind: "edit"; row: AttorneyRow };
+
 export function AttorneysSection({ initial }: { initial: AttorneyRow[] }) {
   const [query, setQuery] = useState("");
+  const [drawer, setDrawer] = useState<DrawerState>({ kind: "closed" });
 
   const stats = useMemo(() => {
     const stateSet = new Set<string>();
@@ -80,8 +86,7 @@ export function AttorneysSection({ initial }: { initial: AttorneyRow[] }) {
         <button
           type="button"
           className="btn btn-primary"
-          disabled
-          title="Add/edit drawer ships in Phase D"
+          onClick={() => setDrawer({ kind: "new" })}
         >
           <i className="icon icon-plus" /> Add Attorney
         </button>
@@ -177,10 +182,11 @@ export function AttorneysSection({ initial }: { initial: AttorneyRow[] }) {
                 )}
               </div>
               <div className="overflow flex items-center gap-0.5 ml-2">
-                <div
+                <button
+                  type="button"
                   className="icon-btn"
-                  title="Edit (coming in Phase D)"
-                  style={{ opacity: 0.4, pointerEvents: "none" }}
+                  title="Edit"
+                  onClick={() => setDrawer({ kind: "edit", row: a })}
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -195,17 +201,23 @@ export function AttorneysSection({ initial }: { initial: AttorneyRow[] }) {
                     <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
                     <path d="m15 5 4 4" />
                   </svg>
-                </div>
+                </button>
               </div>
             </div>
           );
         })}
         {filtered.length === 0 && !query && (
           <div className="list-row" style={{ color: "var(--text-3)" }}>
-            No attorneys yet. Phase D adds the Add Attorney drawer.
+            No attorneys yet. Click Add Attorney to get started.
           </div>
         )}
       </div>
+
+      <AttorneyDrawer
+        attorney={drawer.kind === "edit" ? drawer.row : null}
+        open={drawer.kind !== "closed"}
+        onClose={() => setDrawer({ kind: "closed" })}
+      />
     </section>
   );
 }
