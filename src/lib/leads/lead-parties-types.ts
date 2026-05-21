@@ -23,6 +23,12 @@ export type LeadPartyRow = {
   organization: string | null;
   email: string | null;
   phone: string | null;
+  // Mailing address — added by migration 0103; surfaces in the lead's
+  // Mailing Addresses panel and the Send Mail recipient picker.
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   notes: string | null;
   created_at: string;
 };
