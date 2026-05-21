@@ -152,7 +152,10 @@ function renderPanel(
       );
     case "billing":
       return data.phoneUsage ? (
-        <BillingSection phoneUsage={data.phoneUsage} />
+        <BillingSection
+          phoneUsage={data.phoneUsage}
+          invoiceEmail={currentUser.email}
+        />
       ) : (
         <AdminGate />
       );

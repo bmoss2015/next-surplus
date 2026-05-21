@@ -110,6 +110,12 @@ export default async function SettingsPreviewJsxPage() {
                line and long copy uses the full content-column width before
                wrapping. */
             .section-desc { max-width: none; }
+
+            /* Phase C.7: shift the right-side control in a settings-card head
+               down so its top edge sits on the .settings-card-title line, not
+               the eyebrow above. Mockup put both flush-top which left the
+               14-days input visibly higher than "Needs Action Threshold". */
+            .settings-card-head .settings-card-control { margin-top: 18px; }
           `,
         }}
       />
