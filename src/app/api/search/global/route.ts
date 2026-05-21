@@ -120,22 +120,37 @@ export async function GET(req: NextRequest) {
       ? currencyFilter("amount")
       : null;
 
-  // Phone normalization — phones are stored in mixed formats
-  // ('(555) 123-4567' / '5551234567' / '+1 555-123-4567' / etc). Strip the
-  // query to digits and interleave with wildcards so any punctuation between
-  // any pair of digits still matches. "4567" → "*4*5*6*7*" finds the last
-  // four digits of a formatted phone; "5551234" → "*5*5*5*1*2*3*4*" finds
-  // a 7-digit partial regardless of formatting. Threshold lowered to 4 so
-  // typing a last-4 or area code starts working.
+  // Phone normalization — phones are stored as "(555) 123-4567" per the
+  // app's formatting rule, but some legacy / imported rows may have
+  // "5551234567", "+1 555-123-4567", "555.123.4567", etc.
+  //
+  // Match strategy:
+  //   • Plain substring of the typed digits ("*694*"). Pure substring on the
+  //     stored value — only matches consecutive digit sequences, so "694"
+  //     never matches "(689) 476-5539" (which it WOULD with interleaved
+  //     wildcards like "*6*9*4*"; that pattern was producing false positives).
+  //   • For 10-digit (or 11 starting with 1) queries, also try the canonical
+  //     paren+space format the rest of the app uses, so a flat "5551234567"
+  //     still matches a stored "(555) 123-4567".
+  //   • For 7-digit queries, also try "xxx-xxxx" so "5551234" matches a
+  //     stored local number with a dash.
   const phoneDigits = sanitized.replace(/\D/g, "");
-  let phoneIlikeValue: string | null = null;
+  const phoneIlikePatterns: string[] = [];
   if (phoneDigits.length >= 3) {
     let d = phoneDigits;
-    // Drop a leading country-code 1 if we have 11 digits — '+15551234567' should
-    // match '(555) 123-4567'.
     if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
-    phoneIlikeValue = `*${d.split("").join("*")}*`;
+    phoneIlikePatterns.push(`*${d}*`);
+    if (d.length === 10) {
+      const a = d.slice(0, 3), b = d.slice(3, 6), c = d.slice(6, 10);
+      phoneIlikePatterns.push(`*(${a}) ${b}-${c}*`);
+    } else if (d.length === 7) {
+      const a = d.slice(0, 3), b = d.slice(3, 7);
+      phoneIlikePatterns.push(`*${a}-${b}*`);
+    }
   }
+  // Back-compat alias used by several existing filters below — the first
+  // pattern in the array (the plain-digit substring) is the universal one.
+  const phoneIlikeValue = phoneIlikePatterns[0] ?? null;
 
   // Date parsing — leads have several date columns (sale_date, redemption_ends,
   // filing_deadline). Try to interpret the query as an ISO date / year-month /
@@ -340,15 +355,15 @@ export async function GET(req: NextRequest) {
     .limit(8);
 
   // 3) Contacts (phone/email values) — match the value → lead. If the query
-  // looks like a phone number, also try a digit-wildcard pattern that ignores
-  // formatting differences.
+  // looks like a phone number, also try every format variant we generated
+  // so a flat "5551234567" matches a stored "(555) 123-4567".
   const contactsQ = sb
     .from("contacts")
     .select("value, channel, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .or(
       [
         `value.ilike.${v}`,
-        phoneIlikeValue ? `value.ilike.${phoneIlikeValue}` : null,
+        ...phoneIlikePatterns.map((p) => `value.ilike.${p}`),
       ]
         .filter(Boolean)
         .join(",")
@@ -356,15 +371,12 @@ export async function GET(req: NextRequest) {
     .limit(8);
 
   // 4) Relatives — match full_name, phone (1-5), email (1-5), street, city, state → lead.
-  const phoneIlikeFilters = phoneIlikeValue
-    ? [
-        `phone.ilike.${phoneIlikeValue}`,
-        `phone_2.ilike.${phoneIlikeValue}`,
-        `phone_3.ilike.${phoneIlikeValue}`,
-        `phone_4.ilike.${phoneIlikeValue}`,
-        `phone_5.ilike.${phoneIlikeValue}`,
-      ]
-    : [];
+  const phoneIlikeFilters: string[] = [];
+  for (const slot of ["phone", "phone_2", "phone_3", "phone_4", "phone_5"]) {
+    for (const p of phoneIlikePatterns) {
+      phoneIlikeFilters.push(`${slot}.ilike.${p}`);
+    }
+  }
   const relativesQ = sb
     .from("relatives")
     .select("id, full_name, phone, phone_2, phone_3, phone_4, phone_5, email, email_2, email_3, email_4, email_5, street, city, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
@@ -402,7 +414,7 @@ export async function GET(req: NextRequest) {
         `organization.ilike.${v}`,
         `email.ilike.${v}`,
         `phone.ilike.${v}`,
-        phoneIlikeValue ? `phone.ilike.${phoneIlikeValue}` : null,
+        ...phoneIlikePatterns.map((p) => `phone.ilike.${p}`),
         `custom_role_label.ilike.${v}`,
       ]
         .filter(Boolean)
@@ -485,7 +497,7 @@ export async function GET(req: NextRequest) {
         `name.ilike.${v}`,
         `email.ilike.${v}`,
         `phone.ilike.${v}`,
-        phoneIlikeValue ? `phone.ilike.${phoneIlikeValue}` : null,
+        ...phoneIlikePatterns.map((p) => `phone.ilike.${p}`),
         `notes.ilike.${v}`,
       ]
         .filter(Boolean)
@@ -742,7 +754,7 @@ export async function GET(req: NextRequest) {
         }
       }
       const phones = [r.phone, r.phone_2, r.phone_3, r.phone_4, r.phone_5];
-      if (phoneDigits.length >= 4) {
+      if (phoneDigits.length >= 3) {
         for (const p of phones) {
           if (p && p.replace(/\D/g, "").includes(phoneDigits)) {
             return `${r.full_name} · Phone: ${p}`;
@@ -787,7 +799,7 @@ export async function GET(req: NextRequest) {
         return `${role}: ${p.name} · Email: ${p.email}`;
       }
       const phoneHit =
-        (phoneDigits.length >= 4 && p.phone && p.phone.replace(/\D/g, "").includes(phoneDigits)) ||
+        (phoneDigits.length >= 3 && p.phone && p.phone.replace(/\D/g, "").includes(phoneDigits)) ||
         (p.phone && p.phone.toLowerCase().includes(qLower));
       if (phoneHit && p.phone) {
         return `${role}: ${p.name} · Phone: ${p.phone}`;
