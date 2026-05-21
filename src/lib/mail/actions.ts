@@ -69,6 +69,80 @@ export async function getMailTemplateAttachmentPageCount(
   return { ok: true, pdf_pages: total, pdf_files: paths.length };
 }
 
+// Server action — checks which fonts a template's docx references and
+// flags any that aren't in our Gotenberg renderer's bundled font set.
+// Used by the Mail Templates editor right after upload so the user gets
+// an inline warning when their docx uses something like a designer-only
+// font that won't render correctly in the PDF the printer receives.
+export async function validateTemplateFonts(input: {
+  template_id: string;
+}): Promise<
+  | {
+      ok: true;
+      fonts: string[];
+      unsupported: string[];
+    }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+  const { data: tpl } = await sb
+    .from("mail_templates")
+    .select("id, docx_path")
+    .eq("id", input.template_id)
+    .maybeSingle();
+  if (!tpl || !tpl.docx_path) {
+    return { ok: true, fonts: [], unsupported: [] };
+  }
+  const admin = createServiceClient();
+  const dl = await admin.storage
+    .from("mail-templates")
+    .download(tpl.docx_path as string);
+  if (dl.error || !dl.data) {
+    return {
+      ok: false,
+      error: `Could not load template: ${dl.error?.message ?? "unknown"}`,
+    };
+  }
+  const buffer = Buffer.from(await dl.data.arrayBuffer());
+  const { detectDocxFonts, isFontSupported } = await import("./fonts");
+  const fonts = await detectDocxFonts(buffer);
+  const unsupported = fonts.filter((f) => !isFontSupported(f));
+  return { ok: true, fonts, unsupported };
+}
+
+// Server action — same check but for a freshly-uploaded docx path that
+// hasn't been saved as a template row yet. Lets the upload flow surface
+// font issues before the user clicks Save Template.
+export async function validateDocxPathFonts(input: {
+  docx_path: string;
+}): Promise<
+  | { ok: true; fonts: string[]; unsupported: string[] }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  if (!input.docx_path || !input.docx_path.toLowerCase().endsWith(".docx")) {
+    return { ok: true, fonts: [], unsupported: [] };
+  }
+  const admin = createServiceClient();
+  const dl = await admin.storage
+    .from("mail-templates")
+    .download(input.docx_path);
+  if (dl.error || !dl.data) {
+    return {
+      ok: false,
+      error: `Could not load uploaded file: ${dl.error?.message ?? "unknown"}`,
+    };
+  }
+  const buffer = Buffer.from(await dl.data.arrayBuffer());
+  const { detectDocxFonts, isFontSupported } = await import("./fonts");
+  const fonts = await detectDocxFonts(buffer);
+  const unsupported = fonts.filter((f) => !isFontSupported(f));
+  return { ok: true, fonts, unsupported };
+}
+
 // Server action — given a template and a recipient's contact-level merge
 // context, returns the merged .docx as a base64 string. Called by the
 // Send Mail modal's preview pane so the user sees the exact document the
