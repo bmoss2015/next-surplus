@@ -1,16 +1,16 @@
-// Settings clone · Phase C.7 — Billing rebuilt to match mockup.
+"use client";
+
+// Settings clone · Phase E.6 — Billing with live Run Backfill button.
 //
-// Layout (in render order, per mockup):
-//   1. plan-hero — Team plan, $197/mo, Change Plan button. Static for now;
-//      Phase D wires Stripe price-id lookup + checkout-portal redirect.
-//   2. Add-Ons usage — addon-meter for Phone Validation (real, from
-//      getValidationUsage). Plus three "Coming Soon" add-on rows for
-//      Skip Tracing, Bulk Mail Discount, Priority Support.
-//   3. Payment Method — Visa card brand + Update Card + Send Invoices To
-//      email. Static for now; Phase D wires Stripe Elements / billing
-//      portal.
-//   4. Invoice History — table. Static for now; Phase D fetches from
-//      Stripe invoices API.
+// Plan-hero, Payment Method, and Invoice History stay static until a
+// Stripe integration ships (separate project — no SDK or webhook handler
+// in this codebase). The Phone Validation add-on meter is real, and the
+// Run Backfill button now fires runPhoneValidationBackfill — the server
+// action kicks off the sweep via after() and returns immediately, so the
+// UI just confirms the run started.
+
+import { useState, useTransition } from "react";
+import { runPhoneValidationBackfill } from "@/app/(app)/settings/_actions";
 
 export type PhoneValidationUsage = {
   used: number;
@@ -40,6 +40,32 @@ export function BillingSection({
   phoneUsage: PhoneValidationUsage;
   invoiceEmail: string;
 }) {
+  const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
+  const [backfillErr, setBackfillErr] = useState<string | null>(null);
+  const [backfillPending, startBackfill] = useTransition();
+
+  function onBackfill() {
+    setBackfillErr(null);
+    setBackfillMsg(null);
+    if (
+      !window.confirm(
+        "Validate every untested phone in this org (on non-lost leads)? Uses the validation quota above."
+      )
+    ) {
+      return;
+    }
+    startBackfill(async () => {
+      const res = await runPhoneValidationBackfill();
+      if (!res.ok) {
+        setBackfillErr(res.error);
+        return;
+      }
+      setBackfillMsg(
+        "Started — every untested phone on non-lost leads is queueing now. The counter above updates as each one finishes."
+      );
+    });
+  }
+
   const pct =
     phoneUsage.cap > 0
       ? Math.min(100, Math.round((phoneUsage.used / phoneUsage.cap) * 100))
@@ -128,15 +154,37 @@ export function BillingSection({
           <button
             type="button"
             className="btn btn-outline btn-sm"
-            disabled
-            title="Backfill button wires in Phase D"
+            disabled={backfillPending}
+            onClick={onBackfill}
           >
-            Run Backfill
+            {backfillPending ? "Starting…" : "Run Backfill"}
           </button>
           <span className="addon-meter-action-hint">
             Validates every untested phone on non-lost leads in the background.
           </span>
         </div>
+        {backfillMsg && (
+          <div
+            style={{
+              marginTop: 10,
+              color: "var(--success)",
+              fontSize: 12,
+            }}
+          >
+            {backfillMsg}
+          </div>
+        )}
+        {backfillErr && (
+          <div
+            style={{
+              marginTop: 10,
+              color: "var(--danger)",
+              fontSize: 12,
+            }}
+          >
+            {backfillErr}
+          </div>
+        )}
       </div>
 
       {COMING_SOON.map((row) => (

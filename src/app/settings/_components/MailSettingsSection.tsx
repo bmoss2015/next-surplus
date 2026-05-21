@@ -16,9 +16,13 @@
 // updateMailSettings. Signature image upload is still deferred to Phase D
 // (multipart FormData flow).
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateMailSettings } from "@/app/(app)/settings/_actions";
+import {
+  updateMailSettings,
+  uploadSignatureImage,
+  removeSignatureImage,
+} from "@/app/(app)/settings/_actions";
 import type { MailSettings } from "@/lib/settings/fetch";
 
 type MailClass = MailSettings["default_mail_class"];
@@ -54,6 +58,38 @@ export function MailSettingsSection({
   );
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [sigUploading, setSigUploading] = useState(false);
+  const [sigErr, setSigErr] = useState<string | null>(null);
+  const sigFileRef = useRef<HTMLInputElement | null>(null);
+
+  async function onSigUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSigErr(null);
+    setSigUploading(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await uploadSignatureImage(fd);
+    setSigUploading(false);
+    if (!res.ok) {
+      setSigErr(res.error);
+      return;
+    }
+    router.refresh();
+    if (sigFileRef.current) sigFileRef.current.value = "";
+  }
+
+  async function onSigRemove() {
+    setSigErr(null);
+    setSigUploading(true);
+    const res = await removeSignatureImage();
+    setSigUploading(false);
+    if (!res.ok) {
+      setSigErr(res.error);
+      return;
+    }
+    router.refresh();
+  }
 
   const dirty =
     (signerName.trim() || null) !== initial.signer_name ||
@@ -134,27 +170,49 @@ export function MailSettingsSection({
             wherever your template&apos;s{" "}
             <code>{"{{signature}}"}</code> merge field appears.
           </div>
+          <input
+            ref={sigFileRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            style={{ display: "none" }}
+            onChange={onSigUpload}
+          />
           <div className="flex items-center gap-2 mt-3">
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              disabled
-              title="Upload flow ships in Phase D"
+              disabled={sigUploading}
+              onClick={() => sigFileRef.current?.click()}
             >
-              {initial.signature_image_path ? "Replace Image" : "Upload Image"}
+              {sigUploading
+                ? "Uploading…"
+                : initial.signature_image_path
+                  ? "Replace Image"
+                  : "Upload Image"}
             </button>
             {initial.signature_image_path && (
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
-                disabled
-                title="Remove ships in Phase D"
+                disabled={sigUploading}
                 style={{ color: "var(--danger)" }}
+                onClick={onSigRemove}
               >
                 Remove
               </button>
             )}
           </div>
+          {sigErr && (
+            <div
+              style={{
+                color: "var(--danger)",
+                fontSize: 12,
+                marginTop: 8,
+              }}
+            >
+              {sigErr}
+            </div>
+          )}
         </div>
       </div>
 

@@ -14,9 +14,10 @@
 // upgrade. The drawer surfaces a small hint about the {{merge_field}} syntax
 // so users know it'll get substituted when sending.
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Drawer } from "./Drawer";
+import { MergeFieldPicker } from "./MergeFieldPicker";
 import {
   upsertTemplate,
   deleteTemplate,
@@ -85,6 +86,8 @@ function TextEditor({
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const subjectRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -96,6 +99,40 @@ function TextEditor({
       setConfirmDelete(false);
     }
   }, [open, row]);
+
+  function insertIntoBody(token: string) {
+    const el = bodyRef.current;
+    if (!el) {
+      setBody((prev) => prev + token);
+      return;
+    }
+    const start = el.selectionStart ?? body.length;
+    const end = el.selectionEnd ?? body.length;
+    const next = body.slice(0, start) + token + body.slice(end);
+    setBody(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  function insertIntoSubject(token: string) {
+    const el = subjectRef.current;
+    if (!el) {
+      setSubject((prev) => prev + token);
+      return;
+    }
+    const start = el.selectionStart ?? subject.length;
+    const end = el.selectionEnd ?? subject.length;
+    const next = subject.slice(0, start) + token + subject.slice(end);
+    setSubject(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
 
   const ready = name.trim().length > 0 && body.trim().length > 0;
 
@@ -219,7 +256,9 @@ function TextEditor({
       {channel === "email" && (
         <div className="drawer-field">
           <label className="drawer-label">Subject</label>
+          <MergeFieldPicker onInsert={insertIntoSubject} compact />
           <input
+            ref={subjectRef}
             className="input"
             style={{ width: "100%" }}
             value={subject}
@@ -231,11 +270,12 @@ function TextEditor({
       <div className="drawer-field">
         <label className="drawer-label">Body</label>
         <div className="drawer-hint">
-          Merge fields like{" "}
-          <code>{"{{contact.first_name}}"}</code> and{" "}
-          <code>{"{{lead.address}}"}</code> are substituted when sending.
+          Click a merge field below to insert it at the cursor. Fields get
+          substituted with real values when the template is sent.
         </div>
+        <MergeFieldPicker onInsert={insertIntoBody} />
         <textarea
+          ref={bodyRef}
           className="input drawer-textarea"
           style={{ width: "100%" }}
           value={body}
