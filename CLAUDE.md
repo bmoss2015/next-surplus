@@ -67,21 +67,33 @@ C:\\Users\\info\\moss-equity-portal
 
 \#### Deploy flow — GitHub first, never `vercel --prod` from local
 
+The assistant should drive the entire flow without manual GitHub clicks. `gh` CLI is installed at `~/.local/bin/gh` and pre-authed as bmoss2015 with repo scope. Use it.
+
 1. Branch off main: `git checkout -b fix/<short-name>` (never commit directly to main from local)
 
 2. Commit the change with the Fix [number]: [name] format
 
 3. Push the branch: `git push -u origin fix/<short-name>` — Vercel auto-builds a preview URL on every branch push
 
-4. Open a PR to main (gh CLI if available, otherwise the URL GitHub returns)
+4. Open the PR: `gh pr create --base main --head fix/<short-name> --title "..." --body "..."` (no browser tab needed)
 
-5. Wait for the Vercel preview deploy to land. Confirm the fix on the preview URL before merging
+5. Wait for the Vercel preview deploy to land. Confirm the fix on the preview URL — paste login creds inline (info@mossyland.com / MossEquity-858dc58d33!) so Bree doesn't have to look them up
 
-6. Bree merges the PR → Vercel auto-deploys main to production
+6. After Bree confirms on preview, merge from the terminal: `gh pr merge <number> --merge --delete-branch`. Vercel auto-deploys main to production within seconds.
 
-7. After merge, monitor the prod deploy and report the final status — do not assume "merged" means "shipped". If the deploy fails, surface the actual error from the build log
+7. Monitor the prod deploy and report the final status — do not assume "merged" means "shipped". Poll `npx vercel ls` until the new Production deployment reaches Ready (or Error). If the deploy fails, surface the actual error from the build log via `npx vercel inspect <url> --logs`.
 
-`vercel --prod` from local is only an emergency path (broken auto-deploy integration). Default workflow is git push → PR → merge → auto-deploy, so prod always matches what's on GitHub main and nothing drifts
+`vercel --prod` from local is only an emergency path (broken auto-deploy integration). Default workflow is git push → `gh pr create` → preview verify → `gh pr merge` → auto-deploy, so prod always matches what's on GitHub main and nothing drifts.
+
+\#### Quick gh commands
+
+\- `gh pr list --state open` — see open PRs
+
+\- `gh pr view <number>` — see status, checks, comments
+
+\- `gh pr checks <number>` — see CI / Vercel build status
+
+\- `gh pr merge <number> --merge --delete-branch` — merge + clean up branch in one shot (use --squash if you prefer squash-merge)
 
 
 
