@@ -1,49 +1,51 @@
 "use client";
 
-// Modern icon sidebar — replaces the old 200px dark-gradient text-label
-// rail. Defaults to a slim 60px collapsed strip showing icons only; hover
-// or click the toggle to expand to ~220px with labels visible. Same
-// pattern HubSpot 2024 / Linear / Notion use. Brand mark at top, account
-// dropdown at bottom. Active item gets a solid emerald pill + brand bar
-// on the left for muscle-memory cues.
+// Modern dark-emerald icon sidebar. Pattern: Linear / Apollo / Outreach /
+// Salesloft. Dark chrome on the left so the brand has presence; light
+// content area on the right keeps the actual work surface clean. Collapsed
+// rail is 72px (icons only); expanded is 220px (icons + labels). State
+// persists across reloads via localStorage. Active item gets a solid
+// emerald pill + a 3px brand-light accent on the left edge so it reads at
+// a glance even when collapsed.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
-  IconDashboard,
-  IconUsers,
-  IconChecklist,
-  IconInbox,
-  IconMail,
-  IconScale,
-  IconFileUpload,
-  IconChartBar,
-  IconSettings,
-  IconLogout,
-  IconChevronsRight,
-  IconChevronsLeft,
-} from "@tabler/icons-react";
+  LayoutDashboard,
+  Users,
+  CheckSquare,
+  Inbox,
+  Mail,
+  Scale,
+  FileUp,
+  BarChart3,
+  Settings,
+  LogOut,
+  ChevronsRight,
+  ChevronsLeft,
+  type LucideIcon,
+} from "lucide-react";
 import { signOut } from "@/app/(auth)/_actions";
 import { cn } from "@/lib/cn";
 
 type NavItem = {
   label: string;
   href: string;
-  Icon: typeof IconDashboard;
+  Icon: LucideIcon;
   adminOnly?: boolean;
 };
 
 const NAV: NavItem[] = [
-  { label: "Dashboard", href: "/",         Icon: IconDashboard },
-  { label: "Leads",     href: "/leads",    Icon: IconUsers },
-  { label: "Tasks",     href: "/tasks",    Icon: IconChecklist },
-  { label: "Inbox",     href: "/inbox",    Icon: IconInbox },
-  { label: "Mail",      href: "/mail",     Icon: IconMail },
-  { label: "Claims",    href: "/claims",   Icon: IconScale },
-  { label: "Imports",   href: "/imports",  Icon: IconFileUpload },
-  { label: "Reports",   href: "/reports",  Icon: IconChartBar },
-  { label: "Settings",  href: "/settings", Icon: IconSettings },
+  { label: "Dashboard", href: "/",         Icon: LayoutDashboard },
+  { label: "Leads",     href: "/leads",    Icon: Users },
+  { label: "Tasks",     href: "/tasks",    Icon: CheckSquare },
+  { label: "Inbox",     href: "/inbox",    Icon: Inbox },
+  { label: "Mail",      href: "/mail",     Icon: Mail },
+  { label: "Claims",    href: "/claims",   Icon: Scale },
+  { label: "Imports",   href: "/imports",  Icon: FileUp },
+  { label: "Reports",   href: "/reports",  Icon: BarChart3 },
+  { label: "Settings",  href: "/settings", Icon: Settings },
 ];
 
 function initials(name: string): string {
@@ -52,6 +54,8 @@ function initials(name: string): string {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
+
+const STORAGE_KEY = "moss-sidebar-expanded";
 
 export function IconSidebar({
   userName,
@@ -64,34 +68,58 @@ export function IconSidebar({
 }) {
   const pathname = usePathname();
   const items = NAV.filter((item) => isAdmin || !item.adminOnly);
+  // Default collapsed (icons only). Hydrate from localStorage on mount.
   const [expanded, setExpanded] = useState(false);
-  const width = expanded ? 220 : 60;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "true") setExpanded(true);
+  }, []);
+
+  function toggle() {
+    setExpanded((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(STORAGE_KEY, next ? "true" : "false");
+      }
+      return next;
+    });
+  }
+
+  const width = expanded ? 220 : 72;
 
   return (
     <aside
-      className="relative flex shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-surface transition-all duration-200"
-      style={{ width }}
+      className="relative flex shrink-0 flex-col overflow-hidden text-white transition-all duration-200"
+      style={{
+        width,
+        background:
+          "linear-gradient(180deg, #04261c 0%, #0d4b3a 100%)",
+      }}
     >
       {/* Brand */}
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-gray-200 px-[18px]">
+      <div className="flex h-14 shrink-0 items-center gap-2.5 px-[18px]">
         <div
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[12px] font-bold text-white"
-          style={{
-            background:
-              "linear-gradient(135deg, #0d4b3a 0%, #04261c 100%)",
-          }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[11.5px] font-bold tracking-tight text-white"
+          style={{ background: "rgba(255,255,255,0.10)" }}
         >
-          M
+          ME
         </div>
         {expanded && (
-          <span className="truncate text-[13.5px] font-semibold tracking-tight text-ink">
-            Moss Equity
-          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-semibold leading-tight tracking-tight">
+              Moss Equity
+            </div>
+            <div className="truncate text-[10px] text-white/60">Partners</div>
+          </div>
         )}
       </div>
 
+      <div className="mx-3 h-px bg-white/[0.08]" />
+
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-[10px] py-3">
+      <nav className="flex-1 overflow-y-auto px-3 py-3">
         {items.map((item) => {
           const isActive =
             item.href === "/"
@@ -103,50 +131,57 @@ export function IconSidebar({
               href={item.href}
               title={!expanded ? item.label : undefined}
               className={cn(
-                "group relative mb-0.5 flex h-9 items-center gap-2.5 overflow-hidden rounded-md px-2 text-[13px] transition-colors",
+                "group relative mb-0.5 flex h-10 items-center gap-3 overflow-hidden rounded-md px-3 text-[13px] transition-colors",
                 isActive
-                  ? "text-white"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-ink"
+                  ? "font-medium text-white"
+                  : "text-white/65 hover:bg-white/10 hover:text-white"
               )}
               style={
                 isActive
-                  ? { background: "#0d4b3a" }
+                  ? { background: "rgba(255,255,255,0.12)" }
                   : undefined
               }
             >
+              {/* Active brand bar on left edge — reads at a glance even when
+                  the rail is collapsed (the icon alone could be ambiguous). */}
+              {isActive && (
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-1/2 -translate-y-1/2"
+                  style={{
+                    width: 3,
+                    height: 18,
+                    background: "#4a9c75",
+                    borderRadius: "0 2px 2px 0",
+                  }}
+                />
+              )}
               <item.Icon
                 size={18}
-                stroke={isActive ? 2 : 1.75}
+                strokeWidth={isActive ? 2.25 : 1.75}
                 className="shrink-0"
               />
-              {expanded && (
-                <span
-                  className={cn(
-                    "truncate",
-                    isActive ? "font-medium" : "font-normal"
-                  )}
-                >
-                  {item.label}
-                </span>
-              )}
+              {expanded && <span className="truncate">{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      {/* Expand/collapse toggle + account dropdown */}
-      <div className="shrink-0 border-t border-gray-200 px-[10px] py-3">
+      <div className="mx-3 h-px bg-white/[0.08]" />
+
+      {/* Expand/collapse toggle + account */}
+      <div className="shrink-0 px-3 py-3">
         <button
           type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="mb-2 flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-ink"
+          onClick={toggle}
+          className="mb-2 flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-md text-white/55 hover:bg-white/10 hover:text-white"
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
           title={expanded ? "Collapse" : "Expand"}
         >
           {expanded ? (
-            <IconChevronsLeft size={16} stroke={1.75} />
+            <ChevronsLeft size={16} strokeWidth={1.75} />
           ) : (
-            <IconChevronsRight size={16} stroke={1.75} />
+            <ChevronsRight size={16} strokeWidth={1.75} />
           )}
           {expanded && <span className="text-[12px]">Collapse</span>}
         </button>
@@ -198,24 +233,21 @@ function AccountMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-9 w-full cursor-pointer items-center gap-2 overflow-hidden rounded-md px-1 hover:bg-gray-100"
+        className="flex h-10 w-full cursor-pointer items-center gap-2.5 overflow-hidden rounded-md px-2 hover:bg-white/10"
         title={expanded ? undefined : userName}
       >
         <div
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10.5px] font-semibold text-white"
-          style={{
-            background:
-              "linear-gradient(135deg, #0d4b3a 0%, #04261c 100%)",
-          }}
+          style={{ background: "rgba(255,255,255,0.18)" }}
         >
           {initials(userName)}
         </div>
         {expanded && (
           <div className="min-w-0 flex-1 text-left">
-            <div className="truncate text-[12px] font-medium text-ink">
+            <div className="truncate text-[12px] font-medium text-white">
               {userName}
             </div>
-            <div className="truncate text-[10.5px] text-gray-500">
+            <div className="truncate text-[10.5px] text-white/55">
               {isAdmin ? "Admin" : "Member"}
             </div>
           </div>
@@ -262,7 +294,7 @@ function AccountMenu({
             disabled={pending}
             className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2.5 text-left text-[13px] text-ink hover:bg-gray-50 disabled:opacity-50"
           >
-            <IconLogout size={14} stroke={1.75} />
+            <LogOut size={14} strokeWidth={1.75} />
             {pending ? "Signing Out…" : "Sign Out"}
           </button>
         </div>
