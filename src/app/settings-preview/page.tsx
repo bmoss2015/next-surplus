@@ -67,11 +67,18 @@ export default function SettingsPreviewPage() {
       {/* Lift the mockup's <style> block verbatim. Scoped to this route's
           lifecycle — when the user navigates away, the <style> element
           unmounts and its rules stop applying. */}
-      <style dangerouslySetInnerHTML={{ __html: cssText }} />
+      <style
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: cssText }}
+      />
 
-      {/* Lift the mockup's <body> inner HTML verbatim. */}
+      {/* Lift the mockup's <body> inner HTML verbatim. The browser normalizes
+          self-closing voids + attribute casing on parse, so React's diff
+          complains even though the DOM is correct. Suppression here is safe
+          — there's no React tree underneath to hydrate. */}
       <div
         className="settings-preview-root"
+        suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: bodyHtml }}
       />
     </>
