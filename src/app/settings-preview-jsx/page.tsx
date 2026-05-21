@@ -23,6 +23,7 @@ import {
   fetchMailBankAccounts,
   fetchTemplates,
   fetchResearchTemplates,
+  fetchMyNotificationPrefs,
 } from "@/lib/settings/fetch";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
@@ -39,14 +40,21 @@ export default async function SettingsPreviewJsxPage() {
   // Member-visible data — attorneys + lost reasons + contact roles +
   // connected email accounts (per-user, not per-org) + templates (visible to
   // members so they can pick from them in the lead composer).
-  const [attorneys, customContactRoles, emailAccounts, templates, research] =
-    await Promise.all([
-      fetchAttorneys(),
-      fetchOrgCustomRoles(),
-      fetchMyEmailAccounts(),
-      fetchTemplates(),
-      fetchResearchTemplates(),
-    ]);
+  const [
+    attorneys,
+    customContactRoles,
+    emailAccounts,
+    templates,
+    research,
+    notificationPrefs,
+  ] = await Promise.all([
+    fetchAttorneys(),
+    fetchOrgCustomRoles(),
+    fetchMyEmailAccounts(),
+    fetchTemplates(),
+    fetchResearchTemplates(),
+    fetchMyNotificationPrefs(),
+  ]);
 
   // Admin-only data.
   const [
@@ -141,6 +149,7 @@ export default async function SettingsPreviewJsxPage() {
           templates,
           research,
           phoneUsage,
+          notificationPrefs,
         }}
       />
     </>

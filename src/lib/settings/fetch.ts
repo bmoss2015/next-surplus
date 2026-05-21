@@ -1,6 +1,24 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getCurrentProfile } from "@/lib/auth/current-user";
+
+// Notification preferences for the signed-in user. Returns a sparse map of
+// pref_key → enabled. Callers overlay this onto the defaults defined in
+// _notification-prefs.ts. Returns {} gracefully on missing rows / RLS.
+export async function fetchMyNotificationPrefs(): Promise<Record<string, boolean>> {
+  const profile = await getCurrentProfile();
+  if (!profile) return {};
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("user_notification_prefs")
+    .select("pref_key, enabled")
+    .eq("user_id", profile.id);
+  if (error) return {};
+  const out: Record<string, boolean> = {};
+  for (const row of data ?? []) out[row.pref_key] = row.enabled;
+  return out;
+}
 
 export type OrgMemberRow = {
   id: string;

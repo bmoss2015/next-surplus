@@ -66,6 +66,7 @@ export type SettingsData = {
   templates: TemplateRow[];
   research: ResearchTemplateRow[];
   phoneUsage: PhoneValidationUsage | null;
+  notificationPrefs: Record<string, boolean>;
 };
 
 const RAIL_KEYS = new Set(GROUPS.flatMap((g) => g.items.map((i) => i.key)));
@@ -135,7 +136,7 @@ function renderPanel(
     case "password":
       return <SecuritySection />;
     case "notifications":
-      return <NotificationsSection />;
+      return <NotificationsSection initial={data.notificationPrefs} />;
     case "email-accounts":
       return <EmailAccountsSection initial={data.emailAccounts} />;
     case "company":

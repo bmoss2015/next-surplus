@@ -150,6 +150,18 @@ export function BillingSection({
       ))}
 
       <div className="pref-section-h">Payment Method</div>
+      <div
+        style={{
+          fontSize: 12.5,
+          color: "var(--text-2)",
+          margin: "-4px 0 8px",
+          lineHeight: 1.5,
+        }}
+      >
+        Charged monthly for your Moss Equity subscription. Credit or debit
+        cards. Outgoing checks pull from{" "}
+        <a href="#mail-bank">Bank Accounts</a> instead.
+      </div>
       <div className="pref-row">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="card-brand">VISA</div>
