@@ -144,7 +144,7 @@ export function GlobalSearch() {
       </label>
 
       {popoverOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[440px] max-w-[90vw] overflow-hidden rounded-md border border-gray-200 bg-surface shadow-card-hover">
+        <div className="absolute left-0 top-full z-[60] mt-1 w-[440px] max-w-[90vw] overflow-hidden rounded-md border border-gray-200 bg-surface shadow-card-hover">
           {loading && results.length === 0 ? (
             <div className="px-4 py-6 text-center text-[12.5px] text-gray-400">Searching…</div>
           ) : results.length === 0 ? (
