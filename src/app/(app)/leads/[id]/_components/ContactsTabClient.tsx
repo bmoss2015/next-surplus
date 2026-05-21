@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   IconPlus,
   IconTrash,
@@ -271,6 +271,7 @@ export function ContactsTabClient({
   const [newOwnerEmail, setNewOwnerEmail] = useState("");
   const [newOwnerNotes, setNewOwnerNotes] = useState("");
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   // IDs of phone contacts currently being validated server-side. Drives the
   // small "Verifying…" spinner shown on the row while the action awaits
   // Veriphone. Cleared the moment the action returns with the real row.
@@ -484,10 +485,15 @@ export function ContactsTabClient({
         const res = await addMailingAddress(leadId, ownerId, trimmed, label);
         if (!res.ok) {
           setContacts((prev) => prev.filter((c) => c.id !== placeholderId));
+          return;
         }
-        // The server action revalidates the path; the parent server
-        // component will re-render with the persisted row. Until then
-        // the optimistic placeholder is fine — same shape.
+        // Force a refetch of the lead detail server component so the
+        // Overview "Mailing Addresses" panel picks up the new row.
+        // addMailingAddress already calls revalidatePath on the server
+        // but the panel's local state was initialized once from props
+        // and won't re-sync on its own — router.refresh() pulls fresh
+        // server data into the client tree.
+        router.refresh();
       });
       return;
     }
@@ -1056,14 +1062,16 @@ function OwnerCard({
               placeholder="Street address"
               className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
             />
-            <div className="grid grid-cols-[1fr_56px_88px] gap-1.5">
-              <input
-                type="text"
-                value={addrCity}
-                onChange={(e) => setAddrCity(e.target.value)}
-                placeholder="City"
-                className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
-              />
+            <input
+              type="text"
+              value={addrCity}
+              onChange={(e) => setAddrCity(e.target.value)}
+              placeholder="City"
+              className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+            />
+            {/* ST + ZIP stacked under City — matches the relative
+                card form and fits inside any card width. */}
+            <div className="grid grid-cols-[56px_1fr] gap-1.5">
               <input
                 type="text"
                 value={addrState}
