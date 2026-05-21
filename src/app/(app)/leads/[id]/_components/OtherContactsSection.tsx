@@ -86,6 +86,10 @@ export function OtherContactsSection({
         organization: form.organization,
         email: form.email,
         phone: form.phone,
+        street: form.street,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
         notes: form.notes,
       });
       if (!result.ok) return;
@@ -104,6 +108,11 @@ export function OtherContactsSection({
                   organization: form.organization.trim() || null,
                   email: form.email.trim().toLowerCase() || null,
                   phone: form.phone.trim() || null,
+                  street: form.street.trim() || null,
+                  city: form.city.trim() || null,
+                  state:
+                    form.state.trim().toUpperCase().slice(0, 2) || null,
+                  zip: form.zip.trim() || null,
                   notes: form.notes.trim() || null,
                 }
               : r
@@ -124,6 +133,10 @@ export function OtherContactsSection({
             organization: form.organization.trim() || null,
             email: form.email.trim().toLowerCase() || null,
             phone: form.phone.trim() || null,
+            street: form.street.trim() || null,
+            city: form.city.trim() || null,
+            state: form.state.trim().toUpperCase().slice(0, 2) || null,
+            zip: form.zip.trim() || null,
             notes: form.notes.trim() || null,
             created_at: new Date().toISOString(),
           },
@@ -242,10 +255,32 @@ export function OtherContactsSection({
                       {formatPhoneUS(row.phone)}
                     </span>
                   )}
-                  {!row.email && !row.phone && (
+                  {!row.email && !row.phone && !row.street && !row.city && (
                     <span className="text-gray-400">No contact info</span>
                   )}
                 </div>
+                {(row.street || row.city || row.state || row.zip) && (
+                  <div className="mt-1 inline-flex items-start gap-1 text-[11.5px] text-gray-600">
+                    <IconBuildingBank
+                      size={11}
+                      stroke={1.75}
+                      className="mt-[2px] flex-shrink-0 text-gray-400"
+                    />
+                    <span className="leading-snug">
+                      {[
+                        row.street,
+                        [
+                          row.city,
+                          [row.state, row.zip].filter(Boolean).join(" "),
+                        ]
+                          .filter(Boolean)
+                          .join(", "),
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </span>
+                  </div>
+                )}
                 {row.notes && (
                   <div className="mt-2 border-l-2 border-gray-200 pl-2 text-[11.5px] italic leading-relaxed text-gray-600">
                     {row.notes}
@@ -386,6 +421,10 @@ type LeadPartyFormValues = {
   organization: string;
   email: string;
   phone: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
   notes: string;
 };
 
@@ -420,6 +459,10 @@ function LeadPartyForm({
   const [organization, setOrganization] = useState(initial?.organization ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [street, setStreet] = useState(initial?.street ?? "");
+  const [city, setCity] = useState(initial?.city ?? "");
+  const [stateCode, setStateCode] = useState(initial?.state ?? "");
+  const [zip, setZip] = useState(initial?.zip ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
 
   const inputClass =
@@ -523,6 +566,45 @@ function LeadPartyForm({
       </div>
 
       <label className="mt-3 mb-1 block text-[11px] font-medium text-gray-500">
+        Mailing Address
+      </label>
+      <input
+        type="text"
+        value={street}
+        onChange={(e) => setStreet(e.target.value)}
+        placeholder="Street"
+        className={inputClass}
+      />
+      <div className="mt-2 grid grid-cols-[1fr_72px_120px] gap-2">
+        <input
+          type="text"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          placeholder="City"
+          className={`${inputClass} min-w-0`}
+        />
+        <input
+          type="text"
+          value={stateCode}
+          onChange={(e) =>
+            setStateCode(e.target.value.toUpperCase().slice(0, 2))
+          }
+          placeholder="ST"
+          maxLength={2}
+          className={`${inputClass} min-w-0 uppercase`}
+        />
+        <input
+          type="text"
+          value={zip}
+          onChange={(e) =>
+            setZip(e.target.value.replace(/[^\d-]/g, "").slice(0, 10))
+          }
+          placeholder="ZIP"
+          className={`${inputClass} min-w-0`}
+        />
+      </div>
+
+      <label className="mt-3 mb-1 block text-[11px] font-medium text-gray-500">
         Notes
       </label>
       <textarea
@@ -558,6 +640,10 @@ function LeadPartyForm({
               organization,
               email,
               phone,
+              street,
+              city,
+              state: stateCode,
+              zip,
               notes,
             });
           }}

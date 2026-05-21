@@ -14,6 +14,10 @@ export type LeadPartyInput = {
   organization?: string | null;
   email?: string | null;
   phone?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
   notes?: string | null;
 };
 
@@ -38,6 +42,11 @@ export async function upsertLeadParty(
     organization: input.organization?.trim() || null,
     email: input.email?.trim().toLowerCase() || null,
     phone: toE164(input.phone) || null,
+    street: input.street?.trim() || null,
+    city: input.city?.trim() || null,
+    state:
+      input.state?.trim().toUpperCase().slice(0, 2) || null,
+    zip: input.zip?.trim() || null,
     notes: input.notes?.trim() || null,
   };
 

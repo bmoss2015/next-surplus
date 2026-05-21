@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconPlus, IconTrash, IconCheck, IconPencil } from "@tabler/icons-react";
 import {
@@ -8,12 +8,16 @@ import {
   setMailingAddressMailed,
   deleteContact,
   upsertContact,
+  upsertRelative,
 } from "../../_actions";
+import { upsertLeadParty } from "../../_lead-parties-actions";
 import type {
   ContactRow,
   OwnerRowFull,
   RelativeRow,
 } from "@/lib/leads/fetch-detail";
+import type { LeadPartyRow } from "@/lib/leads/lead-parties-types";
+import { LEAD_PARTY_ROLE_LABELS } from "@/lib/leads/lead-parties-types";
 import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
 
@@ -85,24 +89,19 @@ export function MailingAddresses({
   initialAddresses,
   owners,
   relatives = [],
+  leadParties = [],
 }: {
   leadId: string;
   initialAddresses: ContactRow[];
   owners: OwnerRowFull[];
   relatives?: RelativeRow[];
+  leadParties?: LeadPartyRow[];
 }) {
   const router = useRouter();
   const { isAdmin } = useRole();
   const [rows, setRows] = useState<ContactRow[]>(
     initialAddresses.filter((c) => c.channel === "mailing_address")
   );
-  // Sync rows when initialAddresses changes — fires after router.refresh()
-  // from sibling components (e.g. OwnerCard adding a new address). Without
-  // this the panel stayed stuck on whatever was loaded at mount, so newly
-  // added addresses didn't appear here until a full page reload.
-  useEffect(() => {
-    setRows(initialAddresses.filter((c) => c.channel === "mailing_address"));
-  }, [initialAddresses]);
   const [adding, setAdding] = useState(false);
   const [addr, setAddr] = useState<AddrDraft>(EMPTY_ADDR);
   const recipients = buildRecipients(owners, relatives);
@@ -219,29 +218,216 @@ export function MailingAddresses({
     return { street: parts[0], rest: parts.slice(1).join(", ") };
   }
 
-  // Pull relatives that have an address stored directly on the relatives
-  // row (street/city/state/zip — separate from the contacts table where
-  // owner mailing addresses live). Read-only here; edit on the relative
-  // card itself. Closes the gap where addresses added on a relative
-  // card never surfaced in this panel.
-  const relativeAddressRows = (relatives ?? [])
-    .map((r) => {
-      const street = (r.street ?? "").trim();
-      const city = (r.city ?? "").trim();
-      const state = (r.state ?? "").trim();
-      const zip = (r.zip ?? "").trim();
-      if (!street && !city && !state && !zip) return null;
-      const tail = [city, [state, zip].filter(Boolean).join(" ")]
-        .filter(Boolean)
-        .join(", ");
-      const value = [street, tail].filter(Boolean).join(", ");
-      return { id: r.id, name: r.full_name, value };
-    })
-    .filter((x): x is { id: string; name: string; value: string } => x !== null);
-
   const inputClass =
     "w-full rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
   const labelClass = "mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500";
+
+  // Discriminated union of every mailing-address source. Renders in
+  // one unified grid below so the user sees a single Mailing Addresses
+  // list regardless of where the data lives (contacts table for owner
+  // addresses, relatives row, lead_parties row).
+  type DisplayRow =
+    | { kind: "contact"; row: ContactRow; label: string }
+    | {
+        kind: "relative";
+        id: string;
+        label: string;
+        value: string;
+        street: string;
+        city: string;
+        state: string;
+        zip: string;
+      }
+    | {
+        kind: "leadParty";
+        id: string;
+        label: string;
+        value: string;
+        street: string;
+        city: string;
+        state: string;
+        zip: string;
+      };
+
+  function leadPartyLabel(p: LeadPartyRow): string {
+    const role =
+      p.role === "other"
+        ? (p.custom_role_label ?? "").trim() || "Contact"
+        : LEAD_PARTY_ROLE_LABELS[p.role];
+    const name = (p.name ?? "").trim() || "Unknown";
+    return `${role} — ${name}`;
+  }
+
+  function relativeLabel(r: RelativeRow): string {
+    const role = (r.relationship ?? "").trim() || "Relative";
+    const name = (r.full_name ?? "").trim() || "Unknown";
+    return `${role} — ${name}`;
+  }
+
+  function contactLabel(row: ContactRow): string {
+    if (row.recipient_label && row.recipient_label.trim()) {
+      // Convert "Jane Doe (Owner)" → "Owner — Jane Doe" so all sources
+      // read uniformly.
+      const m = row.recipient_label.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+      if (m) return `${m[2].trim()} — ${m[1].trim()}`;
+      return row.recipient_label;
+    }
+    const owner = owners.find((o) => o.id === row.owner_id);
+    const name = owner?.full_name ?? "Unknown";
+    return `Owner — ${name}`;
+  }
+
+  const displayRows: DisplayRow[] = [
+    ...rows.map((row): DisplayRow => ({
+      kind: "contact" as const,
+      row,
+      label: contactLabel(row),
+    })),
+    ...relatives
+      .map((r): DisplayRow | null => {
+        const street = (r.street ?? "").trim();
+        const city = (r.city ?? "").trim();
+        const state = (r.state ?? "").trim();
+        const zip = (r.zip ?? "").trim();
+        if (!street && !city && !state && !zip) return null;
+        const tail = [city, [state, zip].filter(Boolean).join(" ")]
+          .filter(Boolean)
+          .join(", ");
+        const value = [street, tail].filter(Boolean).join(", ");
+        return {
+          kind: "relative" as const,
+          id: r.id,
+          label: relativeLabel(r),
+          value,
+          street,
+          city,
+          state,
+          zip,
+        };
+      })
+      .filter((x): x is DisplayRow => x !== null),
+    ...leadParties
+      .map((p): DisplayRow | null => {
+        const street = (p.street ?? "").trim();
+        const city = (p.city ?? "").trim();
+        const state = (p.state ?? "").trim();
+        const zip = (p.zip ?? "").trim();
+        if (!street && !city && !state && !zip) return null;
+        const tail = [city, [state, zip].filter(Boolean).join(" ")]
+          .filter(Boolean)
+          .join(", ");
+        const value = [street, tail].filter(Boolean).join(", ");
+        return {
+          kind: "leadParty" as const,
+          id: p.id,
+          label: leadPartyLabel(p),
+          value,
+          street,
+          city,
+          state,
+          zip,
+        };
+      })
+      .filter((x): x is DisplayRow => x !== null),
+  ];
+
+  // Inline-edit state for relative + lead-party rows (contacts use the
+  // existing editingId/editAddr). Keyed by "relative:<id>" / "lp:<id>".
+  const [editingExtId, setEditingExtId] = useState<string | null>(null);
+  const [extAddr, setExtAddr] = useState<AddrDraft>(EMPTY_ADDR);
+
+  function startEditExt(row: DisplayRow) {
+    if (row.kind === "contact") return;
+    const key = row.kind === "relative" ? `relative:${row.id}` : `lp:${row.id}`;
+    setEditingExtId(key);
+    setExtAddr({
+      line1: row.street,
+      city: row.city,
+      state: row.state,
+      zip: row.zip,
+    });
+  }
+  function cancelExtEdit() {
+    setEditingExtId(null);
+    setExtAddr(EMPTY_ADDR);
+  }
+  function saveExtEdit(row: DisplayRow) {
+    if (row.kind === "contact") return;
+    const street = extAddr.line1.trim();
+    const city = extAddr.city.trim();
+    const state = extAddr.state.trim().toUpperCase().slice(0, 2);
+    const zip = extAddr.zip.trim();
+    if (!street) return;
+    startTransition(async () => {
+      if (row.kind === "relative") {
+        const res = await upsertRelative(leadId, row.id, {
+          street,
+          city,
+          state,
+          zip,
+        });
+        if (res.ok) {
+          cancelExtEdit();
+          router.refresh();
+        }
+      } else {
+        const lp = leadParties.find((p) => p.id === row.id);
+        if (!lp) return;
+        const res = await upsertLeadParty({
+          id: row.id,
+          lead_id: leadId,
+          role: lp.role,
+          custom_role_label: lp.custom_role_label,
+          name: lp.name,
+          organization: lp.organization,
+          email: lp.email,
+          phone: lp.phone,
+          street,
+          city,
+          state,
+          zip,
+          notes: lp.notes,
+        });
+        if (res.ok) {
+          cancelExtEdit();
+          router.refresh();
+        }
+      }
+    });
+  }
+  function clearExtAddress(row: DisplayRow) {
+    if (row.kind === "contact") return;
+    startTransition(async () => {
+      if (row.kind === "relative") {
+        const res = await upsertRelative(leadId, row.id, {
+          street: null,
+          city: null,
+          state: null,
+          zip: null,
+        });
+        if (res.ok) router.refresh();
+      } else {
+        const lp = leadParties.find((p) => p.id === row.id);
+        if (!lp) return;
+        const res = await upsertLeadParty({
+          id: row.id,
+          lead_id: leadId,
+          role: lp.role,
+          custom_role_label: lp.custom_role_label,
+          name: lp.name,
+          organization: lp.organization,
+          email: lp.email,
+          phone: lp.phone,
+          street: null,
+          city: null,
+          state: null,
+          zip: null,
+          notes: lp.notes,
+        });
+        if (res.ok) router.refresh();
+      }
+    });
+  }
 
   const addButton = (
     <button
@@ -264,29 +450,44 @@ export function MailingAddresses({
         {owners.length > 0 && addButton}
       </div>
 
-      {owners.length === 0 ? (
+      {owners.length === 0 && displayRows.length === 0 ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-7 text-center text-[12px] text-gray-500">
           Add an owner first to attach a mailing address.
         </div>
-      ) : rows.length === 0 && relativeAddressRows.length === 0 && !adding ? (
+      ) : displayRows.length === 0 && !adding ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-7 text-center text-[12px] text-gray-500">
           No Mailing Addresses Yet.
         </div>
       ) : (
-        rows.length > 0 && (
+        displayRows.length > 0 && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {rows.map((row) => {
-              const { street, rest } = addressLines(row.value);
-              const isEditing = editingId === row.id;
+            {displayRows.map((dr) => {
+              const key =
+                dr.kind === "contact"
+                  ? `c:${dr.row.id}`
+                  : dr.kind === "relative"
+                    ? `r:${dr.id}`
+                    : `lp:${dr.id}`;
+              const isContact = dr.kind === "contact";
+              const isContactEditing =
+                isContact && editingId === dr.row.id;
+              const extKey =
+                dr.kind === "relative"
+                  ? `relative:${dr.id}`
+                  : dr.kind === "leadParty"
+                    ? `lp:${dr.id}`
+                    : "";
+              const isExtEditing = !isContact && editingExtId === extKey;
+              const value =
+                dr.kind === "contact" ? dr.row.value : dr.value;
+              const { street, rest } = addressLines(value);
               return (
                 <div
-                  key={row.id}
+                  key={key}
                   className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3"
                 >
-                  <div className="text-[11px] text-gray-500">
-                    {recipientLabel(row)}
-                  </div>
-                  {isEditing ? (
+                  <div className="text-[11px] text-gray-500">{dr.label}</div>
+                  {isContactEditing ? (
                     <div className="flex flex-col gap-2">
                       <input
                         autoFocus
@@ -337,8 +538,67 @@ export function MailingAddresses({
                         </button>
                         <button
                           type="button"
-                          onClick={() => saveEdit(row)}
+                          onClick={() => saveEdit(dr.row)}
                           disabled={!editAddr.line1.trim()}
+                          className="btn-primary cursor-pointer rounded-md px-2 py-[4px] text-[11px] font-medium disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : isExtEditing ? (
+                    <div className="flex flex-col gap-2">
+                      <input
+                        autoFocus
+                        value={extAddr.line1}
+                        onChange={(e) =>
+                          setExtAddr((d) => ({ ...d, line1: e.target.value }))
+                        }
+                        placeholder="Street"
+                        className={inputClass}
+                      />
+                      <input
+                        value={extAddr.city}
+                        onChange={(e) =>
+                          setExtAddr((d) => ({ ...d, city: e.target.value }))
+                        }
+                        placeholder="City"
+                        className={inputClass}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          value={extAddr.state}
+                          maxLength={2}
+                          onChange={(e) =>
+                            setExtAddr((d) => ({
+                              ...d,
+                              state: e.target.value.toUpperCase(),
+                            }))
+                          }
+                          placeholder="ST"
+                          className={inputClass}
+                        />
+                        <input
+                          value={extAddr.zip}
+                          onChange={(e) =>
+                            setExtAddr((d) => ({ ...d, zip: e.target.value }))
+                          }
+                          placeholder="Zip"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={cancelExtEdit}
+                          className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11px] text-ink hover:border-gray-300"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => saveExtEdit(dr)}
+                          disabled={!extAddr.line1.trim()}
                           className="btn-primary cursor-pointer rounded-md px-2 py-[4px] text-[11px] font-medium disabled:opacity-50"
                         >
                           Save
@@ -351,29 +611,32 @@ export function MailingAddresses({
                       {rest && <div className="text-gray-500">{rest}</div>}
                     </div>
                   )}
-                  {!isEditing && (
+                  {!isContactEditing && !isExtEditing && isContact && (
                     <button
                       type="button"
-                      onClick={() => toggleMailed(row)}
+                      onClick={() => toggleMailed(dr.row)}
                       className={cn(
                         "inline-flex w-fit cursor-pointer items-center gap-1 rounded-full px-2.5 py-[3px] text-[10px] font-medium transition-colors",
-                        row.mailed
-                          ? "border-none bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] text-white"
+                        dr.row.mailed
+                          ? "border-none bg-gradient-to-br from-[#0d4b3a] to-[#13644e] text-white"
                           : "border border-[#e2e8f0] bg-[#f1f5f9] text-[#64748b] hover:border-petrol-200"
                       )}
-                      title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
+                      title={dr.row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
                     >
-                      {row.mailed && <IconCheck size={11} stroke={2.5} />}
-                      {row.mailed && row.mailed_at
-                        ? `Mailed ${fmtMailedAt(row.mailed_at)}`
+                      {dr.row.mailed && <IconCheck size={11} stroke={2.5} />}
+                      {dr.row.mailed && dr.row.mailed_at
+                        ? `Mailed ${fmtMailedAt(dr.row.mailed_at)}`
                         : "Not Mailed"}
                     </button>
                   )}
-                  {!isEditing && (
+                  {!isContactEditing && !isExtEditing && (
                     <div className="mt-auto flex items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => startEdit(row)}
+                        onClick={() => {
+                          if (dr.kind === "contact") startEdit(dr.row);
+                          else startEditExt(dr);
+                        }}
                         className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-petrol-600"
                         aria-label="Edit Mailing Address"
                       >
@@ -383,7 +646,10 @@ export function MailingAddresses({
                       {isAdmin && (
                         <button
                           type="button"
-                          onClick={() => remove(row)}
+                          onClick={() => {
+                            if (dr.kind === "contact") remove(dr.row);
+                            else clearExtAddress(dr);
+                          }}
                           className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-gray-400 hover:text-danger"
                           aria-label="Remove Mailing Address"
                         >
@@ -398,36 +664,6 @@ export function MailingAddresses({
             })}
           </div>
         )
-      )}
-
-      {relativeAddressRows.length > 0 && (
-        <div className="mt-4">
-          <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.5px] text-gray-500">
-            From Relatives
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {relativeAddressRows.map((r) => {
-              const { street, rest } = addressLines(r.value);
-              return (
-                <div
-                  key={r.id}
-                  className="flex flex-col gap-2 rounded-md border border-gray-200 bg-gray-50 p-3"
-                >
-                  <div className="text-[11px] text-gray-500">
-                    {r.name} (Relative)
-                  </div>
-                  <div className="text-[12px] leading-snug text-ink">
-                    <div>{street}</div>
-                    {rest && <div className="text-gray-500">{rest}</div>}
-                  </div>
-                  <div className="text-[10px] italic text-gray-400">
-                    Edit on the Relatives section below.
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       )}
 
       {adding && (
