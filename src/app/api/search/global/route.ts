@@ -574,17 +574,87 @@ export async function GET(req: NextRequest) {
       pushFromJoin(c, `${humanize(c.channel)}: ${c.value}`);
     }
   }
-  // 4) Relatives
+  // 4) Relatives — figure out which slot actually matched so the result
+  // doesn't read as "relative: <name>" when the match was a phone/email
+  // sitting on that relative record. e.g. searching an email shouldn't
+  // surface as "relative: <name>" with no breadcrumb to the email field.
   if (relativesR.status === "fulfilled" && relativesR.value.data) {
-    for (const r of relativesR.value.data as Array<{ full_name: string; lead_id: string; leads: unknown }>) {
-      pushFromJoin(r, `relative: ${r.full_name}`);
+    const qLower = sanitized.toLowerCase();
+    type RelativeRow = {
+      full_name: string;
+      phone: string | null; phone_2: string | null; phone_3: string | null; phone_4: string | null; phone_5: string | null;
+      email: string | null; email_2: string | null; email_3: string | null; email_4: string | null; email_5: string | null;
+      street: string | null;
+      city: string | null;
+      lead_id: string;
+      leads: unknown;
+    };
+    function relativeMatchHint(r: RelativeRow): string {
+      const emails = [r.email, r.email_2, r.email_3, r.email_4, r.email_5];
+      for (const e of emails) {
+        if (e && e.toLowerCase().includes(qLower)) {
+          return `${r.full_name} · Email: ${e}`;
+        }
+      }
+      const phones = [r.phone, r.phone_2, r.phone_3, r.phone_4, r.phone_5];
+      if (phoneDigits.length >= 4) {
+        for (const p of phones) {
+          if (p && p.replace(/\D/g, "").includes(phoneDigits)) {
+            return `${r.full_name} · Phone: ${p}`;
+          }
+        }
+      } else {
+        for (const p of phones) {
+          if (p && p.toLowerCase().includes(qLower)) {
+            return `${r.full_name} · Phone: ${p}`;
+          }
+        }
+      }
+      if (r.street && r.street.toLowerCase().includes(qLower)) {
+        return `${r.full_name} · Street: ${r.street}`;
+      }
+      if (r.city && r.city.toLowerCase().includes(qLower)) {
+        return `${r.full_name} · City: ${r.city}`;
+      }
+      // Default: name matched.
+      return `Relative: ${r.full_name}`;
+    }
+    for (const r of relativesR.value.data as RelativeRow[]) {
+      pushFromJoin(r, relativeMatchHint(r));
     }
   }
-  // 5) Lead parties
+  // 5) Lead parties — same field-aware hint pattern as relatives so an
+  // email/phone/organization match doesn't show only the role + name.
   if (partiesR.status === "fulfilled" && partiesR.value.data) {
-    for (const p of partiesR.value.data as Array<{ name: string; custom_role_label: string | null; lead_id: string; leads: unknown }>) {
-      const label = humanize(p.custom_role_label || "contact");
-      pushFromJoin(p, `${label}: ${p.name}`);
+    const qLower = sanitized.toLowerCase();
+    type PartyRow = {
+      name: string;
+      organization: string | null;
+      email: string | null;
+      phone: string | null;
+      custom_role_label: string | null;
+      lead_id: string;
+      leads: unknown;
+    };
+    function partyMatchHint(p: PartyRow): string {
+      const role = humanize(p.custom_role_label || "contact");
+      if (p.email && p.email.toLowerCase().includes(qLower)) {
+        return `${role}: ${p.name} · Email: ${p.email}`;
+      }
+      const phoneHit =
+        (phoneDigits.length >= 4 && p.phone && p.phone.replace(/\D/g, "").includes(phoneDigits)) ||
+        (p.phone && p.phone.toLowerCase().includes(qLower));
+      if (phoneHit && p.phone) {
+        return `${role}: ${p.name} · Phone: ${p.phone}`;
+      }
+      if (p.organization && p.organization.toLowerCase().includes(qLower)) {
+        return `${role}: ${p.name} · ${p.organization}`;
+      }
+      // Default: name or role matched.
+      return `${role}: ${p.name}`;
+    }
+    for (const p of partiesR.value.data as PartyRow[]) {
+      pushFromJoin(p, partyMatchHint(p));
     }
   }
   // 6) Tasks

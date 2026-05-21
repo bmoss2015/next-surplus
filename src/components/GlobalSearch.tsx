@@ -68,6 +68,15 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0);
+  // Platform-aware shortcut label. Render nothing until after mount so
+  // SSR/CSR don't disagree, then show ⌘K on Mac and Ctrl K elsewhere.
+  const [shortcutLabel, setShortcutLabel] = useState<string | null>(null);
+  useEffect(() => {
+    const isMac =
+      typeof navigator !== "undefined" &&
+      /mac/i.test(navigator.userAgent || (navigator as { platform?: string }).platform || "");
+    setShortcutLabel(isMac ? "⌘K" : "Ctrl K");
+  }, []);
 
   useEffect(() => {
     const q = query.trim();
@@ -179,7 +188,11 @@ export function GlobalSearch() {
           onKeyDown={onKeyDown}
           autoComplete="off"
         />
-        <kbd className="rounded border border-gray-200 bg-surface px-1.5 py-0.5 text-[10px] font-medium text-gray-500 font-mono">⌘K</kbd>
+        {shortcutLabel && (
+          <kbd className="rounded border border-gray-200 bg-surface px-1.5 py-0.5 text-[10px] font-medium text-gray-500 font-mono">
+            {shortcutLabel}
+          </kbd>
+        )}
       </label>
 
       {popoverOpen && (
