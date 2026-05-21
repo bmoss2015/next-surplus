@@ -7,7 +7,6 @@
 // corresponding panel components.
 
 import { useEffect, useState } from "react";
-import { Topbar } from "./Topbar";
 import { SubRail, GROUPS } from "./SubRail";
 import { Placeholder } from "./Placeholder";
 
@@ -106,21 +105,21 @@ export function SettingsPreviewJsx({
       data.templates.length + data.research.length,
   };
 
+  // Settings now sits inside AppShell, so the portal-wide IconSidebar
+  // and Topbar handle the global chrome. This component only renders the
+  // settings-internal sub-rail + active panel.
   return (
-    <>
-      <Topbar currentUser={currentUser} />
-      <div className="flex" style={{ minHeight: "calc(100vh - 56px)" }}>
-        <SubRail
-          active={railActive}
-          onSelect={pick}
-          isAdmin={currentUser.isAdmin}
-          counts={counts}
-        />
-        <main className="flex-1 overflow-y-auto scroll-area">
-          <div className="content">{renderPanel(active, currentUser, data)}</div>
-        </main>
-      </div>
-    </>
+    <div className="flex h-full">
+      <SubRail
+        active={railActive}
+        onSelect={pick}
+        isAdmin={currentUser.isAdmin}
+        counts={counts}
+      />
+      <main className="flex-1 overflow-y-auto scroll-area">
+        <div className="content">{renderPanel(active, currentUser, data)}</div>
+      </main>
+    </div>
   );
 }
 

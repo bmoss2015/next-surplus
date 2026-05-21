@@ -21,13 +21,16 @@ export default async function DashboardPage() {
 
   return (
     <div className="px-7 py-6">
-      <div className="mb-[22px]">
-        <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
+      {/* Title — date is a quiet overline so the eye lands on "Dashboard"
+          first. The active-leads count lives in the metric row, so no need
+          to repeat it inline here. */}
+      <div className="mb-[26px]">
+        <div className="text-[11px] font-medium uppercase tracking-[0.6px] text-petrol-500">
+          {today}
+        </div>
+        <h1 className="m-0 mt-1.5 text-[26px] font-semibold tracking-tight text-ink">
           Dashboard
         </h1>
-        <div className="mt-1 text-[13px] text-gray-500">
-          {today} · {data.totalActive} active leads
-        </div>
       </div>
 
       {/* Metric row */}
@@ -71,37 +74,33 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Stages strip */}
+      {/* Stages strip — count duplicated the metric row, so the sub-line
+          now just gives the section its purpose ("by stage"). */}
       <div className="mb-3 flex items-baseline justify-between">
-        <div>
-          <h2 className="section-subheader">Lead Stages</h2>
-          <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
-            {data.totalActive} active leads
-          </div>
-        </div>
+        <h2 className="section-subheader">Lead Stages</h2>
         <Link
           href="/leads"
           className="text-[12px] text-ink underline decoration-gray-300 underline-offset-[3px] hover:decoration-petrol-500"
         >View All Leads</Link>
       </div>
-      <div className="mb-[22px] grid grid-cols-9 gap-2">
+      <div className="mb-[26px] grid grid-cols-9 gap-2">
         {STAGES.map((stage) => {
           const numColor =
             stage === "won"
-              ? "text-[#16a34a]"
+              ? "text-success"
               : stage === "lost"
-                ? "text-[#64748b]"
-                : "text-[#0d4b3a]";
+                ? "text-gray-500"
+                : "text-petrol-700";
           return (
             <Link
               key={stage}
               href={`/leads?stage=${stage}`}
-              className="rounded-lg border border-[#e2e8f0] bg-white p-4 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-all hover:border-[#13644e] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+              className="rounded-lg border border-gray-200 bg-white p-4 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:-translate-y-[1px] hover:border-petrol-300 hover:shadow-[0_4px_14px_rgba(13,75,58,0.10)]"
             >
-              <div className={`text-[28px] font-bold leading-none tracking-tight ${numColor}`}>
+              <div className={`text-[28px] font-semibold leading-none tracking-tight ${numColor}`}>
                 {data.stagesCounts[stage]}
               </div>
-              <div className="mt-2 text-[12px] font-medium text-[#64748b]">
+              <div className="mt-2 text-[12px] font-medium text-gray-500">
                 {STAGE_LABELS[stage]}
               </div>
             </Link>
@@ -112,7 +111,18 @@ export default async function DashboardPage() {
       {/* Split row: Leads Needing Action + Markets/Deadlines */}
       <div className="grid grid-cols-[1.5fr_1fr] gap-[22px]">
         <div>
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-card">
+          {/* Leads Needing Action — the primary daily work surface. Thin
+              emerald accent strip up top quietly anoints it without going
+              full dark hero. */}
+          <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-card">
+            <div
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-[3px]"
+              style={{
+                background:
+                  "linear-gradient(90deg, #0d4b3a 0%, #4a9c75 100%)",
+              }}
+            />
             <div className="flex items-center justify-between border-b border-gray-200 px-[18px] py-[14px]">
               <div>
                 <h2 className="section-subheader">
@@ -173,6 +183,9 @@ export default async function DashboardPage() {
             <h2 className="section-subheader">
               Active Markets
             </h2>
+            <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
+              Pipeline By State
+            </div>
           </div>
           <div className="mb-[18px] rounded-lg border border-gray-200 bg-surface p-5 shadow-card">
             {data.marketsByState.length === 0 ? (

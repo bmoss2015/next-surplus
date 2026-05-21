@@ -80,22 +80,16 @@ export default async function SettingsPreviewJsxPage() {
     : [null, null, [], [], null, null, [], null];
 
   const cssText = readFileSync(
-    path.join(process.cwd(), "src", "app", "settings", "preview.css"),
+    path.join(process.cwd(), "src", "app", "(app)", "settings", "preview.css"),
     "utf-8"
   );
 
   return (
     <>
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link
-        rel="preconnect"
-        href="https://fonts.gstatic.com"
-        crossOrigin="anonymous"
-      />
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
-      />
+      {/* Fonts (Inter + JetBrains Mono) now load globally from the root
+          layout. Lucide icon font still loads here since it's only used
+          by the Settings sub-rail breadcrumbs + a few mockup-style
+          icons inside panels. */}
       <link
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/lucide-static@0.460.0/font/lucide.css"
