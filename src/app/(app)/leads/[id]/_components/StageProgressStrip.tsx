@@ -73,7 +73,7 @@ export function StageProgressStrip({
                   "relative z-[2] flex h-[26px] w-[26px] items-center justify-center rounded-full bg-surface text-[11px] font-medium",
                   isDone && "bg-petrol-500 text-white",
                   isCurrent &&
-                    "border-2 border-petrol-500 text-petrol-500 shadow-[0_0_0_4px_rgba(13,108,125,0.12)]",
+                    "border-2 border-petrol-500 text-petrol-500 shadow-[0_0_0_4px_rgba(19,100,78,0.12)]",
                   isUpcoming && "border-[1.5px] border-gray-300 text-gray-400"
                 )}
               >

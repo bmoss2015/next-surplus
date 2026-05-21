@@ -22,18 +22,10 @@
         --danger: #b42318;
         --success: #067647;
       }
-      html, body {
-        font-family: "Inter", system-ui, sans-serif;
-        font-feature-settings: "cv11", "ss03", "ss01", "cv02";
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: optimizeLegibility;
-        letter-spacing: -0.008em;
-      }
-      body {
-        background: var(--bg);
-        color: var(--ink);
-      }
+      /* html, body styles removed — fonts, typography refinements, and
+         body background/color are now set portal-wide by globals.css.
+         Settings shares AppShell with the rest of the portal so it
+         no longer overrides them. */
       .tabular { font-variant-numeric: tabular-nums; }
       .serifish { font-family: "Inter", serif; font-feature-settings: "cv11"; }
 
