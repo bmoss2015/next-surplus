@@ -229,7 +229,7 @@ export async function GET(req: NextRequest) {
   // 1) Leads — match against every lead-level column.
   const leadsQ = sb
     .from("leads")
-    .select("id, lead_id, address, city, state, zip, county, case_number, estimated_surplus, confirmed_surplus, closing_bid, attorney_cost, stage, sale_type")
+    .select("id, lead_id, address, city, state, zip, county, case_number, estimated_surplus, confirmed_surplus, source_surplus, estimated_net_payout, closing_bid, attorney_cost, recovery_fee_percent, stage, sale_type")
     .or(
       [
         `lead_id.ilike.${v}`,
@@ -511,8 +511,47 @@ export async function GET(req: NextRequest) {
       city: string | null; state: string | null; zip: string | null;
       county: string | null; case_number: string | null;
       stage: string | null; sale_type: string | null;
+      estimated_surplus: number | null;
+      confirmed_surplus: number | null;
+      source_surplus: number | null;
+      estimated_net_payout: number | null;
+      closing_bid: number | null;
+      attorney_cost: number | null;
+      recovery_fee_percent: number | null;
     };
+    // Currency columns in priority order — when a numeric query matches one
+    // of these, the hint reads e.g. "Est. Net Payout: $96,668" so the user
+    // can see which financial value brought this lead up.
+    const CURRENCY_COLS: Array<[string, keyof LeadRow]> = [
+      ["Est. Net Payout", "estimated_net_payout"],
+      ["Confirmed Surplus", "confirmed_surplus"],
+      ["Est. Surplus", "estimated_surplus"],
+      ["Source Surplus", "source_surplus"],
+      ["Closing Bid", "closing_bid"],
+      ["Attorney Cost", "attorney_cost"],
+    ];
+    function fmtMoney(n: number): string {
+      return `$${Math.round(n).toLocaleString()}`;
+    }
     function leadMatchHint(r: LeadRow): string | null {
+      // Numeric match — surface the financial field that rounds to the query.
+      if (numericValue != null && Number.isFinite(numericValue)) {
+        for (const [label, col] of CURRENCY_COLS) {
+          const v = r[col] as number | null;
+          if (v == null) continue;
+          const hitsRounded = numericIsInteger && Math.round(v) === numericValue;
+          const hitsExact = !numericIsInteger && v === numericValue;
+          if (hitsRounded || hitsExact) {
+            return `${label}: ${fmtMoney(v)}`;
+          }
+        }
+        if (
+          r.recovery_fee_percent != null &&
+          r.recovery_fee_percent === numericValue
+        ) {
+          return `Recovery Fee: ${r.recovery_fee_percent}%`;
+        }
+      }
       const addr = (r.address || "").toLowerCase();
       // If the address itself contains the query, the title already shows it.
       if (addr.includes(qLower)) return null;
