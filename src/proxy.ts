@@ -52,18 +52,27 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && !isPublic && !isAuthFlow) {
+  // Helper — build a redirect response that carries over any refresh cookies
+  // Supabase set on `response` during getUser(). Without this copy step the
+  // browser never sees the refreshed access/refresh tokens, then sends a
+  // stale cookie on the next request, and the middleware flip-flops between
+  // "authed" and "not authed" — classic loop.
+  function redirectTo(pathname: string, redirectTo?: string) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirectTo", pathname);
-    return NextResponse.redirect(url);
+    url.pathname = pathname;
+    if (redirectTo) url.searchParams.set("redirectTo", redirectTo);
+    else url.searchParams.delete("redirectTo");
+    const r = NextResponse.redirect(url);
+    response.cookies.getAll().forEach((c) => r.cookies.set(c));
+    return r;
+  }
+
+  if (!user && !isPublic && !isAuthFlow) {
+    return redirectTo("/login", pathname);
   }
 
   if (user && isPublic) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    url.searchParams.delete("redirectTo");
-    return NextResponse.redirect(url);
+    return redirectTo("/");
   }
 
   return response;
