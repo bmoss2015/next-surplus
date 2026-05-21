@@ -15,21 +15,13 @@ import { cn } from "@/lib/cn";
 // Nothing on the pill scale uses black; the strongest stage is the
 // brand-emerald mid, never deep/ink.
 //
-// Progression — all greens are emerald-family (no off-palette success
-// greens, no near-black). On the Claims page the three relevant stages
-// (with_attorney / claim_filed / won) deliberately step OUTLINE → SOLID
-// MID → SOLID BRIGHT so they're visually obvious as their own claims
-// pipeline:
-//   new_leads      gray pillow (hasn't started)
-//   qualifying     emerald outline — early, owning the lead
-//   outreach       emerald outline
-//   in_conversation brand emerald SOLID MID (#0d4b3a)
-//   contract       brand emerald SOLID MID
-//   with_attorney  emerald OUTLINE — claim just starting at attorney
-//   claim_filed    brand emerald SOLID MID (#0d4b3a) — committed
-//   won            BRIGHT emerald (#4a9c75) + ink text — celebratory
-//                  but still on-brand
-//   lost           danger red
+// Bree rejected every off-brand or near-black option for Won (ink, deep
+// emerald, success vivid lime, bright petrol-300). The honest truth is
+// there's no good "different green" that stays on the emerald palette
+// AND looks distinct from Claim Filed. Solution: Won shares Claim
+// Filed's solid brand emerald color, but the StagePill prepends a ✓ to
+// the label below so the two are unmistakable at a glance without
+// adding a color outside the brand.
 const STAGE_CLASSES: Record<Stage, string> = {
   new_leads:       "bg-gray-150 text-gray-600",
   qualifying:      "border border-petrol-500 text-petrol-500 bg-transparent",
@@ -38,7 +30,7 @@ const STAGE_CLASSES: Record<Stage, string> = {
   contract:        "bg-petrol-500 text-white",
   with_attorney:   "border border-petrol-500 text-petrol-500 bg-transparent",
   claim_filed:     "bg-petrol-500 text-white",
-  won:             "bg-petrol-300 text-ink",
+  won:             "bg-petrol-500 text-white",
   lost:            "bg-danger text-white",
 };
 
@@ -57,6 +49,7 @@ export function StagePill({
         className
       )}
     >
+      {stage === "won" && "✓ "}
       {STAGE_LABELS[stage]}
     </span>
   );
