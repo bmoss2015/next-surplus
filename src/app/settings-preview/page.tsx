@@ -2,19 +2,17 @@ import { readFileSync } from "fs";
 import path from "path";
 import Script from "next/script";
 
-// Settings redesign — Phase A pixel clone.
+// Settings redesign — Phase A pixel clone (with Phase B.2 CSS co-location).
 //
-// The 3001 mockup (C:\Users\info\moss-equity-settings-mockup\index.html) is
-// copied verbatim into src/data/settings-mockup.html. This route extracts the
-// mockup's <style> block and its <body> inner HTML and renders both via
-// dangerouslySetInnerHTML inside a route OUTSIDE the (app) group — bypassing
-// AppShell, since the mockup brings its own top bar.
+// The 3001 mockup is preserved verbatim at src/data/settings-mockup.html and
+// its CSS has been lifted into ./preview.css. This route reads the mockup
+// body inner HTML from the .html file and the styles from preview.css, then
+// injects both via dangerouslySetInnerHTML — same render as before, but the
+// CSS is now a proper co-located file an editor can syntax-highlight.
 //
-// The mockup uses Tailwind CDN + Lucide icon font + Google Fonts Inter; all
-// three are loaded here exactly as the mockup loads them, so the rendered
-// output is byte-comparable to localhost:3001.
-//
-// Phase B will split this single page into real JSX components.
+// Lives outside the (app) group so it bypasses AppShell — the mockup ships
+// its own top bar. Tailwind CDN + Lucide icon font + Google Fonts Inter are
+// loaded the same way the mockup loads them.
 
 export const dynamic = "force-static";
 
@@ -23,14 +21,16 @@ export default function SettingsPreviewPage() {
     path.join(process.cwd(), "src", "data", "settings-mockup.html"),
     "utf-8"
   );
+  const cssText = readFileSync(
+    path.join(process.cwd(), "src", "app", "settings-preview", "preview.css"),
+    "utf-8"
+  );
 
-  const styleMatch = html.match(/<style>([\s\S]*?)<\/style>/);
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/);
   const tailwindConfigMatch = html.match(
     /<script>\s*(tailwind\.config[\s\S]*?)<\/script>/
   );
 
-  const cssText = styleMatch ? styleMatch[1] : "";
   const bodyHtml = bodyMatch ? bodyMatch[1] : "";
   const tailwindConfig = tailwindConfigMatch ? tailwindConfigMatch[1] : "";
 
