@@ -8,6 +8,8 @@ export type CurrentProfile = {
   role: "admin" | "member";
   orgId: string;
   isAdmin: boolean;
+  avatarUrl: string | null;
+  timeZone: string | null;
 };
 
 // Resolves the signed-in user's profile (org + role). Returns null if there is
@@ -21,7 +23,7 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
 
   const { data, error } = await sb
     .from("profiles")
-    .select("id, email, full_name, role, org_id")
+    .select("id, email, full_name, role, org_id, avatar_url, time_zone")
     .eq("id", user.id)
     .maybeSingle();
   if (error || !data) return null;
@@ -34,6 +36,8 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
     role,
     orgId: data.org_id as string,
     isAdmin: role === "admin",
+    avatarUrl: (data.avatar_url as string | null) ?? null,
+    timeZone: (data.time_zone as string | null) ?? null,
   };
 }
 
