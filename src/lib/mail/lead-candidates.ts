@@ -2,31 +2,28 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { smartParseAddress, splitFullName } from "./address";
 import { activeSurplus } from "@/lib/leads/active-surplus";
+import {
+  LEAD_PARTY_ROLE_LABELS,
+  type LeadPartyRole,
+} from "@/lib/leads/lead-parties-types";
 import type { SendMailModalRecipient } from "@/components/mail/SendMailModal";
 
-// Collects every plausible mail recipient for a given lead — owners,
-// relatives, and lead_parties with a usable address. Used by the Send Mail
-// button on the lead detail page so the modal can present the full picker.
+// Since migration 0119, every mailing address lives in the contacts table
+// with one of owner_id / relative_id / lead_party_id set. This builder reads
+// only from contacts and joins to the source records to get the recipient
+// name + relation chip.
 export async function buildLeadSendMailCandidates(
   leadId: string
 ): Promise<SendMailModalRecipient[]> {
   const sb = await createClient();
-  const [contactsRes, relRes, partyRes, leadRes, ownersRes] = await Promise.all([
+  const [contactsRes, leadRes, ownersRes, relRes, partyRes] = await Promise.all([
     sb
       .from("contacts")
-      .select("id, owner_id, lead_id, channel, value, recipient_label, mailed, mailed_at")
+      .select(
+        "id, owner_id, relative_id, lead_party_id, lead_id, channel, value, recipient_label, mailed, mailed_at"
+      )
       .eq("lead_id", leadId)
       .eq("channel", "mailing_address"),
-    sb
-      .from("relatives")
-      .select("id, lead_id, full_name, street, city, state, zip")
-      .eq("lead_id", leadId),
-    sb
-      .from("lead_parties")
-      .select(
-        "id, lead_id, name, organization, role, street, city, state, zip"
-      )
-      .eq("lead_id", leadId),
     sb
       .from("leads")
       .select(
@@ -35,21 +32,43 @@ export async function buildLeadSendMailCandidates(
       .eq("id", leadId)
       .maybeSingle(),
     sb.from("owners").select("id, full_name").eq("lead_id", leadId),
+    sb
+      .from("relatives")
+      .select("id, full_name, relationship")
+      .eq("lead_id", leadId),
+    sb
+      .from("lead_parties")
+      .select("id, name, role, custom_role_label")
+      .eq("lead_id", leadId),
   ]);
 
-  // Owner lookup so we can fall back to the owner's real name when a
-  // mailing-address row has no recipient_label (the common case for rows
-  // created by the legacy importer, which didn't populate it).
   const ownersById = new Map<string, string>();
   for (const o of ownersRes.data ?? []) {
     ownersById.set(o.id as string, ((o.full_name as string | null) ?? "").trim());
   }
+  const relativesById = new Map<
+    string,
+    { full_name: string; relationship: string | null }
+  >();
+  for (const r of relRes.data ?? []) {
+    relativesById.set(r.id as string, {
+      full_name: ((r.full_name as string | null) ?? "").trim(),
+      relationship: (r.relationship as string | null) ?? null,
+    });
+  }
+  const leadPartiesById = new Map<
+    string,
+    { name: string; role: LeadPartyRole; custom_role_label: string | null }
+  >();
+  for (const lp of partyRes.data ?? []) {
+    leadPartiesById.set(lp.id as string, {
+      name: ((lp.name as string | null) ?? "").trim(),
+      role: (lp.role as LeadPartyRole) ?? "other",
+      custom_role_label: (lp.custom_role_label as string | null) ?? null,
+    });
+  }
 
   const lead = leadRes.data ?? null;
-  // Owner-take-home range for mail templates only. Confirmed > source >
-  // computed via activeSurplus(); 35% low / 20% high deducted as the
-  // recovery-fee bracket. Never rendered in the CRM UI per CLAUDE.md —
-  // the only consumer is {{lead.owner_range}} in mailer HTML.
   const surplus = lead
     ? activeSurplus({
         confirmed_surplus: (lead.confirmed_surplus as number | null) ?? null,
@@ -83,123 +102,73 @@ export async function buildLeadSendMailCandidates(
 
   const out: SendMailModalRecipient[] = [];
 
-  // 1. Mailing address rows from contacts table (manually-added envelope-
-  //    addressed entries). These are the primary outreach surface.
   for (const c of contactsRes.data ?? []) {
     const value = (c.value as string | null) ?? "";
     if (!value) continue;
     const parsed = smartParseAddress(value);
     if (!parsed) continue;
-    const label = ((c.recipient_label as string | null) ?? "").trim();
-    const nameFromLabel = label.replace(/\s*\(.*?\)\s*$/, "").trim();
-    // Some legacy rows have garbage in the label — e.g. the literal string
-    // "Owner" with no actual name, which would render "Dear Owner" on the
-    // letter. Treat any bare relation word as "no name" so the owner
-    // lookup below kicks in.
-    const RELATION_WORDS = new Set([
-      "owner",
-      "co-owner",
-      "co owner",
-      "relative",
-      "spouse",
-      "heir",
-      "executor",
-      "recipient",
-      "contact",
-    ]);
-    const looksLikeRelation = RELATION_WORDS.has(nameFromLabel.toLowerCase());
-    // Fallback chain: real name in label → owner row's full name → generic.
-    const ownerName = ownersById.get(c.owner_id as string) ?? "";
-    const nameOnly =
-      (!looksLikeRelation && nameFromLabel) || ownerName || "Recipient";
-    // Derive the relation chip shown in the picker. If the stored label
-    // ends with "(Something)" use that; otherwise if the whole label IS a
-    // relation word ("Owner"), use that; otherwise default to "Owner"
-    // since owner_id always points at an owner record.
-    const relationMatch = label.match(/\(([^)]+)\)\s*$/);
-    const relation = relationMatch
-      ? relationMatch[1].trim()
-      : looksLikeRelation
-        ? nameFromLabel
-        : "Owner";
-    const { first_name, last_name } = splitFullName(nameOnly);
+
+    // Resolve the recipient name + relation chip from whichever FK is set.
+    let fullName: string;
+    let relation: string;
+    let key: string;
+    let relativeId: string | null = null;
+    let leadPartyId: string | null = null;
+
+    const relativeFk = (c.relative_id as string | null) ?? null;
+    const leadPartyFk = (c.lead_party_id as string | null) ?? null;
+    const ownerFk = (c.owner_id as string | null) ?? null;
+
+    if (relativeFk) {
+      const rel = relativesById.get(relativeFk);
+      fullName = (rel?.full_name || "").trim() || "Unknown";
+      relation = (rel?.relationship ?? "").trim() || "Relative";
+      key = `contact:${c.id}`;
+      relativeId = relativeFk;
+    } else if (leadPartyFk) {
+      const lp = leadPartiesById.get(leadPartyFk);
+      fullName = (lp?.name || "").trim() || "Recipient";
+      relation =
+        lp?.role === "other"
+          ? (lp.custom_role_label ?? "").trim() || "Other"
+          : lp
+            ? LEAD_PARTY_ROLE_LABELS[lp.role]
+            : "Contact";
+      key = `contact:${c.id}`;
+      leadPartyId = leadPartyFk;
+    } else if (ownerFk) {
+      fullName = (ownersById.get(ownerFk) || "").trim() || "Recipient";
+      relation = "Owner";
+      key = `contact:${c.id}`;
+    } else {
+      // Pre-migration legacy rows with no FK at all — fall back to the
+      // recipient_label parse.
+      const label = ((c.recipient_label as string | null) ?? "").trim();
+      const nameFromLabel = label.replace(/\s*\(.*?\)\s*$/, "").trim();
+      fullName = nameFromLabel || "Recipient";
+      const relationMatch = label.match(/\(([^)]+)\)\s*$/);
+      relation = relationMatch ? relationMatch[1].trim() : "Recipient";
+      key = `contact:${c.id}`;
+    }
+
+    const { first_name, last_name } = splitFullName(fullName);
     out.push({
-      key: `contact:${c.id}`,
+      key,
       lead_id: c.lead_id as string,
+      relative_id: relativeId,
+      lead_party_id: leadPartyId,
       relation,
       mailed: Boolean(c.mailed),
       mailed_at: (c.mailed_at as string | null) ?? null,
       contact: {
         first_name,
         last_name,
-        full_name: nameOnly,
+        full_name: fullName,
         line1: parsed.line1,
         line2: parsed.line2,
         city: parsed.city,
         state: parsed.state,
         postal_code: parsed.postal_code,
-      },
-      lead: leadContext,
-    });
-  }
-
-  // 2. Relatives with a street address.
-  for (const r of relRes.data ?? []) {
-    const street = ((r.street as string | null) ?? "").trim();
-    const city = ((r.city as string | null) ?? "").trim();
-    const state = ((r.state as string | null) ?? "").trim();
-    const zip = ((r.zip as string | null) ?? "").trim();
-    if (!street || !city || !state || !zip) continue;
-    const fullName = ((r.full_name as string | null) ?? "Unknown").trim();
-    const { first_name, last_name } = splitFullName(fullName);
-    out.push({
-      key: `relative:${r.id}`,
-      relative_id: r.id as string,
-      lead_id: r.lead_id as string,
-      relation: "Relative",
-      mailed: false,
-      mailed_at: null,
-      contact: {
-        first_name,
-        last_name,
-        full_name: fullName,
-        line1: street,
-        line2: null,
-        city,
-        state,
-        postal_code: zip,
-      },
-      lead: leadContext,
-    });
-  }
-
-  // 3. Lead parties (county clerks etc.) with an address. The new address
-  //    columns (street/city/state/zip) were added by migration 0103.
-  for (const p of partyRes.data ?? []) {
-    const street = ((p.street as string | null) ?? "").trim();
-    const city = ((p.city as string | null) ?? "").trim();
-    const state = ((p.state as string | null) ?? "").trim();
-    const zip = ((p.zip as string | null) ?? "").trim();
-    if (!street || !city || !state || !zip) continue;
-    const fullName = ((p.name as string | null) ?? "Recipient").trim();
-    const { first_name, last_name } = splitFullName(fullName);
-    const partyRole = ((p.role as string | null) ?? "").trim();
-    out.push({
-      key: `party:${p.id}`,
-      lead_party_id: p.id as string,
-      lead_id: p.lead_id as string,
-      relation: partyRole || "Contact",
-      mailed: false,
-      mailed_at: null,
-      contact: {
-        first_name,
-        last_name,
-        full_name: fullName,
-        line1: street,
-        line2: null,
-        city,
-        state,
-        postal_code: zip,
       },
       lead: leadContext,
     });

@@ -315,6 +315,8 @@ export function ContactsTabClient({
           newContacts.push({
             id: r.id,
             owner_id: ownerId,
+            relative_id: null,
+            lead_party_id: null,
             lead_id: leadId,
             channel: "phone",
             value: phone,
@@ -345,6 +347,8 @@ export function ContactsTabClient({
           newContacts.push({
             id: r.id,
             owner_id: ownerId,
+            relative_id: null,
+            lead_party_id: null,
             lead_id: leadId,
             channel: "email",
             value: email,
@@ -448,6 +452,8 @@ export function ContactsTabClient({
     const placeholder: ContactRow = {
       id: placeholderId,
       owner_id: ownerId,
+      relative_id: null,
+      lead_party_id: null,
       lead_id: leadId,
       channel,
       value: trimmed,
