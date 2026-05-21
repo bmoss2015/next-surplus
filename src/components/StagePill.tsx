@@ -2,16 +2,34 @@ import type { Stage } from "@/lib/leads/types";
 import { STAGE_LABELS } from "@/lib/leads/types";
 import { cn } from "@/lib/cn";
 
+// Stage pills used in the leads list, kanban hovers, claims, reports, etc.
+// Per Bree: the old "gray pillow + green text" look read muted and
+// indistinguishable across stages. Each stage now gets its own pill style
+// from the role-tab vocabulary so a row scanning across the list reads
+// real progress (gray → emerald-outline → solid emerald → black → won) and
+// terminal-loss is clearly red.
+//
+// Buckets:
+//   New leads / lost      → muted gray (haven't started / dead-end)
+//   Qualifying / outreach → emerald OUTLINE (early, in-motion)
+//   In conversation /
+//     contract            → SOLID emerald (active engagement)
+//   With attorney /
+//     claim filed         → BLACK (admin-tier — money is at stake)
+//   Won                   → BLACK (terminal positive — same weight as
+//                           with_attorney / claim_filed; the rest of the
+//                           UI shows the trophy/checkmark separately)
+//   Lost                  → DANGER RED
 const STAGE_CLASSES: Record<Stage, string> = {
-  new_leads: "bg-gray-150 text-gray-500",
-  qualifying: "bg-petrol-100 text-petrol-700",
-  outreach: "bg-petrol-100 text-petrol-700",
-  in_conversation: "bg-info-violet-bg text-info-violet-deep",
-  contract: "bg-warn-bg text-warn-strong",
-  with_attorney: "bg-warn-bg text-warn-strong",
-  claim_filed: "bg-success-bg text-success-strong",
-  won: "bg-success-bg text-success-strong",
-  lost: "bg-gray-150 text-gray-500",
+  new_leads:       "bg-gray-150 text-gray-600",
+  qualifying:      "border border-petrol-500 text-petrol-500 bg-transparent",
+  outreach:        "border border-petrol-500 text-petrol-500 bg-transparent",
+  in_conversation: "bg-petrol-500 text-white",
+  contract:        "bg-petrol-500 text-white",
+  with_attorney:   "bg-ink text-white",
+  claim_filed:     "bg-ink text-white",
+  won:             "bg-ink text-white",
+  lost:            "bg-danger text-white",
 };
 
 export function StagePill({
