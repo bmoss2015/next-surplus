@@ -1,161 +1,211 @@
-// Settings clone · Phase B — AttorneysSection.
-//
-// Mechanically converted from src/data/settings-mockup.html via
-// scripts/convert-mockup-panels.js. Re-run the script to regenerate.
-// Static visual JSX only — handlers and data wiring come in later phases.
-/* eslint-disable react/no-unknown-property, react/jsx-no-comment-textnodes, jsx-a11y/anchor-is-valid */
+"use client";
 
-export function AttorneysSection() {
+// Settings clone · Phase C.3 — Attorneys wired to real data (display).
+//
+// Reads the org's attorneys from AttorneyRow[] and renders the mockup's
+// list. Search is wired client-side over name/email/states/fee. Edit
+// pencils and the Add Attorney button are visual-only — the upsert/delete
+// drawer ships in Phase D.
+
+import { useMemo, useState } from "react";
+import type { AttorneyRow } from "@/lib/settings/fetch";
+
+function avatarInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function fmtMoney(n: number | null): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return "$" + Math.round(n).toLocaleString("en-US");
+}
+
+const ALL_STATES = 50;
+
+export function AttorneysSection({ initial }: { initial: AttorneyRow[] }) {
+  const [query, setQuery] = useState("");
+
+  const stats = useMemo(() => {
+    const stateSet = new Set<string>();
+    for (const a of initial) for (const s of a.states_covered) stateSet.add(s);
+    const fees = initial
+      .map((a) => a.default_cost)
+      .filter((n): n is number => n != null && Number.isFinite(n));
+    const avg =
+      fees.length > 0 ? fees.reduce((a, b) => a + b, 0) / fees.length : 0;
+    return {
+      total: initial.length,
+      covered: stateSet.size,
+      avg,
+      notCovered: Math.max(0, ALL_STATES - stateSet.size),
+    };
+  }, [initial]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return initial;
+    return initial.filter((a) => {
+      const blob = [
+        a.name,
+        a.email ?? "",
+        ...a.states_covered,
+        a.default_cost != null ? String(a.default_cost) : "",
+        a.default_cost != null ? Math.round(a.default_cost).toLocaleString() : "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return blob.includes(q);
+    });
+  }, [initial, query]);
+
   return (
     <section id="panel-attorneys" className="panel active">
       <div className="breadcrumb">
-                    <a>Settings</a><i className="icon icon-chevron-right" />
-                    <a>Leads</a><i className="icon icon-chevron-right" />
-                    <span>Attorneys</span>
-                  </div>
-                  <div className="page-head">
-                    <div>
-                      <h1 className="section-h1">Attorneys</h1>
-                      <p className="section-desc">
-                        Attorneys you assign to leads filing claims. Their default cost feeds into Est. Net To You.
-                      </p>
-                    </div>
-                    <button className="btn btn-primary">
-                      <i className="icon icon-plus" /> Add Attorney
-                    </button>
-                  </div>
-      
-                  <div className="stats-strip">
-                    <div className="stat-cell">
-                      <div className="label">Attorneys</div>
-                      <div className="value" id="stat-attorneys">6</div>
-                    </div>
-                    <div className="stat-cell">
-                      <div className="label">States Covered</div>
-                      <div className="value value-em" id="stat-covered">50</div>
-                    </div>
-                    <div className="stat-cell">
-                      <div className="label">Average Attorney Fee</div>
-                      <div className="value" id="stat-avgfee">$1,600</div>
-                    </div>
-                    <div className="stat-cell">
-                      <div className="label">States Not Covered</div>
-                      <div className="value" id="stat-notcovered">0</div>
-                    </div>
-                  </div>
-      
-                  {/* Search / filter toolbar */}
-                  <div className="flex items-center gap-2 mt-6 mb-4">
-                    <label className="topbar-search attorney-search-wrap" style={{ height: "34px", flex: "1", maxWidth: "320px", minWidth: "0" }}>
-                      <i className="icon icon-search" />
-                      <input
-                        type="search"
-                        id="attorney-search"
-                        placeholder="Search by name, email, phone, fee, or state"
-                        className="attorney-search-input"
-                        autoComplete="off"
-                      />
-                    </label>
-                    <button className="btn btn-outline btn-sm">
-                      <i className="icon icon-filter" /> State
-                    </button>
-                    <button className="btn btn-outline btn-sm">
-                      <i className="icon icon-arrow-up-down" /> Sort
-                    </button>
-                  </div>
-                  <div id="attorney-empty" className="attorney-empty" style={{ display: "none" }}>
-                    No attorneys match <span id="attorney-empty-q"></span>
-                  </div>
-      
-                  {/* ATTORNEYS LIST — single, scannable directory; click any row (or pencil) to edit */}
-                  <div className="list attorney-list">
-                    <div className="list-row attorney-row" data-search="jane daniels esq jane@danielslaw.com 901 555 0142 1500 1,500 tennessee kentucky mississippi tn ky ms">
-                      <div className="avatar av-self">JD</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="row-name text-[13.5px] font-medium">Jane Daniels, Esq.</div>
-                        <div className="row-meta text-[12px] text-2 mt-0.5 tabular">jane@danielslaw.com · (901) 555-0142 · <span style={{ color: "var(--ink-2)", fontWeight: "500" }}>$1,500</span> per claim</div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="chip">TN</span><span className="chip">KY</span><span className="chip">MS</span>
-                      </div>
-                      <div className="overflow flex items-center gap-0.5 ml-2">
-                        <div className="icon-btn" title="Edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></div>
-                      </div>
-                    </div>
-      
-                    <div className="list-row attorney-row" data-search="raymond patel p.c. pc ray@patel-pc.com 843 555 0177 1750 1,750 south carolina north carolina georgia tennessee sc nc ga tn">
-                      <div className="avatar av-self">RP</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="row-name text-[13.5px] font-medium">Raymond Patel, P.C.</div>
-                        <div className="row-meta text-[12px] text-2 mt-0.5 tabular">ray@patel-pc.com · (843) 555-0177 · <span style={{ color: "var(--ink-2)", fontWeight: "500" }}>$1,750</span> per claim</div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="chip">SC</span><span className="chip">NC</span><span className="chip">GA</span><span className="chip">TN</span>
-                      </div>
-                      <div className="overflow flex items-center gap-0.5 ml-2">
-                        <div className="icon-btn" title="Edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></div>
-                      </div>
-                    </div>
-      
-                    <div className="list-row attorney-row" data-search="sara kim esq sara@kimlegal.co 512 555 0198 1200 1,200 texas oklahoma tx ok">
-                      <div className="avatar av-self">SK</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="row-name text-[13.5px] font-medium">Sara Kim, Esq.</div>
-                        <div className="row-meta text-[12px] text-2 mt-0.5 tabular">sara@kimlegal.co · (512) 555-0198 · <span style={{ color: "var(--ink-2)", fontWeight: "500" }}>$1,200</span> per claim</div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="chip">TX</span><span className="chip">OK</span>
-                      </div>
-                      <div className="overflow flex items-center gap-0.5 ml-2">
-                        <div className="icon-btn" title="Edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></div>
-                      </div>
-                    </div>
-      
-                    <div className="list-row attorney-row" data-search="marcus nguyen esq marcus@ngn-legal.com 305 555 0163 1400 1,400 florida alabama fl al">
-                      <div className="avatar av-self">MN</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="row-name text-[13.5px] font-medium">Marcus Nguyen, Esq.</div>
-                        <div className="row-meta text-[12px] text-2 mt-0.5 tabular">marcus@ngn-legal.com · (305) 555-0163 · <span style={{ color: "var(--ink-2)", fontWeight: "500" }}>$1,400</span> per claim</div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="chip">FL</span><span className="chip">AL</span>
-                      </div>
-                      <div className="overflow flex items-center gap-0.5 ml-2">
-                        <div className="icon-btn" title="Edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></div>
-                      </div>
-                    </div>
-      
-                    {/* Example: attorney with many states — first 4 shown + "+N more" overflow chip */}
-                    <div className="list-row attorney-row" data-search="maria lopez esq maria@lopezfirm.com 213 555 0119 1650 1,650 california nevada arizona oregon washington idaho utah colorado new mexico wyoming montana hawaii ca nv az or wa id ut co nm wy mt hi">
-                      <div className="avatar av-self">ML</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="row-name text-[13.5px] font-medium">Maria Lopez, Esq.</div>
-                        <div className="row-meta text-[12px] text-2 mt-0.5 tabular">maria@lopezfirm.com · (213) 555-0119 · <span style={{ color: "var(--ink-2)", fontWeight: "500" }}>$1,650</span> per claim</div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="chip">CA</span><span className="chip">NV</span><span className="chip">AZ</span><span className="chip">OR</span>
-                        <span className="chip chip-more">+8 More</span>
-                      </div>
-                      <div className="overflow flex items-center gap-0.5 ml-2">
-                        <div className="icon-btn" title="Edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></div>
-                      </div>
-                    </div>
-      
-                    {/* Example: attorney with national coverage — single dark "All 50 States" chip */}
-                    <div className="list-row attorney-row" data-search="david reyes esq david@reyes-national.com 646 555 0124 2100 2,100 all 50 states national united states">
-                      <div className="avatar av-self">DR</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="row-name text-[13.5px] font-medium">David Reyes, Esq.</div>
-                        <div className="row-meta text-[12px] text-2 mt-0.5 tabular">david@reyes-national.com · (646) 555-0124 · <span style={{ color: "var(--ink-2)", fontWeight: "500" }}>$2,100</span> per claim</div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="chip chip-all">All 50 States</span>
-                      </div>
-                      <div className="overflow flex items-center gap-0.5 ml-2">
-                        <div className="icon-btn" title="Edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></div>
-                      </div>
-                    </div>
-                  </div>
+        <a>Settings</a>
+        <i className="icon icon-chevron-right" />
+        <a>Leads</a>
+        <i className="icon icon-chevron-right" />
+        <span>Attorneys</span>
+      </div>
+      <div className="page-head">
+        <div>
+          <h1 className="section-h1">Attorneys</h1>
+          <p className="section-desc">
+            Attorneys you assign to leads filing claims. Their default cost
+            feeds into Est. Net To You.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled
+          title="Add/edit drawer ships in Phase D"
+        >
+          <i className="icon icon-plus" /> Add Attorney
+        </button>
+      </div>
+
+      <div className="stats-strip">
+        <div className="stat-cell">
+          <div className="label">Attorneys</div>
+          <div className="value">{stats.total}</div>
+        </div>
+        <div className="stat-cell">
+          <div className="label">States Covered</div>
+          <div className="value value-em">{stats.covered}</div>
+        </div>
+        <div className="stat-cell">
+          <div className="label">Average Attorney Fee</div>
+          <div className="value">{fmtMoney(stats.avg)}</div>
+        </div>
+        <div className="stat-cell">
+          <div className="label">States Not Covered</div>
+          <div className="value">{stats.notCovered}</div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 mt-6 mb-4">
+        <label
+          className="topbar-search attorney-search-wrap"
+          style={{ height: 34, flex: 1, maxWidth: 320, minWidth: 0 }}
+        >
+          <i className="icon icon-search" />
+          <input
+            type="search"
+            placeholder="Search by name, email, fee, or state"
+            className="attorney-search-input"
+            autoComplete="off"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+        <button type="button" className="btn btn-outline btn-sm" disabled>
+          <i className="icon icon-filter" /> State
+        </button>
+        <button type="button" className="btn btn-outline btn-sm" disabled>
+          <i className="icon icon-arrow-up-down" /> Sort
+        </button>
+      </div>
+
+      {filtered.length === 0 && query && (
+        <div className="attorney-empty">
+          No attorneys match <span>&ldquo;{query}&rdquo;</span>
+        </div>
+      )}
+
+      <div className="list attorney-list">
+        {filtered.map((a) => {
+          const isNational = a.states_covered.length >= ALL_STATES;
+          const shown = isNational ? [] : a.states_covered.slice(0, 4);
+          const overflow = isNational
+            ? 0
+            : Math.max(0, a.states_covered.length - shown.length);
+          return (
+            <div key={a.id} className="list-row attorney-row">
+              <div className="avatar av-self">{avatarInitials(a.name)}</div>
+              <div className="flex-1 min-w-0">
+                <div className="row-name text-[13.5px] font-medium">
+                  {a.name}
+                </div>
+                <div className="row-meta text-[12px] text-2 mt-0.5 tabular">
+                  {a.email ?? ""}
+                  {a.email && a.default_cost != null && " · "}
+                  {a.default_cost != null && (
+                    <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>
+                      {fmtMoney(a.default_cost)}
+                    </span>
+                  )}
+                  {a.default_cost != null && " per claim"}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {isNational ? (
+                  <span className="chip chip-all">All 50 States</span>
+                ) : (
+                  <>
+                    {shown.map((s) => (
+                      <span key={s} className="chip">
+                        {s}
+                      </span>
+                    ))}
+                    {overflow > 0 && (
+                      <span className="chip chip-more">+{overflow} More</span>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="overflow flex items-center gap-0.5 ml-2">
+                <div
+                  className="icon-btn"
+                  title="Edit (coming in Phase D)"
+                  style={{ opacity: 0.4, pointerEvents: "none" }}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+                    <path d="m15 5 4 4" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && !query && (
+          <div className="list-row" style={{ color: "var(--text-3)" }}>
+            No attorneys yet. Phase D adds the Add Attorney drawer.
+          </div>
+        )}
+      </div>
     </section>
   );
 }

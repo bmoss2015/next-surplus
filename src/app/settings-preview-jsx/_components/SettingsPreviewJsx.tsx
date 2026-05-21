@@ -31,7 +31,13 @@ import { SmsTemplatesSection } from "./SmsTemplatesSection";
 import { ResearchTemplatesSection } from "./ResearchTemplatesSection";
 import { LostReasonsSection } from "./LostReasonsSection";
 
-import type { AppSettings, LostReasonAdminRow } from "@/lib/settings/fetch";
+import type {
+  AppSettings,
+  AttorneyRow,
+  LostReasonAdminRow,
+  OrgMemberRow,
+} from "@/lib/settings/fetch";
+import type { EmailAccountRow } from "@/lib/email/types";
 
 export type CurrentUser = {
   fullName: string;
@@ -43,6 +49,11 @@ export type SettingsData = {
   defaults: AppSettings | null;
   needsActionThreshold: number | null;
   lostReasons: LostReasonAdminRow[];
+  attorneys: AttorneyRow[];
+  customContactRoles: string[];
+  members: OrgMemberRow[];
+  orgName: string;
+  emailAccounts: EmailAccountRow[];
 };
 
 const RAIL_KEYS = new Set(GROUPS.flatMap((g) => g.items.map((i) => i.key)));
@@ -114,17 +125,21 @@ function renderPanel(
     case "notifications":
       return <NotificationsSection />;
     case "email-accounts":
-      return <EmailAccountsSection />;
+      return <EmailAccountsSection initial={data.emailAccounts} />;
     case "company":
       return <CompanyProfileSection />;
     case "team":
-      return <TeamSection />;
+      return data.members.length > 0 || currentUser.isAdmin ? (
+        <TeamSection initial={data.members} orgName={data.orgName} />
+      ) : (
+        <AdminGate />
+      );
     case "billing":
       return <BillingSection />;
     case "attorneys":
-      return <AttorneysSection />;
+      return <AttorneysSection initial={data.attorneys} />;
     case "contact-roles":
-      return <ContactRolesSection />;
+      return <ContactRolesSection initial={data.customContactRoles} />;
     case "mail-settings":
       return <MailSettingsSection />;
     case "mail-bank":

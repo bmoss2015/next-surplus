@@ -16,7 +16,12 @@ import {
   fetchAppSettings,
   fetchNeedsActionThreshold,
   fetchLostReasonsAdmin,
+  fetchAttorneys,
+  fetchOrgMembers,
+  fetchOrgInfo,
 } from "@/lib/settings/fetch";
+import { fetchMyEmailAccounts } from "@/lib/email/fetch";
+import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
 import { SettingsPreviewJsx } from "./_components/SettingsPreviewJsx";
 
 export const dynamic = "force-dynamic";
@@ -26,17 +31,24 @@ export default async function SettingsPreviewJsxPage() {
   if (!profile) redirect("/login");
   const isAdmin = profile.isAdmin;
 
-  // Member-visible data (Lost Reasons admin includes archived rows, which is
-  // why it's behind isAdmin even though the panel itself is admin-only).
-  const [lostReasons] = await Promise.all([
-    isAdmin ? fetchLostReasonsAdmin() : Promise.resolve([]),
+  // Member-visible data — attorneys + lost reasons + contact roles +
+  // connected email accounts (per-user, not per-org).
+  const [attorneys, customContactRoles, emailAccounts] = await Promise.all([
+    fetchAttorneys(),
+    fetchOrgCustomRoles(),
+    fetchMyEmailAccounts(),
   ]);
 
-  // Admin-only data. Promise.all keeps the wait time bounded by the slowest
-  // single fetcher rather than summed.
-  const [defaults, needsActionThreshold] = isAdmin
-    ? await Promise.all([fetchAppSettings(), fetchNeedsActionThreshold()])
-    : [null, null];
+  // Admin-only data.
+  const [defaults, needsActionThreshold, lostReasons, members, orgInfo] = isAdmin
+    ? await Promise.all([
+        fetchAppSettings(),
+        fetchNeedsActionThreshold(),
+        fetchLostReasonsAdmin(),
+        fetchOrgMembers(),
+        fetchOrgInfo(),
+      ])
+    : [null, null, [], [], null];
 
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "settings-preview", "preview.css"),
@@ -74,6 +86,11 @@ export default async function SettingsPreviewJsxPage() {
           defaults,
           needsActionThreshold,
           lostReasons,
+          attorneys,
+          customContactRoles,
+          members,
+          orgName: orgInfo?.name ?? "Your Organization",
+          emailAccounts,
         }}
       />
     </>
