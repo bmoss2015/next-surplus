@@ -106,7 +106,7 @@ export function EditTaskDrawer({
   const inputClass =
     "w-full rounded-md border border-gray-200 bg-surface px-3 py-2 text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
   const pickerClass =
-    "w-full cursor-pointer rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-[13px] text-ink outline-none focus:border-[#0d6c7d]";
+    "w-full cursor-pointer rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-[13px] text-ink outline-none focus:border-[#13644e]";
   const labelClass =
     "block text-[10px] tracking-[0.5px] font-medium text-gray-500 mb-1";
 

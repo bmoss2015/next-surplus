@@ -220,7 +220,7 @@ export function LeadTasksTabClient({
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
+        <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
           Tasks
         </h3>
         <span className="text-[11px] text-gray-400">
@@ -230,7 +230,7 @@ export function LeadTasksTabClient({
 
       {/* Fix WWWW: the Add Task form sits at the top, above the task list. */}
       <div className="mb-5 rounded-xl border border-gray-200 bg-[#f8fafc] p-4">
-        <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
+        <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
           Add Task
         </div>
         <div className="space-y-3">

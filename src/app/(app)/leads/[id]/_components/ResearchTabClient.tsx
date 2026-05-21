@@ -172,7 +172,7 @@ export function ResearchTabClient({
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
+        <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
           Research
         </h3>
         {addButton}
@@ -215,7 +215,7 @@ export function ResearchTabClient({
                     ) : (
                       <IconChevronDown size={14} stroke={2.25} className="shrink-0 text-gray-500" />
                     )}
-                    <span className="truncate text-[13px] font-medium text-[#0a3d4a]">
+                    <span className="truncate text-[13px] font-medium text-[#0d4b3a]">
                       {displayHeader(t.name)}
                     </span>
                   </button>
@@ -235,7 +235,7 @@ export function ResearchTabClient({
                 {/* Thin progress bar reflecting done / total. */}
                 <div className="h-[3px] w-full bg-gray-200">
                   <div
-                    className="h-full bg-[#0d6c7d] transition-[width] duration-200"
+                    className="h-full bg-[#13644e] transition-[width] duration-200"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -318,7 +318,7 @@ export function ResearchTabClient({
 
       <div className="mt-5 rounded-xl border border-gray-200 bg-[#f8fafc] p-4">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#0a3d4a]">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
             Overall Findings
           </span>
           <button
@@ -369,7 +369,7 @@ export function ResearchTabClient({
                     "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-[13px]",
                     isAdded
                       ? "cursor-not-allowed text-gray-400"
-                      : "cursor-pointer text-ink hover:bg-[#e0f2f7]"
+                      : "cursor-pointer text-ink hover:bg-[#f3f4f6]"
                   )}
                 >
                   <span className="min-w-0">

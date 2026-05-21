@@ -281,7 +281,7 @@
       .input:hover { border-color: #d8d6cf; }
       .input:focus {
         border-color: var(--brand);
-        box-shadow: 0 0 0 3px var(--brand-ring);
+        outline: none;
       }
       .input::placeholder { color: var(--text-4); }
       .field { position: relative; display: inline-flex; align-items: center; }

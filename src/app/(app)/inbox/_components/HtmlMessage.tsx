@@ -40,7 +40,7 @@ export function HtmlMessage({ html }: { html: string }) {
       overflow-wrap: break-word;
     }
     img { max-width: 100%; height: auto; }
-    a { color: #0d6c7d; text-decoration: underline; }
+    a { color: #13644e; text-decoration: underline; }
     table { max-width: 100%; border-collapse: collapse; }
     blockquote {
       border-left: 3px solid #e5e7eb;

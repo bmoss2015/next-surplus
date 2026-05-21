@@ -128,7 +128,7 @@ export function SearchBox() {
           }
         }}
         placeholder="Search by lead ID, address, or owner name..."
-        className="w-full rounded-md border border-[#e2e8f0] bg-white py-[6px] pl-8 pr-8 text-xs text-ink outline-none transition-colors placeholder:not-italic placeholder:text-[#94a3b8] focus:border-[#0d6c7d]"
+        className="w-full rounded-md border border-[#e2e8f0] bg-white py-[6px] pl-8 pr-8 text-xs text-ink outline-none transition-colors placeholder:not-italic placeholder:text-[#94a3b8] focus:border-[#13644e]"
       />
       {value && (
         <button
@@ -160,7 +160,7 @@ export function SearchBox() {
                   key={h.id}
                   type="button"
                   onClick={() => go(h.id)}
-                  className="block w-full cursor-pointer truncate px-3 py-2 text-left text-[12px] text-ink hover:bg-[#e0f2f7]"
+                  className="block w-full cursor-pointer truncate px-3 py-2 text-left text-[12px] text-ink hover:bg-[#f3f4f6]"
                 >
                   <span className="font-mono text-[11px] text-gray-500">{h.lead_id}</span>
                   {" · "}
