@@ -740,11 +740,20 @@ function PdfPreview({ blob }: { blob: Blob }) {
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
-        // Worker via CDN so we don't have to ship a copy. Version matches
-        // the installed pdfjs-dist build automatically.
+        // Bundle the worker as a static asset via Next/Turbopack instead
+        // of pulling from a third-party CDN. cdnjs doesn't mirror every
+        // pdfjs-dist patch version (5.7.284 returned 404 against the
+        // bundled version), and a CDN dependency for something this
+        // core is fragile. `new URL(..., import.meta.url)` is pdf.js's
+        // documented bundler pattern — the worker file gets emitted to
+        // /_next/static and served from the same origin as the app.
+        const workerUrl = new URL(
+          "pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url
+        ).toString();
         (
           pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: string } }
-        ).GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+        ).GlobalWorkerOptions.workerSrc = workerUrl;
         const data = new Uint8Array(await blob.arrayBuffer());
         const doc = await (
           pdfjs as unknown as {
