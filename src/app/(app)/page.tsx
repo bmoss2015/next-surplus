@@ -21,16 +21,17 @@ export default async function DashboardPage() {
 
   return (
     <div className="px-7 py-6">
-      {/* Hero — anchors Dashboard in the brand vocabulary. Subtle emerald
-          gradient (lighter than the sidebar chrome so it reads as content,
-          not chrome). Date + title + a one-line glance summary. Specific
+      {/* Hero — anchors Dashboard in the brand vocabulary. Same gradient
+          the Members section uses (brand → brand-deep, 135°), so the
+          Dashboard reads as cousin to the Settings hero rather than its
+          own dialect. Date + title + a one-line glance summary. Specific
           numbers live in the metric row below; the hero is greeting, not
           dashboard-in-miniature. */}
       <div
-        className="mb-[22px] overflow-hidden rounded-xl border border-petrol-300/30 px-7 py-7 text-white shadow-card"
+        className="mb-[22px] overflow-hidden rounded-xl px-7 py-7 text-white shadow-card"
         style={{
           background:
-            "linear-gradient(135deg, #0d4b3a 0%, #2d7a5e 55%, #4a9c75 100%)",
+            "linear-gradient(135deg, #0d4b3a 0%, #04261c 100%)",
         }}
       >
         <div className="text-[11px] font-medium uppercase tracking-[0.5px] text-white/75">
