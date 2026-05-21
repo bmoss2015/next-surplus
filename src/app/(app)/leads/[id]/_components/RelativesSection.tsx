@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { IconPlus, IconTrash, IconUsersGroup, IconPencil, IconPhone } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconUsersGroup, IconPencil, IconPhone, IconMail } from "@tabler/icons-react";
 import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
