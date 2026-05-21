@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconPencil, IconTrash } from "@tabler/icons-react";
 import {
@@ -51,9 +51,11 @@ function isComplete(d: AddrDraft): boolean {
 
 /**
  * Inline "Mailing Addresses" section for OwnerCard / RelativeCard / LeadParty
- * row. Simple model: rows are derived from the addresses prop (no optimistic
- * state). Save → await action → if ok router.refresh and the prop drives the
- * re-render; if not ok show the error inline with the draft preserved.
+ * row. Local `rows` state is authoritative — we seed it from the addresses
+ * prop on first mount and then mutate it on each successful action. We don't
+ * sync from the prop afterwards because router.refresh has proven unreliable
+ * about propagating fresh data through Next.js's segment cache before the
+ * next interaction.
  */
 export function MailingAddressSubsection({
   leadId,
@@ -69,6 +71,7 @@ export function MailingAddressSubsection({
   canRemove: boolean;
 }) {
   const router = useRouter();
+  const [rows, setRows] = useState<ContactRow[]>(addresses);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<AddrDraft>(EMPTY_ADDR);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -76,11 +79,31 @@ export function MailingAddressSubsection({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Clear stale error when the address list updates (e.g. after a successful
-  // save that re-rendered the parent).
-  useEffect(() => {
-    setError(null);
-  }, [addresses]);
+  function buildContactRow(id: string, value: string): ContactRow {
+    return {
+      id,
+      owner_id: target.kind === "owner" ? target.ownerId : null,
+      relative_id: target.kind === "relative" ? target.relativeId : null,
+      lead_party_id:
+        target.kind === "leadParty" ? target.leadPartyId : null,
+      lead_id: leadId,
+      channel: "mailing_address",
+      value,
+      status: "untested",
+      connection_status: null,
+      source: null,
+      last_attempted: null,
+      is_primary: rows.length === 0,
+      phone_type: null,
+      is_dnc: false,
+      is_litigator: false,
+      mailed: false,
+      mailed_at: null,
+      recipient_label: recipientLabel,
+      validation_checked_at: null,
+      validation_provider: null,
+    };
+  }
 
   function add() {
     if (!isComplete(draft)) return;
@@ -98,8 +121,11 @@ export function MailingAddressSubsection({
           setError(result.error || "Could not save address.");
           return;
         }
+        setRows((prev) => [...prev, buildContactRow(result.id, value)]);
         setDraft(EMPTY_ADDR);
         setAdding(false);
+        // Refresh in the background so the Overview panel + Send Mail picker
+        // pick up the new row. Local state already shows it.
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not save address.");
@@ -134,6 +160,9 @@ export function MailingAddressSubsection({
           setError(res.error || "Could not save address.");
           return;
         }
+        setRows((prev) =>
+          prev.map((r) => (r.id === row.id ? { ...r, value } : r))
+        );
         cancelEdit();
         router.refresh();
       } catch (e) {
@@ -151,6 +180,7 @@ export function MailingAddressSubsection({
           setError(res.error || "Could not remove address.");
           return;
         }
+        setRows((prev) => prev.filter((r) => r.id !== row.id));
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not remove address.");
@@ -162,10 +192,10 @@ export function MailingAddressSubsection({
     "w-full min-w-0 rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
 
   return (
-    <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
+    <div className="flex flex-col gap-1.5">
       <SectionSubheader className="mb-0">Mailing Addresses</SectionSubheader>
 
-      {addresses.map((row) => {
+      {rows.map((row) => {
         const isEditing = editingId === row.id;
         if (isEditing) {
           return (

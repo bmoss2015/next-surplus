@@ -520,13 +520,15 @@ function RelativeCard({
         )}
       </div>
 
-      <MailingAddressSubsection
-        leadId={leadId}
-        target={{ kind: "relative", relativeId: relative.id }}
-        recipientLabel={`${(relative.full_name ?? "Unknown").trim()} (${(relative.relationship ?? "Relative").trim() || "Relative"})`}
-        addresses={addresses}
-        canRemove={canRemove}
-      />
+      <div className="border-t border-gray-150 pt-2">
+        <MailingAddressSubsection
+          leadId={leadId}
+          target={{ kind: "relative", relativeId: relative.id }}
+          recipientLabel={`${(relative.full_name ?? "Unknown").trim()} (${(relative.relationship ?? "Relative").trim() || "Relative"})`}
+          addresses={addresses}
+          canRemove={canRemove}
+        />
+      </div>
 
       {relative.notes && (
         <div className="border-t border-gray-150 pt-2">

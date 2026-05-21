@@ -526,7 +526,7 @@ export async function addMailingAddress(
   // related row's name. Stored so legacy readers without the join still get
   // a sensible label.
   recipientLabel?: string | null
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const trimmed = address.trim();
   if (trimmed.length === 0) {
     return { ok: false, error: "Address can't be empty" };
@@ -545,10 +545,16 @@ export async function addMailingAddress(
     mailed_at: null,
     recipient_label: recipientLabel?.trim() || null,
   };
-  const { error } = await sb.from("contacts").insert(row);
-  if (error) return { ok: false, error: error.message };
+  const { data, error } = await sb
+    .from("contacts")
+    .insert(row)
+    .select("id")
+    .single();
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "insert failed" };
+  }
   revalidatePath(`/leads/${leadId}`);
-  return { ok: true };
+  return { ok: true, id: data.id as string };
 }
 
 export async function setMailingAddressMailed(

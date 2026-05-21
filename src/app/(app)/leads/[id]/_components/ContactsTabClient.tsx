@@ -949,13 +949,15 @@ function OwnerCard({
         )}
       </div>
 
-      <MailingAddressSubsection
-        leadId={leadId}
-        target={{ kind: "owner", ownerId: owner.id }}
-        recipientLabel={`${owner.full_name} (Owner)`}
-        addresses={mailingAddresses}
-        canRemove={isAdmin}
-      />
+      <div className="border-t border-gray-150 pt-2">
+        <MailingAddressSubsection
+          leadId={leadId}
+          target={{ kind: "owner", ownerId: owner.id }}
+          recipientLabel={`${owner.full_name} (Owner)`}
+          addresses={mailingAddresses}
+          canRemove={isAdmin}
+        />
+      </div>
 
       <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
         <SectionSubheader className="mb-0">Notes</SectionSubheader>
