@@ -23,9 +23,11 @@ type Tab = "email" | "sms" | "research";
 export function TemplatesSection({
   templates,
   research,
+  canEdit,
 }: {
   templates: TemplateRow[];
   research: ResearchTemplateRow[];
+  canEdit: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("email");
   const [editor, setEditor] = useState<TemplateEditorState>({ kind: "closed" });
@@ -71,13 +73,15 @@ export function TemplatesSection({
             merge fields.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          onClick={() => setEditor({ kind: "new", channel: tab })}
-        >
-          <i className="icon icon-plus" /> {addLabel}
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => setEditor({ kind: "new", channel: tab })}
+          >
+            <i className="icon icon-plus" /> {addLabel}
+          </button>
+        )}
       </div>
 
       <div className="tpl-tabs">
@@ -107,19 +111,19 @@ export function TemplatesSection({
       {tab === "email" && (
         <EmailList
           rows={email}
-          onEdit={(row) => setEditor({ kind: "edit-template", row })}
+          onEdit={canEdit ? (row) => setEditor({ kind: "edit-template", row }) : null}
         />
       )}
       {tab === "sms" && (
         <SmsList
           rows={sms}
-          onEdit={(row) => setEditor({ kind: "edit-template", row })}
+          onEdit={canEdit ? (row) => setEditor({ kind: "edit-template", row }) : null}
         />
       )}
       {tab === "research" && (
         <ResearchList
           rows={research}
-          onEdit={(row) => setEditor({ kind: "edit-research", row })}
+          onEdit={canEdit ? (row) => setEditor({ kind: "edit-research", row }) : null}
         />
       )}
 
@@ -139,7 +143,8 @@ function EmptyRow({ msg }: { msg: string }) {
   );
 }
 
-function RowActions({ onEdit }: { onEdit: () => void }) {
+function RowActions({ onEdit }: { onEdit: (() => void) | null }) {
+  if (!onEdit) return null;
   return (
     <div className="overflow flex items-center gap-0.5 ml-2">
       <button
@@ -171,7 +176,7 @@ function EmailList({
   onEdit,
 }: {
   rows: TemplateRow[];
-  onEdit: (row: TemplateRow) => void;
+  onEdit: ((row: TemplateRow) => void) | null;
 }) {
   return (
     <div className="tpl-pane active">
@@ -196,7 +201,7 @@ function EmailList({
                   )}
                 </div>
               </div>
-              <RowActions onEdit={() => onEdit(t)} />
+              <RowActions onEdit={onEdit ? () => onEdit(t) : null} />
             </div>
           ))
         )}
@@ -210,7 +215,7 @@ function SmsList({
   onEdit,
 }: {
   rows: TemplateRow[];
-  onEdit: (row: TemplateRow) => void;
+  onEdit: ((row: TemplateRow) => void) | null;
 }) {
   return (
     <div className="tpl-pane active">
@@ -235,7 +240,7 @@ function SmsList({
                   )}
                 </div>
               </div>
-              <RowActions onEdit={() => onEdit(t)} />
+              <RowActions onEdit={onEdit ? () => onEdit(t) : null} />
             </div>
           ))
         )}
@@ -249,7 +254,7 @@ function ResearchList({
   onEdit,
 }: {
   rows: ResearchTemplateRow[];
-  onEdit: (row: ResearchTemplateRow) => void;
+  onEdit: ((row: ResearchTemplateRow) => void) | null;
 }) {
   return (
     <div className="tpl-pane active">
@@ -278,7 +283,7 @@ function ResearchList({
                   · {r.steps.length} step{r.steps.length === 1 ? "" : "s"}
                 </div>
               </div>
-              <RowActions onEdit={() => onEdit(r)} />
+              <RowActions onEdit={onEdit ? () => onEdit(r) : null} />
             </div>
           ))
         )}

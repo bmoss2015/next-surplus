@@ -95,11 +95,27 @@ export function SettingsPreviewJsx({
 
   const railActive = RAIL_KEYS.has(active) ? active : "";
 
+  // Live counts pulled from the fetched data so the rail's trailing-count
+  // chips reflect real records instead of mockup placeholders.
+  const counts: Record<string, number> = {
+    "email-accounts": data.emailAccounts.length,
+    team: data.members.length,
+    attorneys: data.attorneys.length,
+    "mail-bank": data.mailBank.length,
+    templates:
+      data.templates.length + data.research.length,
+  };
+
   return (
     <>
       <Topbar currentUser={currentUser} />
       <div className="flex" style={{ minHeight: "calc(100vh - 56px)" }}>
-        <SubRail active={railActive} onSelect={pick} />
+        <SubRail
+          active={railActive}
+          onSelect={pick}
+          isAdmin={currentUser.isAdmin}
+          counts={counts}
+        />
         <main className="flex-1 overflow-y-auto scroll-area">
           <div className="content">{renderPanel(active, currentUser, data)}</div>
         </main>
@@ -163,7 +179,12 @@ function renderPanel(
         <AdminGate />
       );
     case "attorneys":
-      return <AttorneysSection initial={data.attorneys} />;
+      return (
+        <AttorneysSection
+          initial={data.attorneys}
+          canEdit={currentUser.isAdmin}
+        />
+      );
     case "contact-roles":
       return <ContactRolesSection initial={data.customContactRoles} />;
     case "mail-settings":
@@ -179,6 +200,7 @@ function renderPanel(
         <TemplatesSection
           templates={data.templates}
           research={data.research}
+          canEdit={currentUser.isAdmin}
         />
       );
     default:

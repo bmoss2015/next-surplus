@@ -29,7 +29,13 @@ const ALL_STATES = 50;
 // when the drawer is closed.
 type DrawerState = { kind: "closed" } | { kind: "new" } | { kind: "edit"; row: AttorneyRow };
 
-export function AttorneysSection({ initial }: { initial: AttorneyRow[] }) {
+export function AttorneysSection({
+  initial,
+  canEdit,
+}: {
+  initial: AttorneyRow[];
+  canEdit: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [drawer, setDrawer] = useState<DrawerState>({ kind: "closed" });
 
@@ -83,13 +89,15 @@ export function AttorneysSection({ initial }: { initial: AttorneyRow[] }) {
             feeds into Est. Net To You.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setDrawer({ kind: "new" })}
-        >
-          <i className="icon icon-plus" /> Add Attorney
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setDrawer({ kind: "new" })}
+          >
+            <i className="icon icon-plus" /> Add Attorney
+          </button>
+        )}
       </div>
 
       <div className="stats-strip">
@@ -181,28 +189,30 @@ export function AttorneysSection({ initial }: { initial: AttorneyRow[] }) {
                   </>
                 )}
               </div>
-              <div className="overflow flex items-center gap-0.5 ml-2">
-                <button
-                  type="button"
-                  className="icon-btn"
-                  title="Edit"
-                  onClick={() => setDrawer({ kind: "edit", row: a })}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+              {canEdit && (
+                <div className="overflow flex items-center gap-0.5 ml-2">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="Edit"
+                    onClick={() => setDrawer({ kind: "edit", row: a })}
                   >
-                    <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
-                    <path d="m15 5 4 4" />
-                  </svg>
-                </button>
-              </div>
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+                      <path d="m15 5 4 4" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
