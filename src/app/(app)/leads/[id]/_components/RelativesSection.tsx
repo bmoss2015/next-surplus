@@ -429,6 +429,19 @@ function RelativeCard({
   const [city, setCity] = useState(relative.city ?? "");
   const [stateCode, setStateCode] = useState(relative.state ?? "");
   const [zip, setZip] = useState(relative.zip ?? "");
+  // Address section follows the same +Add pattern as the OwnerCard's
+  // Mailing Address (consistency Bree called out). Hidden behind the
+  // button when empty; revealed inline once the user clicks Add OR if
+  // the relative already has any address data on load (so existing
+  // rows stay visible without a click).
+  const [addingAddress, setAddingAddress] = useState(
+    Boolean(
+      (relative.street ?? "").trim() ||
+        (relative.city ?? "").trim() ||
+        (relative.state ?? "").trim() ||
+        (relative.zip ?? "").trim()
+    )
+  );
   // Fix III: a discrete "+ Add Phone" / "+ Add Email" link reveals the next
   // empty slot (capped at 5 each); hidden once all five are showing.
   const [extraPhones, setExtraPhones] = useState(0);
@@ -519,39 +532,92 @@ function RelativeCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
+      <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
         <SectionSubheader className="mb-0">Address</SectionSubheader>
-        <input
-          value={street}
-          onChange={(e) => setStreet(e.target.value)}
-          onBlur={() => onPatch({ street: street.trim() || null })}
-          placeholder="Street"
-          className={addrInputClass}
-        />
-        <input
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          onBlur={() => onPatch({ city: city.trim() || null })}
-          placeholder="City"
-          className={addrInputClass}
-        />
-        <div className="flex gap-1">
-          <input
-            value={stateCode}
-            onChange={(e) => setStateCode(e.target.value.toUpperCase().slice(0, 2))}
-            onBlur={() => onPatch({ state: stateCode.trim() || null })}
-            placeholder="ST"
-            maxLength={2}
-            className={cn(addrInputClass, "w-12 shrink-0 uppercase")}
-          />
-          <input
-            value={zip}
-            onChange={(e) => setZip(e.target.value)}
-            onBlur={() => onPatch({ zip: zip.trim() || null })}
-            placeholder="Zip"
-            className={cn(addrInputClass, "min-w-0 flex-1")}
-          />
-        </div>
+        {!addingAddress && (
+          <button
+            type="button"
+            onClick={() => setAddingAddress(true)}
+            className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
+          >
+            + Add Address
+          </button>
+        )}
+        {addingAddress && (
+          <div className="flex flex-col gap-1.5 rounded-md border border-petrol-200 bg-petrol-50/40 p-2">
+            <input
+              value={street}
+              onChange={(e) => setStreet(e.target.value)}
+              placeholder="Street"
+              className={addrInputClass}
+            />
+            <div className="grid grid-cols-[1fr_56px_88px] gap-1.5">
+              <input
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="City"
+                className={addrInputClass}
+              />
+              <input
+                value={stateCode}
+                onChange={(e) =>
+                  setStateCode(e.target.value.toUpperCase().slice(0, 2))
+                }
+                placeholder="ST"
+                maxLength={2}
+                className={cn(addrInputClass, "uppercase")}
+              />
+              <input
+                value={zip}
+                onChange={(e) => setZip(e.target.value)}
+                placeholder="ZIP"
+                className={addrInputClass}
+              />
+            </div>
+            <div className="flex items-center justify-end gap-1.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  // Cancel: reset to last-saved values from the row and
+                  // collapse back to the +Add affordance if nothing is
+                  // saved yet, or keep open if there's a stored value
+                  // (so the user can still see what was there).
+                  setStreet(relative.street ?? "");
+                  setCity(relative.city ?? "");
+                  setStateCode(relative.state ?? "");
+                  setZip(relative.zip ?? "");
+                  const hasStored = Boolean(
+                    (relative.street ?? "").trim() ||
+                      (relative.city ?? "").trim() ||
+                      (relative.state ?? "").trim() ||
+                      (relative.zip ?? "").trim()
+                  );
+                  if (!hasStored) setAddingAddress(false);
+                }}
+                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-[4px] text-[11px] font-medium text-ink hover:border-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // One save call patches all four address fields at
+                  // once so the address row writes atomically.
+                  onPatch({
+                    street: street.trim() || null,
+                    city: city.trim() || null,
+                    state: stateCode.trim() || null,
+                    zip: zip.trim() || null,
+                  });
+                }}
+                disabled={!street.trim()}
+                className="cursor-pointer rounded-md bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-3 py-[4px] text-[11px] font-medium text-white disabled:opacity-40"
+              >
+                Save Address
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {relative.notes && (

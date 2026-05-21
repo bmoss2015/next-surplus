@@ -236,11 +236,16 @@ export function NameEditField({
       type="button"
       onClick={startEdit}
       title="Click To Edit Name"
-      className="cursor-text rounded px-0.5 text-[13px] font-medium text-ink hover:bg-petrol-50"
+      className="group inline-flex cursor-pointer items-center gap-1 rounded px-1 py-[1px] text-[13px] font-medium text-ink hover:bg-petrol-50 hover:ring-1 hover:ring-petrol-200"
     >
       {value || (
         <span className="italic text-gray-400">Add Name</span>
       )}
+      <IconPencil
+        size={11}
+        stroke={1.75}
+        className="text-gray-300 group-hover:text-petrol-500"
+      />
     </button>
   );
 }
@@ -1042,22 +1047,22 @@ function OwnerCard({
           </div>
         ))}
         {addingAddress ? (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5 rounded-md border border-petrol-200 bg-petrol-50/40 p-2">
             <input
               type="text"
               autoFocus
               value={addrStreet}
               onChange={(e) => setAddrStreet(e.target.value)}
               placeholder="Street address"
-              className="rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+              className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
             />
-            <div className="grid grid-cols-[1fr_60px_80px] gap-1">
+            <div className="grid grid-cols-[1fr_56px_88px] gap-1.5">
               <input
                 type="text"
                 value={addrCity}
                 onChange={(e) => setAddrCity(e.target.value)}
                 placeholder="City"
-                className="rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
               />
               <input
                 type="text"
@@ -1065,7 +1070,7 @@ function OwnerCard({
                 onChange={(e) => setAddrState(e.target.value.toUpperCase().slice(0, 2))}
                 placeholder="ST"
                 maxLength={2}
-                className="rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] uppercase text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] uppercase text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
               />
               <input
                 type="text"
@@ -1085,10 +1090,10 @@ function OwnerCard({
                     setAddrZip("");
                   }
                 }}
-                className="rounded-md border border-gray-200 bg-surface px-2 py-[3px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+                className="rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
               />
             </div>
-            <div className="flex justify-end gap-1">
+            <div className="flex items-center justify-end gap-1.5 pt-0.5">
               <button
                 type="button"
                 onClick={() => {
@@ -1098,7 +1103,7 @@ function OwnerCard({
                   setAddrState("");
                   setAddrZip("");
                 }}
-                className="cursor-pointer rounded-md px-1.5 py-[2px] text-[11px] text-gray-500 hover:text-gray-700"
+                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-[4px] text-[11px] font-medium text-ink hover:border-gray-300"
               >
                 Cancel
               </button>
@@ -1106,10 +1111,9 @@ function OwnerCard({
                 type="button"
                 onClick={submitAddress}
                 disabled={!addrStreet.trim()}
-                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-1.5 py-[3px] text-gray-500 hover:border-petrol-500 hover:text-petrol-500 disabled:opacity-50"
-                aria-label="Save Mailing Address"
+                className="cursor-pointer rounded-md bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-3 py-[4px] text-[11px] font-medium text-white disabled:opacity-40"
               >
-                <IconPlus size={11} stroke={2} />
+                Save Address
               </button>
             </div>
           </div>
