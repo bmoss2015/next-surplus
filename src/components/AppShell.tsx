@@ -1,7 +1,10 @@
-import { Sidebar } from "./Sidebar";
-import { Topbar } from "./Topbar";
+import { TopNav } from "./TopNav";
 import { RoleProvider } from "./RoleProvider";
 
+// Step 2 — replaced the left Sidebar + thin Topbar with a single horizontal
+// TopNav. The whole portal now flows top-to-bottom: nav at the top, page
+// content fills the rest. Sidebar.tsx + Topbar.tsx are retired (kept
+// around in git history; not imported anywhere).
 export function AppShell({
   children,
   userName,
@@ -15,12 +18,11 @@ export function AppShell({
 }) {
   return (
     <RoleProvider isAdmin={isAdmin}>
-      <div className="flex h-screen w-screen overflow-hidden bg-canvas">
-        <Sidebar userName={userName} userEmail={userEmail} isAdmin={isAdmin} />
-        <div className="flex flex-1 flex-col overflow-hidden bg-surface-muted">
-          <Topbar />
-          <main className="flex-1 overflow-auto">{children}</main>
-        </div>
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-canvas">
+        <TopNav userName={userName} userEmail={userEmail} isAdmin={isAdmin} />
+        <main className="flex-1 overflow-auto bg-surface-muted">
+          {children}
+        </main>
       </div>
     </RoleProvider>
   );
