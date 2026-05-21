@@ -12,7 +12,12 @@ export type VerificationItem = {
 
 export type ContactRow = {
   id: string;
-  owner_id: string;
+  // Exactly one of owner_id / relative_id / lead_party_id is non-null
+  // (migration 0119). Phone + email rows always belong to an owner; mailing
+  // address rows can belong to any of the three.
+  owner_id: string | null;
+  relative_id: string | null;
+  lead_party_id: string | null;
   lead_id: string;
   channel: "phone" | "email" | "mailing_address";
   value: string;
@@ -194,7 +199,7 @@ export async function fetchOwnersWithContacts(leadId: string): Promise<{
     sb
       .from("contacts")
       .select(
-        "id, owner_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, recipient_label, validation_checked_at, validation_provider"
+        "id, owner_id, relative_id, lead_party_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, recipient_label, validation_checked_at, validation_provider"
       )
       .eq("lead_id", leadId)
       .order("channel", { ascending: true })
@@ -257,10 +262,6 @@ export type RelativeRow = {
   email_4: string | null;
   email_5: string | null;
   notes: string | null;
-  street: string | null;
-  city: string | null;
-  state: string | null;
-  zip: string | null;
 };
 
 const RELATIVE_COLUMNS =
@@ -271,7 +272,7 @@ const RELATIVE_COLUMNS =
   "phone_4, phone_4_type, phone_4_is_dnc, phone_4_is_litigator, phone_4_status, phone_4_validation_checked_at, phone_4_validation_provider, " +
   "phone_5, phone_5_type, phone_5_is_dnc, phone_5_is_litigator, phone_5_status, phone_5_validation_checked_at, phone_5_validation_provider, " +
   "email, email_2, email_3, email_4, email_5, " +
-  "notes, street, city, state, zip";
+  "notes";
 
 export async function fetchRelatives(leadId: string): Promise<RelativeRow[]> {
   const sb = await createClient();

@@ -3,7 +3,8 @@
 import { useEffect, useState, useTransition } from "react";
 import { IconPlus, IconTrash, IconUsersGroup, IconPencil, IconPhone } from "@tabler/icons-react";
 import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
-import type { RelativeRow } from "@/lib/leads/fetch-detail";
+import type { ContactRow, RelativeRow } from "@/lib/leads/fetch-detail";
+import { MailingAddressSubsection } from "./MailingAddressSubsection";
 import { useRole } from "@/components/RoleProvider";
 import { Modal } from "@/components/Modal";
 import { AgeEditField, NameEditField } from "./ContactsTabClient";
@@ -107,19 +108,17 @@ function makeRelativeRow(
     email_4: null,
     email_5: null,
     notes: null,
-    street: null,
-    city: null,
-    state: null,
-    zip: null,
   };
 }
 
 export function RelativesSection({
   leadId,
   initial,
+  contacts,
 }: {
   leadId: string;
   initial: RelativeRow[];
+  contacts: ContactRow[];
 }) {
   const { isAdmin } = useRole();
   const [relatives, setRelatives] = useState<RelativeRow[]>(initial);
@@ -269,6 +268,11 @@ export function RelativesSection({
             <RelativeCard
               key={r.id}
               relative={r}
+              leadId={leadId}
+              addresses={contacts.filter(
+                (c) =>
+                  c.relative_id === r.id && c.channel === "mailing_address"
+              )}
               canRemove={isAdmin}
               onPatch={(fields) => patch(r.id, fields)}
               onRemove={() => remove(r.id)}
@@ -414,28 +418,25 @@ export function RelativesSection({
 
 function RelativeCard({
   relative,
+  leadId,
+  addresses,
   canRemove,
   onPatch,
   onRemove,
   verifyingSlots,
 }: {
   relative: RelativeRow;
+  leadId: string;
+  addresses: ContactRow[];
   canRemove: boolean;
   onPatch: (fields: RelativePatch) => void;
   onRemove: () => void;
   verifyingSlots: Set<string>;
 }) {
-  const [street, setStreet] = useState(relative.street ?? "");
-  const [city, setCity] = useState(relative.city ?? "");
-  const [stateCode, setStateCode] = useState(relative.state ?? "");
-  const [zip, setZip] = useState(relative.zip ?? "");
   // Fix III: a discrete "+ Add Phone" / "+ Add Email" link reveals the next
   // empty slot (capped at 5 each); hidden once all five are showing.
   const [extraPhones, setExtraPhones] = useState(0);
   const [extraEmails, setExtraEmails] = useState(0);
-
-  const addrInputClass =
-    "w-full rounded-md border border-gray-200 bg-surface px-2 py-[4px] text-[11.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
 
   const filledPhones = PHONE_SLOTS.filter(
     (s) => ((relative[s.value] as string | null) ?? "").trim()
@@ -519,39 +520,14 @@ function RelativeCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-1 border-t border-gray-150 pt-2">
-        <SectionSubheader className="mb-0">Address</SectionSubheader>
-        <input
-          value={street}
-          onChange={(e) => setStreet(e.target.value)}
-          onBlur={() => onPatch({ street: street.trim() || null })}
-          placeholder="Street"
-          className={addrInputClass}
+      <div className="border-t border-gray-150 pt-2">
+        <MailingAddressSubsection
+          leadId={leadId}
+          target={{ kind: "relative", relativeId: relative.id }}
+          recipientLabel={`${(relative.full_name ?? "Unknown").trim()} (${(relative.relationship ?? "Relative").trim() || "Relative"})`}
+          addresses={addresses}
+          canRemove={canRemove}
         />
-        <input
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          onBlur={() => onPatch({ city: city.trim() || null })}
-          placeholder="City"
-          className={addrInputClass}
-        />
-        <div className="flex gap-1">
-          <input
-            value={stateCode}
-            onChange={(e) => setStateCode(e.target.value.toUpperCase().slice(0, 2))}
-            onBlur={() => onPatch({ state: stateCode.trim() || null })}
-            placeholder="ST"
-            maxLength={2}
-            className={cn(addrInputClass, "w-12 shrink-0 uppercase")}
-          />
-          <input
-            value={zip}
-            onChange={(e) => setZip(e.target.value)}
-            onBlur={() => onPatch({ zip: zip.trim() || null })}
-            placeholder="Zip"
-            className={cn(addrInputClass, "min-w-0 flex-1")}
-          />
-        </div>
       </div>
 
       {relative.notes && (

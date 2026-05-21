@@ -508,23 +508,35 @@ export async function deleteVerificationItem(
 
 // -- Mailing addresses (channel = mailing_address contacts) ------------------
 
+// Mailing addresses can belong to an owner, a relative, or a lead_party
+// (migration 0119). The contacts table has a CHECK enforcing exactly one of
+// owner_id / relative_id / lead_party_id is non-null, so the caller must
+// specify which target the address belongs to via `target.kind`.
+export type MailingAddressTarget =
+  | { kind: "owner"; ownerId: string }
+  | { kind: "relative"; relativeId: string }
+  | { kind: "leadParty"; leadPartyId: string };
+
 export async function addMailingAddress(
   leadId: string,
-  ownerId: string,
+  target: MailingAddressTarget,
   address: string,
-  // Fix AAA Patch: full recipient label ("Jane Doe (Relative)" / "John Doe
-  // (Owner)") — stored in contacts.notes so a relative can be the recipient
-  // while owner_id still satisfies the FK.
+  // Full recipient label ("Jane Doe (Sister)" / "John Doe (Owner)" /
+  // "ACME Title (Title Company)"). Display-only; derivable from the FK + the
+  // related row's name. Stored so legacy readers without the join still get
+  // a sensible label.
   recipientLabel?: string | null
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const trimmed = address.trim();
   if (trimmed.length === 0) {
     return { ok: false, error: "Address can't be empty" };
   }
   const sb = await createClient();
-  const { error } = await sb.from("contacts").insert({
+  const row: Record<string, unknown> = {
     lead_id: leadId,
-    owner_id: ownerId,
+    owner_id: target.kind === "owner" ? target.ownerId : null,
+    relative_id: target.kind === "relative" ? target.relativeId : null,
+    lead_party_id: target.kind === "leadParty" ? target.leadPartyId : null,
     channel: "mailing_address",
     value: trimmed,
     status: "untested",
@@ -532,10 +544,17 @@ export async function addMailingAddress(
     mailed: false,
     mailed_at: null,
     recipient_label: recipientLabel?.trim() || null,
-  });
-  if (error) return { ok: false, error: error.message };
+  };
+  const { data, error } = await sb
+    .from("contacts")
+    .insert(row)
+    .select("id")
+    .single();
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "insert failed" };
+  }
   revalidatePath(`/leads/${leadId}`);
-  return { ok: true };
+  return { ok: true, id: data.id as string };
 }
 
 export async function setMailingAddressMailed(
@@ -589,7 +608,7 @@ export async function deleteContact(
 // Columns the client needs back to render the freshly-validated contact row
 // without re-fetching the whole page.
 const CONTACT_SELECT_COLUMNS =
-  "id, owner_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, recipient_label, validation_checked_at, validation_provider";
+  "id, owner_id, relative_id, lead_party_id, lead_id, channel, value, status, connection_status, source, last_attempted, is_primary, phone_type, is_dnc, is_litigator, mailed, mailed_at, recipient_label, validation_checked_at, validation_provider";
 
 export async function upsertContact(
   leadId: string,
@@ -782,10 +801,6 @@ export type RelativePatch = {
   email_4?: string | null;
   email_5?: string | null;
   notes?: string | null;
-  street?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zip?: string | null;
 };
 
 const RELATIVE_SELECT_COLUMNS =
@@ -796,7 +811,7 @@ const RELATIVE_SELECT_COLUMNS =
   "phone_4, phone_4_type, phone_4_is_dnc, phone_4_is_litigator, phone_4_status, phone_4_validation_checked_at, phone_4_validation_provider, " +
   "phone_5, phone_5_type, phone_5_is_dnc, phone_5_is_litigator, phone_5_status, phone_5_validation_checked_at, phone_5_validation_provider, " +
   "email, email_2, email_3, email_4, email_5, " +
-  "notes, street, city, state, zip";
+  "notes";
 
 export async function upsertRelative(
   leadId: string,

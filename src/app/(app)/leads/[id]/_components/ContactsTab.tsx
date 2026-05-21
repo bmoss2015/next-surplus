@@ -92,11 +92,16 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
           initialContacts={contacts}
         />
       </div>
-      <RelativesSection leadId={leadId} initial={relatives} />
+      <RelativesSection
+        leadId={leadId}
+        initial={relatives}
+        contacts={contacts}
+      />
       <OtherContactsSection
         leadId={leadId}
         initial={leadParties}
         customRoles={customRoles}
+        contacts={contacts}
       />
       <div className="mt-4 flex flex-col gap-3">
         <div className="flex items-center justify-end">
@@ -107,6 +112,7 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
           initialAddresses={contacts}
           owners={owners}
           relatives={relatives}
+          leadParties={leadParties}
         />
       </div>
     </>

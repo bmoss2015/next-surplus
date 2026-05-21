@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconPlus, IconTrash, IconCheck, IconPencil } from "@tabler/icons-react";
 import {
@@ -8,12 +8,17 @@ import {
   setMailingAddressMailed,
   deleteContact,
   upsertContact,
+  type MailingAddressTarget,
 } from "../../_actions";
 import type {
   ContactRow,
   OwnerRowFull,
   RelativeRow,
 } from "@/lib/leads/fetch-detail";
+import {
+  LEAD_PARTY_ROLE_LABELS,
+  type LeadPartyRow,
+} from "@/lib/leads/lead-parties-types";
 import { useRole } from "@/components/RoleProvider";
 import { cn } from "@/lib/cn";
 
@@ -36,10 +41,6 @@ function joinAddress(d: AddrDraft): string {
   return [d.line1.trim(), tail].filter(Boolean).join(", ");
 }
 
-// Split a stored "line1, city, ST zip" string back into its components so the
-// edit form can prefill correctly. Mirrors the parser in src/lib/mail/address.ts
-// but is lenient — falls back to putting everything in line1 when the format
-// is unexpected, so a user can still fix a malformed legacy entry.
 function splitAddress(value: string): AddrDraft {
   const parts = value.split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.length < 3) return { line1: value, city: "", state: "", zip: "" };
@@ -54,30 +55,46 @@ function splitAddress(value: string): AddrDraft {
   };
 }
 
-// Fix AAA Patch: a mailing address can be addressed to any owner OR any
-// relative. We keep contacts.owner_id (FK) pointing at an owner, and store the
-// full recipient label (e.g. "Jane Doe (Relative)") in contacts.recipient_label.
-type Recipient = { key: string; label: string; ownerId: string };
+function leadPartyRoleLabel(row: LeadPartyRow): string {
+  if (row.role === "other" && row.custom_role_label?.trim()) {
+    return row.custom_role_label.trim();
+  }
+  return LEAD_PARTY_ROLE_LABELS[row.role];
+}
+
+type Recipient =
+  | { key: string; label: string; target: MailingAddressTarget }
+  | never;
 
 function buildRecipients(
   owners: OwnerRowFull[],
-  relatives: RelativeRow[]
+  relatives: RelativeRow[],
+  leadParties: LeadPartyRow[]
 ): Recipient[] {
-  if (owners.length === 0) return [];
-  const fallbackOwnerId =
-    owners.find((o) => o.is_primary)?.id ?? owners[0].id;
-  return [
-    ...owners.map((o) => ({
+  const out: Recipient[] = [];
+  for (const o of owners) {
+    out.push({
       key: `o:${o.id}`,
       label: `${o.full_name} (Owner)`,
-      ownerId: o.id,
-    })),
-    ...relatives.map((r) => ({
+      target: { kind: "owner", ownerId: o.id },
+    });
+  }
+  for (const r of relatives) {
+    const rel = (r.relationship ?? "").trim() || "Relative";
+    out.push({
       key: `r:${r.id}`,
-      label: `${(r.full_name ?? "").trim() || "Unknown"} (Relative)`,
-      ownerId: fallbackOwnerId,
-    })),
-  ];
+      label: `${(r.full_name ?? "").trim() || "Unknown"} (${rel})`,
+      target: { kind: "relative", relativeId: r.id },
+    });
+  }
+  for (const lp of leadParties) {
+    out.push({
+      key: `lp:${lp.id}`,
+      label: `${(lp.name ?? "").trim() || "Recipient"} (${leadPartyRoleLabel(lp)})`,
+      target: { kind: "leadParty", leadPartyId: lp.id },
+    });
+  }
+  return out;
 }
 
 export function MailingAddresses({
@@ -85,26 +102,66 @@ export function MailingAddresses({
   initialAddresses,
   owners,
   relatives = [],
+  leadParties = [],
 }: {
   leadId: string;
   initialAddresses: ContactRow[];
   owners: OwnerRowFull[];
   relatives?: RelativeRow[];
+  leadParties?: LeadPartyRow[];
 }) {
   const router = useRouter();
   const { isAdmin } = useRole();
   const [rows, setRows] = useState<ContactRow[]>(
     initialAddresses.filter((c) => c.channel === "mailing_address")
   );
+  // Re-sync local rows when the server component re-fetches (e.g. after
+  // adding an address elsewhere on the page).
+  useEffect(() => {
+    setRows(initialAddresses.filter((c) => c.channel === "mailing_address"));
+  }, [initialAddresses]);
+
   const [adding, setAdding] = useState(false);
   const [addr, setAddr] = useState<AddrDraft>(EMPTY_ADDR);
-  const recipients = buildRecipients(owners, relatives);
+  const recipients = buildRecipients(owners, relatives, leadParties);
   const [newRecipientKey, setNewRecipientKey] = useState(
     recipients[0]?.key ?? ""
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAddr, setEditAddr] = useState<AddrDraft>(EMPTY_ADDR);
   const [, startTransition] = useTransition();
+
+  // Lookups for deriving the label of each address row from its FK. We
+  // prefer the live name from the source record over the stored
+  // recipient_label so a rename on the owner/relative/lead-party flows
+  // through automatically.
+  const ownerById = new Map(owners.map((o) => [o.id, o]));
+  const relativeById = new Map(relatives.map((r) => [r.id, r]));
+  const leadPartyById = new Map(leadParties.map((lp) => [lp.id, lp]));
+
+  function recipientLabel(row: ContactRow): string {
+    if (row.relative_id) {
+      const r = relativeById.get(row.relative_id);
+      if (r) {
+        const rel = (r.relationship ?? "").trim() || "Relative";
+        return `${(r.full_name ?? "").trim() || "Unknown"} (${rel})`;
+      }
+    }
+    if (row.lead_party_id) {
+      const lp = leadPartyById.get(row.lead_party_id);
+      if (lp) {
+        return `${(lp.name ?? "").trim() || "Recipient"} (${leadPartyRoleLabel(lp)})`;
+      }
+    }
+    if (row.owner_id) {
+      const o = ownerById.get(row.owner_id);
+      if (o) return `${o.full_name} (Owner)`;
+    }
+    // Legacy fallback: recipient_label was the only source of truth before
+    // migration 0119.
+    if (row.recipient_label?.trim()) return row.recipient_label.trim();
+    return "Recipient";
+  }
 
   function add() {
     const value = joinAddress(addr);
@@ -113,7 +170,7 @@ export function MailingAddresses({
     startTransition(async () => {
       const result = await addMailingAddress(
         leadId,
-        recipient.ownerId,
+        recipient.target,
         value,
         recipient.label
       );
@@ -122,7 +179,16 @@ export function MailingAddresses({
           ...prev,
           {
             id: crypto.randomUUID(),
-            owner_id: recipient.ownerId,
+            owner_id:
+              recipient.target.kind === "owner" ? recipient.target.ownerId : null,
+            relative_id:
+              recipient.target.kind === "relative"
+                ? recipient.target.relativeId
+                : null,
+            lead_party_id:
+              recipient.target.kind === "leadParty"
+                ? recipient.target.leadPartyId
+                : null,
             lead_id: leadId,
             channel: "mailing_address",
             value,
@@ -164,7 +230,14 @@ export function MailingAddresses({
     const value = joinAddress(editAddr);
     if (!editAddr.line1.trim()) return;
     startTransition(async () => {
-      const res = await upsertContact(leadId, row.owner_id, row.id, { value });
+      // upsertContact only mutates by id for edits, so the ownerId argument
+      // is ignored. Pass any non-null string to satisfy the signature.
+      const res = await upsertContact(
+        leadId,
+        row.owner_id ?? "",
+        row.id,
+        { value }
+      );
       if (res.ok) {
         setRows((prev) =>
           prev.map((r) => (r.id === row.id ? { ...r, value } : r))
@@ -197,15 +270,6 @@ export function MailingAddresses({
     });
   }
 
-  function ownerName(ownerId: string) {
-    return owners.find((o) => o.id === ownerId)?.full_name ?? "—";
-  }
-
-  function recipientLabel(row: ContactRow) {
-    if (row.recipient_label && row.recipient_label.trim()) return row.recipient_label;
-    return `${ownerName(row.owner_id)} (Owner)`;
-  }
-
   function addressLines(value: string): { street: string; rest: string } {
     const parts = value.split(", ");
     if (parts.length <= 1) return { street: value, rest: "" };
@@ -216,11 +280,13 @@ export function MailingAddresses({
     "w-full rounded-md border border-gray-200 bg-surface px-2.5 py-[6px] text-[12.5px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500";
   const labelClass = "mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500";
 
+  const noRecipients = recipients.length === 0;
+
   const addButton = (
     <button
       type="button"
       onClick={() => setAdding(true)}
-      disabled={owners.length === 0}
+      disabled={noRecipients}
       className="btn-primary inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-[6px] text-[12px] font-medium disabled:opacity-50"
     >
       <IconPlus size={13} stroke={2} />
@@ -234,12 +300,12 @@ export function MailingAddresses({
         <h3 className="section-subheader">
           Mailing Addresses
         </h3>
-        {owners.length > 0 && addButton}
+        {!noRecipients && addButton}
       </div>
 
-      {owners.length === 0 ? (
+      {noRecipients ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-7 text-center text-[12px] text-gray-500">
-          Add an owner first to attach a mailing address.
+          Add an owner, relative, or other contact first to attach a mailing address.
         </div>
       ) : rows.length === 0 && !adding ? (
         <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-7 text-center text-[12px] text-gray-500">
@@ -399,7 +465,7 @@ export function MailingAddresses({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className={labelClass}>State</label>
-                <input value={addr.state} onChange={(e) => setAddr((d) => ({ ...d, state: e.target.value }))} className={cn(inputClass, "max-w-[120px]")} />
+                <input value={addr.state} onChange={(e) => setAddr((d) => ({ ...d, state: e.target.value.toUpperCase().slice(0, 2) }))} className={cn(inputClass, "max-w-[120px]")} />
               </div>
               <div>
                 <label className={labelClass}>Zip</label>

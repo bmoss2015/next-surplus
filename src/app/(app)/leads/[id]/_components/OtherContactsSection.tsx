@@ -23,6 +23,8 @@ import {
   replaceCustomRole,
   type CustomRoleReplacement,
 } from "../_lead-parties-actions";
+import type { ContactRow } from "@/lib/leads/fetch-detail";
+import { MailingAddressSubsection } from "./MailingAddressSubsection";
 
 // Built-in roles, displayed alphabetically by label. "Other" is excluded —
 // it's not a real role option; selecting it reveals the "+ Add new role"
@@ -57,10 +59,12 @@ export function OtherContactsSection({
   leadId,
   initial,
   customRoles,
+  contacts,
 }: {
   leadId: string;
   initial: LeadPartyRow[];
   customRoles: string[];
+  contacts: ContactRow[];
 }) {
   const [rows, setRows] = useState(initial);
   const [editing, setEditing] = useState<LeadPartyRow | "new" | null>(null);
@@ -251,6 +255,19 @@ export function OtherContactsSection({
                     {row.notes}
                   </div>
                 )}
+                <div className="mt-2">
+                  <MailingAddressSubsection
+                    leadId={leadId}
+                    target={{ kind: "leadParty", leadPartyId: row.id }}
+                    recipientLabel={`${row.name} (${roleLabel(row)})`}
+                    addresses={contacts.filter(
+                      (c) =>
+                        c.lead_party_id === row.id &&
+                        c.channel === "mailing_address"
+                    )}
+                    canRemove
+                  />
+                </div>
               </div>
               <button
                 type="button"
