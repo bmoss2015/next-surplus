@@ -9,27 +9,31 @@ import { cn } from "@/lib/cn";
 // real progress (gray → emerald-outline → solid emerald → black → won) and
 // terminal-loss is clearly red.
 //
-// Buckets:
-//   New leads / lost      → muted gray (haven't started / dead-end)
-//   Qualifying / outreach → emerald OUTLINE (early, in-motion)
-//   In conversation /
-//     contract            → SOLID emerald (active engagement)
-//   With attorney /
-//     claim filed         → DEEP EMERALD (admin-tier weight; brand-family
-//                           dark so it reads authoritative without going
-//                           full black — Bree said true ink was too harsh
-//                           at this size)
-//   Won                   → DEEP EMERALD (terminal positive)
-//   Lost                  → DANGER RED
+// Each stage maps to its own visual style. The Claims page in particular
+// filters to just with_attorney / claim_filed / won — those three MUST
+// read as a progression of three different greens, not "everything dark."
+// Nothing on the pill scale uses black; the strongest stage is the
+// brand-emerald mid, never deep/ink.
+//
+// Progression (light → mid → vivid):
+//   new_leads      gray pillow (hasn't started)
+//   qualifying     emerald outline (early — owning the lead)
+//   outreach       emerald outline (still cold-touch)
+//   in_conversation brand emerald solid (#0d4b3a — engagement)
+//   contract       brand emerald solid
+//   with_attorney  brand emerald solid (claim in-flight)
+//   claim_filed    success-strong green (#065f46 — distinct deeper green)
+//   won            success vivid green (#15803d — celebratory bright)
+//   lost           danger red (terminal loss)
 const STAGE_CLASSES: Record<Stage, string> = {
   new_leads:       "bg-gray-150 text-gray-600",
   qualifying:      "border border-petrol-500 text-petrol-500 bg-transparent",
   outreach:        "border border-petrol-500 text-petrol-500 bg-transparent",
   in_conversation: "bg-petrol-500 text-white",
   contract:        "bg-petrol-500 text-white",
-  with_attorney:   "bg-petrol-900 text-white",
-  claim_filed:     "bg-petrol-900 text-white",
-  won:             "bg-petrol-900 text-white",
+  with_attorney:   "bg-petrol-500 text-white",
+  claim_filed:     "bg-success-strong text-white",
+  won:             "bg-success text-white",
   lost:            "bg-danger text-white",
 };
 
