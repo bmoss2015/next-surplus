@@ -1,14 +1,17 @@
-// Settings clone · Phase C.6 — Bank Accounts restructured to match mockup.
-//
-// Two-column bank-grid of bank-card panels. Each card shows:
-//   head — bank name + holder + status tab (VERIFIED / VERIFY)
-//   rows — Account, Routing, Verified-or-Added date
-//   foot — "Default for outgoing checks" caption OR "Enter Test Deposits"
-//          button (for unverified) + remove icon
-//
-// Add/Verify/Delete actions all stay disabled — they ship in Phase D.
+"use client";
 
+// Settings clone · Phase D.3 — Bank Accounts with add + verify + delete.
+//
+// Two-column bank-grid of bank-card panels. Add Bank Account opens
+// BankAccountDrawer in "add" mode. The Enter Test Deposits button on each
+// unverified card opens the drawer in "verify" mode. Per-card delete uses
+// a two-click confirm and calls deleteMailBankAccount.
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { MailBankAccountRow } from "@/lib/settings/fetch";
+import { deleteMailBankAccount } from "@/app/(app)/settings/_actions";
+import { BankAccountDrawer, type BankDrawerState } from "./BankAccountDrawer";
 
 function maskLast4(last4: string | null): string {
   if (!last4) return "•••• ••••";
@@ -30,6 +33,8 @@ export function MailBankAccountsSection({
 }: {
   initial: MailBankAccountRow[];
 }) {
+  const [drawer, setDrawer] = useState<BankDrawerState>({ kind: "closed" });
+
   return (
     <section id="panel-mail-bank" className="panel active">
       <div className="breadcrumb">
@@ -53,8 +58,7 @@ export function MailBankAccountsSection({
         <button
           type="button"
           className="btn btn-primary btn-sm"
-          disabled
-          title="Add Account drawer ships in Phase D"
+          onClick={() => setDrawer({ kind: "add" })}
         >
           <i className="icon icon-plus" /> Add Bank Account
         </button>
@@ -73,15 +77,25 @@ export function MailBankAccountsSection({
             fontSize: 13,
           }}
         >
-          No bank accounts yet. Phase D adds the connect-account drawer.
+          No bank accounts yet. Click Add Bank Account to connect one.
         </div>
       ) : (
         <div className="bank-grid">
           {initial.map((b, idx) => (
-            <BankCard key={b.id} bank={b} isFirst={idx === 0} />
+            <BankCard
+              key={b.id}
+              bank={b}
+              isFirst={idx === 0}
+              onVerify={() => setDrawer({ kind: "verify", row: b })}
+            />
           ))}
         </div>
       )}
+
+      <BankAccountDrawer
+        state={drawer}
+        onClose={() => setDrawer({ kind: "closed" })}
+      />
     </section>
   );
 }
@@ -89,11 +103,24 @@ export function MailBankAccountsSection({
 function BankCard({
   bank,
   isFirst,
+  onVerify,
 }: {
   bank: MailBankAccountRow;
   isFirst: boolean;
+  onVerify: () => void;
 }) {
+  const router = useRouter();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [, startTransition] = useTransition();
   const isVerified = bank.status === "verified";
+
+  function remove() {
+    startTransition(async () => {
+      await deleteMailBankAccount(bank.id);
+      router.refresh();
+    });
+  }
+
   return (
     <div className="bank-card">
       <div className="bank-card-head">
@@ -151,8 +178,7 @@ function BankCard({
           <button
             type="button"
             className="btn btn-outline btn-sm"
-            disabled
-            title="Test-deposit flow ships in Phase D"
+            onClick={onVerify}
           >
             Enter Test Deposits
           </button>
@@ -160,9 +186,9 @@ function BankCard({
         <button
           type="button"
           className="icon-btn"
-          title="Remove (ships Phase D)"
-          disabled
-          style={{ opacity: 0.4 }}
+          title={confirmDelete ? "Click again to confirm" : "Remove"}
+          onClick={() => (confirmDelete ? remove() : setConfirmDelete(true))}
+          style={confirmDelete ? { color: "var(--danger)" } : undefined}
         >
           <i className="icon icon-trash" />
         </button>
