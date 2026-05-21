@@ -22,6 +22,7 @@ import { MailTemplateEditor } from "./MailTemplateEditor";
 import { SuperDocEditor, type SuperDocSource } from "./SuperDocEditor";
 import { PdfPreview } from "./PdfPreview";
 import { MERGE_FIELDS, MERGE_GROUP_LABELS } from "@/lib/mail/merge";
+import { validateDocxPathFonts } from "@/lib/mail/actions";
 import type {
   MailTemplateRow,
   MailTemplateFolderRow,
@@ -458,6 +459,30 @@ function MailTemplateForm({
   const [popoutOpen, setPopoutOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
 
+  // Font validation — runs whenever a .docx is loaded or freshly
+  // uploaded. The PDF renderer (Gotenberg / LibreOffice headless) can
+  // only render fonts that are installed in its container. Any font in
+  // the template that ISN'T in our supported set gets substituted at
+  // render time with a different-metric fallback, which causes tables
+  // and paragraphs to overlap. Warning here surfaces the issue at upload
+  // time instead of letting it slip through to the recipient's mailbox.
+  const [unsupportedFonts, setUnsupportedFonts] = useState<string[]>([]);
+  useEffect(() => {
+    if (!docxPath || fileType !== "docx") {
+      setUnsupportedFonts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const res = await validateDocxPathFonts({ docx_path: docxPath });
+      if (cancelled) return;
+      if (res.ok) setUnsupportedFonts(res.unsupported);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [docxPath, fileType]);
+
   // Attachments (extra .docx/.pdf files that ride along with the main
   // letter in the same envelope). The paths array mirrors the storage
   // bucket paths; the parallel labels array is just display metadata
@@ -736,6 +761,27 @@ function MailTemplateForm({
       {/* Active file editor with the action bar pinned to its top.
           Replace / Merge / Full Screen all live next to the filename
           so the controls are in context — not in a separate row above. */}
+      {mode === "file" && (docxSource || pdfUrl) && unsupportedFonts.length > 0 && (
+        <div className="rounded-md border border-danger/40 bg-red-50 px-3 py-2 text-[11px] leading-snug text-ink">
+          <div className="font-medium text-danger">
+            Unsupported font{unsupportedFonts.length === 1 ? "" : "s"}:{" "}
+            {unsupportedFonts.join(", ")}
+          </div>
+          <div className="mt-1 text-ink/80">
+            Our PDF renderer doesn&apos;t have{" "}
+            {unsupportedFonts.length === 1 ? "this font" : "these fonts"}{" "}
+            installed and will substitute with a different one, which can
+            shift the layout (tables and paragraphs may overlap). To fix:
+            open the .docx in Word, change to one of these supported
+            fonts, save and re-upload —{" "}
+            <span className="font-mono">
+              Arial, Calibri, Times New Roman, Roboto, Inter, Open Sans,
+              Lato, Montserrat, Poppins, Merriweather, Lora, Source Serif
+            </span>
+            .
+          </div>
+        </div>
+      )}
       {mode === "file" && (docxSource || pdfUrl) && (
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-surface px-3 py-[6px]">

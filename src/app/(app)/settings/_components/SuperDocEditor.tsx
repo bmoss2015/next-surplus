@@ -114,9 +114,14 @@ export function SuperDocEditor({
 
   return (
     <div
-      className={`superdoc-wrap relative rounded-md border border-gray-200 bg-gray-100 ${
-        autoHeight ? "" : "overflow-auto"
-      } ${documentMode === "viewing" ? "superdoc-viewing" : ""}`}
+      className={`superdoc-wrap relative rounded-md border border-gray-200 ${
+        // Viewing mode reads as a paper preview — white wrap so blank
+        // areas around the page don't tint the rendered document pale.
+        // Editing mode keeps the workspace gray so the page edges read.
+        documentMode === "viewing" ? "bg-white" : "bg-gray-100"
+      } ${autoHeight ? "" : "overflow-auto"} ${
+        documentMode === "viewing" ? "superdoc-viewing" : ""
+      }`}
       style={
         autoHeight
           ? { height: "auto", width: "100%" }
@@ -166,24 +171,25 @@ export function SuperDocEditor({
         .superdoc-wrap.superdoc-viewing [class*="Toolbar"] {
           display: none !important;
         }
-        /* autoHeight mode: kill every internal scrolling surface
-           SuperDoc creates so the only scrollbar is the modal's outer
-           one. This is the sledgehammer version — targets all
-           descendants. Safe because in viewing mode there are no
-           interactive overflows that matter (no dropdowns inside
-           tables that need their own scroll). */
-        .superdoc-wrap:not(.overflow-auto),
-        .superdoc-wrap:not(.overflow-auto) * {
+        /* autoHeight mode: let the OUTER scrolling surfaces grow so the
+           whole document flows inline (modal scrolls, not a nested
+           scrollbar). Critically we do NOT strip max-height from every
+           descendant — individual page elements rely on max-height to
+           know where one page ends and the next begins. Killing it
+           caused multi-page content to overlap. We only override
+           overflow / max-height on the outermost SuperDoc shell
+           containers, not page bodies. */
+        .superdoc-wrap:not(.overflow-auto) {
           overflow: visible !important;
-          max-height: none !important;
         }
         .superdoc-wrap:not(.overflow-auto) [class*="superdoc"],
         .superdoc-wrap:not(.overflow-auto) [class*="editor-container"],
         .superdoc-wrap:not(.overflow-auto) [class*="page-container"],
-        .superdoc-wrap:not(.overflow-auto) [class*="layout"],
-        .superdoc-wrap:not(.overflow-auto) [class*="container"] {
+        .superdoc-wrap:not(.overflow-auto) [class*="layout"] {
           height: auto !important;
           min-height: 0 !important;
+          max-height: none !important;
+          overflow: visible !important;
         }
       `}</style>
       <SuperDocEditorInner

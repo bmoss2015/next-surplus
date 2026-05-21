@@ -69,6 +69,80 @@ export async function getMailTemplateAttachmentPageCount(
   return { ok: true, pdf_pages: total, pdf_files: paths.length };
 }
 
+// Server action — checks which fonts a template's docx references and
+// flags any that aren't in our Gotenberg renderer's bundled font set.
+// Used by the Mail Templates editor right after upload so the user gets
+// an inline warning when their docx uses something like a designer-only
+// font that won't render correctly in the PDF the printer receives.
+export async function validateTemplateFonts(input: {
+  template_id: string;
+}): Promise<
+  | {
+      ok: true;
+      fonts: string[];
+      unsupported: string[];
+    }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+  const { data: tpl } = await sb
+    .from("mail_templates")
+    .select("id, docx_path")
+    .eq("id", input.template_id)
+    .maybeSingle();
+  if (!tpl || !tpl.docx_path) {
+    return { ok: true, fonts: [], unsupported: [] };
+  }
+  const admin = createServiceClient();
+  const dl = await admin.storage
+    .from("mail-templates")
+    .download(tpl.docx_path as string);
+  if (dl.error || !dl.data) {
+    return {
+      ok: false,
+      error: `Could not load template: ${dl.error?.message ?? "unknown"}`,
+    };
+  }
+  const buffer = Buffer.from(await dl.data.arrayBuffer());
+  const { detectDocxFonts, isFontSupported } = await import("./fonts");
+  const fonts = await detectDocxFonts(buffer);
+  const unsupported = fonts.filter((f) => !isFontSupported(f));
+  return { ok: true, fonts, unsupported };
+}
+
+// Server action — same check but for a freshly-uploaded docx path that
+// hasn't been saved as a template row yet. Lets the upload flow surface
+// font issues before the user clicks Save Template.
+export async function validateDocxPathFonts(input: {
+  docx_path: string;
+}): Promise<
+  | { ok: true; fonts: string[]; unsupported: string[] }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  if (!input.docx_path || !input.docx_path.toLowerCase().endsWith(".docx")) {
+    return { ok: true, fonts: [], unsupported: [] };
+  }
+  const admin = createServiceClient();
+  const dl = await admin.storage
+    .from("mail-templates")
+    .download(input.docx_path);
+  if (dl.error || !dl.data) {
+    return {
+      ok: false,
+      error: `Could not load uploaded file: ${dl.error?.message ?? "unknown"}`,
+    };
+  }
+  const buffer = Buffer.from(await dl.data.arrayBuffer());
+  const { detectDocxFonts, isFontSupported } = await import("./fonts");
+  const fonts = await detectDocxFonts(buffer);
+  const unsupported = fonts.filter((f) => !isFontSupported(f));
+  return { ok: true, fonts, unsupported };
+}
+
 // Server action — given a template and a recipient's contact-level merge
 // context, returns the merged .docx as a base64 string. Called by the
 // Send Mail modal's preview pane so the user sees the exact document the
@@ -77,7 +151,7 @@ export async function previewMailMergeDocx(input: {
   template_id: string;
   recipient_merge_context: MergeContext;
 }): Promise<
-  | { ok: true; base64: string }
+  | { ok: true; base64: string; kind: "pdf" | "docx" }
   | { ok: false; error: string }
 > {
   const profile = await getCurrentProfile();
@@ -135,7 +209,47 @@ export async function previewMailMergeDocx(input: {
   const buffer = Buffer.from(await dl.data.arrayBuffer());
   const merged = await fillDocxTemplate(buffer, fullCtx);
   if (!merged.ok) return { ok: false, error: merged.error };
-  return { ok: true, base64: merged.value.toString("base64") };
+  // Convert the merged docx to a PDF via Gotenberg so the preview shows
+  // pixel-accurate layout (SuperDoc's docx renderer was overlapping
+  // tables / text boxes on complex templates). Gotenberg uses
+  // LibreOffice headless under the hood — same engine the printer
+  // will use for final rendering, so what we preview matches what
+  // gets mailed. Falls back to returning the docx if GOTENBERG_URL
+  // isn't set so local-dev without the URL still works.
+  const gotenbergUrl = process.env.GOTENBERG_URL;
+  if (!gotenbergUrl) {
+    return { ok: true, base64: merged.value.toString("base64"), kind: "docx" };
+  }
+  try {
+    const fd = new FormData();
+    fd.append(
+      "files",
+      new Blob([new Uint8Array(merged.value)], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+      "document.docx"
+    );
+    const res = await fetch(`${gotenbergUrl}/forms/libreoffice/convert`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `Gotenberg PDF render failed: ${res.status} ${await res.text()}`,
+      };
+    }
+    const pdfBytes = Buffer.from(await res.arrayBuffer());
+    return { ok: true, base64: pdfBytes.toString("base64"), kind: "pdf" };
+  } catch (err) {
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? `Gotenberg request failed: ${err.message}`
+          : "Gotenberg request failed",
+    };
+  }
 }
 
 // Runs docxtemplater against a Word doc buffer using a MergeContext that
@@ -153,38 +267,32 @@ async function fillDocxTemplate(
       (DocxtemplaterMod as unknown as { default: typeof DocxtemplaterMod })
         .default ?? DocxtemplaterMod;
     const zip = new PizZip(buffer);
-    // docxtemplater treats dots in {contact.first_name} as nested property
-    // access, so flatten our dotted-key context into a nested object tree.
-    const nested: Record<string, unknown> = {};
+    // Build flat string data — keys are literal dotted strings like
+    // "contact.first_name". The custom parser below looks them up
+    // verbatim instead of treating the dot as nested-object access.
+    // Verified via direct docxtemplater test: nested-object + default
+    // parser silently returned null for every token (rendered blank);
+    // flat keys + literal-key parser resolves correctly.
+    const data: Record<string, string> = {};
     for (const [k, v] of Object.entries(ctx)) {
-      const parts = k.split(".");
-      let cur: Record<string, unknown> = nested;
-      for (let i = 0; i < parts.length - 1; i++) {
-        const seg = parts[i];
-        if (
-          cur[seg] == null ||
-          typeof cur[seg] !== "object" ||
-          Array.isArray(cur[seg])
-        ) {
-          cur[seg] = {};
-        }
-        cur = cur[seg] as Record<string, unknown>;
-      }
-      cur[parts[parts.length - 1]] = v == null ? "" : String(v);
+      data[k] = v == null ? "" : String(v);
     }
     const doc = new (Docxtemplater as unknown as new (
       zip: unknown,
       opts: unknown
     ) => {
-      render(data: Record<string, unknown>): void;
+      render(data: Record<string, string>): void;
       getZip(): { generate(opts: { type: string }): Buffer };
     })(zip, {
       paragraphLoop: true,
       linebreaks: true,
       delimiters: { start: "{", end: "}" },
       nullGetter: () => "",
+      parser: (tag: string) => ({
+        get: (scope: Record<string, string>) => scope?.[tag],
+      }),
     });
-    doc.render(nested);
+    doc.render(data);
     return { ok: true, value: doc.getZip().generate({ type: "nodebuffer" }) };
   } catch (err) {
     return {
