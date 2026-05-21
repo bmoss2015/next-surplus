@@ -1,19 +1,22 @@
 "use client";
 
-// Settings clone · Phase C.5 — Templates wired to real data (display).
+// Settings clone · Phase D.4 — Templates with editor drawer.
 //
-// Three internal tabs that share a single state: Email, SMS, Research.
+// Three internal tabs share a single panel state: Email, SMS, Research.
 // Email and SMS pull from TemplateRow[] (channel filter), Research pulls
-// from ResearchTemplateRow[] which has its own table. The Add Template,
-// Edit pencil, and Delete buttons are visual-only — Phase D wires the
-// template-editor drawer (upsertMailTemplate / deleteMailTemplate, plus
-// the research-template equivalents).
+// from ResearchTemplateRow[]. Add Template + per-row Edit pencil both open
+// <TemplateEditorDrawer /> which routes to the right editor based on the
+// active tab (or the row's channel for edits).
 
 import { useMemo, useState } from "react";
 import type {
   ResearchTemplateRow,
   TemplateRow,
 } from "@/lib/settings/fetch";
+import {
+  TemplateEditorDrawer,
+  type TemplateEditorState,
+} from "./TemplateEditorDrawer";
 
 type Tab = "email" | "sms" | "research";
 
@@ -25,6 +28,7 @@ export function TemplatesSection({
   research: ResearchTemplateRow[];
 }) {
   const [tab, setTab] = useState<Tab>("email");
+  const [editor, setEditor] = useState<TemplateEditorState>({ kind: "closed" });
 
   const email = useMemo(
     () => templates.filter((t) => t.channel.toLowerCase() === "email"),
@@ -70,8 +74,7 @@ export function TemplatesSection({
         <button
           type="button"
           className="btn btn-primary btn-sm"
-          disabled
-          title="Template editor drawer ships in Phase D"
+          onClick={() => setEditor({ kind: "new", channel: tab })}
         >
           <i className="icon icon-plus" /> {addLabel}
         </button>
@@ -101,9 +104,29 @@ export function TemplatesSection({
         </button>
       </div>
 
-      {tab === "email" && <EmailList rows={email} />}
-      {tab === "sms" && <SmsList rows={sms} />}
-      {tab === "research" && <ResearchList rows={research} />}
+      {tab === "email" && (
+        <EmailList
+          rows={email}
+          onEdit={(row) => setEditor({ kind: "edit-template", row })}
+        />
+      )}
+      {tab === "sms" && (
+        <SmsList
+          rows={sms}
+          onEdit={(row) => setEditor({ kind: "edit-template", row })}
+        />
+      )}
+      {tab === "research" && (
+        <ResearchList
+          rows={research}
+          onEdit={(row) => setEditor({ kind: "edit-research", row })}
+        />
+      )}
+
+      <TemplateEditorDrawer
+        state={editor}
+        onClose={() => setEditor({ kind: "closed" })}
+      />
     </section>
   );
 }
@@ -116,13 +139,14 @@ function EmptyRow({ msg }: { msg: string }) {
   );
 }
 
-function RowActions() {
+function RowActions({ onEdit }: { onEdit: () => void }) {
   return (
     <div className="overflow flex items-center gap-0.5 ml-2">
-      <div
+      <button
+        type="button"
         className="icon-btn"
-        title="Edit (ships Phase D)"
-        style={{ opacity: 0.4, pointerEvents: "none" }}
+        title="Edit"
+        onClick={onEdit}
       >
         <svg
           viewBox="0 0 24 24"
@@ -137,19 +161,18 @@ function RowActions() {
           <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
           <path d="m15 5 4 4" />
         </svg>
-      </div>
-      <div
-        className="icon-btn"
-        title="Delete (ships Phase D)"
-        style={{ opacity: 0.4, pointerEvents: "none" }}
-      >
-        <i className="icon icon-trash" />
-      </div>
+      </button>
     </div>
   );
 }
 
-function EmailList({ rows }: { rows: TemplateRow[] }) {
+function EmailList({
+  rows,
+  onEdit,
+}: {
+  rows: TemplateRow[];
+  onEdit: (row: TemplateRow) => void;
+}) {
   return (
     <div className="tpl-pane active">
       <div className="list">
@@ -173,7 +196,7 @@ function EmailList({ rows }: { rows: TemplateRow[] }) {
                   )}
                 </div>
               </div>
-              <RowActions />
+              <RowActions onEdit={() => onEdit(t)} />
             </div>
           ))
         )}
@@ -182,7 +205,13 @@ function EmailList({ rows }: { rows: TemplateRow[] }) {
   );
 }
 
-function SmsList({ rows }: { rows: TemplateRow[] }) {
+function SmsList({
+  rows,
+  onEdit,
+}: {
+  rows: TemplateRow[];
+  onEdit: (row: TemplateRow) => void;
+}) {
   return (
     <div className="tpl-pane active">
       <div className="list">
@@ -206,7 +235,7 @@ function SmsList({ rows }: { rows: TemplateRow[] }) {
                   )}
                 </div>
               </div>
-              <RowActions />
+              <RowActions onEdit={() => onEdit(t)} />
             </div>
           ))
         )}
@@ -215,7 +244,13 @@ function SmsList({ rows }: { rows: TemplateRow[] }) {
   );
 }
 
-function ResearchList({ rows }: { rows: ResearchTemplateRow[] }) {
+function ResearchList({
+  rows,
+  onEdit,
+}: {
+  rows: ResearchTemplateRow[];
+  onEdit: (row: ResearchTemplateRow) => void;
+}) {
   return (
     <div className="tpl-pane active">
       <div className="list">
@@ -243,7 +278,7 @@ function ResearchList({ rows }: { rows: ResearchTemplateRow[] }) {
                   · {r.steps.length} step{r.steps.length === 1 ? "" : "s"}
                 </div>
               </div>
-              <RowActions />
+              <RowActions onEdit={() => onEdit(r)} />
             </div>
           ))
         )}
