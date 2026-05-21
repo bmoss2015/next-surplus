@@ -15,10 +15,11 @@ import { cn } from "@/lib/cn";
 //   In conversation /
 //     contract            → SOLID emerald (active engagement)
 //   With attorney /
-//     claim filed         → BLACK (admin-tier — money is at stake)
-//   Won                   → BLACK (terminal positive — same weight as
-//                           with_attorney / claim_filed; the rest of the
-//                           UI shows the trophy/checkmark separately)
+//     claim filed         → DEEP EMERALD (admin-tier weight; brand-family
+//                           dark so it reads authoritative without going
+//                           full black — Bree said true ink was too harsh
+//                           at this size)
+//   Won                   → DEEP EMERALD (terminal positive)
 //   Lost                  → DANGER RED
 const STAGE_CLASSES: Record<Stage, string> = {
   new_leads:       "bg-gray-150 text-gray-600",
@@ -26,9 +27,9 @@ const STAGE_CLASSES: Record<Stage, string> = {
   outreach:        "border border-petrol-500 text-petrol-500 bg-transparent",
   in_conversation: "bg-petrol-500 text-white",
   contract:        "bg-petrol-500 text-white",
-  with_attorney:   "bg-ink text-white",
-  claim_filed:     "bg-ink text-white",
-  won:             "bg-ink text-white",
+  with_attorney:   "bg-petrol-900 text-white",
+  claim_filed:     "bg-petrol-900 text-white",
+  won:             "bg-petrol-900 text-white",
   lost:            "bg-danger text-white",
 };
 
