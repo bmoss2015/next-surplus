@@ -534,6 +534,9 @@ function RelativeCard({
 
       <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
         <SectionSubheader className="mb-0">Mailing Address</SectionSubheader>
+        {/* Render the +Add button at the END of this section always,
+            so it's never hidden after a save. The IIFE below renders
+            the form / saved-row / empty-state body above the button. */}
         {(() => {
           const storedStreet = (relative.street ?? "").trim();
           const storedCity = (relative.city ?? "").trim();
@@ -687,16 +690,29 @@ function RelativeCard({
             );
           }
 
-          return (
-            <button
-              type="button"
-              onClick={() => setAddingAddress(true)}
-              className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
-            >
-              + Add Mailing Address
-            </button>
-          );
+          // Empty state body — actual button is always-rendered below.
+          return null;
         })()}
+        {/* Always-visible +Add button. Mirrors the owner card pattern
+            so Bree never loses the affordance after saving. Clicking
+            it opens the form pre-filled with the current address (so
+            an "add" effectively becomes an edit since each relative
+            stores a single address). Disabled while the form is open
+            to avoid double-trigger. */}
+        <button
+          type="button"
+          onClick={() => {
+            setStreet(relative.street ?? "");
+            setCity(relative.city ?? "");
+            setStateCode(relative.state ?? "");
+            setZip(relative.zip ?? "");
+            setAddingAddress(true);
+          }}
+          disabled={addingAddress}
+          className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          + Add Mailing Address
+        </button>
       </div>
 
       {relative.notes && (
