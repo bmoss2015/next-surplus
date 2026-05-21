@@ -1,15 +1,20 @@
 "use client";
 
-// Settings clone · Phase C.4 — Company Profile wired to real data.
+// Settings clone · Phase E.3 — Company Profile fully wired.
 //
-// All OrgInfo fields are editable except Tax ID (EIN) and Logo upload —
-// those need migration 0115 (orgs.tax_id_ein + orgs.logo_url + storage
-// buckets). Save Changes / Discard buttons appear when the form is dirty
-// and call updateOrgInfo as a single transaction.
+// Org name/legal/email/phone/website/address all save via updateOrgInfo
+// in a single Save Changes click. Logo upload + Tax ID (EIN) are now
+// live too (migration 0118): logo uploads via uploadOrgLogo, EIN persists
+// via setOrgTaxId on blur.
 
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateOrgInfo } from "@/app/(app)/settings/_actions";
+import {
+  uploadOrgLogo,
+  removeOrgLogo,
+  setOrgTaxId,
+} from "@/app/(app)/settings/_upload-actions";
 import type { OrgInfo } from "@/lib/settings/fetch";
 
 export function CompanyProfileSection({ initial }: { initial: OrgInfo }) {
@@ -17,8 +22,18 @@ export function CompanyProfileSection({ initial }: { initial: OrgInfo }) {
   const [form, setForm] = useState<OrgInfo>(initial);
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [ein, setEin] = useState(initial.tax_id_ein ?? "");
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [, startTransition] = useTransition();
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(initial);
+  // dirty/ready compare against the non-EIN, non-logo fields. EIN saves on
+  // blur (its own action); logo saves through its own upload flow. Save
+  // Changes only writes the address/contact subset.
+  const formForDirty = { ...form, tax_id_ein: null, logo_url: null };
+  const initialForDirty = { ...initial, tax_id_ein: null, logo_url: null };
+  const dirty = JSON.stringify(formForDirty) !== JSON.stringify(initialForDirty);
   const ready = form.name.trim().length > 0;
 
   function set<K extends keyof OrgInfo>(key: K, value: OrgInfo[K]) {
@@ -69,9 +84,18 @@ export function CompanyProfileSection({ initial }: { initial: OrgInfo }) {
       <div className="clean-hero">
         <div
           className="clean-hero-avatar"
-          style={{ fontSize: 14, letterSpacing: "0.04em" }}
+          style={
+            initial.logo_url
+              ? {
+                  backgroundImage: `url(${initial.logo_url})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  color: "transparent",
+                }
+              : { fontSize: 14, letterSpacing: "0.04em" }
+          }
         >
-          {initials}
+          {!initial.logo_url && initials}
         </div>
         <div className="flex-1 min-w-0">
           <div className="clean-hero-title">{form.name || "Your Organization"}</div>
@@ -81,15 +105,68 @@ export function CompanyProfileSection({ initial }: { initial: OrgInfo }) {
             {form.city && form.region ? `${form.city}, ${form.region}` : form.city ?? ""}
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm clean-hero-upload"
-          disabled
-          title="Logo upload lands once migration 0115 applies to staging"
-        >
-          Upload Logo
-        </button>
+        <div className="clean-hero-upload flex items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            style={{ display: "none" }}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setUploadErr(null);
+              setUploading(true);
+              const fd = new FormData();
+              fd.append("file", file);
+              const res = await uploadOrgLogo(fd);
+              setUploading(false);
+              if (!res.ok) {
+                setUploadErr(res.error);
+                return;
+              }
+              router.refresh();
+              if (fileRef.current) fileRef.current.value = "";
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+          >
+            {uploading
+              ? "Uploading…"
+              : initial.logo_url
+                ? "Replace Logo"
+                : "Upload Logo"}
+          </button>
+          {initial.logo_url && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={uploading}
+              style={{ color: "var(--danger)" }}
+              onClick={async () => {
+                setUploading(true);
+                const res = await removeOrgLogo();
+                setUploading(false);
+                if (!res.ok) {
+                  setUploadErr(res.error);
+                  return;
+                }
+                router.refresh();
+              }}
+            >
+              Remove
+            </button>
+          )}
+        </div>
       </div>
+      {uploadErr && (
+        <div style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 8 }}>
+          {uploadErr}
+        </div>
+      )}
 
       <PrefRow title="Organization Name">
         <input
@@ -174,10 +251,19 @@ export function CompanyProfileSection({ initial }: { initial: OrgInfo }) {
           />
         </div>
       </PrefRow>
-      <PrefRow title="Tax ID (EIN)" desc="00-0000000 format. Needs migration 0115.">
+      <PrefRow title="Tax ID (EIN)" desc="Used on contracts and tax forms. Stored only on this org row, never on a lead.">
         <input
           className="input pref-row-input"
-          disabled
+          value={ein}
+          onChange={(e) => setEin(e.target.value)}
+          onBlur={(e) => {
+            const next = e.target.value.trim();
+            if (next === (initial.tax_id_ein ?? "")) return;
+            startTransition(async () => {
+              await setOrgTaxId(next);
+              router.refresh();
+            });
+          }}
           placeholder="00-0000000"
         />
       </PrefRow>

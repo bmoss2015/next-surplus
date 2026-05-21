@@ -90,6 +90,8 @@ export type OrgInfo = {
   region: string | null;
   postal_code: string | null;
   country: string | null;
+  tax_id_ein: string | null;
+  logo_url: string | null;
 };
 
 export async function fetchOrgInfo(): Promise<OrgInfo> {
@@ -97,7 +99,7 @@ export async function fetchOrgInfo(): Promise<OrgInfo> {
   const { data, error } = await sb
     .from("orgs")
     .select(
-      "name, legal_name, email, phone, website, address_line1, address_line2, city, region, postal_code, country"
+      "name, legal_name, email, phone, website, address_line1, address_line2, city, region, postal_code, country, tax_id_ein, logo_url"
     )
     .single();
   if (error) throw error;
@@ -113,6 +115,8 @@ export async function fetchOrgInfo(): Promise<OrgInfo> {
     region: (data.region as string | null) ?? null,
     postal_code: (data.postal_code as string | null) ?? null,
     country: (data.country as string | null) ?? null,
+    tax_id_ein: (data.tax_id_ein as string | null) ?? null,
+    logo_url: (data.logo_url as string | null) ?? null,
   };
 }
 

@@ -134,6 +134,8 @@ export default async function SettingsPreviewJsxPage() {
           fullName: profile.fullName,
           email: profile.email ?? "",
           isAdmin,
+          avatarUrl: profile.avatarUrl,
+          timeZone: profile.timeZone,
         }}
         data={{
           defaults,

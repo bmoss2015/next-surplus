@@ -45,6 +45,8 @@ export type CurrentUser = {
   fullName: string;
   email: string;
   isAdmin: boolean;
+  avatarUrl: string | null;
+  timeZone: string | null;
 };
 
 export type SettingsData = {

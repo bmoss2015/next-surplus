@@ -1,16 +1,20 @@
 "use client";
 
-// Settings clone · Phase C.1 — Profile wired to real data.
+// Settings clone · Phase E.3 — Profile fully wired.
 //
-// Receives the signed-in user's profile from the page (server) and renders
-// the mockup's clean-hero + pref-row layout. First/Last/Email are editable
-// and call updateMyProfile on Save. Time Zone is intentionally disabled
-// here — that field needs migration 0115 (profiles.time_zone column) to
-// land on staging before it can save anywhere.
+// Avatar upload + time zone select are now live (migration 0118 landed
+// the columns + storage buckets). First/Last/Email still write through
+// updateMyProfile; time zone writes via setMyTimeZone on change; avatar
+// uploads via uploadMyAvatar / removeMyAvatar.
 
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateMyProfile } from "@/app/(app)/settings/_actions";
+import {
+  uploadMyAvatar,
+  removeMyAvatar,
+  setMyTimeZone,
+} from "@/app/(app)/settings/_upload-actions";
 
 function splitName(fullName: string): { first: string; last: string } {
   const parts = fullName.trim().split(/\s+/);
@@ -26,18 +30,40 @@ function initials(first: string, last: string): string {
   return a + b || "?";
 }
 
+const TIME_ZONES: { value: string; label: string }[] = [
+  { value: "America/New_York", label: "(GMT-05:00) Eastern Time — New York" },
+  { value: "America/Chicago", label: "(GMT-06:00) Central Time — Chicago" },
+  { value: "America/Denver", label: "(GMT-07:00) Mountain Time — Denver" },
+  { value: "America/Los_Angeles", label: "(GMT-08:00) Pacific Time — Los Angeles" },
+  { value: "America/Anchorage", label: "(GMT-09:00) Alaska Time — Anchorage" },
+  { value: "Pacific/Honolulu", label: "(GMT-10:00) Hawaii — Honolulu" },
+];
+
 export function ProfileSection({
   initial,
 }: {
-  initial: { fullName: string; email: string; isAdmin: boolean };
+  initial: {
+    fullName: string;
+    email: string;
+    isAdmin: boolean;
+    avatarUrl: string | null;
+    timeZone: string | null;
+  };
 }) {
   const router = useRouter();
   const seed = splitName(initial.fullName);
   const [firstName, setFirstName] = useState(seed.first);
   const [lastName, setLastName] = useState(seed.last);
   const [email, setEmail] = useState(initial.email);
+  const [timeZone, setTimeZone] = useState(
+    initial.timeZone ?? "America/Chicago"
+  );
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [, startTransition] = useTransition();
 
   const dirty =
     `${firstName.trim()} ${lastName.trim()}`.trim() !== initial.fullName.trim() ||
@@ -64,6 +90,42 @@ export function ProfileSection({
     setErrMsg(null);
   }
 
+  async function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadErr(null);
+    setUploading(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await uploadMyAvatar(fd);
+    setUploading(false);
+    if (!res.ok) {
+      setUploadErr(res.error);
+      return;
+    }
+    router.refresh();
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function onAvatarRemove() {
+    setUploadErr(null);
+    setUploading(true);
+    const res = await removeMyAvatar();
+    setUploading(false);
+    if (!res.ok) {
+      setUploadErr(res.error);
+      return;
+    }
+    router.refresh();
+  }
+
+  function onTimeZoneChange(value: string) {
+    setTimeZone(value);
+    startTransition(async () => {
+      await setMyTimeZone(value);
+    });
+  }
+
   return (
     <section id="panel-profile" className="panel active">
       <div className="breadcrumb">
@@ -75,7 +137,21 @@ export function ProfileSection({
       </div>
 
       <div className="clean-hero">
-        <div className="clean-hero-avatar">{initials(firstName, lastName)}</div>
+        <div
+          className="clean-hero-avatar"
+          style={
+            initial.avatarUrl
+              ? {
+                  backgroundImage: `url(${initial.avatarUrl})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  color: "transparent",
+                }
+              : undefined
+          }
+        >
+          {!initial.avatarUrl && initials(firstName, lastName)}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="clean-hero-title">
             {firstName} {lastName}
@@ -84,15 +160,44 @@ export function ProfileSection({
             {email} · {initial.isAdmin ? "Admin" : "Member"}
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm clean-hero-upload"
-          disabled
-          title="Avatar upload lands once migration 0115 applies to staging"
-        >
-          Upload Photo
-        </button>
+        <div className="clean-hero-upload flex items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            style={{ display: "none" }}
+            onChange={onAvatarChange}
+          />
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+          >
+            {uploading
+              ? "Uploading…"
+              : initial.avatarUrl
+                ? "Replace Photo"
+                : "Upload Photo"}
+          </button>
+          {initial.avatarUrl && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={uploading}
+              style={{ color: "var(--danger)" }}
+              onClick={onAvatarRemove}
+            >
+              Remove
+            </button>
+          )}
+        </div>
       </div>
+      {uploadErr && (
+        <div style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 8 }}>
+          {uploadErr}
+        </div>
+      )}
 
       <div className="pref-row">
         <div className="flex-1 min-w-0">
@@ -137,14 +242,14 @@ export function ProfileSection({
         </div>
         <select
           className="input pref-row-input"
-          defaultValue="central"
-          disabled
-          title="Time zone storage lands with migration 0115"
+          value={timeZone}
+          onChange={(e) => onTimeZoneChange(e.target.value)}
         >
-          <option value="central">(GMT-06:00) Central Time — Chicago</option>
-          <option value="eastern">(GMT-05:00) Eastern Time — New York</option>
-          <option value="mountain">(GMT-07:00) Mountain Time — Denver</option>
-          <option value="pacific">(GMT-08:00) Pacific Time — Los Angeles</option>
+          {TIME_ZONES.map((tz) => (
+            <option key={tz.value} value={tz.value}>
+              {tz.label}
+            </option>
+          ))}
         </select>
       </div>
 
