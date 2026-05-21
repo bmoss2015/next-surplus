@@ -97,6 +97,23 @@ export default async function SettingsPreviewJsxPage() {
         dangerouslySetInnerHTML={{ __html: cssText }}
       />
 
+      {/* Local overrides layered on top of the lifted mockup CSS. Loaded
+          AFTER preview.css so the cascade picks them up. */}
+      <style
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{
+          __html: `
+            /* Bree's review (Phase C.6): the gray .section-desc was capped at
+               60ch which made even short descriptions wrap awkwardly and
+               long ones (Contact Roles) wrap to 3+ lines well short of the
+               divider line below. Unconstrain it so short copy stays one
+               line and long copy uses the full content-column width before
+               wrapping. */
+            .section-desc { max-width: none; }
+          `,
+        }}
+      />
+
       <SettingsPreviewJsx
         currentUser={{
           fullName: profile.fullName,
