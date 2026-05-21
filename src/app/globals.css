@@ -208,6 +208,50 @@ input[type="button"]:not(:disabled),
   cursor: pointer;
 }
 
+/* Portal-wide status/role pill system. Same vocabulary as the Settings
+   Members panel — black ink for admin-tier, neutral gray for default
+   members, emerald (solid or outline) for in-progress / branded states,
+   danger red for destructive flags. Use .role-tab as the base + a
+   modifier for the color scheme. Tiny uppercase letters, fixed
+   min-width so a row of mixed pills aligns. */
+.role-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 4px;
+  line-height: 1;
+  text-align: center;
+  min-width: 76px;
+  box-sizing: border-box;
+}
+.role-tab-admin {
+  background: var(--color-ink);
+  color: #ffffff;
+}
+.role-tab-member {
+  background: var(--color-petrol-100);
+  color: var(--color-gray-700);
+}
+.role-tab-pending {
+  background: var(--color-petrol-500);
+  color: #ffffff;
+}
+.role-tab-outline {
+  background: transparent;
+  color: var(--color-petrol-500);
+  border: 1px solid var(--color-petrol-500);
+  padding: 4px 9px;
+}
+.role-tab-danger {
+  background: var(--color-danger);
+  color: #ffffff;
+}
+
 /* Fix V — pill-shaped, always-visible horizontal scrollbar for the Kanban
    board (the visible bottom track + the synced sticky mirror at the top). */
 .kanban-scroll {
