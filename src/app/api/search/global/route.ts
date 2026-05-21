@@ -29,6 +29,12 @@ type Result = {
   id: string;
   title: string;
   subtitle: string | null;
+  // Richer card surfaces for lead-style results. `body` is the third line
+  // (e.g. owner + key amount); `matchedField` is the "Matched: …" footer;
+  // `badge` is a small chip on the right (typically the stage).
+  body: string | null;
+  matchedField: string | null;
+  badge: string | null;
   href: string;
 };
 
@@ -80,42 +86,71 @@ export async function GET(req: NextRequest) {
     ownerStatusMatches.length > 0 ? `status.in.(${ownerStatusMatches.join(",")})` : null;
 
   // Numeric — if the query parses as a number (after stripping $/,/space),
-  // try to match every amount-style column.
+  // try to match every amount-style column. Currency in the UI is rounded
+  // to whole dollars (maximumFractionDigits: 0), so a typed integer like
+  // 96668 should match any stored value that displays as $96,668 — i.e.
+  // [96667.50, 96668.50). Decimals match exactly.
   const numericRaw = sanitized.replace(/[$,\s]/g, "");
   const numericValue = /^-?\d+(\.\d+)?$/.test(numericRaw) ? Number(numericRaw) : null;
+  const numericIsInteger = numericValue != null && Number.isInteger(numericValue);
+  function currencyFilter(col: string): string | null {
+    if (numericValue == null) return null;
+    if (numericIsInteger) {
+      const low = numericValue - 0.5;
+      const high = numericValue + 0.5;
+      return `and(${col}.gte.${low},${col}.lt.${high})`;
+    }
+    return `${col}.eq.${numericValue}`;
+  }
   const leadAmountFilters =
     numericValue != null && Number.isFinite(numericValue)
-      ? [
-          `closing_bid.eq.${numericValue}`,
-          `estimated_surplus.eq.${numericValue}`,
-          `confirmed_surplus.eq.${numericValue}`,
-          `source_surplus.eq.${numericValue}`,
-          `estimated_net_payout.eq.${numericValue}`,
-          `attorney_cost.eq.${numericValue}`,
+      ? ([
+          currencyFilter("closing_bid"),
+          currencyFilter("estimated_surplus"),
+          currencyFilter("confirmed_surplus"),
+          currencyFilter("source_surplus"),
+          currencyFilter("estimated_net_payout"),
+          currencyFilter("attorney_cost"),
+          // recovery_fee_percent is a percent, not currency — exact match only.
           `recovery_fee_percent.eq.${numericValue}`,
-        ]
+        ].filter(Boolean) as string[])
       : [];
   const lienAmountFilter =
     numericValue != null && Number.isFinite(numericValue)
-      ? `amount.eq.${numericValue}`
+      ? currencyFilter("amount")
       : null;
 
-  // Phone normalization — phones are stored in mixed formats
-  // ('(555) 123-4567' / '5551234567' / '+1 555-123-4567' / etc). Strip the
-  // query to digits and interleave with wildcards so any punctuation between
-  // any pair of digits still matches. "4567" → "*4*5*6*7*" finds the last
-  // four digits of a formatted phone; "5551234" → "*5*5*5*1*2*3*4*" finds
-  // a 7-digit partial regardless of formatting. Threshold lowered to 4 so
-  // typing a last-4 or area code starts working.
+  // Phone normalization — phones are stored as "(555) 123-4567" per the
+  // app's formatting rule, but some legacy / imported rows may have
+  // "5551234567", "+1 555-123-4567", "555.123.4567", etc.
+  //
+  // Match strategy:
+  //   • Plain substring of the typed digits ("*694*"). Pure substring on the
+  //     stored value — only matches consecutive digit sequences, so "694"
+  //     never matches "(689) 476-5539" (which it WOULD with interleaved
+  //     wildcards like "*6*9*4*"; that pattern was producing false positives).
+  //   • For 10-digit (or 11 starting with 1) queries, also try the canonical
+  //     paren+space format the rest of the app uses, so a flat "5551234567"
+  //     still matches a stored "(555) 123-4567".
+  //   • For 7-digit queries, also try "xxx-xxxx" so "5551234" matches a
+  //     stored local number with a dash.
   const phoneDigits = sanitized.replace(/\D/g, "");
-  let phoneIlikeValue: string | null = null;
-  if (phoneDigits.length >= 4) {
+  const phoneIlikePatterns: string[] = [];
+  if (phoneDigits.length >= 3) {
     let d = phoneDigits;
-    // Drop a leading country-code 1 if we have 11 digits — '+15551234567' should
-    // match '(555) 123-4567'.
     if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
-    phoneIlikeValue = `*${d.split("").join("*")}*`;
+    phoneIlikePatterns.push(`*${d}*`);
+    if (d.length === 10) {
+      const a = d.slice(0, 3), b = d.slice(3, 6), c = d.slice(6, 10);
+      phoneIlikePatterns.push(`*(${a}) ${b}-${c}*`);
+    } else if (d.length === 7) {
+      const a = d.slice(0, 3), b = d.slice(3, 7);
+      phoneIlikePatterns.push(`*${a}-${b}*`);
+    }
   }
+  // Back-compat alias used by several existing filters below — the first
+  // pattern in the array (the plain-digit substring) is the universal one.
+  const phoneIlikeValue = phoneIlikePatterns[0] ?? null;
 
   // Date parsing — leads have several date columns (sale_date, redemption_ends,
   // filing_deadline). Try to interpret the query as an ISO date / year-month /
@@ -156,12 +191,72 @@ export async function GET(req: NextRequest) {
     let y = slashMatch[3];
     if (y.length === 2) y = "20" + y;
     pushExactDate(`${y}-${m}-${dd}`);
+  } else {
+    // Month name parsing: "may" / "may 2025" / "feb 24". Matches any date
+    // column falling in that month across recent years (current ± 2).
+    const MONTHS = [
+      "january", "february", "march", "april", "may", "june",
+      "july", "august", "september", "october", "november", "december",
+    ];
+    const monthYearMatch = /^([a-z]+)(?:\s+(\d{2,4}))?$/.exec(sanitized.toLowerCase());
+    if (monthYearMatch && monthYearMatch[1].length >= 3) {
+      const namePart = monthYearMatch[1];
+      const monthIdx = MONTHS.findIndex((m) => m.startsWith(namePart));
+      if (monthIdx >= 0) {
+        const moStr = String(monthIdx + 1).padStart(2, "0");
+        let years: number[];
+        if (monthYearMatch[2]) {
+          let y = Number(monthYearMatch[2]);
+          if (y < 100) y = 2000 + y;
+          years = [y];
+        } else {
+          const cy = new Date().getFullYear();
+          years = [cy - 2, cy - 1, cy, cy + 1];
+        }
+        for (const y of years) {
+          const start = `${y}-${moStr}-01`;
+          const nextMo = monthIdx === 11 ? 1 : monthIdx + 2;
+          const nextYr = monthIdx === 11 ? y + 1 : y;
+          const end = `${nextYr}-${String(nextMo).padStart(2, "0")}-01`;
+          pushRange(start, end);
+        }
+      }
+    }
   }
 
   const sb = await createClient();
   const leadIdSet = new Set<string>();
   const results: Result[] = [];
-  const leadCache = new Map<string, { lead_id: string; address: string; city: string | null; state: string | null; zip: string | null }>();
+  // Cache holds the richer per-lead info needed to build the card layout.
+  type LeadCardInfo = {
+    lead_id: string;
+    address: string;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+    stage: string | null;
+    estimated_net_payout: number | null;
+    primary_owner_name: string | null;
+  };
+  const leadCache = new Map<string, LeadCardInfo>();
+
+  // Field list to embed on every child-table query that joins leads(...).
+  // Keeping it in one constant means owners/stage/net-payout stay in sync
+  // across owners, contacts, relatives, parties, tasks, documents, liens,
+  // comments, activities.
+  const LEAD_JOIN_FIELDS =
+    "id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary)";
+
+  function pickPrimaryOwnerName(owners: unknown): string | null {
+    if (!Array.isArray(owners) || owners.length === 0) return null;
+    const list = owners as Array<{ full_name: string | null; is_primary: boolean | null }>;
+    const primary = list.find((o) => o.is_primary) ?? list[0];
+    return primary?.full_name || null;
+  }
+
+  function fmtMoneyShort(n: number): string {
+    return `$${Math.round(n).toLocaleString()}`;
+  }
 
   function placeLine(city?: string | null, state?: string | null, zip?: string | null): string {
     const place = [city, state].filter(Boolean).join(", ");
@@ -174,19 +269,28 @@ export async function GET(req: NextRequest) {
 
   function pushLead(
     leadId: string,
-    leadInfo: { lead_id: string; address: string; city: string | null; state: string | null; zip: string | null },
-    matchHint: string | null
+    info: LeadCardInfo,
+    matchedField: string | null
   ) {
     if (leadIdSet.has(leadId)) return;
     leadIdSet.add(leadId);
-    const place = placeLine(leadInfo.city, leadInfo.state, leadInfo.zip);
-    const subtitleParts = [leadInfo.lead_id, place || null, matchHint].filter(Boolean);
+    const place = placeLine(info.city, info.state, info.zip);
+    const subtitleParts = [info.lead_id, place || null].filter(Boolean) as string[];
+    const bodyParts: string[] = [];
+    if (info.primary_owner_name) bodyParts.push(info.primary_owner_name);
+    if (info.estimated_net_payout != null) {
+      bodyParts.push(`Est. Net Payout ${fmtMoneyShort(info.estimated_net_payout)}`);
+    }
+    const badge = info.stage ? STAGE_LABELS[info.stage as Stage] ?? null : null;
     results.push({
       group: "leads",
       groupLabel: "Leads",
       id: leadId,
-      title: leadInfo.address || place || leadInfo.lead_id,
+      title: info.address || place || info.lead_id,
       subtitle: subtitleParts.join(" · ") || null,
+      body: bodyParts.length > 0 ? bodyParts.join(" · ") : null,
+      matchedField,
+      badge,
       href: leadHref(leadId),
     });
   }
@@ -197,15 +301,18 @@ export async function GET(req: NextRequest) {
     if (missing.length === 0) return;
     const { data } = await sb
       .from("leads")
-      .select("id, lead_id, address, city, state, zip")
+      .select(LEAD_JOIN_FIELDS)
       .in("id", missing);
-    for (const r of data ?? []) {
+    for (const r of (data ?? []) as Array<Record<string, unknown>>) {
       leadCache.set(r.id as string, {
         lead_id: r.lead_id as string,
         address: r.address as string,
         city: r.city as string | null,
         state: r.state as string | null,
         zip: r.zip as string | null,
+        stage: r.stage as string | null,
+        estimated_net_payout: r.estimated_net_payout as number | null,
+        primary_owner_name: pickPrimaryOwnerName(r.owners),
       });
     }
   }
@@ -215,7 +322,7 @@ export async function GET(req: NextRequest) {
   // 1) Leads — match against every lead-level column.
   const leadsQ = sb
     .from("leads")
-    .select("id, lead_id, address, city, state, zip, county, case_number, estimated_surplus, confirmed_surplus, closing_bid, attorney_cost, stage, sale_type")
+    .select("id, lead_id, address, city, state, zip, county, case_number, estimated_surplus, confirmed_surplus, source_surplus, estimated_net_payout, closing_bid, attorney_cost, recovery_fee_percent, stage, sale_type, owners(full_name, is_primary)")
     .or(
       [
         `lead_id.ilike.${v}`,
@@ -241,22 +348,22 @@ export async function GET(req: NextRequest) {
   // 2) Owners — name OR status (Living/Deceased/etc.) → lead.
   const ownersQ = sb
     .from("owners")
-    .select("full_name, status, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .select("full_name, status, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .or(
       [`full_name.ilike.${v}`, ownerStatusInFilter].filter(Boolean).join(",")
     )
     .limit(8);
 
   // 3) Contacts (phone/email values) — match the value → lead. If the query
-  // looks like a phone number, also try a digit-wildcard pattern that ignores
-  // formatting differences.
+  // looks like a phone number, also try every format variant we generated
+  // so a flat "5551234567" matches a stored "(555) 123-4567".
   const contactsQ = sb
     .from("contacts")
-    .select("value, channel, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .select("value, channel, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .or(
       [
         `value.ilike.${v}`,
-        phoneIlikeValue ? `value.ilike.${phoneIlikeValue}` : null,
+        ...phoneIlikePatterns.map((p) => `value.ilike.${p}`),
       ]
         .filter(Boolean)
         .join(",")
@@ -264,18 +371,15 @@ export async function GET(req: NextRequest) {
     .limit(8);
 
   // 4) Relatives — match full_name, phone (1-5), email (1-5), street, city, state → lead.
-  const phoneIlikeFilters = phoneIlikeValue
-    ? [
-        `phone.ilike.${phoneIlikeValue}`,
-        `phone_2.ilike.${phoneIlikeValue}`,
-        `phone_3.ilike.${phoneIlikeValue}`,
-        `phone_4.ilike.${phoneIlikeValue}`,
-        `phone_5.ilike.${phoneIlikeValue}`,
-      ]
-    : [];
+  const phoneIlikeFilters: string[] = [];
+  for (const slot of ["phone", "phone_2", "phone_3", "phone_4", "phone_5"]) {
+    for (const p of phoneIlikePatterns) {
+      phoneIlikeFilters.push(`${slot}.ilike.${p}`);
+    }
+  }
   const relativesQ = sb
     .from("relatives")
-    .select("id, full_name, phone, phone_2, phone_3, phone_4, phone_5, email, email_2, email_3, email_4, email_5, street, city, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .select("id, full_name, phone, phone_2, phone_3, phone_4, phone_5, email, email_2, email_3, email_4, email_5, street, city, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .or(
       [
         `full_name.ilike.${v}`,
@@ -303,14 +407,14 @@ export async function GET(req: NextRequest) {
   // 5) Lead parties (other contacts) — name, organization, email, phone, custom_role_label, notes.
   const partiesQ = sb
     .from("lead_parties")
-    .select("id, name, organization, email, phone, custom_role_label, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .select("id, name, organization, email, phone, custom_role_label, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .or(
       [
         `name.ilike.${v}`,
         `organization.ilike.${v}`,
         `email.ilike.${v}`,
         `phone.ilike.${v}`,
-        phoneIlikeValue ? `phone.ilike.${phoneIlikeValue}` : null,
+        ...phoneIlikePatterns.map((p) => `phone.ilike.${p}`),
         `custom_role_label.ilike.${v}`,
       ]
         .filter(Boolean)
@@ -321,7 +425,7 @@ export async function GET(req: NextRequest) {
   // 6) Tasks — title, description, notes.
   const tasksQ = sb
     .from("tasks")
-    .select("id, title, description, notes, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .select("id, title, description, notes, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .or(
       [`title.ilike.${v}`, `description.ilike.${v}`, `notes.ilike.${v}`].join(",")
     )
@@ -330,7 +434,7 @@ export async function GET(req: NextRequest) {
   // 7) Documents — filename, custom_name, notes.
   const docsQ = sb
     .from("documents")
-    .select("id, filename, custom_name, notes, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .select("id, filename, custom_name, notes, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .or([`filename.ilike.${v}`, `custom_name.ilike.${v}`, `notes.ilike.${v}`].join(","))
     .limit(8);
 
@@ -355,14 +459,14 @@ export async function GET(req: NextRequest) {
   // 9) Liens — name OR amount, bound to lead.
   const liensQ = sb
     .from("liens")
-    .select("id, name, amount, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .select("id, name, amount, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .or([`name.ilike.${v}`, lienAmountFilter].filter(Boolean).join(","))
     .limit(6);
 
   // 9a) Discussion comments — flat text body tied to a lead.
   const commentsQ = sb
     .from("discussion_comments")
-    .select("id, body, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .select("id, body, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .ilike("body", v)
     .limit(6);
 
@@ -371,7 +475,7 @@ export async function GET(req: NextRequest) {
   // `column->>field.ilike.*x*` for JSON-path text matching.
   const activitiesQ = sb
     .from("activities")
-    .select("id, activity_type, payload, lead_id, leads(id, lead_id, address, city, state, zip, archived)")
+    .select("id, activity_type, payload, lead_id, leads(id, lead_id, address, city, state, zip, archived, stage, estimated_net_payout, owners(full_name, is_primary))")
     .or(
       [
         `payload->>body.ilike.${v}`,
@@ -393,7 +497,7 @@ export async function GET(req: NextRequest) {
         `name.ilike.${v}`,
         `email.ilike.${v}`,
         `phone.ilike.${v}`,
-        phoneIlikeValue ? `phone.ilike.${phoneIlikeValue}` : null,
+        ...phoneIlikePatterns.map((p) => `phone.ilike.${p}`),
         `notes.ilike.${v}`,
       ]
         .filter(Boolean)
@@ -470,11 +574,35 @@ export async function GET(req: NextRequest) {
     mailTplsR,
   ] = settled;
 
-  type LeadJoin = { id: string; lead_id: string; address: string; city: string | null; state: string | null; zip: string | null; archived: boolean } | null;
+  type LeadJoin = {
+    id: string;
+    lead_id: string;
+    address: string;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+    archived: boolean;
+    stage: string | null;
+    estimated_net_payout: number | null;
+    owners: unknown;
+  } | null;
 
   function leadFromJoin(j: unknown): LeadJoin {
     if (!j || typeof j !== "object") return null;
     return j as LeadJoin;
+  }
+
+  function leadInfoFromJoin(l: NonNullable<LeadJoin>): LeadCardInfo {
+    return {
+      lead_id: l.lead_id,
+      address: l.address,
+      city: l.city,
+      state: l.state,
+      zip: l.zip,
+      stage: l.stage,
+      estimated_net_payout: l.estimated_net_payout,
+      primary_owner_name: pickPrimaryOwnerName(l.owners),
+    };
   }
 
   // snake_case / SCREAMING_CASE → "Title Case" so backend identifiers never
@@ -497,8 +625,48 @@ export async function GET(req: NextRequest) {
       city: string | null; state: string | null; zip: string | null;
       county: string | null; case_number: string | null;
       stage: string | null; sale_type: string | null;
+      estimated_surplus: number | null;
+      confirmed_surplus: number | null;
+      source_surplus: number | null;
+      estimated_net_payout: number | null;
+      closing_bid: number | null;
+      attorney_cost: number | null;
+      recovery_fee_percent: number | null;
+      owners: unknown;
     };
+    // Currency columns in priority order — when a numeric query matches one
+    // of these, the hint reads e.g. "Est. Net Payout: $96,668" so the user
+    // can see which financial value brought this lead up.
+    const CURRENCY_COLS: Array<[string, keyof LeadRow]> = [
+      ["Est. Net Payout", "estimated_net_payout"],
+      ["Confirmed Surplus", "confirmed_surplus"],
+      ["Est. Surplus", "estimated_surplus"],
+      ["Source Surplus", "source_surplus"],
+      ["Closing Bid", "closing_bid"],
+      ["Attorney Cost", "attorney_cost"],
+    ];
+    function fmtMoney(n: number): string {
+      return `$${Math.round(n).toLocaleString()}`;
+    }
     function leadMatchHint(r: LeadRow): string | null {
+      // Numeric match — surface the financial field that rounds to the query.
+      if (numericValue != null && Number.isFinite(numericValue)) {
+        for (const [label, col] of CURRENCY_COLS) {
+          const v = r[col] as number | null;
+          if (v == null) continue;
+          const hitsRounded = numericIsInteger && Math.round(v) === numericValue;
+          const hitsExact = !numericIsInteger && v === numericValue;
+          if (hitsRounded || hitsExact) {
+            return `${label}: ${fmtMoney(v)}`;
+          }
+        }
+        if (
+          r.recovery_fee_percent != null &&
+          r.recovery_fee_percent === numericValue
+        ) {
+          return `Recovery Fee: ${r.recovery_fee_percent}%`;
+        }
+      }
       const addr = (r.address || "").toLowerCase();
       // If the address itself contains the query, the title already shows it.
       if (addr.includes(qLower)) return null;
@@ -535,6 +703,9 @@ export async function GET(req: NextRequest) {
         city: r.city,
         state: r.state,
         zip: r.zip,
+        stage: r.stage,
+        estimated_net_payout: r.estimated_net_payout,
+        primary_owner_name: pickPrimaryOwnerName(r.owners),
       });
       pushLead(r.id, leadCache.get(r.id)!, leadMatchHint(r));
     }
@@ -544,7 +715,7 @@ export async function GET(req: NextRequest) {
   function pushFromJoin(row: { lead_id?: string | null; leads?: unknown }, matchHint: string | null) {
     const l = leadFromJoin(row.leads);
     if (!l || l.archived) return;
-    leadCache.set(l.id, { lead_id: l.lead_id, address: l.address, city: l.city, state: l.state, zip: l.zip });
+    leadCache.set(l.id, leadInfoFromJoin(l));
     pushLead(l.id, leadCache.get(l.id)!, matchHint);
   }
 
@@ -560,17 +731,87 @@ export async function GET(req: NextRequest) {
       pushFromJoin(c, `${humanize(c.channel)}: ${c.value}`);
     }
   }
-  // 4) Relatives
+  // 4) Relatives — figure out which slot actually matched so the result
+  // doesn't read as "relative: <name>" when the match was a phone/email
+  // sitting on that relative record. e.g. searching an email shouldn't
+  // surface as "relative: <name>" with no breadcrumb to the email field.
   if (relativesR.status === "fulfilled" && relativesR.value.data) {
-    for (const r of relativesR.value.data as Array<{ full_name: string; lead_id: string; leads: unknown }>) {
-      pushFromJoin(r, `relative: ${r.full_name}`);
+    const qLower = sanitized.toLowerCase();
+    type RelativeRow = {
+      full_name: string;
+      phone: string | null; phone_2: string | null; phone_3: string | null; phone_4: string | null; phone_5: string | null;
+      email: string | null; email_2: string | null; email_3: string | null; email_4: string | null; email_5: string | null;
+      street: string | null;
+      city: string | null;
+      lead_id: string;
+      leads: unknown;
+    };
+    function relativeMatchHint(r: RelativeRow): string {
+      const emails = [r.email, r.email_2, r.email_3, r.email_4, r.email_5];
+      for (const e of emails) {
+        if (e && e.toLowerCase().includes(qLower)) {
+          return `${r.full_name} · Email: ${e}`;
+        }
+      }
+      const phones = [r.phone, r.phone_2, r.phone_3, r.phone_4, r.phone_5];
+      if (phoneDigits.length >= 3) {
+        for (const p of phones) {
+          if (p && p.replace(/\D/g, "").includes(phoneDigits)) {
+            return `${r.full_name} · Phone: ${p}`;
+          }
+        }
+      } else {
+        for (const p of phones) {
+          if (p && p.toLowerCase().includes(qLower)) {
+            return `${r.full_name} · Phone: ${p}`;
+          }
+        }
+      }
+      if (r.street && r.street.toLowerCase().includes(qLower)) {
+        return `${r.full_name} · Street: ${r.street}`;
+      }
+      if (r.city && r.city.toLowerCase().includes(qLower)) {
+        return `${r.full_name} · City: ${r.city}`;
+      }
+      // Default: name matched.
+      return `Relative: ${r.full_name}`;
+    }
+    for (const r of relativesR.value.data as RelativeRow[]) {
+      pushFromJoin(r, relativeMatchHint(r));
     }
   }
-  // 5) Lead parties
+  // 5) Lead parties — same field-aware hint pattern as relatives so an
+  // email/phone/organization match doesn't show only the role + name.
   if (partiesR.status === "fulfilled" && partiesR.value.data) {
-    for (const p of partiesR.value.data as Array<{ name: string; custom_role_label: string | null; lead_id: string; leads: unknown }>) {
-      const label = humanize(p.custom_role_label || "contact");
-      pushFromJoin(p, `${label}: ${p.name}`);
+    const qLower = sanitized.toLowerCase();
+    type PartyRow = {
+      name: string;
+      organization: string | null;
+      email: string | null;
+      phone: string | null;
+      custom_role_label: string | null;
+      lead_id: string;
+      leads: unknown;
+    };
+    function partyMatchHint(p: PartyRow): string {
+      const role = humanize(p.custom_role_label || "contact");
+      if (p.email && p.email.toLowerCase().includes(qLower)) {
+        return `${role}: ${p.name} · Email: ${p.email}`;
+      }
+      const phoneHit =
+        (phoneDigits.length >= 3 && p.phone && p.phone.replace(/\D/g, "").includes(phoneDigits)) ||
+        (p.phone && p.phone.toLowerCase().includes(qLower));
+      if (phoneHit && p.phone) {
+        return `${role}: ${p.name} · Phone: ${p.phone}`;
+      }
+      if (p.organization && p.organization.toLowerCase().includes(qLower)) {
+        return `${role}: ${p.name} · ${p.organization}`;
+      }
+      // Default: name or role matched.
+      return `${role}: ${p.name}`;
+    }
+    for (const p of partiesR.value.data as PartyRow[]) {
+      pushFromJoin(p, partyMatchHint(p));
     }
   }
   // 6) Tasks
@@ -605,6 +846,9 @@ export async function GET(req: NextRequest) {
           ]
             .filter(Boolean)
             .join(" · "),
+          body: null,
+          matchedField: null,
+          badge: null,
           href: "/mail",
         });
       }
@@ -653,6 +897,9 @@ export async function GET(req: NextRequest) {
         id: a.id,
         title: a.name,
         subtitle: [a.email, a.phone].filter(Boolean).join(" · ") || null,
+        body: null,
+        matchedField: null,
+        badge: null,
         href: "/settings#attorneys",
       });
     }
@@ -666,6 +913,9 @@ export async function GET(req: NextRequest) {
         id: m.id,
         title: m.full_name || m.email || "Member",
         subtitle: m.email,
+        body: null,
+        matchedField: null,
+        badge: null,
         href: "/settings#team",
       });
     }
@@ -680,6 +930,9 @@ export async function GET(req: NextRequest) {
         id: t.id,
         title: t.name,
         subtitle: t.subject ?? null,
+        body: null,
+        matchedField: null,
+        badge: null,
         href: isEmail ? "/settings#email-templates" : "/settings#sms-templates",
       });
     }
@@ -693,6 +946,9 @@ export async function GET(req: NextRequest) {
         id: r.id,
         title: r.name,
         subtitle: [r.state, r.sale_type].filter(Boolean).join(" · ") || null,
+        body: null,
+        matchedField: null,
+        badge: null,
         href: "/settings#research-templates",
       });
     }
@@ -706,6 +962,9 @@ export async function GET(req: NextRequest) {
         id: t.id,
         title: t.name,
         subtitle: t.description ?? null,
+        body: null,
+        matchedField: null,
+        badge: null,
         href: "/mail/templates",
       });
     }

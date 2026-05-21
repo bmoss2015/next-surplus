@@ -20,6 +20,9 @@ type Result = {
   id: string;
   title: string;
   subtitle: string | null;
+  body: string | null;
+  matchedField: string | null;
+  badge: string | null;
   href: string;
 };
 
@@ -179,7 +182,6 @@ export function GlobalSearch() {
           onKeyDown={onKeyDown}
           autoComplete="off"
         />
-        <kbd className="rounded border border-gray-200 bg-surface px-1.5 py-0.5 text-[10px] font-medium text-gray-500 font-mono">⌘K</kbd>
       </label>
 
       {popoverOpen && (
@@ -219,12 +221,30 @@ export function GlobalSearch() {
                             <RowIcon size={13} stroke={1.75} />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[13px] font-medium text-ink">
-                              {highlight(r.title, q)}
+                            <span className="flex items-start justify-between gap-2">
+                              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
+                                {highlight(r.title, q)}
+                              </span>
+                              {r.badge && (
+                                <span className="shrink-0 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                                  {r.badge}
+                                </span>
+                              )}
                             </span>
                             {r.subtitle && (
                               <span className="mt-0.5 block truncate text-[11.5px] text-gray-500 tabular-nums">
                                 {highlight(r.subtitle, q)}
+                              </span>
+                            )}
+                            {r.body && (
+                              <span className="mt-0.5 block truncate text-[11.5px] text-gray-600">
+                                {highlight(r.body, q)}
+                              </span>
+                            )}
+                            {r.matchedField && (
+                              <span className="mt-1 flex items-center gap-1 truncate text-[11px] text-petrol-500">
+                                <span className="font-mono text-gray-400">↳</span>
+                                Matched: {highlight(r.matchedField, q)}
                               </span>
                             )}
                           </span>
