@@ -39,22 +39,39 @@ export async function GET(req: NextRequest) {
   const sb = await createClient();
   const results: Result[] = [];
 
-  // Leads — by lead_id, address, or owner name
+  // Leads — match across every searchable column. The address, city, state,
+  // zip, county are separate columns on `leads`, so "Suwanee" only finds
+  // leads if we explicitly query `city` (not just `address`).
   const { data: leads } = await sb
     .from("leads")
-    .select("id, lead_id, address, owners(full_name, is_primary)")
-    .or(`lead_id.ilike.${v},address.ilike.${v}`)
+    .select("id, lead_id, address, city, state, zip, county, case_number, owners(full_name, is_primary)")
+    .or(
+      [
+        `lead_id.ilike.${v}`,
+        `address.ilike.${v}`,
+        `city.ilike.${v}`,
+        `state.ilike.${v}`,
+        `zip.ilike.${v}`,
+        `county.ilike.${v}`,
+        `case_number.ilike.${v}`,
+      ].join(",")
+    )
     .eq("archived", false)
-    .limit(5);
+    .limit(8);
   for (const r of leads ?? []) {
     const owners = ((r as { owners?: Array<{ full_name: string; is_primary: boolean }> }).owners) ?? [];
     const owner = owners.find((o) => o.is_primary)?.full_name ?? owners[0]?.full_name ?? null;
+    const city = (r as { city?: string | null }).city;
+    const state = (r as { state?: string | null }).state;
+    const zip = (r as { zip?: string | null }).zip;
+    const place = [city, state].filter(Boolean).join(", ");
+    const subtitleParts = [r.lead_id as string, place || null, zip || null, owner].filter(Boolean);
     results.push({
       group: "leads",
       groupLabel: "Leads",
       id: r.id as string,
-      title: r.address as string,
-      subtitle: [r.lead_id as string, owner].filter(Boolean).join(" · "),
+      title: (r.address as string) || place || (r.lead_id as string),
+      subtitle: subtitleParts.join(" · ") || null,
       href: `/leads/${r.id}`,
     });
   }
@@ -62,20 +79,21 @@ export async function GET(req: NextRequest) {
   // Owners — separate query for owner name matches (search.owners is harder via PostgREST joins)
   const { data: leadsByOwner } = await sb
     .from("owners")
-    .select("full_name, leads(id, lead_id, address)")
+    .select("full_name, leads(id, lead_id, address, city, state, zip)")
     .ilike("full_name", v)
     .limit(5);
   for (const o of leadsByOwner ?? []) {
-    const leadRow = (o as { leads?: { id: string; lead_id: string; address: string } | null }).leads;
+    const leadRow = (o as { leads?: { id: string; lead_id: string; address: string; city: string | null; state: string | null; zip: string | null } | null }).leads;
     if (!leadRow) continue;
     // Skip if already in results
     if (results.find((r) => r.group === "leads" && r.id === leadRow.id)) continue;
+    const place = [leadRow.city, leadRow.state].filter(Boolean).join(", ");
     results.push({
       group: "leads",
       groupLabel: "Leads",
       id: leadRow.id,
-      title: leadRow.address,
-      subtitle: [leadRow.lead_id, (o as { full_name: string }).full_name].filter(Boolean).join(" · "),
+      title: leadRow.address || place || leadRow.lead_id,
+      subtitle: [leadRow.lead_id, place || null, (o as { full_name: string }).full_name].filter(Boolean).join(" · "),
       href: `/leads/${leadRow.id}`,
     });
   }
