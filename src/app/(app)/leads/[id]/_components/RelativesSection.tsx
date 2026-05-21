@@ -533,91 +533,153 @@ function RelativeCard({
       </div>
 
       <div className="flex flex-col gap-1.5 border-t border-gray-150 pt-2">
-        <SectionSubheader className="mb-0">Address</SectionSubheader>
-        {!addingAddress && (
-          <button
-            type="button"
-            onClick={() => setAddingAddress(true)}
-            className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
-          >
-            + Add Address
-          </button>
-        )}
-        {addingAddress && (
-          <div className="flex flex-col gap-1.5 rounded-md border border-petrol-200 bg-petrol-50/40 p-2">
-            <input
-              value={street}
-              onChange={(e) => setStreet(e.target.value)}
-              placeholder="Street"
-              className={addrInputClass}
-            />
-            <div className="grid grid-cols-[1fr_56px_88px] gap-1.5">
-              <input
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="City"
-                className={addrInputClass}
-              />
-              <input
-                value={stateCode}
-                onChange={(e) =>
-                  setStateCode(e.target.value.toUpperCase().slice(0, 2))
-                }
-                placeholder="ST"
-                maxLength={2}
-                className={cn(addrInputClass, "uppercase")}
-              />
-              <input
-                value={zip}
-                onChange={(e) => setZip(e.target.value)}
-                placeholder="ZIP"
-                className={addrInputClass}
-              />
-            </div>
-            <div className="flex items-center justify-end gap-1.5 pt-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  // Cancel: reset to last-saved values from the row and
-                  // collapse back to the +Add affordance if nothing is
-                  // saved yet, or keep open if there's a stored value
-                  // (so the user can still see what was there).
-                  setStreet(relative.street ?? "");
-                  setCity(relative.city ?? "");
-                  setStateCode(relative.state ?? "");
-                  setZip(relative.zip ?? "");
-                  const hasStored = Boolean(
-                    (relative.street ?? "").trim() ||
-                      (relative.city ?? "").trim() ||
-                      (relative.state ?? "").trim() ||
-                      (relative.zip ?? "").trim()
-                  );
-                  if (!hasStored) setAddingAddress(false);
-                }}
-                className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-[4px] text-[11px] font-medium text-ink hover:border-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  // One save call patches all four address fields at
-                  // once so the address row writes atomically.
-                  onPatch({
-                    street: street.trim() || null,
-                    city: city.trim() || null,
-                    state: stateCode.trim() || null,
-                    zip: zip.trim() || null,
-                  });
-                }}
-                disabled={!street.trim()}
-                className="cursor-pointer rounded-md bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-3 py-[4px] text-[11px] font-medium text-white disabled:opacity-40"
-              >
-                Save Address
-              </button>
-            </div>
-          </div>
-        )}
+        <SectionSubheader className="mb-0">Mailing Address</SectionSubheader>
+        {(() => {
+          const storedStreet = (relative.street ?? "").trim();
+          const storedCity = (relative.city ?? "").trim();
+          const storedState = (relative.state ?? "").trim();
+          const storedZip = (relative.zip ?? "").trim();
+          const hasStored = Boolean(
+            storedStreet || storedCity || storedState || storedZip
+          );
+          const tail = [
+            storedCity,
+            [storedState, storedZip].filter(Boolean).join(" "),
+          ]
+            .filter(Boolean)
+            .join(", ");
+          const fullAddress = [storedStreet, tail]
+            .filter(Boolean)
+            .join(", ");
+
+          if (addingAddress) {
+            return (
+              <div className="flex flex-col gap-1.5 rounded-md border border-petrol-200 bg-petrol-50/40 p-2">
+                <input
+                  autoFocus
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  placeholder="Street"
+                  className={addrInputClass}
+                />
+                <div className="grid grid-cols-[1fr_56px_88px] gap-1.5">
+                  <input
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City"
+                    className={addrInputClass}
+                  />
+                  <input
+                    value={stateCode}
+                    onChange={(e) =>
+                      setStateCode(e.target.value.toUpperCase().slice(0, 2))
+                    }
+                    placeholder="ST"
+                    maxLength={2}
+                    className={cn(addrInputClass, "uppercase")}
+                  />
+                  <input
+                    value={zip}
+                    onChange={(e) => setZip(e.target.value)}
+                    placeholder="ZIP"
+                    className={addrInputClass}
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-1.5 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStreet(relative.street ?? "");
+                      setCity(relative.city ?? "");
+                      setStateCode(relative.state ?? "");
+                      setZip(relative.zip ?? "");
+                      setAddingAddress(false);
+                    }}
+                    className="cursor-pointer rounded-md border border-gray-200 bg-surface px-2.5 py-[4px] text-[11px] font-medium text-ink hover:border-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Patch all four fields atomically + close the
+                      // form so the saved row appears immediately
+                      // (without this, the form stayed open and the
+                      // Save button felt "stuck").
+                      onPatch({
+                        street: street.trim() || null,
+                        city: city.trim() || null,
+                        state: stateCode.trim() || null,
+                        zip: zip.trim() || null,
+                      });
+                      setAddingAddress(false);
+                    }}
+                    disabled={!street.trim()}
+                    className="cursor-pointer rounded-md bg-gradient-to-br from-[#0a3d4a] to-[#0d6c7d] px-3 py-[4px] text-[11px] font-medium text-white disabled:opacity-40"
+                  >
+                    Save Address
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          if (hasStored) {
+            return (
+              <div className="flex items-start gap-1 rounded-md border border-gray-200 bg-surface px-2 py-[5px] text-[11.5px] text-ink">
+                <span className="mt-[1px] flex-shrink-0 text-gray-400">
+                  <IconMail size={11} stroke={2} />
+                </span>
+                <span className="min-w-0 flex-1 whitespace-pre-wrap break-words leading-snug">
+                  {fullAddress}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStreet(relative.street ?? "");
+                    setCity(relative.city ?? "");
+                    setStateCode(relative.state ?? "");
+                    setZip(relative.zip ?? "");
+                    setAddingAddress(true);
+                  }}
+                  className="cursor-pointer text-gray-400 hover:text-petrol-500"
+                  aria-label="Edit Mailing Address"
+                >
+                  <IconPencil size={11} stroke={1.75} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStreet("");
+                    setCity("");
+                    setStateCode("");
+                    setZip("");
+                    onPatch({
+                      street: null,
+                      city: null,
+                      state: null,
+                      zip: null,
+                    });
+                  }}
+                  className="cursor-pointer text-gray-400 hover:text-danger"
+                  aria-label="Remove Mailing Address"
+                >
+                  <IconTrash size={11} stroke={1.75} />
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <button
+              type="button"
+              onClick={() => setAddingAddress(true)}
+              className="w-fit cursor-pointer text-[11px] font-medium text-petrol-500 hover:text-petrol-700"
+            >
+              + Add Mailing Address
+            </button>
+          );
+        })()}
       </div>
 
       {relative.notes && (
