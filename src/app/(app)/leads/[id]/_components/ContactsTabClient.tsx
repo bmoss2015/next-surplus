@@ -131,6 +131,119 @@ export function AgeEditField({
   );
 }
 
+// Inline editor for an owner / relative name. Names are stored as a
+// single full_name column in Postgres, but users want to see and edit
+// First and Last as separate fields. We split on the LAST whitespace
+// (so middle names stay with first name) for editing, then rejoin
+// with a single space on save. Click the displayed name to edit;
+// Enter or focus loss commits; Esc cancels.
+export function NameEditField({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (fullName: string) => void;
+}) {
+  function splitForEdit(full: string): { first: string; last: string } {
+    const cleaned = full.trim();
+    if (!cleaned) return { first: "", last: "" };
+    const lastSpace = cleaned.lastIndexOf(" ");
+    if (lastSpace < 0) return { first: cleaned, last: "" };
+    return {
+      first: cleaned.slice(0, lastSpace).trim(),
+      last: cleaned.slice(lastSpace + 1).trim(),
+    };
+  }
+
+  const [editing, setEditing] = useState(false);
+  const initial = splitForEdit(value);
+  const [first, setFirst] = useState(initial.first);
+  const [last, setLast] = useState(initial.last);
+  const cancelNext = useRef(false);
+  const wrapRef = useRef<HTMLSpanElement | null>(null);
+
+  function startEdit() {
+    const split = splitForEdit(value);
+    setFirst(split.first);
+    setLast(split.last);
+    setEditing(true);
+  }
+  function commit() {
+    if (cancelNext.current) {
+      cancelNext.current = false;
+      setEditing(false);
+      return;
+    }
+    const combined = `${first.trim()} ${last.trim()}`.replace(/\s+/g, " ").trim();
+    setEditing(false);
+    if (combined && combined !== value) onCommit(combined);
+  }
+
+  if (editing) {
+    return (
+      <span
+        ref={wrapRef}
+        className="inline-flex items-center gap-1"
+        onBlur={(e) => {
+          // Only commit when focus leaves the whole edit cluster, not
+          // when moving between First and Last inputs.
+          if (!wrapRef.current?.contains(e.relatedTarget as Node | null)) {
+            commit();
+          }
+        }}
+      >
+        <input
+          type="text"
+          autoFocus
+          value={first}
+          placeholder="First"
+          onChange={(e) => setFirst(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              (e.currentTarget as HTMLInputElement).blur();
+            } else if (e.key === "Escape") {
+              cancelNext.current = true;
+              (e.currentTarget as HTMLInputElement).blur();
+            }
+          }}
+          className="w-[100px] rounded border border-petrol-500 bg-white px-1 py-[1px] text-[13px] text-ink outline-none"
+          aria-label="First Name"
+        />
+        <input
+          type="text"
+          value={last}
+          placeholder="Last"
+          onChange={(e) => setLast(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              (e.currentTarget as HTMLInputElement).blur();
+            } else if (e.key === "Escape") {
+              cancelNext.current = true;
+              (e.currentTarget as HTMLInputElement).blur();
+            }
+          }}
+          className="w-[100px] rounded border border-petrol-500 bg-white px-1 py-[1px] text-[13px] text-ink outline-none"
+          aria-label="Last Name"
+        />
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      title="Click To Edit Name"
+      className="cursor-text rounded px-0.5 text-[13px] font-medium text-ink hover:bg-petrol-50"
+    >
+      {value || (
+        <span className="italic text-gray-400">Add Name</span>
+      )}
+    </button>
+  );
+}
+
 export function ContactsTabClient({
   leadId,
   initialOwners,
@@ -298,6 +411,17 @@ export function ContactsTabClient({
     setOwners((prev) => prev.map((o) => (o.id === ownerId ? { ...o, age } : o)));
     startTransition(async () => {
       await upsertOwner(leadId, ownerId, { age });
+    });
+  }
+
+  function changeOwnerName(ownerId: string, fullName: string) {
+    const trimmed = fullName.trim();
+    if (!trimmed) return;
+    setOwners((prev) =>
+      prev.map((o) => (o.id === ownerId ? { ...o, full_name: trimmed } : o))
+    );
+    startTransition(async () => {
+      await upsertOwner(leadId, ownerId, { full_name: trimmed });
     });
   }
 
@@ -564,6 +688,7 @@ export function ContactsTabClient({
               )}
               onChangeStatus={(s) => changeOwnerStatus(owner.id, s)}
               onChangeAge={(n) => changeOwnerAge(owner.id, n)}
+              onChangeName={(n) => changeOwnerName(owner.id, n)}
               onChangeNotes={(n) => changeOwnerNotes(owner.id, n)}
               onRemoveOwner={() => removeOwner(owner.id)}
               onAddContact={(channel, value) =>
@@ -587,6 +712,7 @@ function OwnerCard({
   emails,
   onChangeStatus,
   onChangeAge,
+  onChangeName,
   onChangeNotes,
   onRemoveOwner,
   onAddContact,
@@ -600,6 +726,7 @@ function OwnerCard({
   emails: ContactRow[];
   onChangeStatus: (s: OwnerStatus) => void;
   onChangeAge: (n: number | null) => void;
+  onChangeName: (fullName: string) => void;
   onChangeNotes: (n: string | null) => void;
   onRemoveOwner: () => void;
   onAddContact: (channel: "phone" | "email", value: string) => void;
@@ -640,7 +767,7 @@ function OwnerCard({
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3">
       <div className="flex items-start gap-1.5">
         <div className="min-w-0 flex-1 leading-tight">
-          <span className="text-[13px] font-medium text-ink">{owner.full_name}</span>
+          <NameEditField value={owner.full_name} onCommit={onChangeName} />
           <AgeEditField value={owner.age} onCommit={onChangeAge} />
         </div>
         {isAdmin && (

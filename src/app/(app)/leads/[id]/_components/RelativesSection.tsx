@@ -6,7 +6,7 @@ import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions"
 import type { RelativeRow } from "@/lib/leads/fetch-detail";
 import { useRole } from "@/components/RoleProvider";
 import { Modal } from "@/components/Modal";
-import { AgeEditField } from "./ContactsTabClient";
+import { AgeEditField, NameEditField } from "./ContactsTabClient";
 import { formatPhone } from "@/lib/format/phone";
 import { formatPhoneInput, toE164 } from "@/lib/phone";
 import { properCaseName } from "@/lib/format/proper-case-name";
@@ -451,8 +451,14 @@ function RelativeCard({
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-surface p-3">
-      <div className="text-[13px] font-medium leading-tight text-ink">
-        {properCaseName(relative.full_name) || "Unknown"}
+      <div className="flex items-center gap-1 text-[13px] font-medium leading-tight text-ink">
+        <NameEditField
+          value={properCaseName(relative.full_name) || ""}
+          onCommit={(fullName) => {
+            const trimmed = fullName.trim();
+            if (trimmed) onPatch({ full_name: trimmed });
+          }}
+        />
         <AgeEditField value={relative.age} onCommit={(n) => onPatch({ age: n })} />
       </div>
 
