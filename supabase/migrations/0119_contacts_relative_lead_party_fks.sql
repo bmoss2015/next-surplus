@@ -43,6 +43,7 @@ create index if not exists contacts_lead_party_id_idx on contacts(lead_party_id)
 -- rows on re-runs (idempotent) or for relatives that the user had already
 -- added through the legacy Overview-panel flow.
 insert into contacts (
+  org_id,
   lead_id,
   owner_id,
   relative_id,
@@ -55,6 +56,7 @@ insert into contacts (
   recipient_label
 )
 select
+  l.org_id,
   r.lead_id,
   (
     select o.id from owners o
@@ -71,6 +73,7 @@ select
   null,
   trim(coalesce(r.full_name, 'Unknown')) || ' (' || coalesce(r.relationship, 'Relative') || ')'
 from relatives r
+join leads l on l.id = r.lead_id
 where r.street is not null and trim(r.street) <> ''
   and r.city is not null and trim(r.city) <> ''
   and r.state is not null and trim(r.state) <> ''
@@ -100,6 +103,7 @@ alter table contacts alter column owner_id drop not null;
 -------------------------------------------------------------------------------
 
 insert into contacts (
+  org_id,
   lead_id,
   owner_id,
   relative_id,
@@ -112,6 +116,7 @@ insert into contacts (
   recipient_label
 )
 select
+  l.org_id,
   r.lead_id,
   null,
   r.id,
@@ -123,6 +128,7 @@ select
   null,
   trim(coalesce(r.full_name, 'Unknown')) || ' (' || coalesce(r.relationship, 'Relative') || ')'
 from relatives r
+join leads l on l.id = r.lead_id
 where r.street is not null and trim(r.street) <> ''
   and r.city is not null and trim(r.city) <> ''
   and r.state is not null and trim(r.state) <> ''
@@ -140,6 +146,7 @@ where r.street is not null and trim(r.street) <> ''
 -------------------------------------------------------------------------------
 
 insert into contacts (
+  org_id,
   lead_id,
   owner_id,
   lead_party_id,
@@ -152,6 +159,7 @@ insert into contacts (
   recipient_label
 )
 select
+  lp.org_id,
   lp.lead_id,
   null,
   lp.id,
