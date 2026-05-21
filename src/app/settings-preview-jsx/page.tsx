@@ -20,9 +20,13 @@ import {
   fetchOrgMembers,
   fetchOrgInfo,
   fetchMailSettings,
+  fetchMailBankAccounts,
+  fetchTemplates,
+  fetchResearchTemplates,
 } from "@/lib/settings/fetch";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
+import { getValidationUsage } from "@/lib/phone-validate";
 import { SettingsPreviewJsx } from "./_components/SettingsPreviewJsx";
 
 export const dynamic = "force-dynamic";
@@ -33,15 +37,28 @@ export default async function SettingsPreviewJsxPage() {
   const isAdmin = profile.isAdmin;
 
   // Member-visible data — attorneys + lost reasons + contact roles +
-  // connected email accounts (per-user, not per-org).
-  const [attorneys, customContactRoles, emailAccounts] = await Promise.all([
-    fetchAttorneys(),
-    fetchOrgCustomRoles(),
-    fetchMyEmailAccounts(),
-  ]);
+  // connected email accounts (per-user, not per-org) + templates (visible to
+  // members so they can pick from them in the lead composer).
+  const [attorneys, customContactRoles, emailAccounts, templates, research] =
+    await Promise.all([
+      fetchAttorneys(),
+      fetchOrgCustomRoles(),
+      fetchMyEmailAccounts(),
+      fetchTemplates(),
+      fetchResearchTemplates(),
+    ]);
 
   // Admin-only data.
-  const [defaults, needsActionThreshold, lostReasons, members, orgInfo, mailSettings] = isAdmin
+  const [
+    defaults,
+    needsActionThreshold,
+    lostReasons,
+    members,
+    orgInfo,
+    mailSettings,
+    mailBank,
+    phoneUsage,
+  ] = isAdmin
     ? await Promise.all([
         fetchAppSettings(),
         fetchNeedsActionThreshold(),
@@ -49,8 +66,10 @@ export default async function SettingsPreviewJsxPage() {
         fetchOrgMembers(),
         fetchOrgInfo(),
         fetchMailSettings(),
+        fetchMailBankAccounts(),
+        getValidationUsage(profile.orgId),
       ])
-    : [null, null, [], [], null, null];
+    : [null, null, [], [], null, null, [], null];
 
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "settings-preview", "preview.css"),
@@ -95,6 +114,10 @@ export default async function SettingsPreviewJsxPage() {
           orgName: orgInfo?.name ?? "Your Organization",
           emailAccounts,
           mailSettings,
+          mailBank,
+          templates,
+          research,
+          phoneUsage,
         }}
       />
     </>

@@ -35,11 +35,15 @@ import type {
   AppSettings,
   AttorneyRow,
   LostReasonAdminRow,
+  MailBankAccountRow,
   MailSettings,
   OrgInfo,
   OrgMemberRow,
+  ResearchTemplateRow,
+  TemplateRow,
 } from "@/lib/settings/fetch";
 import type { EmailAccountRow } from "@/lib/email/types";
+import type { PhoneValidationUsage } from "./BillingSection";
 
 export type CurrentUser = {
   fullName: string;
@@ -58,6 +62,10 @@ export type SettingsData = {
   orgName: string;
   emailAccounts: EmailAccountRow[];
   mailSettings: MailSettings | null;
+  mailBank: MailBankAccountRow[];
+  templates: TemplateRow[];
+  research: ResearchTemplateRow[];
+  phoneUsage: PhoneValidationUsage | null;
 };
 
 const RAIL_KEYS = new Set(GROUPS.flatMap((g) => g.items.map((i) => i.key)));
@@ -143,7 +151,11 @@ function renderPanel(
         <AdminGate />
       );
     case "billing":
-      return <BillingSection />;
+      return data.phoneUsage ? (
+        <BillingSection phoneUsage={data.phoneUsage} />
+      ) : (
+        <AdminGate />
+      );
     case "attorneys":
       return <AttorneysSection initial={data.attorneys} />;
     case "contact-roles":
@@ -155,9 +167,14 @@ function renderPanel(
         <AdminGate />
       );
     case "mail-bank":
-      return <MailBankAccountsSection />;
+      return <MailBankAccountsSection initial={data.mailBank} />;
     case "templates":
-      return <TemplatesSection />;
+      return (
+        <TemplatesSection
+          templates={data.templates}
+          research={data.research}
+        />
+      );
     case "email-templates":
       return <EmailTemplatesSection />;
     case "sms-templates":
