@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useTransition } from "react";
-import { IconCheck, IconX, IconPlayerPlay, IconTrash, IconLoader2, IconInfoCircle } from "@tabler/icons-react";
+import { IconCheck, IconX, IconPlayerPlay, IconTrash, IconLoader2 } from "@tabler/icons-react";
 import { SCENARIOS, type Scenario } from "../_scenarios";
 import {
   seedMailTestArtifacts,
@@ -112,24 +112,6 @@ export function MailTestClient() {
 
   return (
     <div className="space-y-6">
-      {/* Bulk recommendation banner */}
-      <div className="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-charcoal">
-        <div className="flex items-start gap-2">
-          <IconInfoCircle size={18} className="mt-0.5 text-gray-500" />
-          <div>
-            <div className="font-medium">Bulk mailers recommendation</div>
-            <div className="text-gray-700 mt-1">
-              Multi-recipient sends (N=3 per scenario) are covered in this
-              harness via the &quot;3 recipients&quot; scenario. True large-batch
-              bulk send (50+ recipients with progress / partial-failure UX)
-              is not implemented. Recommend deferring it until single + multi
-              prove out — adds queue, retry semantics, and progress UI that
-              we should not invent before need is concrete.
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Seed status + actions */}
       <div className="flex flex-wrap items-center gap-3 rounded-md border border-gray-200 bg-white p-4">
         <button

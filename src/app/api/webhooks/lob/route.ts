@@ -132,16 +132,15 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Bell notification on every status change (mirrors the C2M handler).
-  if (job.created_by) {
+  // Bell notification on terminal states only — in_transit is noise.
+  if (
+    job.created_by &&
+    (mappedStatus === "delivered" || mappedStatus === "returned")
+  ) {
     const kindLabel = job.include_check ? "Check" : "Letter";
     const cityState = `${job.recipient_city}, ${job.recipient_state}`;
     const statusLabel =
-      mappedStatus === "delivered"
-        ? "delivered"
-        : mappedStatus === "returned"
-          ? "returned to sender"
-          : "in transit";
+      mappedStatus === "delivered" ? "delivered" : "returned to sender";
     await sb.from("notifications").insert({
       org_id: job.org_id,
       recipient_id: job.created_by,

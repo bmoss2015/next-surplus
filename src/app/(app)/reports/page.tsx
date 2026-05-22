@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { IconArrowRight } from "@tabler/icons-react";
 import { fetchReports, STAGE_NAMES } from "@/lib/reports/fetch";
 import { formatCurrency } from "@/lib/leads/format";
 import { SALE_TYPE_LABELS, type SaleType } from "@/lib/leads/types";
@@ -15,13 +17,22 @@ export default async function ReportsPage() {
 
   return (
     <div className="px-7 py-6">
-      <div className="mb-[22px]">
-        <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-          Reports
-        </h1>
-        <div className="mt-1 text-[13px] text-gray-500">
-          Read-only summaries of pipeline, conversion, and outcomes.
+      <div className="mb-[22px] flex items-end justify-between gap-4">
+        <div>
+          <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
+            Reports
+          </h1>
+          <div className="mt-1 text-[13px] text-gray-500">
+            Read-only summaries of pipeline, conversion, and outcomes.
+          </div>
         </div>
+        <Link
+          href="/reports/mail"
+          className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-[12px] font-medium text-ink hover:bg-gray-50"
+        >
+          Mail &amp; Cost
+          <IconArrowRight size={12} stroke={2} />
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-[18px]">

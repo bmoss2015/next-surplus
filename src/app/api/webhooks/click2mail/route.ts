@@ -97,19 +97,23 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Bell notification on every status change so the sender sees the
-  // piece move through the pipeline. Webhook runs without auth, so we
-  // set org_id explicitly (service client bypasses the table default).
-  if (mappedStatus && job.created_by) {
+  // Bell notification on terminal states only. in_transit fires multiple
+  // times per piece (printed → mailed → out_for_delivery), which would
+  // turn the bell into noise. Webhook runs without auth, so we set
+  // org_id explicitly (service client bypasses the table default).
+  if (
+    job.created_by &&
+    (mappedStatus === "delivered" ||
+      mappedStatus === "returned" ||
+      mappedStatus === "failed")
+  ) {
     const cityState = `${job.recipient_city}, ${job.recipient_state}`;
     const statusLabel =
       mappedStatus === "delivered"
         ? "delivered"
         : mappedStatus === "returned"
           ? "returned to sender"
-          : mappedStatus === "failed"
-            ? "failed"
-            : "in transit";
+          : "failed";
     await sb.from("notifications").insert({
       org_id: job.org_id,
       recipient_id: job.created_by,

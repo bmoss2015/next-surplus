@@ -711,18 +711,9 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     }
     jobIds.push(inserted.id as string);
 
-    // Bell notification so the sender sees the queued send even if they
-    // navigated away from the modal. Webhook handlers add follow-ups
-    // on delivered / returned.
-    const kindLabel = input.include_check ? "Check" : "Letter";
-    const cityState = `${recipient.city}, ${recipient.state}`;
-    await sb.from("notifications").insert({
-      recipient_id: profile.id,
-      actor_id: profile.id,
-      type: "mail_sent",
-      lead_id: recipient.lead_id ?? null,
-      body_preview: `${kindLabel} to ${recipient.name} in ${cityState} queued for mailing`,
-    });
+    // No bell notification at send time — the activity row is the
+    // sender-side record. Bell only fires on the terminal webhook
+    // states (delivered / returned / failed).
 
     // Activity entry on the related lead (if any). Activities are scoped to
     // a lead — drops cleanly when no lead is attached.
