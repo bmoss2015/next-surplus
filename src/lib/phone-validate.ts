@@ -300,18 +300,73 @@ export async function validatePhone(
   return { status: "untested", provider: "clearout", checkedAt, raw: body, phoneType: null };
 }
 
-// Helpers for callers that need balance/usage info without performing
-// validation (e.g., the Billing UI). `used` is cumulative across all months
-// because Clearout PAYG credits don't auto-reset — the cap is a top-off
-// balance the user maintains manually. period_month is still returned for
-// downstream consumers that key on it (unchanged shape).
-export async function getValidationUsage(orgId: string): Promise<{ used: number; cap: number; period_month: string }> {
+// Live balance pull from Clearout. The /getcredits endpoint is free (doesn't
+// consume a credit) so we hit it on every Settings page load — keeps the
+// meter honest when the user tops off at clearoutphone.io without ever
+// having to bump a value in app_settings. Returns null on any failure
+// (missing key, network error, non-2xx) so callers can fall back gracefully.
+async function getClearoutBalance(): Promise<number | null> {
+  const apiKey = process.env.CLEAROUT_PHONE_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const res = await fetch("https://api.clearoutphone.io/v1/phonenumber/getcredits", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      // Don't let a slow Clearout call freeze the Settings page render.
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { status?: string; data?: { available_credits?: number } };
+    if (body.status !== "success") return null;
+    const n = body.data?.available_credits;
+    return typeof n === "number" && Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+// Sums org_addon_usage units inside the current calendar month — gives the
+// Billing meter a "this billing cycle's spend" figure independent of the
+// running Clearout balance.
+async function getMonthCreditsUsed(sb: ServiceClient, orgId: string): Promise<number> {
+  const { data } = await sb
+    .from("org_addon_usage")
+    .select("units")
+    .eq("org_id", orgId)
+    .eq("addon_key", ADDON_KEY)
+    .eq("period_month", currentPeriodMonth());
+  if (!data) return 0;
+  return data.reduce((sum, row) => sum + (row.units ?? 0), 0);
+}
+
+// Billing UI's source of truth. `remainingCredits` is pulled live from
+// Clearout when possible — that means a top-off at clearoutphone.io shows up
+// in the portal meter immediately, no manual reconciliation needed. When
+// Clearout is unreachable, `remainingCredits` is null and the UI falls back
+// to the older cap-minus-used calculation against app_settings.
+export type ValidationUsageSummary = {
+  remainingCredits: number | null;
+  usedThisMonth: number;
+  usedAllTime: number;
+  fallbackCap: number;
+  source: "clearout_live" | "fallback";
+};
+
+export async function getValidationUsage(orgId: string): Promise<ValidationUsageSummary> {
   const sb = createServiceClient();
-  const [cap, used] = await Promise.all([
-    getQuotaCap(sb, orgId),
+  const [remaining, usedThisMonth, usedAllTime, fallbackCap] = await Promise.all([
+    getClearoutBalance(),
+    getMonthCreditsUsed(sb, orgId),
     getTotalCreditsUsed(sb, orgId),
+    getQuotaCap(sb, orgId),
   ]);
-  return { used, cap, period_month: currentPeriodMonth() };
+  return {
+    remainingCredits: remaining,
+    usedThisMonth,
+    usedAllTime,
+    fallbackCap,
+    source: remaining !== null ? "clearout_live" : "fallback",
+  };
 }
 
 // Phone slot column bases on the relatives table — one row per relative,
@@ -393,40 +448,61 @@ export async function validateSpecificPhones(
     }
   }
 
+  // Dedup by E.164: same phone repeated across contacts + relatives (very
+  // common in skip-trace data) is validated ONCE against Clearout. The
+  // single result fans out to every row that shares that number. Tasks
+  // whose phone can't be normalized are kept as their own bucket so the
+  // libphonenumber pre-filter still rejects them per-row.
+  const buckets = new Map<string, PendingTask[]>();
+  for (const t of tasks) {
+    const parsed = parsePhoneNumberFromString(t.phone.trim(), "US");
+    const key = parsed && parsed.isValid() ? parsed.number : `raw:${t.phone}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(t);
+    else buckets.set(key, [t]);
+  }
+
+  const uniquePhones = buckets.size;
   console.log(
-    `[phone-validate] specific org=${orgId}: ${tasks.length} phones (` +
+    `[phone-validate] specific org=${orgId}: ${tasks.length} rows -> ${uniquePhones} unique phones (` +
       `${tasks.filter((t) => t.kind === "contact").length} contacts, ` +
       `${tasks.filter((t) => t.kind === "relative").length} relative slots)`
   );
 
   let processed = 0;
-  for (let i = 0; i < tasks.length; i += concurrency) {
-    const batch = tasks.slice(i, i + concurrency);
+  const entries = Array.from(buckets.entries());
+  for (let i = 0; i < entries.length; i += concurrency) {
+    const batch = entries.slice(i, i + concurrency);
     await Promise.all(
-      batch.map(async (task) => {
-        const result = await validatePhone(task.phone, orgId);
+      batch.map(async ([, rows]) => {
+        // Validate the phone once using the first row's value (every row in
+        // the bucket has the same E.164 by construction).
+        const result = await validatePhone(rows[0].phone, orgId);
         if (result.status === "untested" && result.checkedAt === null) return;
-        const shouldFillType = !task.existingType && result.phoneType;
-        if (task.kind === "contact") {
-          const update: Record<string, unknown> = {
-            status: result.status,
-            validation_checked_at: result.checkedAt,
-            validation_provider: result.provider,
-            validation_raw: result.raw as object,
-          };
-          if (shouldFillType) update.phone_type = result.phoneType;
-          await sb.from("contacts").update(update).eq("id", task.rowId);
-        } else {
-          const update: Record<string, unknown> = {
-            [`${task.base}_status`]: result.status,
-            [`${task.base}_validation_checked_at`]: result.checkedAt,
-            [`${task.base}_validation_provider`]: result.provider,
-            [`${task.base}_validation_raw`]: result.raw as object,
-          };
-          if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
-          await sb.from("relatives").update(update).eq("id", task.rowId);
+        // Fan the same result out to every row in the bucket.
+        for (const task of rows) {
+          const shouldFillType = !task.existingType && result.phoneType;
+          if (task.kind === "contact") {
+            const update: Record<string, unknown> = {
+              status: result.status,
+              validation_checked_at: result.checkedAt,
+              validation_provider: result.provider,
+              validation_raw: result.raw as object,
+            };
+            if (shouldFillType) update.phone_type = result.phoneType;
+            await sb.from("contacts").update(update).eq("id", task.rowId);
+          } else {
+            const update: Record<string, unknown> = {
+              [`${task.base}_status`]: result.status,
+              [`${task.base}_validation_checked_at`]: result.checkedAt,
+              [`${task.base}_validation_provider`]: result.provider,
+              [`${task.base}_validation_raw`]: result.raw as object,
+            };
+            if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
+            await sb.from("relatives").update(update).eq("id", task.rowId);
+          }
+          processed += 1;
         }
-        processed += 1;
       })
     );
   }
@@ -506,45 +582,61 @@ export async function validateAllUntestedForOrg(
     }
   }
 
-  const limited = tasks.slice(0, maxItems);
+  // Dedup by E.164 before slicing — the maxItems budget counts UNIQUE phones,
+  // not rows. Same number repeated across rows is a single Clearout call
+  // that updates every row that shares it.
+  const buckets = new Map<string, PendingTask[]>();
+  for (const t of tasks) {
+    const parsed = parsePhoneNumberFromString(t.phone.trim(), "US");
+    const key = parsed && parsed.isValid() ? parsed.number : `raw:${t.phone}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(t);
+    else buckets.set(key, [t]);
+  }
+
+  const allEntries = Array.from(buckets.entries());
+  const entries = allEntries.slice(0, maxItems);
   let processed = 0;
   console.log(
-    `[phone-validate] sweep org=${orgId}: ${tasks.length} pending phones ` +
+    `[phone-validate] sweep org=${orgId}: ${tasks.length} rows -> ${allEntries.length} unique phones ` +
       `(${tasks.filter((t) => t.kind === "contact").length} contacts, ` +
       `${tasks.filter((t) => t.kind === "relative").length} relative slots)`
   );
 
-  for (let i = 0; i < limited.length; i += concurrency) {
-    const batch = limited.slice(i, i + concurrency);
+  for (let i = 0; i < entries.length; i += concurrency) {
+    const batch = entries.slice(i, i + concurrency);
     await Promise.all(
-      batch.map(async (task) => {
-        const result = await validatePhone(task.phone, orgId);
+      batch.map(async ([, rows]) => {
+        const result = await validatePhone(rows[0].phone, orgId);
         // Transient errors / quota-exhausted come back as untested w/ null
         // checkedAt; leave those rows alone so the next sweep retries them.
         if (result.status === "untested" && result.checkedAt === null) return;
-        // Auto-fill phone type from Clearout IFF the row doesn't already have
-        // one — never override a manual choice.
-        const shouldFillType = !task.existingType && result.phoneType;
-        if (task.kind === "contact") {
-          const update: Record<string, unknown> = {
-            status: result.status,
-            validation_checked_at: result.checkedAt,
-            validation_provider: result.provider,
-            validation_raw: result.raw as object,
-          };
-          if (shouldFillType) update.phone_type = result.phoneType;
-          await sb.from("contacts").update(update).eq("id", task.rowId);
-        } else {
-          const update: Record<string, unknown> = {
-            [`${task.base}_status`]: result.status,
-            [`${task.base}_validation_checked_at`]: result.checkedAt,
-            [`${task.base}_validation_provider`]: result.provider,
-            [`${task.base}_validation_raw`]: result.raw as object,
-          };
-          if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
-          await sb.from("relatives").update(update).eq("id", task.rowId);
+        // Fan the single Clearout result out to every row sharing this number.
+        for (const task of rows) {
+          // Auto-fill phone type from Clearout IFF the row doesn't already
+          // have one — never override a manual choice.
+          const shouldFillType = !task.existingType && result.phoneType;
+          if (task.kind === "contact") {
+            const update: Record<string, unknown> = {
+              status: result.status,
+              validation_checked_at: result.checkedAt,
+              validation_provider: result.provider,
+              validation_raw: result.raw as object,
+            };
+            if (shouldFillType) update.phone_type = result.phoneType;
+            await sb.from("contacts").update(update).eq("id", task.rowId);
+          } else {
+            const update: Record<string, unknown> = {
+              [`${task.base}_status`]: result.status,
+              [`${task.base}_validation_checked_at`]: result.checkedAt,
+              [`${task.base}_validation_provider`]: result.provider,
+              [`${task.base}_validation_raw`]: result.raw as object,
+            };
+            if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
+            await sb.from("relatives").update(update).eq("id", task.rowId);
+          }
+          processed += 1;
         }
-        processed += 1;
       })
     );
   }
