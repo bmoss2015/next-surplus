@@ -1,5 +1,17 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import {
+  IconMail,
+  IconCalendar,
+  IconCircleCheck,
+  IconArrowBackUp,
+  IconHash,
+  IconCash,
+  IconClock,
+  IconBarcode,
+  IconExternalLink,
+  IconFileText,
+} from "@tabler/icons-react";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 
 // Variant 2 — Editorial card layout, info-driven pass.
@@ -191,53 +203,60 @@ function Card({
           </span>
         </div>
 
-        {/* Inline horizontal meta strip — each field a small chunk */}
-        <div className="mt-4 flex flex-wrap items-baseline gap-x-7 gap-y-2 text-[12px]">
-          <InlineKV label="Class">{p.mailClass}</InlineKV>
-          <InlineKV label="Sent">{p.sentAt}</InlineKV>
+        {/* Meta strip — icon-led, sentence case, no uppercase labels.
+            Anchored on Linear / Attio property rendering where the
+            icon IS the label, no separate text label needed. */}
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-ink">
+          <Meta icon={IconMail}>{p.mailClass}</Meta>
+          <Meta icon={IconCalendar}>Sent {p.sentAt}</Meta>
           {p.status === "Delivered" && p.deliveredAt && (
-            <InlineKV label="Delivered" tone="ok">
-              {p.deliveredAt}
-            </InlineKV>
+            <Meta icon={IconCircleCheck} tone="ok">
+              Delivered {p.deliveredAt}
+            </Meta>
           )}
           {p.status === "Returned" && p.returnedAt && (
-            <InlineKV label="Returned" tone="danger">
-              {p.returnedAt} ({p.returnReason})
-            </InlineKV>
+            <Meta icon={IconArrowBackUp} tone="danger">
+              Returned {p.returnedAt} ({p.returnReason})
+            </Meta>
           )}
           {p.status === "In Transit" && (
-            <InlineKV label="ETA">2 to 4 business days</InlineKV>
+            <Meta icon={IconClock}>2 to 4 business days</Meta>
           )}
-          <InlineKV label="Lead">
+          <Meta icon={IconHash}>
             <Link href="#" className="cursor-pointer text-[#0d4b3a] underline decoration-[#0d4b3a]/30 underline-offset-2 hover:decoration-[#0d4b3a]">
               {p.lead}
-            </Link>{" "}
-            <span className="text-gray-400">·</span>{" "}
-            <span className="text-ink">{p.surplus} surplus</span>
-          </InlineKV>
+            </Link>
+          </Meta>
+          <Meta icon={IconCash}>{p.surplus} surplus</Meta>
         </div>
 
-        {/* Address — single line, full width */}
+        {/* Address — single line */}
         <div className="mt-3 text-[12px] text-gray-600">
           {p.line1}, {p.city}, {p.state} {p.postal}
         </div>
 
-        {/* Bottom row: tracking + actions */}
+        {/* Bottom row: tracking + actions. Tracking gets an icon
+            instead of an uppercase "TRACKING" label, no font-mono
+            bold weight; reads as a number tag, not a heavy block. */}
         <div className="mt-auto flex items-center justify-between gap-4 pt-4">
           <a
             href="#"
-            className="cursor-pointer whitespace-nowrap font-mono text-[11.5px] text-[#0d4b3a] hover:underline"
+            className="group inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-[12px] text-gray-600 hover:text-[#0d4b3a]"
           >
-            <span className="mr-2 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-              Tracking
+            <IconBarcode size={14} stroke={1.75} className="text-gray-400 group-hover:text-[#0d4b3a]" />
+            <span className="font-mono tabular-nums tracking-[0.02em]">
+              {p.tracking}
             </span>
-            {p.tracking}
           </a>
           <div className="flex shrink-0 gap-2 text-[11.5px] font-medium">
-            <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
+            {/* Primary: View Letter — solid green like Send Mail */}
+            <button className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-[#0d4b3a] px-3 py-1.5 text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-[#0d6c4d]">
+              <IconFileText size={13} stroke={2} />
               View Letter
             </button>
-            <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
+            {/* Secondary: Track — outlined green, icon-led */}
+            <button className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
+              <IconExternalLink size={13} stroke={2} />
               Track
             </button>
             {p.status === "Returned" && (
@@ -252,32 +271,38 @@ function Card({
   );
 }
 
-function InlineKV({
-  label,
+function Meta({
+  icon: Icon,
   children,
   tone,
 }: {
-  label: string;
+  icon: typeof IconMail;
   children: React.ReactNode;
   tone?: "ok" | "danger";
 }) {
   return (
-    <div className="flex items-baseline gap-1.5">
-      <span className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-        {label}
-      </span>
-      <span
+    <span
+      className={`inline-flex items-center gap-1.5 ${
+        tone === "ok"
+          ? "text-[#0d4b3a]"
+          : tone === "danger"
+            ? "text-[#c4253c]"
+            : "text-ink"
+      }`}
+    >
+      <Icon
+        size={13}
+        stroke={1.75}
         className={
           tone === "ok"
-            ? "text-[#0d4b3a]"
+            ? "text-[#0d4b3a]/70"
             : tone === "danger"
-              ? "text-[#c4253c]"
-              : "text-ink"
+              ? "text-[#c4253c]/70"
+              : "text-gray-400"
         }
-      >
-        {children}
-      </span>
-    </div>
+      />
+      {children}
+    </span>
   );
 }
 
