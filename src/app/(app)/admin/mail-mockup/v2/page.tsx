@@ -80,16 +80,13 @@ export default async function MockupV2() {
                   Sent Mail
                 </h2>
               </div>
-              {/* Send Mail action — V4-style button (green pill,
-                  compact). Address count sits underneath. */}
-              <div className="text-right">
-                <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-3 py-2 text-[12px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)]">
-                  Send Mail
-                </button>
-                <div className="mt-1.5 text-[11px] text-gray-500">
-                  3 mailing addresses on file
-                </div>
-              </div>
+              {/* Send Mail action — V4-style green pill. Opens the
+                  Send Mail modal where recipients get picked. No
+                  inline address-count hint since the modal handles
+                  the picker. */}
+              <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-4 py-2 text-[12px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)]">
+                Send Mail
+              </button>
             </div>
             <dl className="mt-5 grid grid-cols-4 gap-x-6 gap-y-2">
               <StatPair label="Total Sent" value="3" />
@@ -148,95 +145,139 @@ function Card({
   const sc = STATUS_COLORS[p.status];
   return (
     <article
-      className={`grid grid-cols-[110px_1fr] gap-5 rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-[inset_3px_0_0_#0d4b3a] ${
+      className={`flex gap-5 rounded-lg border border-gray-200 bg-white p-5 transition-shadow hover:shadow-[inset_3px_0_0_#0d4b3a] ${
         highlight ? "shadow-[inset_3px_0_0_#0d4b3a]" : ""
       }`}
     >
-      {/* Letter thumbnail — smaller (was 200px tall, now 130px) */}
-      <div className="relative h-[130px] overflow-hidden rounded-sm border border-gray-200 bg-white">
-        <div className="absolute inset-0 p-2 text-[5.5px] leading-[1.4] text-ink">
+      {/* Bigger letter thumbnail */}
+      <div className="relative h-[180px] w-[140px] shrink-0 overflow-hidden rounded-sm border border-gray-200 bg-white">
+        <div className="absolute inset-0 p-2.5 text-[6.5px] leading-[1.45] text-ink">
           <div className="mb-[3px] text-right text-gray-500">{p.sentAt}</div>
           <div className="mb-[3px]">{p.recipient}</div>
           <div className="mb-[3px] text-gray-500">
-            {p.line1}<br />{p.city}, {p.state}
+            {p.line1}<br />{p.city}, {p.state} {p.postal}
           </div>
           <div className="mt-2 mb-[2px]">Dear {p.recipient.split(" ")[0]},</div>
           <div className="mb-[2px] text-gray-700">
             Our records indicate you may be entitled to surplus funds
-            being held by the county following...
+            being held by the county following the recent sale of...
           </div>
           <div className="mb-[2px] text-gray-700">
             Moss Equity Partners specializes in helping rightful owners
-            recover these funds...
+            recover these funds. If you would like to discuss your
+            situation, please reply by mail or call us...
           </div>
+          <div className="mt-2 text-gray-700">Sincerely,</div>
+          <div className="text-gray-700">Bree Moss</div>
         </div>
       </div>
 
-      {/* Info block — tightened */}
-      <div className="flex min-w-0 flex-col">
-        <div className="flex items-start justify-between gap-3">
+      {/* Info — uses horizontal width with inline meta strip */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Top row: name + role on left, status on right */}
+        <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-[15.5px] font-semibold tracking-tight text-ink">
+            <div className="text-[17px] font-semibold tracking-tight text-ink">
               {p.recipient}
             </div>
-            <div className="mt-[1px] truncate text-[11.5px] text-gray-500">
+            <div className="mt-[1px] truncate text-[12px] text-gray-500">
               {p.role}
             </div>
           </div>
           <span
-            className={`inline-flex items-center justify-center rounded-[4px] px-[8px] py-[4px] text-[9px] font-semibold uppercase leading-none tracking-[0.12em] ${sc.bg} ${sc.text}`}
+            className={`inline-flex shrink-0 items-center justify-center rounded-[4px] px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] ${sc.bg} ${sc.text}`}
           >
             {p.status}
           </span>
         </div>
 
-        <dl className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2 text-[11.5px]">
-          <KV label="Class">{p.mailClass}</KV>
-          <KV label="Sent">{p.sentAt}</KV>
-          <KV label="Lead">
+        {/* Inline horizontal meta strip — each field a small chunk */}
+        <div className="mt-4 flex flex-wrap items-baseline gap-x-7 gap-y-2 text-[12px]">
+          <InlineKV label="Class">{p.mailClass}</InlineKV>
+          <InlineKV label="Sent">{p.sentAt}</InlineKV>
+          {p.status === "Delivered" && p.deliveredAt && (
+            <InlineKV label="Delivered" tone="ok">
+              {p.deliveredAt}
+            </InlineKV>
+          )}
+          {p.status === "Returned" && p.returnedAt && (
+            <InlineKV label="Returned" tone="danger">
+              {p.returnedAt} ({p.returnReason})
+            </InlineKV>
+          )}
+          {p.status === "In Transit" && (
+            <InlineKV label="ETA">2 to 4 business days</InlineKV>
+          )}
+          <InlineKV label="Lead">
             <Link href="#" className="cursor-pointer text-[#0d4b3a] underline decoration-[#0d4b3a]/30 underline-offset-2 hover:decoration-[#0d4b3a]">
               {p.lead}
             </Link>{" "}
             <span className="text-gray-400">·</span>{" "}
             <span className="text-ink">{p.surplus} surplus</span>
-          </KV>
-          {p.status === "Delivered" && p.deliveredAt && (
-            <KV label="Delivered">{p.deliveredAt}</KV>
-          )}
-          {p.status === "Returned" && p.returnedAt && (
-            <KV label="Returned">
-              {p.returnedAt}
-              <span className="ml-1 text-[#c4253c]">({p.returnReason})</span>
-            </KV>
-          )}
-          {p.status === "In Transit" && <KV label="ETA">2-4 business days</KV>}
-          <div className="col-span-2">
-            <KV label="Tracking">
-              <a
-                href="#"
-                className="cursor-pointer whitespace-nowrap font-mono text-[11px] text-[#0d4b3a] underline decoration-[#0d4b3a]/30 underline-offset-2 hover:decoration-[#0d4b3a]"
-              >
-                {p.tracking}
-              </a>
-            </KV>
-          </div>
-        </dl>
+          </InlineKV>
+        </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px] font-medium">
-          <button className="cursor-pointer rounded-md border border-gray-200 bg-white px-2.5 py-1 text-ink hover:bg-gray-50">
-            View Letter
-          </button>
-          <button className="cursor-pointer rounded-md border border-gray-200 bg-white px-2.5 py-1 text-ink hover:bg-gray-50">
-            Track
-          </button>
-          {p.status === "Returned" && (
-            <button className="cursor-pointer rounded-md bg-[#c4253c] px-2.5 py-1 text-white">
-              Fix Address &amp; Resend
+        {/* Address — single line, full width */}
+        <div className="mt-3 text-[12px] text-gray-600">
+          {p.line1}, {p.city}, {p.state} {p.postal}
+        </div>
+
+        {/* Bottom row: tracking + actions */}
+        <div className="mt-auto flex items-center justify-between gap-4 pt-4">
+          <a
+            href="#"
+            className="cursor-pointer whitespace-nowrap font-mono text-[11.5px] text-[#0d4b3a] hover:underline"
+          >
+            <span className="mr-2 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+              Tracking
+            </span>
+            {p.tracking}
+          </a>
+          <div className="flex shrink-0 gap-2 text-[11.5px] font-medium">
+            <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
+              View Letter
             </button>
-          )}
+            <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
+              Track
+            </button>
+            {p.status === "Returned" && (
+              <button className="cursor-pointer rounded-md bg-[#c4253c] px-3 py-1.5 text-white">
+                Fix Address &amp; Resend
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </article>
+  );
+}
+
+function InlineKV({
+  label,
+  children,
+  tone,
+}: {
+  label: string;
+  children: React.ReactNode;
+  tone?: "ok" | "danger";
+}) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+        {label}
+      </span>
+      <span
+        className={
+          tone === "ok"
+            ? "text-[#0d4b3a]"
+            : tone === "danger"
+              ? "text-[#c4253c]"
+              : "text-ink"
+        }
+      >
+        {children}
+      </span>
+    </div>
   );
 }
 
