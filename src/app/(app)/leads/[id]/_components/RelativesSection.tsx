@@ -175,12 +175,20 @@ export function RelativesSection({
         notes,
       });
       if (res.ok) {
-        const row = makeRelativeRow(res.id, leadId, name, relationship, phone);
-        row.age = age;
-        row.phone_is_dnc = phone ? draftPhoneDnc : false;
-        row.phone_is_litigator = phone ? draftPhoneLitigator : false;
-        row.email = email;
-        row.notes = notes;
+        // upsertRelative awaits the validator and returns res.row populated
+        // with post-validation phone_status / phone_type / checkedAt /
+        // provider on every populated slot. Use that directly so the new
+        // relative renders Verified the moment it lands, instead of stale
+        // "Not Verified" until refresh.
+        const row = (res.row as RelativeRow | null) ?? (() => {
+          const stub = makeRelativeRow(res.id, leadId, name, relationship, phone);
+          stub.age = age;
+          stub.phone_is_dnc = phone ? draftPhoneDnc : false;
+          stub.phone_is_litigator = phone ? draftPhoneLitigator : false;
+          stub.email = email;
+          stub.notes = notes;
+          return stub;
+        })();
         setRelatives((prev) => [...prev, row]);
         resetDrafts();
         setAdding(false);
