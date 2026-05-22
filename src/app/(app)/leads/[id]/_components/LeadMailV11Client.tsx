@@ -303,7 +303,7 @@ function DetailPane({
           </div>
           <span
             className={cn(
-              "inline-flex shrink-0 items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em]",
+              "inline-flex min-w-[76px] shrink-0 items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em]",
               statusPillClass(piece.status)
             )}
           >

@@ -352,7 +352,7 @@ function PieceRow({
           </span>
           <span
             className={cn(
-              "inline-flex items-center justify-center rounded-[4px] border bg-white px-[8px] py-[3px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em]",
+              "inline-flex min-w-[76px] items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em]",
               pillClass
             )}
           >
@@ -465,7 +465,7 @@ function BatchRow({
             <span className="text-[15px] font-semibold text-ink">
               Batch of {batch.length}
             </span>
-            <span className="inline-flex items-center justify-center rounded-[4px] border border-gray-300 bg-white px-[8px] py-[3px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] text-ink">
+            <span className="inline-flex min-w-[76px] items-center justify-center rounded-[4px] border border-gray-300 bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] text-ink">
               In Transit
             </span>
           </div>
