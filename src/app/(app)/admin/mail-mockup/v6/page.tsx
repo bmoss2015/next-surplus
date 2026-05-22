@@ -323,8 +323,7 @@ function PieceRow({
         {status === "returned" ? (
           <button
             type="button"
-            onClick={(e) => e.preventDefault()}
-            className="cursor-pointer rounded-md bg-[#c4253c] px-3 py-1.5 text-[11.5px] font-semibold text-white"
+className="cursor-pointer rounded-md bg-[#c4253c] px-3 py-1.5 text-[11.5px] font-semibold text-white"
           >
             Fix &amp; Resend
           </button>
@@ -332,15 +331,13 @@ function PieceRow({
           <>
             <button
               type="button"
-              onClick={(e) => e.preventDefault()}
-              className="cursor-pointer rounded-md bg-[#0d4b3a] px-3 py-1.5 text-[11.5px] font-medium text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-[#0d6c4d]"
+    className="cursor-pointer rounded-md bg-[#0d4b3a] px-3 py-1.5 text-[11.5px] font-medium text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-[#0d6c4d]"
             >
               View Letter
             </button>
             <button
               type="button"
-              onClick={(e) => e.preventDefault()}
-              className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[11.5px] font-medium text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]"
+    className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[11.5px] font-medium text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]"
             >
               Track
             </button>
