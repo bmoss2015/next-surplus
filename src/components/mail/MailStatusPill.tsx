@@ -2,16 +2,18 @@ import { cn } from "@/lib/cn";
 import type { MailStatus } from "@/lib/mail/fetch";
 
 // Single source of truth for how mail status renders across the portal.
-// `queued` and `in_transit` collapse to one user-facing "In Transit"
-// state — the DB still tracks them separately for debugging, but to a
-// human the distinction is meaningless (once we hand off to the printer,
-// it's on its way).
+// `queued` + `in_transit` collapse to "In Transit"; `failed` collapses
+// to "Returned" — to a user, both mean "didn't reach the recipient,
+// fix something." The DB keeps the distinction for debugging and the
+// drawer behaves differently (returned → Update Address & Resend;
+// failed → show error + Delete Record), but the dashboard chrome shows
+// one bucket.
 const LABELS: Record<MailStatus, string> = {
   queued: "In Transit",
   in_transit: "In Transit",
   delivered: "Delivered",
   returned: "Returned",
-  failed: "Failed",
+  failed: "Returned",
 };
 
 const PILL_CLASSES: Record<MailStatus, string> = {

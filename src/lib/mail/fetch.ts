@@ -41,17 +41,19 @@ export type MailJobDetailRow = MailJobListRow & {
 };
 
 export type MailStats = {
-  // queued and in_transit collapse to one "in flight" bucket in the UI
+  // queued + in_transit collapse to "in_flight"; returned + failed
+  // collapse to "returned" (the UI shows one bucket — to the user both
+  // mean "didn't reach the recipient, fix something").
   in_flight: number;
   delivered: number;
   returned: number;
-  failed: number;
   spent_cents: number;
 };
 
-// Status filter the UI sends. "in_flight" maps to (queued OR in_transit)
-// in the query so the user-facing collapse is honored everywhere.
-export type MailStatusFilter = "all" | "in_flight" | "delivered" | "returned" | "failed";
+// Status filter the UI sends. "in_flight" maps to (queued OR in_transit);
+// "returned" maps to (returned OR failed). No standalone failed filter
+// in the UI.
+export type MailStatusFilter = "all" | "in_flight" | "delivered" | "returned";
 
 export type MailDashboardOpts = {
   limit?: number;
@@ -70,8 +72,7 @@ const STATUS_FILTERS: Record<MailStatusFilter, MailStatus[] | null> = {
   all: null,
   in_flight: ["queued", "in_transit"],
   delivered: ["delivered"],
-  returned: ["returned"],
-  failed: ["failed"],
+  returned: ["returned", "failed"],
 };
 
 export async function fetchMailDashboard(
@@ -90,11 +91,10 @@ export async function fetchMailDashboard(
     sb.from("mail_jobs").select("id", { count: "exact", head: true }).gte("created_at", since);
   const statsLeadEq = (q: ReturnType<typeof baseStat>) =>
     opts.leadId ? q.eq("lead_id", opts.leadId) : q;
-  const [inFlightRes, deliveredRes, returnedRes, failedRes, costRes] = await Promise.all([
+  const [inFlightRes, deliveredRes, returnedRes, costRes] = await Promise.all([
     statsLeadEq(baseStat()).in("status", ["queued", "in_transit"]),
     statsLeadEq(baseStat()).eq("status", "delivered"),
-    statsLeadEq(baseStat()).eq("status", "returned"),
-    statsLeadEq(baseStat()).eq("status", "failed"),
+    statsLeadEq(baseStat()).in("status", ["returned", "failed"]),
     (opts.leadId
       ? sb.from("mail_jobs").select("cost_cents").gte("created_at", since).eq("lead_id", opts.leadId)
       : sb.from("mail_jobs").select("cost_cents").gte("created_at", since)),
@@ -144,7 +144,6 @@ export async function fetchMailDashboard(
       in_flight: inFlightRes.count ?? 0,
       delivered: deliveredRes.count ?? 0,
       returned: returnedRes.count ?? 0,
-      failed: failedRes.count ?? 0,
       spent_cents: spent,
     },
     rows,

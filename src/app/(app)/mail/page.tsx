@@ -13,7 +13,7 @@ type SearchParams = Promise<{
 }>;
 
 function parseStatus(s: string | undefined): MailStatusFilter {
-  if (s === "in_flight" || s === "delivered" || s === "returned" || s === "failed") {
+  if (s === "in_flight" || s === "delivered" || s === "returned") {
     return s;
   }
   return "all";

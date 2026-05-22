@@ -8,13 +8,11 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconDownload,
-  IconRefresh,
   IconExternalLink,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { MailStatusPill } from "@/components/mail/MailStatusPill";
 import { LetterPreviewModal, type LetterPreviewData } from "@/components/mail/LetterPreviewModal";
-import { fetchMailJobAction } from "../_fetchers";
 import type {
   MailJobListRow,
   MailStats,
@@ -33,7 +31,6 @@ const STATUS_CHIPS: Array<{ id: MailStatusFilter; label: string }> = [
   { id: "in_flight", label: "In Transit" },
   { id: "delivered", label: "Delivered" },
   { id: "returned", label: "Returned" },
-  { id: "failed", label: "Failed" },
 ];
 
 function fmtDate(iso: string | null): string {
@@ -226,17 +223,6 @@ export function MailListClient({
     URL.revokeObjectURL(url);
   }, [rows]);
 
-  const openLetter = useCallback(async (jobId: string) => {
-    const detail = await fetchMailJobAction(jobId);
-    if (!detail) return;
-    setLetterPreview({
-      jobId: detail.id,
-      recipientName: detail.recipient_name,
-      bodyHtml: detail.body_html,
-      trackingUrl: detail.tracking_url,
-    });
-  }, []);
-
   const toggleBatch = useCallback((batchId: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -255,7 +241,6 @@ export function MailListClient({
       sub: "Re-Verify Address",
       warn: stats.returned > 0,
     },
-    { label: "Failed", value: stats.failed, sub: "Errored Before Mailing", warn: stats.failed > 0 },
   ];
 
   return (
@@ -280,7 +265,7 @@ export function MailListClient({
         </div>
       )}
 
-      <div className="mb-5 grid grid-cols-4 gap-3">
+      <div className="mb-5 grid grid-cols-3 gap-3">
         {statCards.map((card) => (
           <div
             key={card.label}
@@ -339,14 +324,6 @@ export function MailListClient({
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
-            onClick={() => router.refresh()}
-            className="cursor-pointer rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-50"
-            title="Refresh"
-          >
-            <IconRefresh size={14} stroke={1.75} />
-          </button>
-          <button
-            type="button"
             onClick={exportCsv}
             disabled={rows.length === 0}
             className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-[12px] font-medium text-ink hover:bg-gray-50 disabled:opacity-50"
@@ -376,7 +353,7 @@ export function MailListClient({
               <th className="px-4 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-gray-500">
                 Delivered
               </th>
-              <th className="px-4 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-gray-500">
                 Tracking
               </th>
             </tr>
@@ -453,7 +430,7 @@ export function MailListClient({
                       {fmtDate(group.rows[0].sent_at)}
                     </td>
                     <td className="px-4 py-2 text-[12px] text-gray-600">—</td>
-                    <td className="px-4 py-2 text-right text-[12px] text-gray-400">
+                    <td className="px-4 py-2 text-left text-[12px] text-gray-400">
                       —
                     </td>
                   </tr>
@@ -543,7 +520,7 @@ function Row({
       <td className="px-4 py-2 text-[12px] text-gray-600">
         {fmtDate(row.delivered_at ?? row.returned_at)}
       </td>
-      <td className="px-4 py-2 text-right text-[12px]">
+      <td className="px-4 py-2 text-left text-[12px]">
         {row.tracking_number ? (
           row.tracking_url ? (
             <a

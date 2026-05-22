@@ -9,6 +9,7 @@ import {
   runMailTestScenario,
   cleanupMailTestArtifacts,
   seedSampleMailData,
+  deleteStaleFailedMailJobs,
   type RunResult,
 } from "../actions";
 
@@ -30,6 +31,12 @@ type SampleState =
   | { kind: "done"; inserted: number; lead_id: string | null }
   | { kind: "error"; error: string };
 
+type SweepState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "done"; deleted: number }
+  | { kind: "error"; error: string };
+
 function formatCents(c: number | null): string {
   if (c == null) return "—";
   return `$${(c / 100).toFixed(2)}`;
@@ -41,6 +48,19 @@ export function MailTestClient() {
   const [, startTransition] = useTransition();
   const [globalErr, setGlobalErr] = useState<string | null>(null);
   const [sample, setSample] = useState<SampleState>({ kind: "idle" });
+  const [sweep, setSweep] = useState<SweepState>({ kind: "idle" });
+
+  const handleSweepFailed = useCallback(() => {
+    setSweep({ kind: "loading" });
+    startTransition(async () => {
+      const res = await deleteStaleFailedMailJobs();
+      if (!res.ok) {
+        setSweep({ kind: "error", error: res.error });
+        return;
+      }
+      setSweep({ kind: "done", deleted: res.deleted });
+    });
+  }, []);
 
   const handleSeedSamples = useCallback(() => {
     setSample({ kind: "loading" });
@@ -183,6 +203,41 @@ export function MailTestClient() {
             {sample.kind === "loading" ? "Seeding..." : "Seed Sample Mail Data"}
           </button>
         </div>
+      </div>
+
+      {/* Sweep legacy failed rows — for cleaning up Susan Martinez and
+          any other pre-Fix-66 failed records that shouldn't exist after
+          the no-persist-on-sync-failure change. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 bg-white p-4">
+        <div className="min-w-0">
+          <div className="text-[13px] font-medium text-ink">
+            Sweep Legacy Failed Records
+          </div>
+          <div className="mt-1 text-[12px] text-gray-600">
+            Deletes every <code>mail_jobs</code> row currently marked
+            failed. After Fix 66, sync provider rejections no longer
+            persist as failed rows — this is a one-time cleanup for the
+            legacy ones (Susan Martinez, etc.). Activity entries on the
+            related leads are kept.
+          </div>
+          {sweep.kind === "done" && (
+            <div className="mt-2 text-[12px] text-petrol-700">
+              Deleted {sweep.deleted} failed record{sweep.deleted === 1 ? "" : "s"}.
+            </div>
+          )}
+          {sweep.kind === "error" && (
+            <div className="mt-2 text-[12px] text-danger">{sweep.error}</div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleSweepFailed}
+          disabled={sweep.kind === "loading"}
+          className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+        >
+          <IconTrash size={14} stroke={1.75} />
+          {sweep.kind === "loading" ? "Deleting..." : "Delete Failed Records"}
+        </button>
       </div>
 
       {/* Seed status + actions */}

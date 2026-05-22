@@ -344,6 +344,33 @@ export async function runMailTestScenario(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Bulk-delete all currently-failed mail_jobs rows. After the no-persist-on-
+// sync-failure change, "failed" rows should be rare; this sweeps any legacy
+// failed records (e.g. the Susan Martinez artifact from earlier testing).
+// Activity entries on related leads are intentionally left in place —
+// what happened on the lead remains historical truth.
+
+export async function deleteStaleFailedMailJobs(): Promise<{
+  ok: true;
+  deleted: number;
+} | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  if (!profile.isAdmin) return { ok: false, error: "Admin only" };
+  const admin = createServiceClient();
+
+  const { data, count, error } = await admin
+    .from("mail_jobs")
+    .delete({ count: "exact" })
+    .eq("org_id", profile.orgId)
+    .eq("status", "failed")
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/mail");
+  return { ok: true, deleted: count ?? (data?.length ?? 0) };
+}
+
+// ---------------------------------------------------------------------------
 // Cleanup — delete every artifact the harness created or that we tagged.
 
 export async function cleanupMailTestArtifacts(): Promise<{
