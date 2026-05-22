@@ -134,11 +134,7 @@ export function BillingSection({
             <div className="billing-card-num">
               <span className="tabular">{remaining.toLocaleString()}</span>
             </div>
-            <div className="billing-card-lab">
-              {phoneUsage.source === "clearout_live"
-                ? "Credits Remaining"
-                : "Credits Left (cached)"}
-            </div>
+            <div className="billing-card-lab">Credits Remaining</div>
           </div>
         </div>
         <div className="billing-card-bar">
@@ -168,15 +164,8 @@ export function BillingSection({
           </div>
         </div>
         <div className="billing-card-foot">
-          Top off at{" "}
-          <a
-            href="https://app.clearoutphone.io/dashboard/credits"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            clearoutphone.io
-          </a>{" "}
-          when the balance runs low — no auto-recharge.
+          Credits do not auto-recharge — add more before the balance runs low
+          so new phones keep getting screened.
         </div>
         <div className="billing-card-action">
           <button
