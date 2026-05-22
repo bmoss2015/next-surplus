@@ -1,19 +1,15 @@
-import {
-  IconCircleCheck,
-  IconCircleDot,
-  IconArrowBackUp,
-} from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import type { MailStatus } from "@/lib/mail/fetch";
 
-// One canonical status renderer for the whole portal. `queued` + `in_transit`
-// collapse to "In Transit"; `failed` collapses to "Returned". The drawer
-// distinguishes those two for action affordances (resend vs delete) but
-// the dashboard chrome only ever shows three buckets.
+// Status pill anchored on the Settings Members "role-tab" pattern so
+// pills look consistent across the portal:
+//   border-radius: 4px (rectangular rounded, NOT oval)
+//   font-size: 9.5px, weight 600, letter-spacing 0.12em, uppercase
+//   filled background with white text for the active state
 //
-// Design choice: inline icon + text (Linear pattern), no rounded chip
-// background. Pills with backgrounds read as "AI-built SaaS"; quiet
-// inline marks read as deliberate.
+// queued + in_transit collapse to "In Transit"; failed collapses to
+// "Returned" (the drawer distinguishes them for actions). Three
+// dashboard buckets total.
 
 const LABELS: Record<MailStatus, string> = {
   queued: "In Transit",
@@ -23,12 +19,12 @@ const LABELS: Record<MailStatus, string> = {
   failed: "Returned",
 };
 
-const STYLES: Record<MailStatus, { text: string; icon: string }> = {
-  queued: { text: "text-ink", icon: "text-gray-400" },
-  in_transit: { text: "text-ink", icon: "text-gray-400" },
-  delivered: { text: "text-petrol-700", icon: "text-petrol-500" },
-  returned: { text: "text-danger", icon: "text-danger" },
-  failed: { text: "text-danger", icon: "text-danger" },
+const STYLES: Record<MailStatus, string> = {
+  queued: "bg-ink text-white",
+  in_transit: "bg-ink text-white",
+  delivered: "bg-petrol-500 text-white",
+  returned: "bg-danger text-white",
+  failed: "bg-danger text-white",
 };
 
 export function MailStatusPill({
@@ -38,22 +34,16 @@ export function MailStatusPill({
   status: MailStatus;
   className?: string;
 }) {
-  const style = STYLES[status];
-  const Icon =
-    status === "delivered"
-      ? IconCircleCheck
-      : status === "returned" || status === "failed"
-        ? IconArrowBackUp
-        : IconCircleDot;
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 text-[12px] font-medium",
-        style.text,
+        "inline-flex items-center justify-center rounded-[4px] px-[10px] py-[5px]",
+        "text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em]",
+        "min-w-[76px]",
+        STYLES[status],
         className
       )}
     >
-      <Icon size={13} stroke={2} className={style.icon} />
       {LABELS[status]}
     </span>
   );

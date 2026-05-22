@@ -205,7 +205,9 @@ export function MailListClient({
       const next = params.toString();
       startTransition(() => {
         const base = pathname || "/mail";
-        router.replace(`${base}${next ? `?${next}` : ""}`);
+        // scroll: false stops Next from scrolling to top on every chip
+        // click — the user expects only the rows to change.
+        router.replace(`${base}${next ? `?${next}` : ""}`, { scroll: false });
       });
     }, 250);
     return () => clearTimeout(id);
@@ -253,25 +255,6 @@ export function MailListClient({
 
   return (
     <div>
-      {initialLeadId && (
-        <div className="mb-3 flex items-center justify-between rounded-md border border-petrol-200 bg-petrol-50/60 px-3 py-2 text-[12px] text-petrol-700">
-          <span>
-            Filtered to one lead.{" "}
-            <Link
-              href={`/leads/${initialLeadId}`}
-              className="cursor-pointer font-medium underline"
-            >
-              Open Lead
-            </Link>
-          </span>
-          <Link
-            href="/mail"
-            className="cursor-pointer text-[11px] font-medium hover:text-petrol-900"
-          >
-            Clear Filter
-          </Link>
-        </div>
-      )}
 
       {/* Typographic stat banner. Three numbers inline as a magazine
           masthead instead of a SaaS tile grid. Reads differently from
@@ -334,10 +317,10 @@ export function MailListClient({
               type="button"
               onClick={() => setStatus(chip.id)}
               className={cn(
-                "cursor-pointer rounded-full border px-3 py-1 text-[11.5px] font-medium transition-colors",
+                "cursor-pointer rounded-[4px] border px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] transition-colors",
                 status === chip.id
                   ? "border-ink bg-ink text-white"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-ink"
+                  : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-ink"
               )}
             >
               {chip.label}
@@ -697,10 +680,10 @@ function BatchPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2 py-[1px] text-[10px] font-medium",
-        tone === "ok" && "bg-white text-petrol-700 ring-1 ring-inset ring-petrol-200",
-        tone === "neutral" && "bg-white text-ink ring-1 ring-inset ring-gray-200",
-        tone === "danger" && "bg-white text-danger ring-1 ring-inset ring-danger/30"
+        "inline-flex items-center justify-center rounded-[4px] px-[8px] py-[4px] text-[9px] font-semibold uppercase leading-none tracking-[0.1em]",
+        tone === "ok" && "bg-petrol-500 text-white",
+        tone === "neutral" && "bg-ink text-white",
+        tone === "danger" && "bg-danger text-white"
       )}
     >
       {label}
