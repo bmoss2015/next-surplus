@@ -527,14 +527,14 @@ function Row({
               href={row.tracking_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex cursor-pointer items-center gap-1 font-mono text-[11.5px] text-petrol-500 hover:text-petrol-700"
+              className="inline-flex cursor-pointer items-center gap-1 text-[12px] text-petrol-500 hover:text-petrol-700"
               onClick={(e) => e.stopPropagation()}
             >
               {row.tracking_number}
               <IconExternalLink size={11} stroke={1.75} />
             </a>
           ) : (
-            <span className="font-mono text-[11.5px] text-ink">
+            <span className="text-[12px] text-ink">
               {row.tracking_number}
             </span>
           )

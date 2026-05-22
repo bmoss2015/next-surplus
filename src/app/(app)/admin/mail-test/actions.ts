@@ -81,7 +81,6 @@ export async function seedMailTestArtifacts(): Promise<{
       .insert({
         org_id: profile.orgId,
         name: TEMPLATE_NAME,
-        category: "other",
         body_html: TEMPLATE_BODY_HTML,
         default_mail_class: "first_class",
       })
@@ -382,12 +381,18 @@ export async function cleanupMailTestArtifacts(): Promise<{
   if (!profile.isAdmin) return { ok: false, error: "Admin only" };
   const admin = createServiceClient();
 
-  // Jobs the harness created — pinned by template name + recipient name pattern.
+  // Jobs the harness created — match (a) the harness scenarios which use
+  // HARNESS_TAG in recipient_name, OR (b) the sample-data rows which use
+  // provider_id starting with "sample_". Sample rows keep clean
+  // recipient names ("Margaret Chen") so the dashboard reads like
+  // production data.
   const { data: jobs } = await admin
     .from("mail_jobs")
     .select("id")
     .eq("org_id", profile.orgId)
-    .ilike("recipient_name", `${HARNESS_TAG}%`);
+    .or(
+      `recipient_name.ilike.${HARNESS_TAG}%,provider_id.ilike.sample_%`
+    );
   const jobIds = (jobs ?? []).map((j) => j.id as string);
   let activitiesDeleted = 0;
   if (jobIds.length > 0) {
@@ -615,7 +620,7 @@ export async function seedSampleMailData(): Promise<
   };
   const samples: Sample[] = [
     {
-      name: `${HARNESS_TAG} Sample · Margaret Chen`,
+      name: `Margaret Chen`,
       line1: "412 Oakwood Drive",
       city: "Austin",
       state: "TX",
@@ -627,7 +632,7 @@ export async function seedSampleMailData(): Promise<
       tracking_number: "9400111899223344556677",
     },
     {
-      name: `${HARNESS_TAG} Sample · David Rodriguez`,
+      name: `David Rodriguez`,
       line1: "78 Pinecrest Avenue",
       city: "Houston",
       state: "TX",
@@ -639,7 +644,7 @@ export async function seedSampleMailData(): Promise<
       tracking_number: "9400111899223344556712",
     },
     {
-      name: `${HARNESS_TAG} Sample · Patricia Williams`,
+      name: `Patricia Williams`,
       line1: "1023 Heritage Lane",
       city: "Dallas",
       state: "TX",
@@ -650,7 +655,7 @@ export async function seedSampleMailData(): Promise<
       tracking_number: "9400111899223344556728",
     },
     {
-      name: `${HARNESS_TAG} Sample · James O'Brien`,
+      name: `James O'Brien`,
       line1: "245 Magnolia Court",
       city: "San Antonio",
       state: "TX",
@@ -662,7 +667,7 @@ export async function seedSampleMailData(): Promise<
       tracking_number: "9400111899223344556735",
     },
     {
-      name: `${HARNESS_TAG} Sample · Linda Foster (batch)`,
+      name: `Linda Foster (batch)`,
       line1: "5511 Westbrook Way",
       city: "Fort Worth",
       state: "TX",
@@ -674,7 +679,7 @@ export async function seedSampleMailData(): Promise<
       batch_with: "robert-batch",
     },
     {
-      name: `${HARNESS_TAG} Sample · Robert Foster (batch)`,
+      name: `Robert Foster (batch)`,
       line1: "5511 Westbrook Way",
       city: "Fort Worth",
       state: "TX",
@@ -686,7 +691,7 @@ export async function seedSampleMailData(): Promise<
       batch_with: "robert-batch",
     },
     {
-      name: `${HARNESS_TAG} Sample · Susan Park (check)`,
+      name: `Susan Park (check)`,
       line1: "918 Cedar Springs Rd",
       city: "Austin",
       state: "TX",
