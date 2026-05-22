@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   IconSearch,
@@ -16,11 +16,7 @@ import {
 import { cn } from "@/lib/cn";
 import { MailStatusPill } from "@/components/mail/MailStatusPill";
 import { LetterPreviewModal, type LetterPreviewData } from "@/components/mail/LetterPreviewModal";
-import {
-  displayRecipientName,
-  recipientInitials,
-  recipientAvatarStyle,
-} from "@/components/mail/displayName";
+import { displayRecipientName } from "@/components/mail/displayName";
 import type {
   MailJobListRow,
   MailStats,
@@ -184,6 +180,7 @@ export function MailListClient({
   showNeedsAttention?: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState<MailStatusFilter>(initialStatus);
@@ -207,7 +204,8 @@ export function MailListClient({
       else params.delete("status");
       const next = params.toString();
       startTransition(() => {
-        router.replace(`/mail${next ? `?${next}` : ""}`);
+        const base = pathname || "/mail";
+        router.replace(`${base}${next ? `?${next}` : ""}`);
       });
     }, 250);
     return () => clearTimeout(id);
@@ -253,34 +251,6 @@ export function MailListClient({
     });
   }, []);
 
-  const statCards: Array<{
-    label: string;
-    value: number;
-    sub: string;
-    Icon: typeof IconTruckDelivery;
-    warn?: boolean;
-  }> = [
-    {
-      label: "In Transit",
-      value: stats.in_flight,
-      sub: "Pieces Moving",
-      Icon: IconTruckDelivery,
-    },
-    {
-      label: "Delivered",
-      value: stats.delivered,
-      sub: "Reached Recipient",
-      Icon: IconHomeCheck,
-    },
-    {
-      label: "Returned",
-      value: stats.returned,
-      sub: "Re-Verify Address",
-      Icon: IconArrowBackUp,
-      warn: stats.returned > 0,
-    },
-  ];
-
   return (
     <div>
       {initialLeadId && (
@@ -303,52 +273,32 @@ export function MailListClient({
         </div>
       )}
 
-      <div className="mb-5 grid grid-cols-3 gap-3">
-        {statCards.map((card) => {
-          const Icon = card.Icon;
-          return (
-            <div
-              key={card.label}
-              className={cn(
-                "relative overflow-hidden rounded-xl border bg-surface p-5 shadow-card transition-shadow hover:shadow-card-hover",
-                card.warn ? "border-danger" : "border-gray-200"
-              )}
-            >
-              {/* Big watermark icon in the corner gives the cards a
-                  distinct visual identity instead of generic stat tiles */}
-              <div
-                aria-hidden
-                className={cn(
-                  "absolute -right-3 -top-3 opacity-[0.07]",
-                  card.warn ? "text-danger" : "text-ink"
-                )}
-              >
-                <Icon size={104} stroke={1.25} />
-              </div>
-              <div className="relative">
-                <div className="flex items-center gap-2">
-                  <Icon
-                    size={14}
-                    stroke={1.75}
-                    className={card.warn ? "text-danger" : "text-petrol-500"}
-                  />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-gray-500">
-                    {card.label}
-                  </span>
-                </div>
-                <div
-                  className={cn(
-                    "mt-3 text-[32px] font-semibold leading-none tracking-tight",
-                    card.warn ? "text-danger" : "text-ink"
-                  )}
-                >
-                  {card.value}
-                </div>
-                <div className="mt-1.5 text-[11.5px] text-gray-500">{card.sub}</div>
-              </div>
-            </div>
-          );
-        })}
+      {/* Typographic stat banner. Three numbers inline as a magazine
+          masthead instead of a SaaS tile grid. Reads differently from
+          every other dashboard in the portal. */}
+      <div className="mb-6 border-b border-gray-200 pb-5">
+        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
+          <StatNumber
+            value={stats.in_flight}
+            label="In Transit"
+            Icon={IconTruckDelivery}
+            tone="neutral"
+          />
+          <span className="hidden text-gray-200 sm:inline">|</span>
+          <StatNumber
+            value={stats.delivered}
+            label="Delivered"
+            Icon={IconHomeCheck}
+            tone="ok"
+          />
+          <span className="hidden text-gray-200 sm:inline">|</span>
+          <StatNumber
+            value={stats.returned}
+            label="Returned"
+            Icon={IconArrowBackUp}
+            tone={stats.returned > 0 ? "danger" : "neutral"}
+          />
+        </div>
       </div>
 
       {/* Needs Attention — lead-scoped only. Hides on the global /mail
@@ -559,10 +509,8 @@ function Row({
 }) {
   return (
     <tr className="border-b border-gray-150 last:border-b-0 hover:bg-gray-50">
-      <td className={cn("px-4 py-3", indent && "pl-10")}>
-        <RecipientAvatar name={row.recipient_name} />
-      </td>
-      <td className="px-2 py-3 text-[13px]">
+      <td className={cn("py-3", indent ? "pl-10 w-8" : "w-2")}></td>
+      <td className="px-4 py-3 text-[13px]">
         <button
           type="button"
           onClick={onOpenDetail}
@@ -701,19 +649,40 @@ function NeedsAttentionSection({
   );
 }
 
-function RecipientAvatar({ name }: { name: string }) {
-  const initials = recipientInitials(name);
-  const style = recipientAvatarStyle(name);
+function StatNumber({
+  value,
+  label,
+  Icon,
+  tone = "neutral",
+}: {
+  value: number;
+  label: string;
+  Icon: typeof IconTruckDelivery;
+  tone?: "neutral" | "ok" | "danger";
+}) {
   return (
-    <div
-      className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold tracking-wide",
-        style.bg,
-        style.text
-      )}
-      aria-hidden
-    >
-      {initials}
+    <div className="flex items-baseline gap-2">
+      <Icon
+        size={16}
+        stroke={1.75}
+        className={cn(
+          "translate-y-[1px]",
+          tone === "ok" && "text-petrol-500",
+          tone === "danger" && "text-danger",
+          tone === "neutral" && "text-gray-400"
+        )}
+      />
+      <span
+        className={cn(
+          "text-[40px] font-semibold leading-none tracking-tight",
+          tone === "danger" ? "text-danger" : "text-ink"
+        )}
+      >
+        {value}
+      </span>
+      <span className="text-[11px] uppercase tracking-[0.1em] text-gray-500">
+        {label}
+      </span>
     </div>
   );
 }
