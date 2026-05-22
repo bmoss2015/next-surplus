@@ -37,7 +37,7 @@ function avatarInitial(name: string | null): string {
 }
 
 // Renders a comment body with @Name spans (matched against the comment's
-// mentioned team members) highlighted in teal.
+// mentioned team members) highlighted in the brand emerald.
 function CommentBody({
   body,
   mentionNames,
@@ -145,12 +145,12 @@ export function DiscussionTabClient({
     const el = document.getElementById(`comment-${commentId}`);
     if (!el) return;
     el.scrollIntoView({ block: "center", behavior: "smooth" });
-    el.classList.add("ring-2", "ring-petrol-300");
+    el.classList.add("ring-2", "ring-inset", "ring-petrol-500");
     if (highlightTimerRef.current !== null) {
       window.clearTimeout(highlightTimerRef.current);
     }
     highlightTimerRef.current = window.setTimeout(() => {
-      el.classList.remove("ring-2", "ring-petrol-300");
+      el.classList.remove("ring-2", "ring-inset", "ring-petrol-500");
       highlightTimerRef.current = null;
     }, 1800);
   }
@@ -191,9 +191,9 @@ export function DiscussionTabClient({
       const el = document.getElementById(hash.slice(1));
       if (el) {
         el.scrollIntoView({ block: "center" });
-        el.classList.add("ring-2", "ring-petrol-300");
+        el.classList.add("ring-2", "ring-inset", "ring-petrol-500");
         const t = setTimeout(
-          () => el.classList.remove("ring-2", "ring-petrol-300"),
+          () => el.classList.remove("ring-2", "ring-inset", "ring-petrol-500"),
           2500
         );
         return () => clearTimeout(t);
@@ -418,7 +418,7 @@ export function DiscussionTabClient({
             <div
               key={c.id}
               id={`comment-${c.id}`}
-              className="flex gap-3 rounded-md transition-shadow"
+              className="flex gap-3 rounded-md p-2 transition-shadow"
             >
               <div className="mt-[2px] flex h-7 w-7 flex-none items-center justify-center rounded-full bg-petrol-100 text-[12px] font-medium text-petrol-700">
                 {avatarInitial(c.author_first_name ?? c.author_full_name)}
