@@ -11,6 +11,7 @@
 
 import { useState, useTransition } from "react";
 import { runPhoneValidationBackfill } from "@/app/(app)/settings/_actions";
+import { DEFAULT_CREDIT_COST_USD } from "@/lib/phone-validate";
 
 export type PhoneValidationUsage = {
   used: number;
@@ -70,12 +71,14 @@ export function BillingSection({
     phoneUsage.cap > 0
       ? Math.min(100, Math.round((phoneUsage.used / phoneUsage.cap) * 100))
       : 0;
-  const periodDate = new Date(phoneUsage.period_month + "T00:00:00Z");
-  const resetsLabel = new Date(
-    periodDate.getUTCFullYear(),
-    periodDate.getUTCMonth() + 1,
-    1
-  ).toLocaleString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const remaining = Math.max(0, phoneUsage.cap - phoneUsage.used);
+  const spentUsd = phoneUsage.used * DEFAULT_CREDIT_COST_USD;
+  const spentLabel = spentUsd.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
   return (
     <section id="panel-billing" className="panel active">
@@ -120,15 +123,17 @@ export function BillingSection({
         </div>
       </div>
 
-      <div className="pref-section-h">Add-Ons · Usage This Month</div>
+      <div className="pref-section-h">Add-Ons · Credit Balance</div>
 
       <div className="addon-meter">
         <div className="addon-meter-head">
           <div className="flex-1 min-w-0">
             <div className="addon-meter-title">Phone Validation</div>
             <div className="addon-meter-desc">
-              Pre-screens imported and manually added numbers via Veriphone
-              so dead lines stop reaching the call queue.
+              Real-time line-status and carrier check via Clearout Phone —
+              covers both mobile and landline. Pre-screens imported and
+              manually added numbers so dead lines stop reaching the call
+              queue.
             </div>
           </div>
           <div className="addon-meter-counts">
@@ -147,8 +152,9 @@ export function BillingSection({
           />
         </div>
         <div className="addon-meter-foot">
-          Resets {resetsLabel} · Free tier (
-          {phoneUsage.cap.toLocaleString()} / month)
+          {remaining.toLocaleString()} credits remaining · {spentLabel} spent
+          (≈ ${DEFAULT_CREDIT_COST_USD.toFixed(4)}/credit) · top off at
+          clearoutphone.io when low
         </div>
         <div className="addon-meter-action">
           <button

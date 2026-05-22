@@ -14,7 +14,7 @@ const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5
 
 // Synchronous targeted validation for manual saves — validates ONLY the rows
 // passed in and AWAITS the result so the action response carries the final
-// status back to the client. ~500ms-1s per phone for Veriphone, fast enough
+// status back to the client. ~500ms-1s per phone for Clearout, fast enough
 // to feel like part of the save instead of needing a background sweep.
 // (Bulk imports stay async via after() since they can't block on N×500ms.)
 async function runValidationFor(

@@ -35,9 +35,9 @@ export type ContactRow = {
   // label shown in the picker (e.g. "John Doe (Owner)"). Phone/email rows
   // write null. Renamed from `notes` in migration 0107.
   recipient_label: string | null;
-  // Phone validation audit fields (migration 0113). Populated by the Veriphone
-  // sweep so the UI can show "Checked May 18 via Veriphone" tooltips on dead
-  // phones.
+  // Phone validation audit fields (migration 0113). Populated by the Clearout
+  // Phone sweep so the UI can show "Checked May 18 via Clearout" tooltips on
+  // dead phones.
   validation_checked_at: string | null;
   validation_provider: string | null;
 };
