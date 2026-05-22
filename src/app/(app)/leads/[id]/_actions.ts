@@ -644,6 +644,11 @@ export async function upsertContact(
       }
     : {};
 
+  // Note: we deliberately do NOT reject duplicate same-lead phones here.
+  // The validator's 90-day cache picks up the prior result and stamps the
+  // new row as Verified instantly without billing a credit. Two rows can
+  // carry the same number with the same status, no flag, no confirmation.
+
   let resolvedId: string;
   if (contactId) {
     const { error } = await sb
@@ -693,6 +698,13 @@ export async function upsertContact(
     .maybeSingle();
 
   revalidatePath(`/leads/${leadId}`);
+  // Bust the Settings cache so the Billing credit meter reflects any new
+  // validation on the next navigation. The validator updates the live
+  // balance via Clearout's getcredits endpoint and the meter is otherwise
+  // server-rendered and would serve stale data.
+  if (patch.channel === "phone" || (contactId && valueChanged)) {
+    revalidatePath("/settings");
+  }
   return { ok: true, id: resolvedId, row: refreshed ?? null };
 }
 
@@ -875,6 +887,9 @@ export async function upsertRelative(
     .maybeSingle();
 
   revalidatePath(`/leads/${leadId}`);
+  // Bust Settings cache so the Billing credit meter reflects any new
+  // validation on relative phone slots.
+  revalidatePath("/settings");
   return {
     ok: true,
     id: resolvedId,

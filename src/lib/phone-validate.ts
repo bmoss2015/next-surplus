@@ -14,9 +14,19 @@ const DEFAULT_QUOTA_CAP = 5000;
 const CLEAROUT_ENDPOINT = "https://api.clearoutphone.io/v1/phonenumber/validate";
 const ADDON_KEY = "phone_validation";
 // Pay-as-you-go rate Bree confirmed: $35 / 5,000 = $0.0070 per credit.
-// Exported so the Billing meter can render "≈ $X.XX spent" alongside the
-// raw credit count without re-deriving the math.
-export const DEFAULT_CREDIT_COST_USD = 0.007;
+// Override via env CLEAROUT_COST_PER_CREDIT_USD when moving to monthly
+// (10% off → 0.0063) or annual (20% off → 0.0056) so the Billing meter's
+// "Spent This Month" reflects what's actually getting charged.
+//
+// FUTURE: when there are multiple paying orgs on the portal, lift this to
+// per-org app_settings instead of an env var.
+function parseCostFromEnv(): number {
+  const raw = process.env.CLEAROUT_COST_PER_CREDIT_USD;
+  if (!raw) return 0.007;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 0.007;
+}
+export const DEFAULT_CREDIT_COST_USD = parseCostFromEnv();
 
 export type ValidationStatus = "valid" | "invalid" | "untested";
 
@@ -67,11 +77,15 @@ async function getQuotaCap(sb: ServiceClient, orgId: string): Promise<number> {
 // meter as a running balance against `phone_validation_quota_cap`. When the
 // user tops off at Clearout they bump the cap and the meter re-headrooms.
 async function getTotalCreditsUsed(sb: ServiceClient, orgId: string): Promise<number> {
+  // Filter to provider='clearout' so legacy usage rows from prior providers
+  // don't pollute the count — would otherwise fire threshold alerts at
+  // boot for orgs migrating in and inflate the "Validations All-Time" stat.
   const { data } = await sb
     .from("org_addon_usage")
     .select("units")
     .eq("org_id", orgId)
-    .eq("addon_key", ADDON_KEY);
+    .eq("addon_key", ADDON_KEY)
+    .filter("metadata->>provider", "eq", "clearout");
   if (!data) return 0;
   return data.reduce((sum, row) => sum + (row.units ?? 0), 0);
 }
@@ -155,14 +169,14 @@ async function sendThresholdEmail(
 
   const bodyIntro =
     threshold === 100
-      ? "Your Phone Validation add-on has consumed 100% of its credit balance. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened against Clearout Phone until the balance is topped off. Clearout doesn't auto-recharge — log in at clearoutphone.io to purchase more credits, then raise the cap in Settings &rarr; Billing."
-      : `Your Phone Validation add-on has consumed <strong>${threshold}%</strong> of its credit balance. Validation continues normally — this is a heads-up so you can top off at Clearout before hitting zero. <strong>${remaining.toLocaleString()}</strong> credits remaining.`;
+      ? "Your Phone Validation add-on has consumed 100% of its credit balance. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened until more credits are added. The add-on does not auto-recharge."
+      : `Your Phone Validation add-on has consumed <strong>${threshold}%</strong> of its credit balance. Validation continues normally. This is a heads-up so you can add more credits before hitting zero. <strong>${remaining.toLocaleString()}</strong> credits remaining.`;
 
   const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
   <h1 style="margin:0;font-size:20px;font-weight:600;color:#0d4b3a;">${subject}</h1>
   <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">${bodyIntro}</p>
   <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Credits used: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
-  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Settings &rarr; Billing in the portal shows the live meter and lets you raise the cap after topping off at Clearout.</p>
+  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Open Settings &rsaquo; Billing in the portal to see the live meter and add more credits.</p>
 </div>`;
 
   try {
@@ -204,19 +218,22 @@ export async function validatePhone(
   const e164 = parsed.number;
 
   const sb = createServiceClient();
-  const [cap, used] = await Promise.all([
-    getQuotaCap(sb, orgId),
-    getTotalCreditsUsed(sb, orgId),
-  ]);
-  if (used >= cap) {
-    return {
-      status: "untested",
-      provider: null,
-      checkedAt: null,
-      raw: { reason: "credit_balance_exhausted", cap, used },
-      phoneType: null,
-    };
-  }
+
+  // Cache check before spending a credit: if this exact E.164 was validated
+  // to a definitive result in the last 90 days, reuse that. Saves credits
+  // on cross-lead dupes, accidental re-adds, and import overlap.
+  const cached = await findCachedValidation(sb, orgId, e164);
+  if (cached) return cached;
+
+  // Note: we used to pre-check `local_usage_count >= cap` here as a quota
+  // gate. That broke after a provider swap because the local usage count
+  // included pre-migration rows that had nothing to do with the live
+  // balance, so rows silently stayed "Not Verified" even with thousands of
+  // credits actually available. The fix is to let the provider be the
+  // source of truth: if credits are really gone, the upstream call
+  // returns an error and we surface that as a transient untested state.
+  // The threshold-alert plumbing still warns at 80/95/100% based on the
+  // live remaining balance.
 
   const apiKey = process.env.CLEAROUT_PHONE_API_KEY;
   if (!apiKey) {
@@ -246,19 +263,39 @@ export async function validatePhone(
   let body: ClearoutBody | null = null;
   let httpOk = false;
   let networkError: string | null = null;
-  try {
-    const res = await fetch(CLEAROUT_ENDPOINT, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ number: e164, country_code: "US" }),
-    });
-    httpOk = res.ok;
-    body = (await res.json()) as ClearoutBody;
-  } catch (e) {
-    networkError = e instanceof Error ? e.message : String(e);
+  let attempts = 0;
+  // Retry transient failures (network errors, 5xx, 429) with exponential
+  // backoff: 250ms, 500ms, 1000ms. 4xx other than 429 means the request is
+  // bad — no retry, just fall through and the row stays untested. Only the
+  // FINAL response is logged + returned, so cache + usage accounting stays
+  // correct (one credit per real billable call).
+  const MAX_ATTEMPTS = 3;
+  const backoffMs = [250, 500, 1000];
+  while (attempts < MAX_ATTEMPTS) {
+    attempts += 1;
+    networkError = null;
+    httpOk = false;
+    body = null;
+    let status = 0;
+    try {
+      const res = await fetch(CLEAROUT_ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ number: e164, country_code: "US" }),
+      });
+      status = res.status;
+      httpOk = res.ok;
+      body = (await res.json()) as ClearoutBody;
+    } catch (e) {
+      networkError = e instanceof Error ? e.message : String(e);
+    }
+    const transient = !!networkError || status >= 500 || status === 429;
+    if (!transient || attempts >= MAX_ATTEMPTS) break;
+    const delay = backoffMs[attempts - 1] ?? 1000;
+    await new Promise((r) => setTimeout(r, delay));
   }
 
   const checkedAt = new Date().toISOString();
@@ -285,33 +322,142 @@ export async function validatePhone(
   if (!httpOk || body?.status !== "success" || !data) {
     return { status: "untested", provider: "clearout", checkedAt, raw: body, phoneType: null };
   }
+  // Stamp `provider: 'clearout'` on every metered row so threshold alerts
+  // and Billing meter stats can filter out pre-migration usage from prior
+  // providers and only count what's actually been spent here.
   if (data.status === "valid") {
-    await logUsage(sb, orgId, units, { phone_e164: e164, result: "valid", line_type: data.line_type });
+    await logUsage(sb, orgId, units, { phone_e164: e164, result: "valid", line_type: data.line_type, provider: "clearout" });
     return { status: "valid", provider: "clearout", checkedAt, raw: body, phoneType };
   }
   if (data.status === "invalid") {
-    await logUsage(sb, orgId, units, { phone_e164: e164, result: "invalid" });
+    await logUsage(sb, orgId, units, { phone_e164: e164, result: "invalid", provider: "clearout" });
     return { status: "invalid", provider: "clearout", checkedAt, raw: body, phoneType };
   }
   // status === 'unknown' — Clearout still bills credits for unknowns, so log
   // them too, but the row stays untested-with-checkedAt so the sweep won't
   // re-burn credits on the same number.
-  await logUsage(sb, orgId, units, { phone_e164: e164, result: "unknown" });
+  await logUsage(sb, orgId, units, { phone_e164: e164, result: "unknown", provider: "clearout" });
   return { status: "untested", provider: "clearout", checkedAt, raw: body, phoneType: null };
 }
 
-// Helpers for callers that need balance/usage info without performing
-// validation (e.g., the Billing UI). `used` is cumulative across all months
-// because Clearout PAYG credits don't auto-reset — the cap is a top-off
-// balance the user maintains manually. period_month is still returned for
-// downstream consumers that key on it (unchanged shape).
-export async function getValidationUsage(orgId: string): Promise<{ used: number; cap: number; period_month: string }> {
+// Live balance pull from Clearout. The /getcredits endpoint is free (doesn't
+// consume a credit) so we hit it on every Settings page load — keeps the
+// meter honest when the user tops off at clearoutphone.io without ever
+// having to bump a value in app_settings. Returns null on any failure
+// (missing key, network error, non-2xx) so callers can fall back gracefully.
+async function getClearoutBalance(): Promise<number | null> {
+  const apiKey = process.env.CLEAROUT_PHONE_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const res = await fetch("https://api.clearoutphone.io/v1/phonenumber/getcredits", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      // Don't let a slow Clearout call freeze the Settings page render.
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { status?: string; data?: { available_credits?: number } };
+    if (body.status !== "success") return null;
+    const n = body.data?.available_credits;
+    return typeof n === "number" && Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+// Org-wide validation cache: if a phone has been validated to a definitive
+// result (valid/invalid) within the staleness window, reuse that result
+// instead of calling the provider again. Saves credits when the same number
+// shows up on a different lead or gets re-added to the same one.
+//
+// 90-day staleness window — surplus-recovery cold-call lists go stale fast
+// (numbers get disconnected). Older results trigger a fresh validation so we
+// don't show a stale "Verified" on a now-dead line. Returns null on miss.
+async function findCachedValidation(
+  sb: ServiceClient,
+  orgId: string,
+  e164: string
+): Promise<ValidationResult | null> {
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  // PERF FUTURE: JSON path filters here (metadata->>phone_e164,
+  // metadata->>provider) are not indexed. At ~10k+ Clearout-era usage rows
+  // per org this becomes a tablescan and adds ~100ms+ per save. Fix is a
+  // GIN index migration on org_addon_usage.metadata when it bites.
+  const { data, error } = await sb
+    .from("org_addon_usage")
+    .select("created_at, metadata")
+    .eq("org_id", orgId)
+    .eq("addon_key", ADDON_KEY)
+    .gte("created_at", ninetyDaysAgo)
+    .filter("metadata->>phone_e164", "eq", e164)
+    .filter("metadata->>provider", "eq", "clearout")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  const row = data[0] as { created_at: string; metadata: Record<string, unknown> | null };
+  const m = row.metadata ?? {};
+  const result = m.result;
+  if (result !== "valid" && result !== "invalid") return null;
+  const lineType = (m.line_type as string | null | undefined) ?? null;
+  return {
+    status: result === "valid" ? "valid" : "invalid",
+    provider: "clearout-cache",
+    checkedAt: row.created_at,
+    raw: {
+      cached: true,
+      original_validated_at: row.created_at,
+      line_type: lineType,
+      e164,
+    },
+    phoneType: lineType ? mapClearoutLineType(lineType) : null,
+  };
+}
+
+// Sums org_addon_usage units inside the current calendar month, gives the
+// Billing meter a "this billing cycle's spend" figure independent of the
+// running Clearout balance.
+async function getMonthCreditsUsed(sb: ServiceClient, orgId: string): Promise<number> {
+  // Same provider filter as getTotalCreditsUsed: only count Clearout-era
+  // rows so "Spent This Month" reflects what's actually been charged.
+  const { data } = await sb
+    .from("org_addon_usage")
+    .select("units")
+    .eq("org_id", orgId)
+    .eq("addon_key", ADDON_KEY)
+    .eq("period_month", currentPeriodMonth())
+    .filter("metadata->>provider", "eq", "clearout");
+  if (!data) return 0;
+  return data.reduce((sum, row) => sum + (row.units ?? 0), 0);
+}
+
+// Billing UI's source of truth. `remainingCredits` is pulled live from
+// Clearout when possible — that means a top-off at clearoutphone.io shows up
+// in the portal meter immediately, no manual reconciliation needed. When
+// Clearout is unreachable, `remainingCredits` is null and the UI falls back
+// to the older cap-minus-used calculation against app_settings.
+export type ValidationUsageSummary = {
+  remainingCredits: number | null;
+  usedThisMonth: number;
+  usedAllTime: number;
+  fallbackCap: number;
+  source: "clearout_live" | "fallback";
+};
+
+export async function getValidationUsage(orgId: string): Promise<ValidationUsageSummary> {
   const sb = createServiceClient();
-  const [cap, used] = await Promise.all([
-    getQuotaCap(sb, orgId),
+  const [remaining, usedThisMonth, usedAllTime, fallbackCap] = await Promise.all([
+    getClearoutBalance(),
+    getMonthCreditsUsed(sb, orgId),
     getTotalCreditsUsed(sb, orgId),
+    getQuotaCap(sb, orgId),
   ]);
-  return { used, cap, period_month: currentPeriodMonth() };
+  return {
+    remainingCredits: remaining,
+    usedThisMonth,
+    usedAllTime,
+    fallbackCap,
+    source: remaining !== null ? "clearout_live" : "fallback",
+  };
 }
 
 // Phone slot column bases on the relatives table — one row per relative,
@@ -393,40 +539,66 @@ export async function validateSpecificPhones(
     }
   }
 
+  // Dedup by E.164: same phone repeated across contacts + relatives (very
+  // common in skip-trace data) is validated ONCE against Clearout. The
+  // single result fans out to every row that shares that number. Tasks
+  // whose phone can't be normalized are kept as their own bucket so the
+  // libphonenumber pre-filter still rejects them per-row.
+  const buckets = new Map<string, PendingTask[]>();
+  for (const t of tasks) {
+    const parsed = parsePhoneNumberFromString(t.phone.trim(), "US");
+    const key = parsed && parsed.isValid() ? parsed.number : `raw:${t.phone}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(t);
+    else buckets.set(key, [t]);
+  }
+
+  const uniquePhones = buckets.size;
   console.log(
-    `[phone-validate] specific org=${orgId}: ${tasks.length} phones (` +
+    `[phone-validate] specific org=${orgId}: ${tasks.length} rows -> ${uniquePhones} unique phones (` +
       `${tasks.filter((t) => t.kind === "contact").length} contacts, ` +
       `${tasks.filter((t) => t.kind === "relative").length} relative slots)`
   );
 
   let processed = 0;
-  for (let i = 0; i < tasks.length; i += concurrency) {
-    const batch = tasks.slice(i, i + concurrency);
+  const entries = Array.from(buckets.entries());
+  for (let i = 0; i < entries.length; i += concurrency) {
+    const batch = entries.slice(i, i + concurrency);
     await Promise.all(
-      batch.map(async (task) => {
-        const result = await validatePhone(task.phone, orgId);
+      batch.map(async ([, rows]) => {
+        // Validate the phone once using the first row's value (every row in
+        // the bucket has the same E.164 by construction).
+        const result = await validatePhone(rows[0].phone, orgId);
         if (result.status === "untested" && result.checkedAt === null) return;
-        const shouldFillType = !task.existingType && result.phoneType;
-        if (task.kind === "contact") {
-          const update: Record<string, unknown> = {
-            status: result.status,
-            validation_checked_at: result.checkedAt,
-            validation_provider: result.provider,
-            validation_raw: result.raw as object,
-          };
-          if (shouldFillType) update.phone_type = result.phoneType;
-          await sb.from("contacts").update(update).eq("id", task.rowId);
-        } else {
-          const update: Record<string, unknown> = {
-            [`${task.base}_status`]: result.status,
-            [`${task.base}_validation_checked_at`]: result.checkedAt,
-            [`${task.base}_validation_provider`]: result.provider,
-            [`${task.base}_validation_raw`]: result.raw as object,
-          };
-          if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
-          await sb.from("relatives").update(update).eq("id", task.rowId);
+        // Fan the same result out to every row in the bucket. Provider's
+        // line_type ALWAYS wins over an existing phone_type — CSV-imported
+        // types are stale (numbers port carriers and line types) and the
+        // whole point of paying for HLR-grade validation is to get
+        // authoritative carrier data. The "user manually picked a type via
+        // pencil-edit" case is preserved because pencil edits don't reset
+        // status to untested, so validation doesn't re-fire on them.
+        for (const task of rows) {
+          if (task.kind === "contact") {
+            const update: Record<string, unknown> = {
+              status: result.status,
+              validation_checked_at: result.checkedAt,
+              validation_provider: result.provider,
+              validation_raw: result.raw as object,
+            };
+            if (result.phoneType) update.phone_type = result.phoneType;
+            await sb.from("contacts").update(update).eq("id", task.rowId);
+          } else {
+            const update: Record<string, unknown> = {
+              [`${task.base}_status`]: result.status,
+              [`${task.base}_validation_checked_at`]: result.checkedAt,
+              [`${task.base}_validation_provider`]: result.provider,
+              [`${task.base}_validation_raw`]: result.raw as object,
+            };
+            if (result.phoneType) update[`${task.base}_type`] = result.phoneType;
+            await sb.from("relatives").update(update).eq("id", task.rowId);
+          }
+          processed += 1;
         }
-        processed += 1;
       })
     );
   }
@@ -434,10 +606,75 @@ export async function validateSpecificPhones(
   return { processed };
 }
 
-// Explicit backfill — sweeps every untested phone in the org. Never called
+// Dry-run version of the backfill that returns how many UNIQUE phones the
+// sweep would actually send to Clearout (after libphonenumber pre-filtering
+// + E.164 dedup), without consuming a single credit. Powers the pre-count
+// confirmation modal on the Run Backfill button so the user sees the
+// real cost before committing.
+export async function previewBackfillCount(
+  orgId: string,
+  opts: { excludeLostLeads?: boolean } = {}
+): Promise<{ uniquePhones: number; totalRows: number }> {
+  const excludeLostLeads = opts.excludeLostLeads ?? true;
+  const sb = createServiceClient();
+
+  let contactsQuery = sb
+    .from("contacts")
+    .select(
+      excludeLostLeads
+        ? "id, value, leads!inner(stage)"
+        : "id, value"
+    )
+    .eq("org_id", orgId)
+    .eq("channel", "phone")
+    .eq("status", "untested")
+    .not("value", "is", null);
+  if (excludeLostLeads) contactsQuery = contactsQuery.neq("leads.stage", "lost");
+  const contactsRes = await contactsQuery;
+
+  let relativesQuery = sb
+    .from("relatives")
+    .select(
+      excludeLostLeads
+        ? "phone, phone_status, phone_2, phone_2_status, phone_3, phone_3_status, phone_4, phone_4_status, phone_5, phone_5_status, leads!inner(stage)"
+        : "phone, phone_status, phone_2, phone_2_status, phone_3, phone_3_status, phone_4, phone_4_status, phone_5, phone_5_status"
+    )
+    .eq("org_id", orgId)
+    .or(
+      "phone_status.eq.untested,phone_2_status.eq.untested,phone_3_status.eq.untested,phone_4_status.eq.untested,phone_5_status.eq.untested"
+    );
+  if (excludeLostLeads) relativesQuery = relativesQuery.neq("leads.stage", "lost");
+  const relativesRes = await relativesQuery;
+
+  const phones: string[] = [];
+  for (const c of ((contactsRes.data ?? []) as unknown) as Array<{ value: string | null }>) {
+    if (c.value) phones.push(c.value);
+  }
+  for (const r of ((relativesRes.data ?? []) as unknown) as Record<string, unknown>[]) {
+    for (const base of RELATIVE_PHONE_BASES) {
+      const value = r[base] as string | null;
+      const status = r[`${base}_status`] as string | null;
+      if (value && status === "untested") phones.push(value);
+    }
+  }
+
+  // Apply the same E.164 dedup the real sweep uses so the preview matches
+  // the actual credit cost exactly.
+  const unique = new Set<string>();
+  for (const p of phones) {
+    const parsed = parsePhoneNumberFromString(p.trim(), "US");
+    if (parsed && parsed.isValid()) unique.add(parsed.number);
+    // Bad-format numbers won't reach Clearout (libphonenumber rejects them),
+    // so we don't count them toward the credit estimate.
+  }
+
+  return { uniquePhones: unique.size, totalRows: phones.length };
+}
+
+// Explicit backfill: sweeps every untested phone in the org. Never called
 // from import or upsert paths (those use validateSpecificPhones for the IDs
 // they just inserted). Wire this to a dedicated "Run Backfill" button so the
-// spend is always intentional. excludeLostLeads is on by default — skip
+// spend is always intentional. excludeLostLeads is on by default; skip
 // phones on leads the user has already given up on.
 export async function validateAllUntestedForOrg(
   orgId: string,
@@ -506,45 +743,64 @@ export async function validateAllUntestedForOrg(
     }
   }
 
-  const limited = tasks.slice(0, maxItems);
+  // Dedup by E.164 before slicing — the maxItems budget counts UNIQUE phones,
+  // not rows. Same number repeated across rows is a single Clearout call
+  // that updates every row that shares it.
+  const buckets = new Map<string, PendingTask[]>();
+  for (const t of tasks) {
+    const parsed = parsePhoneNumberFromString(t.phone.trim(), "US");
+    const key = parsed && parsed.isValid() ? parsed.number : `raw:${t.phone}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(t);
+    else buckets.set(key, [t]);
+  }
+
+  const allEntries = Array.from(buckets.entries());
+  const entries = allEntries.slice(0, maxItems);
   let processed = 0;
   console.log(
-    `[phone-validate] sweep org=${orgId}: ${tasks.length} pending phones ` +
+    `[phone-validate] sweep org=${orgId}: ${tasks.length} rows -> ${allEntries.length} unique phones ` +
       `(${tasks.filter((t) => t.kind === "contact").length} contacts, ` +
       `${tasks.filter((t) => t.kind === "relative").length} relative slots)`
   );
 
-  for (let i = 0; i < limited.length; i += concurrency) {
-    const batch = limited.slice(i, i + concurrency);
+  for (let i = 0; i < entries.length; i += concurrency) {
+    const batch = entries.slice(i, i + concurrency);
     await Promise.all(
-      batch.map(async (task) => {
-        const result = await validatePhone(task.phone, orgId);
+      batch.map(async ([, rows]) => {
+        const result = await validatePhone(rows[0].phone, orgId);
         // Transient errors / quota-exhausted come back as untested w/ null
         // checkedAt; leave those rows alone so the next sweep retries them.
         if (result.status === "untested" && result.checkedAt === null) return;
-        // Auto-fill phone type from Clearout IFF the row doesn't already have
-        // one — never override a manual choice.
-        const shouldFillType = !task.existingType && result.phoneType;
-        if (task.kind === "contact") {
-          const update: Record<string, unknown> = {
-            status: result.status,
-            validation_checked_at: result.checkedAt,
-            validation_provider: result.provider,
-            validation_raw: result.raw as object,
-          };
-          if (shouldFillType) update.phone_type = result.phoneType;
-          await sb.from("contacts").update(update).eq("id", task.rowId);
-        } else {
-          const update: Record<string, unknown> = {
-            [`${task.base}_status`]: result.status,
-            [`${task.base}_validation_checked_at`]: result.checkedAt,
-            [`${task.base}_validation_provider`]: result.provider,
-            [`${task.base}_validation_raw`]: result.raw as object,
-          };
-          if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
-          await sb.from("relatives").update(update).eq("id", task.rowId);
+        // Fan the single Clearout result out to every row sharing this
+        // number. Provider's line_type ALWAYS wins over an existing
+        // phone_type — CSV-imported types are stale and the whole point
+        // of paying for HLR-grade validation is to get authoritative
+        // carrier data. Pencil-edit-only changes don't trigger
+        // re-validation (they don't reset status to untested), so they're
+        // preserved.
+        for (const task of rows) {
+          if (task.kind === "contact") {
+            const update: Record<string, unknown> = {
+              status: result.status,
+              validation_checked_at: result.checkedAt,
+              validation_provider: result.provider,
+              validation_raw: result.raw as object,
+            };
+            if (result.phoneType) update.phone_type = result.phoneType;
+            await sb.from("contacts").update(update).eq("id", task.rowId);
+          } else {
+            const update: Record<string, unknown> = {
+              [`${task.base}_status`]: result.status,
+              [`${task.base}_validation_checked_at`]: result.checkedAt,
+              [`${task.base}_validation_provider`]: result.provider,
+              [`${task.base}_validation_raw`]: result.raw as object,
+            };
+            if (result.phoneType) update[`${task.base}_type`] = result.phoneType;
+            await sb.from("relatives").update(update).eq("id", task.rowId);
+          }
+          processed += 1;
         }
-        processed += 1;
       })
     );
   }

@@ -313,6 +313,12 @@ export function ContactsTabClient({
           is_litigator: newOwnerPhoneLitigator,
         });
         if (r.ok) {
+          // upsertContact awaits the validator and returns r.row populated
+          // with the post-validation status / phone_type / checkedAt /
+          // provider. Use that instead of hardcoding "untested" so the
+          // newly-added owner phone shows Verified the same way every
+          // other phone-add does.
+          const fresh = (r.row ?? null) as Partial<ContactRow> | null;
           newContacts.push({
             id: r.id,
             owner_id: ownerId,
@@ -321,19 +327,19 @@ export function ContactsTabClient({
             lead_id: leadId,
             channel: "phone",
             value: phone,
-            status: "untested",
+            status: (fresh?.status as ContactRow["status"]) ?? "untested",
             connection_status: null,
             source: null,
             last_attempted: null,
             is_primary: true,
-            phone_type: null,
+            phone_type: (fresh?.phone_type as string | null) ?? null,
             is_dnc: newOwnerPhoneDnc,
             is_litigator: newOwnerPhoneLitigator,
             mailed: false,
             mailed_at: null,
             recipient_label: null,
-            validation_checked_at: null,
-            validation_provider: null,
+            validation_checked_at: (fresh?.validation_checked_at as string | null) ?? null,
+            validation_provider: (fresh?.validation_provider as string | null) ?? null,
           });
         }
       }

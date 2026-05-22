@@ -1,38 +1,35 @@
 "use client";
 
-// Settings clone · Phase E.6 — Billing with live Run Backfill button.
+// Billing — plan, phone-validation credit meter (pulls live remaining from
+// Clearout), payment method, invoice history. Each section sits in its own
+// card so the eye can step between them; section headers carry the heading
+// rather than a thin uppercase rule.
 //
-// Plan-hero, Payment Method, and Invoice History stay static until a
-// Stripe integration ships (separate project — no SDK or webhook handler
-// in this codebase). The Phone Validation add-on meter is real, and the
-// Run Backfill button now fires runPhoneValidationBackfill — the server
-// action kicks off the sweep via after() and returns immediately, so the
-// UI just confirms the run started.
+// The credit meter prefers live Clearout balance (auto-updates when Bree
+// tops off at clearoutphone.io). Falls back to the local cap-minus-used
+// calc only if the Clearout call fails.
 
 import { useState, useTransition } from "react";
-import { runPhoneValidationBackfill } from "@/app/(app)/settings/_actions";
+import {
+  runPhoneValidationBackfill,
+  previewPhoneValidationBackfill,
+} from "@/app/(app)/settings/_actions";
 import { DEFAULT_CREDIT_COST_USD } from "@/lib/phone-validate";
 
-export type PhoneValidationUsage = {
-  used: number;
-  cap: number;
-  period_month: string;
+type BackfillPreview = {
+  uniquePhones: number;
+  totalRows: number;
+  estimatedCostUsd: number;
+  costPerCreditUsd: number;
 };
 
-const COMING_SOON: { title: string; desc: string }[] = [
-  {
-    title: "Skip Tracing Credits",
-    desc: "Pull current address, phone, and relatives on any lead.",
-  },
-  {
-    title: "Bulk Mail Discount",
-    desc: "Drops Click2Mail rates on letters and certified mail at high volume.",
-  },
-  {
-    title: "Priority Support",
-    desc: "Direct Slack channel with our team. Same-day response on weekdays.",
-  },
-];
+export type PhoneValidationUsage = {
+  remainingCredits: number | null;
+  usedThisMonth: number;
+  usedAllTime: number;
+  fallbackCap: number;
+  source: "clearout_live" | "fallback";
+};
 
 export function BillingSection({
   phoneUsage,
@@ -43,37 +40,65 @@ export function BillingSection({
 }) {
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
   const [backfillErr, setBackfillErr] = useState<string | null>(null);
-  const [backfillPending, startBackfill] = useTransition();
+  const [preview, setPreview] = useState<BackfillPreview | null>(null);
+  const [previewPending, startPreview] = useTransition();
+  const [confirmPending, startConfirm] = useTransition();
 
-  function onBackfill() {
+  function onBackfillClick() {
     setBackfillErr(null);
     setBackfillMsg(null);
-    if (
-      !window.confirm(
-        "Validate every untested phone in this org (on non-lost leads)? Uses the validation quota above."
-      )
-    ) {
-      return;
-    }
-    startBackfill(async () => {
-      const res = await runPhoneValidationBackfill();
+    startPreview(async () => {
+      const res = await previewPhoneValidationBackfill();
       if (!res.ok) {
         setBackfillErr(res.error);
         return;
       }
-      setBackfillMsg(
-        "Started — every untested phone on non-lost leads is queueing now. The counter above updates as each one finishes."
-      );
+      setPreview({
+        uniquePhones: res.uniquePhones,
+        totalRows: res.totalRows,
+        estimatedCostUsd: res.estimatedCostUsd,
+        costPerCreditUsd: res.costPerCreditUsd,
+      });
     });
   }
 
-  const pct =
-    phoneUsage.cap > 0
-      ? Math.min(100, Math.round((phoneUsage.used / phoneUsage.cap) * 100))
-      : 0;
-  const remaining = Math.max(0, phoneUsage.cap - phoneUsage.used);
-  const spentUsd = phoneUsage.used * DEFAULT_CREDIT_COST_USD;
-  const spentLabel = spentUsd.toLocaleString("en-US", {
+  function onCancelPreview() {
+    if (confirmPending) return;
+    setPreview(null);
+  }
+
+  function onConfirmBackfill() {
+    if (!preview) return;
+    startConfirm(async () => {
+      const res = await runPhoneValidationBackfill();
+      if (!res.ok) {
+        setBackfillErr(res.error);
+        setPreview(null);
+        return;
+      }
+      setBackfillMsg(
+        `Started. Validating ${preview.uniquePhones.toLocaleString()} unique phone numbers in the background. Refresh to see the balance update.`
+      );
+      setPreview(null);
+    });
+  }
+
+  // Live remaining wins; fall back to cap-minus-all-time when Clearout
+  // can't be reached. The meter bar uses remaining vs the larger of
+  // (remaining + usedAllTime) and fallbackCap so the bar makes sense even
+  // when the user just topped off (recent purchases push remaining > cap).
+  const remaining = phoneUsage.remainingCredits ?? Math.max(
+    0,
+    phoneUsage.fallbackCap - phoneUsage.usedAllTime
+  );
+  const reference = Math.max(
+    remaining + phoneUsage.usedAllTime,
+    phoneUsage.fallbackCap,
+    1
+  );
+  const pct = Math.min(100, Math.round((remaining / reference) * 100));
+  const spentThisMonthUsd = phoneUsage.usedThisMonth * DEFAULT_CREDIT_COST_USD;
+  const spentThisMonthLabel = spentThisMonthUsd.toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
@@ -123,170 +148,167 @@ export function BillingSection({
         </div>
       </div>
 
-      <div className="pref-section-h">Add-Ons · Credit Balance</div>
-
-      <div className="addon-meter">
-        <div className="addon-meter-head">
+      <h2 className="billing-section-h">Phone Validation</h2>
+      <div className="billing-card">
+        <div className="billing-card-head">
           <div className="flex-1 min-w-0">
-            <div className="addon-meter-title">Phone Validation</div>
-            <div className="addon-meter-desc">
-              Real-time line-status and carrier check via Clearout Phone —
-              covers both mobile and landline. Pre-screens imported and
-              manually added numbers so dead lines stop reaching the call
-              queue.
+            <div className="billing-card-title">Credit Balance</div>
+            <div className="billing-card-desc">
+              Real-time line status and carrier check on every phone number,
+              covering both mobile and landline. Pre-screens imported and
+              manually added numbers so dead lines stop reaching the call queue.
             </div>
           </div>
-          <div className="addon-meter-counts">
-            <div className="addon-meter-num">
-              <span className="tabular">{phoneUsage.used.toLocaleString()}</span>{" "}
-              /{" "}
-              <span className="tabular">{phoneUsage.cap.toLocaleString()}</span>
+          <div className="billing-card-counts">
+            <div className="billing-card-num">
+              <span className="tabular">{remaining.toLocaleString()}</span>
             </div>
-            <div className="addon-meter-lab">{pct}% Used</div>
+            <div className="billing-card-lab">Credits Remaining</div>
           </div>
         </div>
-        <div className="addon-meter-bar">
+        <div className="billing-card-bar">
           <div
-            className="addon-meter-bar-fill"
+            className="billing-card-bar-fill"
             style={{ width: `${pct}%` }}
           />
         </div>
-        <div className="addon-meter-foot">
-          {remaining.toLocaleString()} credits remaining · {spentLabel} spent
-          (≈ ${DEFAULT_CREDIT_COST_USD.toFixed(4)}/credit) · top off at
-          clearoutphone.io when low
+        <div className="billing-card-stats">
+          <div>
+            <div className="billing-stat-num">
+              {phoneUsage.usedThisMonth.toLocaleString()}
+            </div>
+            <div className="billing-stat-lab">Validations This Month</div>
+          </div>
+          <div>
+            <div className="billing-stat-num">{spentThisMonthLabel}</div>
+            <div className="billing-stat-lab">
+              Spent This Month (≈ ${DEFAULT_CREDIT_COST_USD.toFixed(4)}/credit)
+            </div>
+          </div>
+          <div>
+            <div className="billing-stat-num">
+              {phoneUsage.usedAllTime.toLocaleString()}
+            </div>
+            <div className="billing-stat-lab">Validations All-Time</div>
+          </div>
         </div>
-        <div className="addon-meter-action">
+        <div className="billing-card-action">
           <button
             type="button"
             className="btn btn-outline btn-sm"
-            disabled={backfillPending}
-            onClick={onBackfill}
+            disabled={previewPending || confirmPending}
+            onClick={onBackfillClick}
           >
-            {backfillPending ? "Starting…" : "Run Backfill"}
+            {previewPending ? "Counting…" : "Run Backfill"}
           </button>
-          <span className="addon-meter-action-hint">
+          <span className="billing-card-action-hint">
             Validates every untested phone on non-lost leads in the background.
+            You will see the credit cost before anything runs.
           </span>
         </div>
         {backfillMsg && (
-          <div
-            style={{
-              marginTop: 10,
-              color: "var(--success)",
-              fontSize: 12,
-            }}
-          >
+          <div className="billing-card-msg billing-card-msg-success">
             {backfillMsg}
           </div>
         )}
         {backfillErr && (
-          <div
-            style={{
-              marginTop: 10,
-              color: "var(--danger)",
-              fontSize: 12,
-            }}
-          >
+          <div className="billing-card-msg billing-card-msg-error">
             {backfillErr}
           </div>
         )}
       </div>
 
-      {COMING_SOON.map((row) => (
-        <div className="pref-row" key={row.title}>
-          <div className="flex-1 min-w-0">
-            <div className="pref-row-title">{row.title}</div>
-            <div className="pref-row-desc">{row.desc}</div>
-          </div>
-          <span className="addon-pending">Coming Soon</span>
-        </div>
-      ))}
-
-      <div className="pref-section-h">Payment Method</div>
-      <div
-        style={{
-          fontSize: 12.5,
-          color: "var(--text-2)",
-          margin: "-4px 0 8px",
-          lineHeight: 1.5,
-        }}
-      >
-        Charged monthly for your Moss Equity subscription. Credit or debit
-        cards. Outgoing checks pull from{" "}
-        <a href="#mail-bank">Bank Accounts</a> instead.
-      </div>
-      <div className="pref-row">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="card-brand">VISA</div>
-          <div>
-            <div className="pref-row-title">Visa ending in 4242</div>
-            <div className="pref-row-desc">Expires 09 / 2027 · Bree Moss</div>
-          </div>
-        </div>
-        <button
-          type="button"
-          className="btn btn-outline btn-sm"
-          disabled
-          title="Stripe portal wires in Phase D"
-        >
-          Update Card
-        </button>
-      </div>
-      <div className="pref-row">
-        <div className="flex-1 min-w-0">
-          <div className="pref-row-title">Send Invoices To</div>
-          <div className="pref-row-desc">
-            Receipts and renewal notices go here.
-          </div>
-        </div>
-        <input
-          className="input pref-row-input"
-          type="email"
-          defaultValue={invoiceEmail}
-          disabled
-          title="Save wires in Phase D"
+      {preview && (
+        <BackfillConfirmModal
+          preview={preview}
+          confirming={confirmPending}
+          remaining={remaining}
+          onCancel={onCancelPreview}
+          onConfirm={onConfirmBackfill}
         />
+      )}
+
+      <h2 className="billing-section-h">Payment Method</h2>
+      <div className="billing-card">
+        <div className="billing-card-desc" style={{ marginBottom: 16 }}>
+          Charged monthly for your Moss Equity subscription. Credit or debit
+          cards. Outgoing checks pull from <a href="#mail-bank">Bank Accounts</a>{" "}
+          instead.
+        </div>
+        <div className="pref-row">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="card-brand">VISA</div>
+            <div>
+              <div className="pref-row-title">Visa ending in 4242</div>
+              <div className="pref-row-desc">Expires 09 / 2027 · Bree Moss</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            disabled
+            title="Stripe portal wires in Phase D"
+          >
+            Update Card
+          </button>
+        </div>
+        <div className="pref-row">
+          <div className="flex-1 min-w-0">
+            <div className="pref-row-title">Send Invoices To</div>
+            <div className="pref-row-desc">
+              Receipts and renewal notices go here.
+            </div>
+          </div>
+          <input
+            className="input pref-row-input"
+            type="email"
+            defaultValue={invoiceEmail}
+            disabled
+            title="Save wires in Phase D"
+          />
+        </div>
       </div>
 
-      <div className="pref-section-h">Invoice History</div>
-      <table className="inv-table">
-        <thead>
-          <tr>
-            <th>Period</th>
-            <th>Invoice</th>
-            <th>Status</th>
-            <th className="num">Amount</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {SAMPLE_INVOICES.map((inv) => (
-            <tr key={inv.id}>
-              <td>{inv.period}</td>
-              <td className="mono">{inv.id}</td>
-              <td>
-                <span className="cov-status hot">
-                  <span className="dot" />
-                  Paid {inv.paid}
-                </span>
-              </td>
-              <td className="num">{inv.amount}</td>
-              <td className="action">
-                <button
-                  type="button"
-                  className="icon-btn"
-                  title="Download PDF (wires in Phase D)"
-                  disabled
-                  style={{ opacity: 0.4 }}
-                >
-                  <i className="icon icon-download" />
-                </button>
-              </td>
+      <h2 className="billing-section-h">Invoice History</h2>
+      <div className="billing-card">
+        <table className="inv-table">
+          <thead>
+            <tr>
+              <th>Period</th>
+              <th>Invoice</th>
+              <th>Status</th>
+              <th className="num">Amount</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {SAMPLE_INVOICES.map((inv) => (
+              <tr key={inv.id}>
+                <td>{inv.period}</td>
+                <td className="mono">{inv.id}</td>
+                <td>
+                  <span className="cov-status hot">
+                    <span className="dot" />
+                    Paid {inv.paid}
+                  </span>
+                </td>
+                <td className="num">{inv.amount}</td>
+                <td className="action">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="Download PDF (wires in Phase D)"
+                    disabled
+                    style={{ opacity: 0.4 }}
+                  >
+                    <i className="icon icon-download" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -296,3 +318,106 @@ const SAMPLE_INVOICES = [
   { id: "INV-2026-04", period: "April 2026", paid: "Apr 12", amount: "$197.00" },
   { id: "INV-2026-03", period: "March 2026", paid: "Mar 12", amount: "$197.00" },
 ];
+
+function BackfillConfirmModal({
+  preview,
+  confirming,
+  remaining,
+  onCancel,
+  onConfirm,
+}: {
+  preview: BackfillPreview;
+  confirming: boolean;
+  remaining: number;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const costLabel = preview.estimatedCostUsd.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const insufficient = preview.uniquePhones > remaining;
+  const dupSavings = preview.totalRows - preview.uniquePhones;
+
+  return (
+    <div className="backfill-modal-overlay" onClick={confirming ? undefined : onCancel}>
+      <div
+        className="backfill-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="backfill-modal-title"
+      >
+        <h3 id="backfill-modal-title" className="backfill-modal-title">
+          Confirm Phone Validation Backfill
+        </h3>
+        {preview.uniquePhones === 0 ? (
+          <p className="backfill-modal-empty">
+            No untested phones to validate. Every phone on non-lost leads has
+            already been screened.
+          </p>
+        ) : (
+          <>
+            <div className="backfill-modal-grid">
+              <div>
+                <div className="backfill-modal-num">
+                  {preview.uniquePhones.toLocaleString()}
+                </div>
+                <div className="backfill-modal-lab">
+                  Unique Phones To Validate
+                </div>
+              </div>
+              <div>
+                <div className="backfill-modal-num">{costLabel}</div>
+                <div className="backfill-modal-lab">
+                  Estimated Cost (at ${preview.costPerCreditUsd.toFixed(4)}/credit)
+                </div>
+              </div>
+              <div>
+                <div className="backfill-modal-num">
+                  {remaining.toLocaleString()}
+                </div>
+                <div className="backfill-modal-lab">Credits Available</div>
+              </div>
+            </div>
+            {dupSavings > 0 && (
+              <p className="backfill-modal-note">
+                {preview.totalRows.toLocaleString()} rows total, but{" "}
+                {dupSavings.toLocaleString()} are duplicates of numbers already
+                in the batch, so you only pay for the unique ones.
+              </p>
+            )}
+            {insufficient && (
+              <p className="backfill-modal-warn">
+                Not enough credits. Add more before running the backfill, or it
+                will stop partway through.
+              </p>
+            )}
+          </>
+        )}
+        <div className="backfill-modal-actions">
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={onCancel}
+            disabled={confirming}
+          >
+            Cancel
+          </button>
+          {preview.uniquePhones > 0 && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={onConfirm}
+              disabled={confirming || insufficient}
+            >
+              {confirming ? "Starting…" : "Validate Now"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
