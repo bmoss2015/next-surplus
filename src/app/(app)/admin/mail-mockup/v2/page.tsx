@@ -249,14 +249,12 @@ function Card({
             </span>
           </a>
           <div className="flex shrink-0 gap-2 text-[11.5px] font-medium">
-            {/* Primary: View Letter — solid green like Send Mail */}
-            <button className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-[#0d4b3a] px-3 py-1.5 text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-[#0d6c4d]">
-              <IconFileText size={13} stroke={2} />
+            {/* Primary: View Letter — solid green */}
+            <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-3 py-1.5 text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-[#0d6c4d]">
               View Letter
             </button>
-            {/* Secondary: Track — outlined green, icon-led */}
-            <button className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
-              <IconExternalLink size={13} stroke={2} />
+            {/* Secondary: Track — outlined green */}
+            <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
               Track
             </button>
             {p.status === "Returned" && (
