@@ -340,11 +340,23 @@ function DetailPane({
         </div>
 
         {piece.tracking_number && (
-          <div className="mt-4 inline-flex items-center gap-1.5 text-[12px] text-gray-600">
-            <IconBarcode size={14} stroke={1.75} className="text-gray-400" />
-            <span className="font-mono tabular-nums">
-              {piece.tracking_number}
-            </span>
+          <div className="mt-4 inline-flex items-center gap-1.5 text-[12px]">
+            <IconBarcode size={14} stroke={1.75} className="text-petrol-500" />
+            {trackingUrl ? (
+              <a
+                href={trackingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cursor-pointer font-mono tabular-nums text-petrol-700 underline decoration-petrol-500/40 underline-offset-2 hover:decoration-petrol-700"
+                title="Open carrier tracking"
+              >
+                {piece.tracking_number}
+              </a>
+            ) : (
+              <span className="font-mono tabular-nums text-gray-600">
+                {piece.tracking_number}
+              </span>
+            )}
           </div>
         )}
 
@@ -407,10 +419,10 @@ function Meta({
         stroke={1.75}
         className={
           tone === "ok"
-            ? "text-petrol-500/70"
+            ? "text-petrol-500"
             : tone === "danger"
-              ? "text-danger/70"
-              : "text-gray-400"
+              ? "text-danger"
+              : "text-petrol-500"
         }
       />
       {children}
