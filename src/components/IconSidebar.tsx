@@ -10,7 +10,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import {
   LayoutDashboard,
   Users,
@@ -217,14 +218,45 @@ function AccountMenu({
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const ref = useRef<HTMLDivElement | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<{ bottom: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Recompute popout position whenever it opens / on viewport changes. The
+  // popout is portaled to <body> with position:fixed so the sidebar's
+  // overflow-hidden can't clip it (that was the "sits behind app" bug).
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const t = triggerRef.current;
+      if (!t) return;
+      const r = t.getBoundingClientRect();
+      setPos({
+        bottom: window.innerHeight - r.top + 8,
+        left: r.left,
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (popRef.current?.contains(target)) return;
+      setOpen(false);
     };
     window.addEventListener("mousedown", onClick);
     return () => window.removeEventListener("mousedown", onClick);
@@ -237,8 +269,9 @@ function AccountMenu({
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex h-10 w-full cursor-pointer items-center gap-2.5 overflow-hidden rounded-md px-2 hover:bg-white/10"
@@ -261,52 +294,55 @@ function AccountMenu({
           </div>
         )}
       </button>
-      {open && (
-        <div
-          className="absolute z-40 rounded-[10px] border border-gray-200 bg-surface shadow-elevated"
-          style={{
-            bottom: "calc(100% + 8px)",
-            left: 0,
-            minWidth: 220,
-            padding: "10px 0",
-          }}
-        >
-          <div className="px-3.5 pb-2.5">
-            <div className="truncate text-[13px] font-medium text-ink">
-              {userName}
-            </div>
-            {userEmail && (
-              <div
-                className="truncate text-[11.5px] text-gray-500"
-                title={userEmail}
-              >
-                {userEmail}
-              </div>
-            )}
-            <div
-              className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-              style={{
-                background: isAdmin
-                  ? "var(--color-ink)"
-                  : "var(--color-petrol-100)",
-                color: isAdmin ? "#fff" : "var(--color-gray-700)",
-              }}
-            >
-              {isAdmin ? "Admin" : "Member"}
-            </div>
-          </div>
-          <div className="h-px bg-gray-200" />
-          <button
-            type="button"
-            onClick={logout}
-            disabled={pending}
-            className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2.5 text-left text-[13px] text-ink hover:bg-gray-50 disabled:opacity-50"
+      {mounted && open && pos &&
+        createPortal(
+          <div
+            ref={popRef}
+            className="fixed z-[1000] rounded-[10px] border border-gray-200 bg-surface shadow-elevated"
+            style={{
+              bottom: pos.bottom,
+              left: pos.left,
+              minWidth: 220,
+              padding: "10px 0",
+            }}
           >
-            <LogOut size={14} strokeWidth={1.75} />
-            {pending ? "Signing Out…" : "Sign Out"}
-          </button>
-        </div>
-      )}
+            <div className="px-3.5 pb-2.5">
+              <div className="truncate text-[13px] font-medium text-ink">
+                {userName}
+              </div>
+              {userEmail && (
+                <div
+                  className="truncate text-[11.5px] text-gray-500"
+                  title={userEmail}
+                >
+                  {userEmail}
+                </div>
+              )}
+              <div
+                className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                style={{
+                  background: isAdmin
+                    ? "var(--color-ink)"
+                    : "var(--color-petrol-100)",
+                  color: isAdmin ? "#fff" : "var(--color-gray-700)",
+                }}
+              >
+                {isAdmin ? "Admin" : "Member"}
+              </div>
+            </div>
+            <div className="h-px bg-gray-200" />
+            <button
+              type="button"
+              onClick={logout}
+              disabled={pending}
+              className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2.5 text-left text-[13px] text-ink hover:bg-gray-50 disabled:opacity-50"
+            >
+              <LogOut size={14} strokeWidth={1.75} />
+              {pending ? "Signing Out…" : "Sign Out"}
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
