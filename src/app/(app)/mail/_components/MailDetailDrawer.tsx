@@ -8,14 +8,27 @@ import {
   IconMail,
   IconTrash,
 } from "@tabler/icons-react";
-import Link from "next/link";
 import { MailStatusPill, mailStatusLabel } from "@/components/mail/MailStatusPill";
 import { MailStepTimeline } from "@/components/mail/MailStepTimeline";
 import type { LetterPreviewData } from "@/components/mail/LetterPreviewModal";
 import { displayRecipientName } from "@/components/mail/displayName";
 import type { MailJobDetailRow } from "@/lib/mail/fetch";
 import { fetchMailJobAction } from "../_fetchers";
-import { resendMailJob, deleteMailJob } from "../_actions";
+import {
+  resendMailJob,
+  deleteMailJob,
+  fetchLeadMailingAddressOptions,
+} from "../_actions";
+
+type AddressPickerOption = {
+  id: string;
+  label: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+};
 
 // Slide-out detail panel that takes ~half the viewport on desktop.
 // Anchors visual focus on a thumbnail of the letter (Linear-style), with
@@ -53,6 +66,7 @@ export function MailDetailDrawer({
   onDeleted: () => void;
 }) {
   const [job, setJob] = useState<MailJobDetailRow | null>(null);
+  const [addressOptions, setAddressOptions] = useState<AddressPickerOption[]>([]);
   // Derive "is loading" from whether the fetched job matches the current
   // jobId, so we don't need a parallel useState that triggers cascading
   // renders inside the effect.
@@ -65,6 +79,13 @@ export function MailDetailDrawer({
       const fetched = await fetchMailJobAction(jobId);
       if (cancelled) return;
       setJob(fetched);
+      // Only fetch address options when the piece is in a state where
+      // the resend form can render (returned/failed) and is linked to
+      // a lead — saves the extra query otherwise.
+      if (fetched?.lead_id && (fetched.status === "returned" || fetched.status === "failed")) {
+        const opts = await fetchLeadMailingAddressOptions({ leadId: fetched.lead_id });
+        if (!cancelled) setAddressOptions(opts);
+      }
     })();
     return () => {
       cancelled = true;
@@ -107,6 +128,7 @@ export function MailDetailDrawer({
             }
             onResent={onResent}
             onDeleted={onDeleted}
+            addressPickerOptions={addressOptions}
           />
         )}
       </aside>
@@ -120,12 +142,14 @@ function DetailContent({
   onOpenLetter,
   onResent,
   onDeleted,
+  addressPickerOptions,
 }: {
   job: MailJobDetailRow;
   onClose: () => void;
   onOpenLetter: () => void;
   onResent: () => void;
   onDeleted: () => void;
+  addressPickerOptions: AddressPickerOption[];
 }) {
   const [deletePending, startDelete] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -208,74 +232,86 @@ function DetailContent({
 
         <MailStepTimeline job={job} />
 
-        {/* Recipient + Sender + Provider details */}
-        <div className="grid grid-cols-2 gap-4 text-[12.5px]">
-          <DetailBlock title="Recipient">
-            <div className="font-medium text-ink">{displayRecipientName(job.recipient_name)}</div>
-            <div className="text-gray-600">{job.recipient_address_line1}</div>
-            {job.recipient_address_line2 && (
-              <div className="text-gray-600">{job.recipient_address_line2}</div>
+        {/* Envelope-style summary — single typographic block instead
+            of generic form boxes. Reads "FROM Bree Moss → TO John
+            Smith" so the direction is obvious. Check + sent date
+            shown inline beneath. */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 text-[12.5px]">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+            From
+          </div>
+          <div className="mt-1 text-ink">
+            <span className="font-medium">{job.from_name}</span>
+            <span className="text-gray-600">
+              {" · "}
+              {job.from_address_line1}
+              {job.from_address_line2 ? `, ${job.from_address_line2}` : ""}
+              {`, ${job.from_city}, ${job.from_state} ${job.from_postal_code}`}
+            </span>
+          </div>
+          <div className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+            To
+          </div>
+          <div className="mt-1 text-ink">
+            <span className="font-medium">
+              {displayRecipientName(job.recipient_name)}
+            </span>
+            <span className="text-gray-600">
+              {" · "}
+              {job.recipient_address_line1}
+              {job.recipient_address_line2 ? `, ${job.recipient_address_line2}` : ""}
+              {`, ${job.recipient_city}, ${job.recipient_state} ${job.recipient_postal_code}`}
+            </span>
+          </div>
+          <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[11.5px] text-gray-600">
+            <span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">Sent</span>{" "}
+              <span className="text-ink">{fmtDateTime(job.sent_at)}</span>
+            </span>
+            <span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">Status</span>{" "}
+              <span className="text-ink">{mailStatusLabel(job.status)}</span>
+            </span>
+            {job.include_check && (
+              <span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">Check</span>{" "}
+                <span className="text-ink">
+                  $
+                  {((job.check_amount_cents ?? 0) / 100).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+                {job.check_memo && (
+                  <span className="text-gray-500"> ({job.check_memo})</span>
+                )}
+              </span>
             )}
-            <div className="text-gray-600">
-              {job.recipient_city}, {job.recipient_state} {job.recipient_postal_code}
-            </div>
-          </DetailBlock>
-          <DetailBlock title="From">
-            <div className="font-medium text-ink">{job.from_name}</div>
-            <div className="text-gray-600">{job.from_address_line1}</div>
-            {job.from_address_line2 && (
-              <div className="text-gray-600">{job.from_address_line2}</div>
-            )}
-            <div className="text-gray-600">
-              {job.from_city}, {job.from_state} {job.from_postal_code}
-            </div>
-          </DetailBlock>
-          {job.include_check && (
-            <DetailBlock title="Check">
-              <div className="font-medium text-ink">
-                $
-                {((job.check_amount_cents ?? 0) / 100).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </div>
-              {job.check_memo && (
-                <div className="text-gray-600">Memo: {job.check_memo}</div>
-              )}
-            </DetailBlock>
-          )}
-          <DetailBlock title="Sent">
-            <div className="text-ink">{fmtDateTime(job.sent_at)}</div>
-            <div className="text-[11px] text-gray-500">
-              Status: {mailStatusLabel(job.status)}
-            </div>
-          </DetailBlock>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {job.tracking_url ? (
-            <a
-              href={job.tracking_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-gray-50"
-            >
-              Track Package
-              <IconExternalLink size={12} stroke={2} />
-            </a>
-          ) : null}
-          {job.lead_id && (
-            <Link
-              href={`/leads/${job.lead_id}`}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-gray-50"
-            >
-              Open Lead
-            </Link>
-          )}
-        </div>
+        {/* Track Package only — Open Lead is removed since opening the
+            drawer from the lead Mail tab means the user is already on
+            the lead. */}
+        {job.tracking_url ? (
+          <a
+            href={job.tracking_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-gray-50"
+          >
+            Track Package
+            <IconExternalLink size={12} stroke={2} />
+          </a>
+        ) : null}
 
         {(job.status === "returned" || job.status === "failed") && (
-          <ResendForm job={job} onResent={onResent} onDeleted={onDeleted} />
+          <ResendForm
+            job={job}
+            onResent={onResent}
+            onClose={onClose}
+            pickerOptions={addressPickerOptions ?? []}
+          />
         )}
 
         {/* Delete is only offered for failed pieces — those are records
@@ -313,31 +349,18 @@ function DetailContent({
   );
 }
 
-function DetailBlock({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-md border border-gray-200 bg-white p-3">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1">
-        {title}
-      </div>
-      <div className="space-y-[1px]">{children}</div>
-    </div>
-  );
-}
-
 function ResendForm({
   job,
   onResent,
-  onDeleted,
+  onClose,
+  pickerOptions,
 }: {
   job: MailJobDetailRow;
   onResent: () => void;
-  onDeleted: () => void;
+  onClose: () => void;
+  // Existing mailing addresses on file for this lead (relatives +
+  // lead parties + owners). User picks one instead of typing.
+  pickerOptions: Array<{ id: string; label: string; line1: string; line2: string | null; city: string; state: string; postal_code: string }>;
 }) {
   const [line1, setLine1] = useState(job.recipient_address_line1);
   const [line2, setLine2] = useState(job.recipient_address_line2 ?? "");
@@ -368,23 +391,22 @@ function ResendForm({
     });
   };
 
-  const cancel = () => {
-    if (
-      !confirm(
-        "Delete this returned record without resending? Activity entry on the lead is kept; the row goes away."
-      )
-    ) {
-      return;
-    }
-    setError(null);
-    startTransition(async () => {
-      const res = await deleteMailJob({ jobId: job.id });
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      onDeleted();
-    });
+  // Close the resend form without sending or deleting. The returned
+  // record stays on the lead as historical truth (Bree's rule: never
+  // delete activity history).
+  const dontResend = () => {
+    onClose();
+  };
+
+  const pickFromOptions = (id: string) => {
+    if (!id) return;
+    const pick = pickerOptions.find((p) => p.id === id);
+    if (!pick) return;
+    setLine1(pick.line1);
+    setLine2(pick.line2 ?? "");
+    setCity(pick.city);
+    setState(pick.state);
+    setPostal(pick.postal_code);
   };
 
   return (
@@ -396,11 +418,29 @@ function ResendForm({
         </div>
       </div>
       <p className="mb-3 text-[11.5px] text-gray-700">
-        The recipient&apos;s address didn&apos;t deliver. Fix it below and send
-        a new piece — or, if you don&apos;t have a corrected address yet,
-        delete this record. The original returned activity entry on the
-        lead is kept either way.
+        The recipient&apos;s address didn&apos;t deliver. Pick a different
+        address from the lead, or type a new one. The returned record
+        stays on the lead either way.
       </p>
+      {pickerOptions.length > 0 && (
+        <label className="mb-3 block">
+          <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-[0.1em] text-gray-500">
+            Pick An Address On File
+          </span>
+          <select
+            onChange={(e) => pickFromOptions(e.target.value)}
+            defaultValue=""
+            className="w-full cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12.5px] text-ink focus:outline-none focus:ring-1 focus:ring-petrol-300"
+          >
+            <option value="">Choose an existing address</option>
+            {pickerOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Field label="Address Line 1" value={line1} onChange={setLine1} colSpan={2} />
         <Field label="Line 2 (optional)" value={line2} onChange={setLine2} colSpan={2} />
@@ -427,11 +467,11 @@ function ResendForm({
       <div className="mt-3 flex items-center justify-between gap-2">
         <button
           type="button"
-          onClick={cancel}
+          onClick={dontResend}
           disabled={pending}
           className="cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         >
-          Don&apos;t Resend — Delete Record
+          Don&apos;t Resend
         </button>
         <button
           type="button"

@@ -184,11 +184,109 @@ async function upsertMailingAddressContact(
   }
 }
 
+// Fetch the mailing addresses on file for a given lead so the resend
+// form can show a picker instead of forcing the user to type addresses
+// from memory. Each option = a contacts row where channel="mailing_address"
+// for this lead.
+export async function fetchLeadMailingAddressOptions(input: {
+  leadId: string;
+}): Promise<
+  Array<{
+    id: string;
+    label: string;
+    line1: string;
+    line2: string | null;
+    city: string;
+    state: string;
+    postal_code: string;
+  }>
+> {
+  const sb = await createClient();
+  const { data } = await sb
+    .from("contacts")
+    .select(
+      "id, value, notes, relative_id, lead_party_id, relatives(full_name), lead_parties(label)"
+    )
+    .eq("lead_id", input.leadId)
+    .eq("channel", "mailing_address");
+  const out: Array<{
+    id: string;
+    label: string;
+    line1: string;
+    line2: string | null;
+    city: string;
+    state: string;
+    postal_code: string;
+  }> = [];
+  for (const row of (data ?? []) as Array<{
+    id: string;
+    value: string | null;
+    notes: string | null;
+    relative_id: string | null;
+    lead_party_id: string | null;
+    relatives?: { full_name: string | null } | { full_name: string | null }[] | null;
+    lead_parties?: { label: string | null } | { label: string | null }[] | null;
+  }>) {
+    const raw = (row.value ?? "").trim();
+    if (!raw) continue;
+    const parsed = parseAddressString(raw);
+    if (!parsed) continue;
+    const relName = Array.isArray(row.relatives)
+      ? row.relatives[0]?.full_name
+      : row.relatives?.full_name;
+    const partyName = Array.isArray(row.lead_parties)
+      ? row.lead_parties[0]?.label
+      : row.lead_parties?.label;
+    const label =
+      (row.notes ?? "").trim() ||
+      relName ||
+      partyName ||
+      raw.split(",")[0] ||
+      "Address";
+    out.push({
+      id: row.id,
+      label: `${label} (${parsed.city}, ${parsed.state})`,
+      line1: parsed.line1,
+      line2: parsed.line2,
+      city: parsed.city,
+      state: parsed.state,
+      postal_code: parsed.postal_code,
+    });
+  }
+  return out;
+}
+
+// Best-effort parser for the single-string mailing-address format the
+// portal stores in contacts.value ("123 Main St, Austin, TX 78701").
+// Returns null if the format doesn't have the expected commas + state-zip.
+function parseAddressString(s: string): {
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+} | null {
+  const parts = s.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 3) return null;
+  const stateZip = parts[parts.length - 1];
+  const city = parts[parts.length - 2];
+  const streetParts = parts.slice(0, parts.length - 2);
+  const m = stateZip.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
+  if (!m) return null;
+  return {
+    line1: streetParts[0] ?? "",
+    line2: streetParts.length > 1 ? streetParts.slice(1).join(", ") : null,
+    city,
+    state: m[1].toUpperCase(),
+    postal_code: m[2],
+  };
+}
+
 // Hard-delete a mail_jobs row. Used to clean up old failed records that
 // pre-date the sync-failure-no-persist change, or to remove any record
 // the user no longer wants to see. The activity row tied to the same
 // piece (if any) is left in place because activities are historical
-// truth — what happened on the lead doesn't unhappen.
+// truth, what happened on the lead doesn't unhappen.
 export async function deleteMailJob(input: {
   jobId: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {

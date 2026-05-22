@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { IconX, IconExternalLink } from "@tabler/icons-react";
+import { IconX } from "@tabler/icons-react";
 
 // Renders the body_html in a sandboxed iframe sized like a real
 // 8.5×11 sheet so the preview reads as a piece of paper, not a wide
@@ -45,27 +45,14 @@ export function LetterPreviewModal({
               {data.recipientName}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {data.trackingUrl && (
-              <a
-                href={data.trackingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11.5px] font-medium text-ink hover:bg-gray-50"
-              >
-                Track Package
-                <IconExternalLink size={11} stroke={2} />
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer rounded-md p-1 text-gray-500 hover:bg-gray-100"
-              aria-label="Close"
-            >
-              <IconX size={15} stroke={1.75} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-md p-1 text-gray-500 hover:bg-gray-100"
+            aria-label="Close"
+          >
+            <IconX size={15} stroke={1.75} />
+          </button>
         </header>
         <div
           className="overflow-hidden rounded-sm border border-gray-300 bg-white shadow-xl"
