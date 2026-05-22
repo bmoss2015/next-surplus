@@ -424,6 +424,12 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       error: "Complete the Company Address in Settings before sending mail",
     };
   }
+  if (!org.name || !String(org.name).trim()) {
+    return {
+      ok: false,
+      error: "Set your Company Name in Settings before sending mail",
+    };
+  }
   // Resolve the signature image (if uploaded) to a long-lived signed URL so
   // the printer can fetch it during HTML→PDF rendering. 30 days is well past
   // any realistic print SLA. The merge field expands to a ready-to-render
@@ -485,7 +491,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   // docxtemplater); attachments are passed through unchanged so we can
   // reuse the same buffers across the batch.
   let docxTemplate: { name: string; buffer: Buffer } | null = null;
-  let attachmentFiles: Array<{
+  const attachmentFiles: Array<{
     name: string;
     buffer: Buffer;
     contentType: string;
@@ -612,7 +618,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
 
     if (!send.ok) {
       // Persist a failed row so the user sees the error in the timeline.
-      await sb.from("mail_jobs").insert({
+      const { data: failedInsert } = await sb.from("mail_jobs").insert({
         batch_id: batchId,
         lead_id: recipient.lead_id ?? null,
         relative_id: recipient.relative_id ?? null,
@@ -642,7 +648,19 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         status: "failed",
         error_message: send.error,
         created_by: profile.id,
+      })
+        .select("id")
+        .single();
+      // Bell notification so the sender sees the failure even if they
+      // navigated away from the modal.
+      await sb.from("notifications").insert({
+        recipient_id: profile.id,
+        actor_id: profile.id,
+        type: "mail_failed",
+        lead_id: recipient.lead_id ?? null,
+        body_preview: `Mail to ${recipient.name} failed: ${truncateForPreview(send.error)}`,
       });
+      void failedInsert;
       return { ok: false, error: send.error };
     }
 
@@ -693,6 +711,19 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     }
     jobIds.push(inserted.id as string);
 
+    // Bell notification so the sender sees the queued send even if they
+    // navigated away from the modal. Webhook handlers add follow-ups
+    // on delivered / returned.
+    const kindLabel = input.include_check ? "Check" : "Letter";
+    const cityState = `${recipient.city}, ${recipient.state}`;
+    await sb.from("notifications").insert({
+      recipient_id: profile.id,
+      actor_id: profile.id,
+      type: "mail_sent",
+      lead_id: recipient.lead_id ?? null,
+      body_preview: `${kindLabel} to ${recipient.name} in ${cityState} queued for mailing`,
+    });
+
     // Activity entry on the related lead (if any). Activities are scoped to
     // a lead — drops cleanly when no lead is attached.
     if (recipient.lead_id) {
@@ -741,6 +772,12 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     provider_letter: activeLetterProvider() as "click2mail" | "lob" | "stub",
     provider_check: activeCheckProvider() as "lob" | "stub",
   };
+}
+
+function truncateForPreview(text: string, max = 120): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
 }
 
 // Wrap the merge-rendered body in a minimal HTML doc so the print engines

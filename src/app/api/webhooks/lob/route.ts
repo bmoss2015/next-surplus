@@ -92,7 +92,9 @@ export async function POST(req: NextRequest) {
   const sb = createServiceClient();
   const { data: job } = await sb
     .from("mail_jobs")
-    .select("id, lead_id, recipient_name, status")
+    .select(
+      "id, lead_id, recipient_name, recipient_city, recipient_state, status, org_id, created_by, include_check"
+    )
     .eq("provider", "lob")
     .eq("provider_id", providerId)
     .maybeSingle();
@@ -127,6 +129,26 @@ export async function POST(req: NextRequest) {
         recipient_name: job.recipient_name,
         tracking_number: event.body?.tracking_number ?? null,
       },
+    });
+  }
+
+  // Bell notification on every status change (mirrors the C2M handler).
+  if (job.created_by) {
+    const kindLabel = job.include_check ? "Check" : "Letter";
+    const cityState = `${job.recipient_city}, ${job.recipient_state}`;
+    const statusLabel =
+      mappedStatus === "delivered"
+        ? "delivered"
+        : mappedStatus === "returned"
+          ? "returned to sender"
+          : "in transit";
+    await sb.from("notifications").insert({
+      org_id: job.org_id,
+      recipient_id: job.created_by,
+      actor_id: null,
+      type: `mail_${mappedStatus}`,
+      lead_id: job.lead_id ?? null,
+      body_preview: `${kindLabel} to ${job.recipient_name} in ${cityState} ${statusLabel}`,
     });
   }
 
