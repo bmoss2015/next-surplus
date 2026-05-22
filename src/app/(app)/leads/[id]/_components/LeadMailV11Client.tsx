@@ -35,18 +35,6 @@ const STATUS_DOT: Record<string, string> = {
   failed: "bg-danger",
 };
 
-function statusLabel(s: MailJobListRow["status"]): string {
-  if (s === "delivered") return "Delivered";
-  if (s === "returned" || s === "failed") return "Returned";
-  return "In Transit";
-}
-
-function statusPillClass(s: MailJobListRow["status"]): string {
-  if (s === "delivered") return "border-petrol-500/40 text-petrol-700";
-  if (s === "returned" || s === "failed") return "border-danger/40 text-danger";
-  return "border-gray-300 text-ink";
-}
-
 function mailClassLabel(mc: MailJobListRow["mail_class"]): string {
   if (mc === "standard") return "Standard";
   if (mc === "certified") return "Certified";
@@ -293,22 +281,14 @@ function DetailPane({
         </div>
       </button>
 
-      {/* Meta + actions column */}
+      {/* Meta + actions column. Status pill omitted — the left-rail
+          status dot + the colored "Delivered <date>" / "Returned
+          <date>" meta line below already convey state. */}
       <div className="flex min-w-0 flex-col">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[18px] font-semibold tracking-tight text-ink">
-              {displayRecipientName(piece.recipient_name)}
-            </div>
+        <div className="min-w-0">
+          <div className="text-[18px] font-semibold tracking-tight text-ink">
+            {displayRecipientName(piece.recipient_name)}
           </div>
-          <span
-            className={cn(
-              "inline-flex min-w-[76px] shrink-0 items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em]",
-              statusPillClass(piece.status)
-            )}
-          >
-            {statusLabel(piece.status)}
-          </span>
         </div>
 
         <div className="mt-3 text-[12.5px] text-gray-600">
@@ -362,7 +342,8 @@ function DetailPane({
 
         <div className="mt-auto flex gap-2 pt-4 text-[11.5px] font-medium">
           {/* Same min-w-[110px] / h-[30px] family as V6 so the button
-              set reads consistent across surfaces. */}
+              set reads consistent across surfaces. Fix & Resend renders
+              only for returned/failed pieces, sitting next to Track. */}
           <button
             type="button"
             onClick={onOpenLetter}
@@ -386,6 +367,14 @@ function DetailPane({
               className="inline-flex h-[30px] min-w-[110px] cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-gray-400"
             >
               Track
+            </button>
+          )}
+          {(piece.status === "returned" || piece.status === "failed") && (
+            <button
+              type="button"
+              className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md bg-danger px-3 font-semibold text-white"
+            >
+              Fix &amp; Resend
             </button>
           )}
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
@@ -10,13 +10,23 @@ import {
 import { cn } from "@/lib/cn";
 import { displayRecipientName } from "@/components/mail/displayName";
 import type { MailJobListRow, MailStats } from "@/lib/mail/fetch";
+import {
+  MailToolbar,
+  type MailFilterState,
+  DEFAULT_MAIL_FILTERS,
+  filtersAreActive,
+  readFiltersFromParams,
+  writeFiltersToParams,
+} from "./MailToolbar";
 
-// V6 main /mail tab. KPI strip + pipeline bar + three status sections
-// (In Transit with batch grouping, Delivered Recent, Returned). Row
-// hierarchy: name + outlined status pill on top, full address on
-// line 2, class · sent · delivered/returned · tracking on line 3.
-// Status pill outlined, action buttons solid-filled — same hue,
-// different weight (informational vs clickable).
+// V6 main /mail tab. Filter toolbar + KPI strip + pipeline bar + three
+// status sections (In Transit with batch grouping, Delivered, Returned).
+//
+// Filters apply client-side over the 200-row / 30-day fetch. Group
+// headers stay; filters narrow contents. Empty groups hide when filters
+// are active (so you don't read "No deliveries" as a real-state signal
+// when it's actually filter-state). With no filters, empty groups show
+// the friendly empty row so the page never looks broken.
 
 type Section = "in_transit" | "delivered" | "returned";
 
@@ -25,9 +35,6 @@ type BatchOrPiece =
   | { kind: "batch"; batchId: string; pieces: MailJobListRow[] };
 
 function groupByBatch(rows: MailJobListRow[]): BatchOrPiece[] {
-  // Pieces with shared batch_id where the batch has >1 piece collapse
-  // into a single expandable parent row. Solo pieces (1 in the batch)
-  // render directly.
   const byBatch = new Map<string, MailJobListRow[]>();
   for (const r of rows) {
     const arr = byBatch.get(r.batch_id) ?? [];
@@ -73,6 +80,50 @@ function isWithinDays(iso: string | null, days: number): boolean {
   return ms <= days * 24 * 60 * 60 * 1000 && ms >= 0;
 }
 
+function matchesFilters(
+  r: MailJobListRow,
+  f: MailFilterState,
+  qNorm: string
+): boolean {
+  // Status — UI groups status into 3 buckets (in_transit, delivered,
+  // returned). Map row statuses to those buckets for the match.
+  if (f.status.length > 0) {
+    const bucket =
+      r.status === "queued" || r.status === "in_transit"
+        ? "in_transit"
+        : r.status === "delivered"
+          ? "delivered"
+          : "returned";
+    if (!f.status.includes(bucket)) return false;
+  }
+  if (f.mailClass.length > 0 && !f.mailClass.includes(r.mail_class)) {
+    return false;
+  }
+  if (f.provider.length > 0 && !f.provider.includes(r.provider)) {
+    return false;
+  }
+  // Date range narrows the fetched 30-day window.
+  if (f.dateRange === "7d" && !isWithinDays(r.sent_at ?? r.created_at, 7)) {
+    return false;
+  }
+  if (qNorm) {
+    const hay = [
+      r.recipient_name,
+      r.recipient_address_line1,
+      r.recipient_address_line2 ?? "",
+      r.recipient_city,
+      r.recipient_state,
+      r.recipient_postal_code,
+      r.tracking_number ?? "",
+      r.lead_label ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
+    if (!hay.includes(qNorm)) return false;
+  }
+  return true;
+}
+
 export function MailDashboardV6({
   rows,
   stats,
@@ -80,91 +131,146 @@ export function MailDashboardV6({
   rows: MailJobListRow[];
   stats: MailStats;
 }) {
-  // Derived operational KPIs (computed from the 30-day rows array
-  // already fetched; avoids extra queries).
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const filters = useMemo(
+    () => readFiltersFromParams(new URLSearchParams(searchParams.toString())),
+    [searchParams]
+  );
+
+  const setFilters = useCallback(
+    (next: MailFilterState) => {
+      const params = writeFiltersToParams(
+        new URLSearchParams(searchParams.toString()),
+        next
+      );
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    },
+    [router, pathname, searchParams]
+  );
+
+  const hasActiveFilters = filtersAreActive(filters);
+
+  // Filtered rows (search + chip filters applied)
+  const filteredRows = useMemo(() => {
+    const qNorm = filters.q.trim().toLowerCase();
+    if (!hasActiveFilters) return rows;
+    return rows.filter((r) => matchesFilters(r, filters, qNorm));
+  }, [rows, filters, hasActiveFilters]);
+
+  // Derived KPIs — operate on filtered rows so the strip reflects the
+  // current view. Stats from server stay raw; KPI strip is the live
+  // read of what's on screen.
   const sentToday = useMemo(
-    () => rows.filter((r) => isWithinDays(r.sent_at, 1)).length,
-    [rows]
+    () => filteredRows.filter((r) => isWithinDays(r.sent_at, 1)).length,
+    [filteredRows]
   );
   const deliveredThisWeek = useMemo(
     () =>
-      rows.filter(
+      filteredRows.filter(
         (r) => r.status === "delivered" && isWithinDays(r.delivered_at, 7)
       ).length,
-    [rows]
+    [filteredRows]
   );
 
-  const inTransitRows = rows.filter(
+  const inTransitRows = filteredRows.filter(
     (r) => r.status === "queued" || r.status === "in_transit"
   );
-  const deliveredRows = rows.filter((r) => r.status === "delivered");
-  const returnedRows = rows.filter(
+  const deliveredRows = filteredRows.filter((r) => r.status === "delivered");
+  const returnedRows = filteredRows.filter(
     (r) => r.status === "returned" || r.status === "failed"
   );
 
   const inTransitGrouped = groupByBatch(inTransitRows);
 
+  // Stats source — when filters are active, recompute from filtered
+  // rows so KPIs reflect what's visible. With no filters, use the
+  // server-side stats (which are accurate even past the 200-row fetch
+  // cap).
+  const displayStats = hasActiveFilters
+    ? {
+        in_flight: inTransitRows.length,
+        delivered: deliveredRows.length,
+        returned: returnedRows.length,
+        spent_cents: 0,
+      }
+    : stats;
+
   return (
     <div>
+      <MailToolbar filters={filters} onChange={setFilters} />
+
       {/* KPI strip — no subtext, four operational counts */}
       <div className="grid grid-cols-4 gap-4">
-        <Kpi label="In Transit" value={stats.in_flight} />
+        <Kpi label="In Transit" value={displayStats.in_flight} />
         <Kpi label="Sent Today" value={sentToday} />
         <Kpi label="Delivered This Week" value={deliveredThisWeek} />
-        <Kpi label="Returned This Month" value={stats.returned} warn={stats.returned > 0} />
+        <Kpi
+          label={hasActiveFilters ? "Returned" : "Returned This Month"}
+          value={displayStats.returned}
+          warn={displayStats.returned > 0}
+        />
       </div>
 
       {/* Pipeline bar */}
       <PipelineSection
-        inTransit={stats.in_flight}
-        delivered={stats.delivered}
-        returned={stats.returned}
+        inTransit={displayStats.in_flight}
+        delivered={displayStats.delivered}
+        returned={displayStats.returned}
       />
 
-      {/* Three status sections — In Transit first (with batch grouping),
-          then Delivered Recent, then Returned. */}
-      <ListSection eyebrow="In Transit">
-        {inTransitGrouped.length === 0 ? (
-          <EmptyRow text="No pieces in transit." />
-        ) : (
-          inTransitGrouped.map((item) =>
-            item.kind === "batch" ? (
-              <BatchRow batch={item.pieces} batchId={item.batchId} key={item.batchId} />
-            ) : (
-              <PieceRow piece={item.piece} section="in_transit" key={item.piece.id} />
+      {/* Three status sections. With filters active, empty sections hide
+          (so the page doesn't claim "no deliveries" when it really means
+          "none match"). With no filters, empty sections show the empty
+          state row. */}
+      {(inTransitGrouped.length > 0 || !hasActiveFilters) && (
+        <ListSection eyebrow="In Transit">
+          {inTransitGrouped.length === 0 ? (
+            <EmptyRow text="No pieces in transit." />
+          ) : (
+            inTransitGrouped.map((item) =>
+              item.kind === "batch" ? (
+                <BatchRow batch={item.pieces} batchId={item.batchId} key={item.batchId} />
+              ) : (
+                <PieceRow piece={item.piece} section="in_transit" key={item.piece.id} />
+              )
             )
-          )
-        )}
-      </ListSection>
+          )}
+        </ListSection>
+      )}
 
-      <ListSection
-        eyebrow="Delivered (Recent)"
-        trailing={
-          deliveredRows.length > 3 ? (
-            <span className="text-[11px] text-gray-500">
-              Showing {Math.min(3, deliveredRows.length)} of {deliveredRows.length}
-            </span>
-          ) : null
-        }
-      >
-        {deliveredRows.length === 0 ? (
-          <EmptyRow text="No deliveries in the last 30 days." />
-        ) : (
-          deliveredRows
-            .slice(0, 3)
-            .map((p) => <PieceRow piece={p} section="delivered" key={p.id} />)
-        )}
-      </ListSection>
+      {(deliveredRows.length > 0 || !hasActiveFilters) && (
+        <ListSection eyebrow="Delivered">
+          {deliveredRows.length === 0 ? (
+            <EmptyRow text="No deliveries in the last 30 days." />
+          ) : (
+            deliveredRows.map((p) => (
+              <PieceRow piece={p} section="delivered" key={p.id} />
+            ))
+          )}
+        </ListSection>
+      )}
 
-      <ListSection eyebrow="Returned" tone="danger">
-        {returnedRows.length === 0 ? (
-          <EmptyRow text="No returned pieces." />
-        ) : (
-          returnedRows.map((p) => (
-            <PieceRow piece={p} section="returned" key={p.id} />
-          ))
-        )}
-      </ListSection>
+      {(returnedRows.length > 0 || !hasActiveFilters) && (
+        <ListSection eyebrow="Returned" tone="danger">
+          {returnedRows.length === 0 ? (
+            <EmptyRow text="No returned pieces." />
+          ) : (
+            returnedRows.map((p) => (
+              <PieceRow piece={p} section="returned" key={p.id} />
+            ))
+          )}
+        </ListSection>
+      )}
+
+      {hasActiveFilters && filteredRows.length === 0 && (
+        <div className="mt-5 rounded-2xl border border-gray-200 bg-white px-6 py-10 text-center text-[13px] text-gray-500 shadow-card">
+          No pieces match these filters.
+        </div>
+      )}
     </div>
   );
 }
@@ -473,7 +579,7 @@ function BatchRow({
             <span className="text-[15px] font-semibold text-ink">
               Batch of {batch.length}
             </span>
-            <span className="inline-flex min-w-[76px] items-center justify-center rounded-[4px] border border-gray-300 bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] text-ink">
+            <span className="inline-flex min-w-[76px] items-center justify-center rounded-[4px] border border-ink bg-ink px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] text-white">
               In Transit
             </span>
           </div>

@@ -14,13 +14,10 @@ export default async function MailDashboardPage() {
   return (
     <div className="px-7 py-6">
       <MailSectionTabs />
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="m-0 text-[28px] font-semibold tracking-tight text-ink">
           Sent Mail
         </h1>
-        <div className="mt-1 text-[12.5px] text-gray-500">
-          Last 30 days. Older pieces are archived under each lead.
-        </div>
       </div>
       <MailDashboardV6 rows={rows} stats={stats} />
     </div>
