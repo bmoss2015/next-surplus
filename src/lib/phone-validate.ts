@@ -525,9 +525,14 @@ export async function validateSpecificPhones(
         // the bucket has the same E.164 by construction).
         const result = await validatePhone(rows[0].phone, orgId);
         if (result.status === "untested" && result.checkedAt === null) return;
-        // Fan the same result out to every row in the bucket.
+        // Fan the same result out to every row in the bucket. Provider's
+        // line_type ALWAYS wins over an existing phone_type — CSV-imported
+        // types are stale (numbers port carriers and line types) and the
+        // whole point of paying for HLR-grade validation is to get
+        // authoritative carrier data. The "user manually picked a type via
+        // pencil-edit" case is preserved because pencil edits don't reset
+        // status to untested, so validation doesn't re-fire on them.
         for (const task of rows) {
-          const shouldFillType = !task.existingType && result.phoneType;
           if (task.kind === "contact") {
             const update: Record<string, unknown> = {
               status: result.status,
@@ -535,7 +540,7 @@ export async function validateSpecificPhones(
               validation_provider: result.provider,
               validation_raw: result.raw as object,
             };
-            if (shouldFillType) update.phone_type = result.phoneType;
+            if (result.phoneType) update.phone_type = result.phoneType;
             await sb.from("contacts").update(update).eq("id", task.rowId);
           } else {
             const update: Record<string, unknown> = {
@@ -544,7 +549,7 @@ export async function validateSpecificPhones(
               [`${task.base}_validation_provider`]: result.provider,
               [`${task.base}_validation_raw`]: result.raw as object,
             };
-            if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
+            if (result.phoneType) update[`${task.base}_type`] = result.phoneType;
             await sb.from("relatives").update(update).eq("id", task.rowId);
           }
           processed += 1;
@@ -722,11 +727,14 @@ export async function validateAllUntestedForOrg(
         // Transient errors / quota-exhausted come back as untested w/ null
         // checkedAt; leave those rows alone so the next sweep retries them.
         if (result.status === "untested" && result.checkedAt === null) return;
-        // Fan the single Clearout result out to every row sharing this number.
+        // Fan the single Clearout result out to every row sharing this
+        // number. Provider's line_type ALWAYS wins over an existing
+        // phone_type — CSV-imported types are stale and the whole point
+        // of paying for HLR-grade validation is to get authoritative
+        // carrier data. Pencil-edit-only changes don't trigger
+        // re-validation (they don't reset status to untested), so they're
+        // preserved.
         for (const task of rows) {
-          // Auto-fill phone type from Clearout IFF the row doesn't already
-          // have one — never override a manual choice.
-          const shouldFillType = !task.existingType && result.phoneType;
           if (task.kind === "contact") {
             const update: Record<string, unknown> = {
               status: result.status,
@@ -734,7 +742,7 @@ export async function validateAllUntestedForOrg(
               validation_provider: result.provider,
               validation_raw: result.raw as object,
             };
-            if (shouldFillType) update.phone_type = result.phoneType;
+            if (result.phoneType) update.phone_type = result.phoneType;
             await sb.from("contacts").update(update).eq("id", task.rowId);
           } else {
             const update: Record<string, unknown> = {
@@ -743,7 +751,7 @@ export async function validateAllUntestedForOrg(
               [`${task.base}_validation_provider`]: result.provider,
               [`${task.base}_validation_raw`]: result.raw as object,
             };
-            if (shouldFillType) update[`${task.base}_type`] = result.phoneType;
+            if (result.phoneType) update[`${task.base}_type`] = result.phoneType;
             await sb.from("relatives").update(update).eq("id", task.rowId);
           }
           processed += 1;
