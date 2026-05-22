@@ -99,7 +99,11 @@ export async function lobSendCheck(
       provider_id: json.id,
       tracking_number: json.tracking_number ?? null,
       tracking_url: json.url ?? null,
-      cost_cents: 116, // base check cost on Lob's Developer tier
+      // Lob's create-check API doesn't return per-piece cost. The actual
+      // amount lands on the monthly Lob invoice. Stored as null so the
+      // report doesn't fabricate a number — we'd rather show "spend not
+      // tracked" than a wrong number. Backfill via invoice import later.
+      cost_cents: null,
     };
   } catch (err) {
     return {
@@ -172,7 +176,9 @@ export async function lobSendLetter(
       provider_id: json.id,
       tracking_number: json.tracking_number ?? null,
       tracking_url: json.url ?? null,
-      cost_cents: 81,
+      // Same reason as the check path — Lob doesn't return per-piece
+      // cost. Reconciled monthly via Lob invoice.
+      cost_cents: null,
     };
   } catch (err) {
     return {

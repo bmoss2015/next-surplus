@@ -106,17 +106,17 @@ export default async function MailActivityReportPage({
       </div>
 
       {/* Cost transparency note — surfaces only when there's at least
-          one Lob piece in the window, since that's the leg that uses a
-          placeholder rate. */}
+          one Lob piece in the window. Lob spend is excluded from the
+          Spent total since we don't fabricate numbers. */}
       {cost_sources.has_lob_pieces && (
         <div className="mb-5 flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[11.5px] text-gray-700">
           <IconInfoCircle size={14} stroke={1.75} className="mt-[1px] shrink-0 text-gray-500" />
           <div>
-            <span className="font-medium text-ink">Cost data source:</span>{" "}
-            Click2Mail amounts are invoiced per piece (accurate). Lob check
-            costs use the published Developer-tier rate ($1.16) since Lob
-            doesn&apos;t return exact cost in their API — reconcile
-            against the monthly Lob invoice for exact spend.
+            <span className="font-medium text-ink">Spent is Click2Mail only.</span>{" "}
+            Lob doesn&apos;t return per-piece cost in their API, so check
+            spend isn&apos;t included in this total. The actual amount lands
+            on the monthly Lob invoice — reconcile there until invoice import
+            is built.
           </div>
         </div>
       )}

@@ -288,6 +288,14 @@ export function MailListClient({
         ))}
       </div>
 
+      {/* Needs Attention — only renders when there are returned/failed
+          pieces. Visually distinct from the table (card layout, danger
+          border) so the actionable items don't get buried. */}
+      <NeedsAttentionSection
+        rows={rows}
+        onOpen={(id) => setDetailId(id)}
+      />
+
       {/* Search + filter chips + actions */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px] max-w-md">
@@ -300,7 +308,7 @@ export function MailListClient({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search Recipient, City, State"
+            placeholder="Search by name, city, or state"
             className="w-full rounded-md border border-gray-200 bg-white pl-8 pr-3 py-2 text-[12.5px] text-ink placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-petrol-300"
           />
         </div>
@@ -527,14 +535,14 @@ function Row({
               href={row.tracking_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex cursor-pointer items-center gap-1 text-[12px] text-petrol-500 hover:text-petrol-700"
+              className="inline-flex cursor-pointer items-center gap-1 font-mono text-[11.5px] text-petrol-500 hover:text-petrol-700"
               onClick={(e) => e.stopPropagation()}
             >
               {row.tracking_number}
               <IconExternalLink size={11} stroke={1.75} />
             </a>
           ) : (
-            <span className="text-[12px] text-ink">
+            <span className="font-mono text-[11.5px] text-ink">
               {row.tracking_number}
             </span>
           )
@@ -543,6 +551,73 @@ function Row({
         )}
       </td>
     </tr>
+  );
+}
+
+// Visually distinct card-stack section that floats returned/failed
+// pieces above the main table so actionable items don't get buried.
+// Renders nothing when there are zero. Layout intentionally differs
+// from the table — paired cards with a left-border accent, larger
+// type, primary action button per card. This is the "different layout
+// per section" Bree liked from the settings panels.
+function NeedsAttentionSection({
+  rows,
+  onOpen,
+}: {
+  rows: MailJobListRow[];
+  onOpen: (id: string) => void;
+}) {
+  const needs = rows.filter((r) => r.status === "returned" || r.status === "failed");
+  if (needs.length === 0) return null;
+  return (
+    <section className="mb-5">
+      <div className="mb-2 flex items-baseline justify-between">
+        <h2 className="text-[13px] font-medium uppercase tracking-wide text-gray-500">
+          Needs Attention
+        </h2>
+        <span className="text-[11px] text-gray-500">
+          {needs.length} {needs.length === 1 ? "piece" : "pieces"} can&apos;t reach the recipient
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {needs.slice(0, 4).map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            onClick={() => onOpen(r.id)}
+            className="cursor-pointer rounded-lg border border-l-4 border-gray-200 border-l-danger bg-white px-4 py-3 text-left transition-shadow hover:shadow-card"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[14px] font-medium text-ink">
+                  {r.recipient_name}
+                </div>
+                <div className="truncate text-[11.5px] text-gray-500">
+                  {r.recipient_address_line1}, {r.recipient_city},{" "}
+                  {r.recipient_state} {r.recipient_postal_code}
+                </div>
+              </div>
+              <span className="shrink-0 text-[10.5px] font-medium uppercase tracking-wide text-danger">
+                Returned
+              </span>
+            </div>
+            {r.error_message && (
+              <div className="mt-2 line-clamp-2 text-[11.5px] text-gray-700">
+                {r.error_message}
+              </div>
+            )}
+            <div className="mt-2 text-[11.5px] font-medium text-petrol-600">
+              Fix Address &amp; Resend →
+            </div>
+          </button>
+        ))}
+      </div>
+      {needs.length > 4 && (
+        <div className="mt-2 text-[11px] text-gray-500">
+          + {needs.length - 4} more — use the Returned filter below to see all.
+        </div>
+      )}
+    </section>
   );
 }
 
