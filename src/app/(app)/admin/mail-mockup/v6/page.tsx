@@ -1,24 +1,88 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import {
+  IconMail,
+  IconCalendar,
+  IconHash,
+  IconCash,
+  IconFileText,
+  IconExternalLink,
+  IconChevronRight,
+  IconChevronDown,
+  IconBarcode,
+  IconArrowBackUp,
+} from "@tabler/icons-react";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 
-// Variant 6 (locked-in baseline).
-// Same report-look aesthetic Bree liked (big KPI tiles with sub-
-// captions + horizontal pipeline bar) but with operational data
-// only. No Action Required block here — per our agreement, returned
-// pieces surface on the LEAD Mail tab, not the global /mail dashboard.
-// Lists below are status-grouped (In Transit, Delivered Recent), the
-// table-equivalent the user uses to scan everything.
+// Variant 6 (next iteration).
+// Bree's pass:
+//   - KPI tile subtext lines removed.
+//   - Send Mail button removed from /mail dashboard (action is per-lead).
+//   - Added Returned section (third list block).
+//   - Batch grouping back — multi-recipient sends collapse to a
+//     parent row you can expand.
+//   - Rows restructured for legibility: name + address on the top,
+//     icon-led meta strip below, status pill + actions on the right.
+//     Whole row is a Link to the lead.
+//   - View Letter promoted to a solid-green primary, Track stays
+//     outlined-green, both icon-led.
+
+type Piece = {
+  id: string;
+  name: string;
+  line1: string;
+  city: string;
+  state: string;
+  postal: string;
+  classLabel: string;
+  sentAt: string;
+  arrivedAt?: string;
+  daysAgo?: string;
+  lead: string;
+  surplus: string;
+  trackingTail: string;
+  check?: string;
+  returnReason?: string;
+};
+
+type Batch = {
+  id: string;
+  pieces: Piece[];
+};
+
+// In Transit — one batch + a solo to demo the grouping
+const IN_TRANSIT: Array<Piece | Batch> = [
+  { id: "m3", name: "Patricia Williams", line1: "1023 Heritage Lane", city: "Dallas", state: "TX", postal: "75204", classLabel: "First Class", sentAt: "Jan 24", daysAgo: "3d ago", lead: "L-2026-0046", surplus: "$61K", trackingTail: "5568" },
+  {
+    id: "b1",
+    pieces: [
+      { id: "m5", name: "Linda Foster", line1: "5511 Westbrook Way", city: "Fort Worth", state: "TX", postal: "76107", classLabel: "First Class", sentAt: "Jan 26", daysAgo: "1d ago", lead: "L-2026-0048", surplus: "$33K", trackingTail: "5570" },
+      { id: "m6", name: "Robert Foster", line1: "5511 Westbrook Way", city: "Fort Worth", state: "TX", postal: "76107", classLabel: "First Class", sentAt: "Jan 26", daysAgo: "1d ago", lead: "L-2026-0048", surplus: "$33K", trackingTail: "5571" },
+    ],
+  },
+  { id: "m7", name: "Susan Park", line1: "918 Cedar Springs Rd", city: "Austin", state: "TX", postal: "78704", classLabel: "First Class", sentAt: "Jan 22", daysAgo: "5d ago", lead: "L-2026-0050", surplus: "$14K", trackingTail: "5572", check: "$4,825" },
+];
+
+const DELIVERED: Piece[] = [
+  { id: "m1", name: "Margaret Chen", line1: "412 Oakwood Drive", city: "Austin", state: "TX", postal: "78745", classLabel: "First Class", sentAt: "Jan 14", arrivedAt: "Jan 18", lead: "L-2026-0042", surplus: "$42K", trackingTail: "5566" },
+  { id: "m2", name: "David Rodriguez", line1: "78 Pinecrest Avenue", city: "Houston", state: "TX", postal: "77019", classLabel: "Certified", sentAt: "Jan 16", arrivedAt: "Jan 20", lead: "L-2026-0044", surplus: "$28K", trackingTail: "5567" },
+  { id: "m8", name: "Carlos Mendez", line1: "2200 Border Avenue", city: "El Paso", state: "TX", postal: "79912", classLabel: "First Class", sentAt: "Jan 13", arrivedAt: "Jan 17", lead: "L-2026-0058", surplus: "$22K", trackingTail: "5573" },
+];
+
+const RETURNED: Piece[] = [
+  { id: "m4", name: "James O'Brien", line1: "245 Magnolia Court", city: "San Antonio", state: "TX", postal: "78216", classLabel: "First Class", sentAt: "Jan 09", arrivedAt: "Jan 22", lead: "L-2026-0051", surplus: "$19K", trackingTail: "5569", returnReason: "Forward expired" },
+  { id: "m10", name: "George Wu", line1: "6111 Llano Estacado", city: "Lubbock", state: "TX", postal: "79407", classLabel: "First Class", sentAt: "Jan 12", arrivedAt: "Jan 19", lead: "L-2026-0062", surplus: "$31K", trackingTail: "5577", returnReason: "Vacant" },
+  { id: "m11", name: "Helen Reyes", line1: "3402 W Slaughter Ln", city: "Austin", state: "TX", postal: "78748", classLabel: "First Class", sentAt: "Jan 06", arrivedAt: "Jan 17", lead: "L-2026-0067", surplus: "$8K", trackingTail: "5580", returnReason: "No such number" },
+];
+
+function isBatch(x: Piece | Batch): x is Batch {
+  return "pieces" in x;
+}
 
 export default async function MockupV6() {
   if (process.env.VERCEL_ENV === "production") notFound();
   const profile = await getCurrentProfile();
   if (!profile?.isAdmin) notFound();
-
-  const inTransit = 3;
-  const delivered = 18;
-  const returned = 3;
-  const total = inTransit + delivered + returned;
 
   return (
     <div className="min-h-screen bg-gray-50 px-7 py-7">
@@ -30,118 +94,93 @@ export default async function MockupV6() {
           ← All Mockups
         </Link>
         <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-400">
-          V6 · KPI Dashboard
+          V6 · Iteration
         </span>
       </div>
 
-      <header className="mb-6 flex items-end justify-between gap-4">
+      {/* Header — no Send Mail button (per Bree, send happens per-lead) */}
+      <header className="mb-6">
         <h1 className="m-0 text-[28px] font-semibold tracking-tight text-ink">
           Sent Mail
         </h1>
-        <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-4 py-2 text-[12px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)]">
-          Send Mail
-        </button>
       </header>
 
-      <KpiStrip
-        tiles={[
-          { label: "In Transit", value: inTransit, sub: "moving toward delivery" },
-          { label: "Sent Today", value: 2, sub: "went out in this morning's run" },
-          { label: "Delivered This Week", value: 6, sub: "confirmed by USPS" },
-          { label: "Returned This Month", value: returned, sub: "awaiting new address", warn: true },
-        ]}
-      />
+      {/* KPI tiles — no subtext lines */}
+      <div className="grid grid-cols-4 gap-4">
+        <Tile label="In Transit" value="3" />
+        <Tile label="Sent Today" value="2" />
+        <Tile label="Delivered This Week" value="6" />
+        <Tile label="Returned This Month" value="3" warn />
+      </div>
 
-      <PipelineBar inTransit={inTransit} delivered={delivered} returned={returned} total={total} />
-
-      {/* Lists below — status-grouped, the working surface */}
-      <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-6">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-          In Transit
-        </div>
-        <div className="mt-4 divide-y divide-gray-150">
-          <PieceRow name="Patricia Williams" lead="L-2026-0046" surplus="$61K" city="Dallas, TX" classLabel="First Class" since="3d ago" />
-          <PieceRow name="Linda Foster" lead="L-2026-0048" surplus="$33K" city="Fort Worth, TX" classLabel="First Class · Batch" since="1d ago" />
-          <PieceRow name="Robert Foster" lead="L-2026-0048" surplus="$33K" city="Fort Worth, TX" classLabel="First Class · Batch" since="1d ago" />
-          <PieceRow name="Susan Park" lead="L-2026-0050" surplus="$14K" city="Austin, TX" classLabel="First Class · Check $4,825" since="5d ago" />
-        </div>
-      </section>
-
+      {/* Pipeline bar */}
       <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-6">
         <div className="flex items-baseline justify-between">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-            Delivered (Recent)
+            Pipeline
           </div>
-          <Link href="#" className="cursor-pointer text-[11px] font-medium text-gray-500 underline decoration-gray-300 underline-offset-2 hover:text-ink">
-            Show all 18
-          </Link>
+          <div className="text-[11px] text-gray-500">24 pieces total</div>
         </div>
-        <div className="mt-4 divide-y divide-gray-150">
-          <PieceRow name="Margaret Chen" lead="L-2026-0042" surplus="$42K" city="Austin, TX" classLabel="First Class" since="Delivered Jan 18" tone="ok" />
-          <PieceRow name="David Rodriguez" lead="L-2026-0044" surplus="$28K" city="Houston, TX" classLabel="Certified" since="Delivered Jan 20" tone="ok" />
-          <PieceRow name="Carlos Mendez" lead="L-2026-0058" surplus="$22K" city="El Paso, TX" classLabel="First Class" since="Delivered Jan 17" tone="ok" />
+        <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-gray-100">
+          <div className="bg-ink" style={{ width: "12.5%" }} />
+          <div className="bg-[#0d4b3a]" style={{ width: "75%" }} />
+          <div className="bg-[#c4253c]" style={{ width: "12.5%" }} />
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-4 text-[12px]">
+          <Pair color="bg-ink" label="In Transit" count={3} />
+          <Pair color="bg-[#0d4b3a]" label="Delivered" count={18} />
+          <Pair color="bg-[#c4253c]" label="Returned" count={3} warn />
         </div>
       </section>
+
+      {/* Lists — each their own section. In Transit + batch grouping. */}
+      <Section eyebrow="In Transit">
+        {IN_TRANSIT.map((item) =>
+          isBatch(item) ? (
+            <BatchRow batch={item} key={item.id} />
+          ) : (
+            <PieceRow piece={item} key={item.id} />
+          )
+        )}
+      </Section>
+
+      <Section eyebrow="Delivered (Recent)" trailing={<Link href="#" className="cursor-pointer text-[11px] font-medium text-gray-500 underline decoration-gray-300 underline-offset-2 hover:text-ink">Show all 18</Link>}>
+        {DELIVERED.map((p) => (
+          <PieceRow piece={p} key={p.id} status="delivered" />
+        ))}
+      </Section>
+
+      <Section eyebrow="Returned" tone="danger">
+        {RETURNED.map((p) => (
+          <PieceRow piece={p} key={p.id} status="returned" />
+        ))}
+      </Section>
     </div>
   );
 }
 
-export function KpiStrip({
-  tiles,
+function Tile({
+  label,
+  value,
+  warn,
 }: {
-  tiles: Array<{ label: string; value: number | string; sub: string; warn?: boolean }>;
+  label: string;
+  value: string;
+  warn?: boolean;
 }) {
   return (
-    <div className={`grid grid-cols-${tiles.length} gap-4`} style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
-      {tiles.map((t) => (
-        <div key={t.label} className="rounded-2xl border border-gray-200 bg-white p-6">
-          <div className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${t.warn ? "text-[#c4253c]" : "text-gray-500"}`}>
-            {t.label}
-          </div>
-          <div className={`mt-2 text-[42px] font-semibold leading-none tracking-tight ${t.warn ? "text-[#c4253c]" : "text-ink"}`}>
-            {t.value}
-          </div>
-          <div className="mt-3 text-[11px] text-gray-500">{t.sub}</div>
-        </div>
-      ))}
+    <div className="rounded-2xl border border-gray-200 bg-white p-6">
+      <div className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${warn ? "text-[#c4253c]" : "text-gray-500"}`}>
+        {label}
+      </div>
+      <div className={`mt-3 text-[42px] font-semibold leading-none tracking-tight ${warn ? "text-[#c4253c]" : "text-ink"}`}>
+        {value}
+      </div>
     </div>
   );
 }
 
-export function PipelineBar({
-  inTransit,
-  delivered,
-  returned,
-  total,
-}: {
-  inTransit: number;
-  delivered: number;
-  returned: number;
-  total: number;
-}) {
-  return (
-    <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-6">
-      <div className="flex items-baseline justify-between">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-          Pipeline
-        </div>
-        <div className="text-[11px] text-gray-500">{total} pieces total</div>
-      </div>
-      <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-gray-100">
-        <div className="bg-ink" style={{ width: `${(inTransit / total) * 100}%` }} />
-        <div className="bg-[#0d4b3a]" style={{ width: `${(delivered / total) * 100}%` }} />
-        <div className="bg-[#c4253c]" style={{ width: `${(returned / total) * 100}%` }} />
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-4 text-[12px]">
-        <BreakdownPair color="bg-ink" label="In Transit" count={inTransit} />
-        <BreakdownPair color="bg-[#0d4b3a]" label="Delivered" count={delivered} />
-        <BreakdownPair color="bg-[#c4253c]" label="Returned" count={returned} warn />
-      </div>
-    </section>
-  );
-}
-
-export function BreakdownPair({
+function Pair({
   color,
   label,
   count,
@@ -169,54 +208,191 @@ export function BreakdownPair({
   );
 }
 
-export function PieceRow({
-  name,
-  lead,
-  surplus,
-  city,
-  classLabel,
-  since,
+function Section({
+  eyebrow,
+  trailing,
   tone,
+  children,
 }: {
-  name: string;
-  lead: string;
-  surplus: string;
-  city: string;
-  classLabel: string;
-  since: string;
-  tone?: "ok";
+  eyebrow: string;
+  trailing?: React.ReactNode;
+  tone?: "danger";
+  children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
+    <section
+      className={`mt-5 overflow-hidden rounded-2xl border bg-white ${
+        tone === "danger" ? "border-[#c4253c]/20" : "border-gray-200"
+      }`}
+    >
+      <header className="flex items-baseline justify-between border-b border-gray-100 px-6 py-3.5">
+        <div className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${tone === "danger" ? "text-[#c4253c]" : "text-gray-500"}`}>
+          {eyebrow}
+        </div>
+        {trailing}
+      </header>
+      <div className="divide-y divide-gray-100">{children}</div>
+    </section>
+  );
+}
+
+function PieceRow({
+  piece,
+  status = "in_transit",
+  isBatchChild,
+}: {
+  piece: Piece;
+  status?: "in_transit" | "delivered" | "returned";
+  isBatchChild?: boolean;
+}) {
+  return (
+    <Link
+      href="#"
+      className={`group grid grid-cols-[1fr_auto] items-center gap-5 px-6 py-4 transition-colors hover:bg-gray-50 ${
+        isBatchChild ? "pl-12" : ""
+      }`}
+    >
+      {/* Left column — name, address, meta */}
       <div className="min-w-0">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[13.5px] font-semibold text-ink">{name}</span>
-          <span className="text-[11.5px] text-gray-500">{city}</span>
+        <div className="flex items-baseline gap-3">
+          <span className="text-[15px] font-semibold text-ink">
+            {piece.name}
+          </span>
+          {status === "delivered" && piece.arrivedAt && (
+            <span className="text-[11px] text-[#0d4b3a]">
+              Delivered {piece.arrivedAt}
+            </span>
+          )}
+          {status === "returned" && piece.arrivedAt && (
+            <span className="text-[11px] text-[#c4253c]">
+              Returned {piece.arrivedAt} ({piece.returnReason})
+            </span>
+          )}
+          {status === "in_transit" && piece.daysAgo && (
+            <span className="text-[11px] text-gray-500">
+              Sent {piece.daysAgo}
+            </span>
+          )}
         </div>
-        <div className="mt-[1px] text-[11px] text-gray-500">
-          <Link href="#" className="cursor-pointer text-[#0d4b3a] underline decoration-[#0d4b3a]/30 underline-offset-2">
-            {lead}
-          </Link>
-          <span className="text-gray-400"> · </span>
-          <span className="text-ink">{surplus} surplus</span>
-          <span className="text-gray-400"> · </span>
-          <span>{classLabel}</span>
+        <div className="mt-[2px] text-[12.5px] text-gray-600">
+          {piece.line1}, {piece.city}, {piece.state} {piece.postal}
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-ink">
+          <span className="inline-flex items-center gap-1.5">
+            <IconMail size={13} stroke={1.75} className="text-gray-400" />
+            {piece.classLabel}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <IconCalendar size={13} stroke={1.75} className="text-gray-400" />
+            {piece.sentAt}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <IconHash size={13} stroke={1.75} className="text-gray-400" />
+            <span className="text-[#0d4b3a]">{piece.lead}</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <IconCash size={13} stroke={1.75} className="text-gray-400" />
+            {piece.surplus} surplus
+          </span>
+          {piece.check && (
+            <span className="inline-flex items-center gap-1.5 text-[#0d4b3a]">
+              <IconCash size={13} stroke={1.75} />
+              check {piece.check}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5 text-gray-500">
+            <IconBarcode size={13} stroke={1.75} className="text-gray-400" />
+            <span className="font-mono tabular-nums">…{piece.trackingTail}</span>
+          </span>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-4">
-        <span className={`text-[11px] ${tone === "ok" ? "text-[#0d4b3a]" : "text-gray-500"}`}>
-          {since}
-        </span>
-        {/* Always-visible action buttons (no hover-only) */}
-        <div className="flex gap-1">
-          <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-2.5 py-1 text-[10.5px] font-medium text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
-            View
+
+      {/* Right column — actions */}
+      <div className="flex shrink-0 items-center gap-2">
+        {/* Returned pieces show Fix & Resend as the loud action */}
+        {status === "returned" ? (
+          <button
+            type="button"
+            onClick={(e) => e.preventDefault()}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-[#c4253c] px-3 py-1.5 text-[11.5px] font-semibold text-white"
+          >
+            <IconArrowBackUp size={13} stroke={2} />
+            Fix &amp; Resend
           </button>
-          <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-2.5 py-1 text-[10.5px] font-medium text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
-            Track
-          </button>
-        </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={(e) => e.preventDefault()}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-[#0d4b3a] px-3 py-1.5 text-[11.5px] font-medium text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-[#0d6c4d]"
+            >
+              <IconFileText size={13} stroke={2} />
+              View Letter
+            </button>
+            <button
+              type="button"
+              onClick={(e) => e.preventDefault()}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[11.5px] font-medium text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]"
+            >
+              <IconExternalLink size={13} stroke={2} />
+              Track
+            </button>
+          </>
+        )}
+        <IconChevronRight size={16} stroke={1.75} className="text-gray-300 group-hover:text-gray-500" />
       </div>
-    </div>
+    </Link>
+  );
+}
+
+function BatchRow({ batch }: { batch: Batch }) {
+  const lead = batch.pieces[0]?.lead ?? "";
+  const surplus = batch.pieces[0]?.surplus ?? "";
+  const sentAt = batch.pieces[0]?.sentAt ?? "";
+  const classLabel = batch.pieces[0]?.classLabel ?? "";
+  return (
+    <details className="group">
+      <summary className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-5 px-6 py-4 transition-colors hover:bg-gray-50">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-3">
+            <span className="text-[15px] font-semibold text-ink">
+              Batch of {batch.pieces.length}{" "}
+              <span className="text-gray-500">to the Foster family</span>
+            </span>
+            <span className="text-[11px] text-gray-500">
+              Sent {sentAt}
+            </span>
+          </div>
+          <div className="mt-[2px] text-[12.5px] text-gray-600">
+            {batch.pieces.map((p) => p.name).join(", ")}
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-ink">
+            <span className="inline-flex items-center gap-1.5">
+              <IconMail size={13} stroke={1.75} className="text-gray-400" />
+              {classLabel}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <IconHash size={13} stroke={1.75} className="text-gray-400" />
+              <span className="text-[#0d4b3a]">{lead}</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <IconCash size={13} stroke={1.75} className="text-gray-400" />
+              {surplus} surplus
+            </span>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-[4px] bg-ink px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-white">
+            Batch
+          </span>
+          <IconChevronDown size={16} stroke={1.75} className="text-gray-400 transition-transform group-open:rotate-180" />
+        </div>
+      </summary>
+      <div className="border-t border-gray-100 bg-gray-50/40">
+        {batch.pieces.map((p) => (
+          <PieceRow piece={p} key={p.id} isBatchChild />
+        ))}
+      </div>
+    </details>
   );
 }
