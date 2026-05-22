@@ -27,7 +27,7 @@ import {
 } from "@/lib/settings/fetch";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
-import { getValidationUsage } from "@/lib/phone-validate";
+import { getValidationUsage, isPhoneValidationEnabled } from "@/lib/phone-validate";
 import { SettingsPreviewJsx } from "./_components/SettingsPreviewJsx";
 
 export const dynamic = "force-dynamic";
@@ -146,6 +146,7 @@ export default async function SettingsPreviewJsxPage() {
           templates,
           research,
           phoneUsage,
+          phoneValidationEnabled: isPhoneValidationEnabled(),
           notificationPrefs,
         }}
       />

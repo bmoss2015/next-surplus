@@ -13,6 +13,28 @@ import { createServiceClient } from "./supabase/service";
 const DEFAULT_QUOTA_CAP = 5000;
 const CLEAROUT_ENDPOINT = "https://api.clearoutphone.io/v1/phonenumber/validate";
 const ADDON_KEY = "phone_validation";
+
+// Master kill switch. When PHONE_VALIDATION_ENABLED is set to anything other
+// than "true" (case-insensitive), every validation entry point short-circuits
+// to a no-op untested result. Lets us pause spend without ripping out the
+// code — flip the env var back to "true" once a real disconnect-detection
+// provider is wired up. Default is OFF: validation has to be explicitly
+// turned on, so a forgotten redeploy or a fresh env doesn't quietly start
+// burning credits.
+export function isPhoneValidationEnabled(): boolean {
+  const raw = process.env.PHONE_VALIDATION_ENABLED;
+  return typeof raw === "string" && raw.trim().toLowerCase() === "true";
+}
+
+function disabledResult(): ValidationResult {
+  return {
+    status: "untested",
+    provider: null,
+    checkedAt: null,
+    raw: { reason: "validation_disabled" },
+    phoneType: null,
+  };
+}
 // Pay-as-you-go rate Bree confirmed: $35 / 5,000 = $0.0070 per credit.
 // Override via env CLEAROUT_COST_PER_CREDIT_USD when moving to monthly
 // (10% off → 0.0063) or annual (20% off → 0.0056) so the Billing meter's
@@ -201,6 +223,7 @@ export async function validatePhone(
   phoneRaw: string | null | undefined,
   orgId: string
 ): Promise<ValidationResult> {
+  if (!isPhoneValidationEnabled()) return disabledResult();
   if (!phoneRaw || !phoneRaw.trim()) {
     return { status: "untested", provider: null, checkedAt: null, raw: null, phoneType: null };
   }
@@ -483,6 +506,7 @@ export async function validateSpecificPhones(
   },
   opts: { concurrency?: number } = {}
 ): Promise<{ processed: number }> {
+  if (!isPhoneValidationEnabled()) return { processed: 0 };
   const concurrency = opts.concurrency ?? 5;
   const contactIds = targets.contactIds ?? [];
   const relativeSlots = targets.relativeSlots ?? [];
@@ -615,6 +639,7 @@ export async function previewBackfillCount(
   orgId: string,
   opts: { excludeLostLeads?: boolean } = {}
 ): Promise<{ uniquePhones: number; totalRows: number }> {
+  if (!isPhoneValidationEnabled()) return { uniquePhones: 0, totalRows: 0 };
   const excludeLostLeads = opts.excludeLostLeads ?? true;
   const sb = createServiceClient();
 
@@ -680,6 +705,7 @@ export async function validateAllUntestedForOrg(
   orgId: string,
   opts: { maxItems?: number; concurrency?: number; excludeLostLeads?: boolean } = {}
 ): Promise<{ processed: number; pending: number }> {
+  if (!isPhoneValidationEnabled()) return { processed: 0, pending: 0 };
   const maxItems = opts.maxItems ?? 10000;
   const concurrency = opts.concurrency ?? 5;
   const excludeLostLeads = opts.excludeLostLeads ?? true;

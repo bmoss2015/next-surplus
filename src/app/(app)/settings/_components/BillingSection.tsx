@@ -33,9 +33,11 @@ export type PhoneValidationUsage = {
 
 export function BillingSection({
   phoneUsage,
+  phoneValidationEnabled,
   invoiceEmail,
 }: {
   phoneUsage: PhoneValidationUsage;
+  phoneValidationEnabled: boolean;
   invoiceEmail: string;
 }) {
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
@@ -149,6 +151,17 @@ export function BillingSection({
       </div>
 
       <h2 className="billing-section-h">Phone Validation</h2>
+      {!phoneValidationEnabled ? (
+        <div className="billing-card">
+          <div className="billing-card-title">Paused</div>
+          <div className="billing-card-desc" style={{ marginTop: 10 }}>
+            Phone validation is currently paused. New phone numbers added
+            via import or manually save as <strong>Not Verified</strong>{" "}
+            and no credits are consumed. The validator code stays in place
+            so it can be re-enabled by an admin once a provider is selected.
+          </div>
+        </div>
+      ) : (
       <div className="billing-card">
         <div className="billing-card-head">
           <div className="flex-1 min-w-0">
@@ -217,8 +230,9 @@ export function BillingSection({
           </div>
         )}
       </div>
+      )}
 
-      {preview && (
+      {phoneValidationEnabled && preview && (
         <BackfillConfirmModal
           preview={preview}
           confirming={confirmPending}

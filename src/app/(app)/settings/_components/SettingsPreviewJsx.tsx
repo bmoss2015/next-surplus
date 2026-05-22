@@ -63,6 +63,7 @@ export type SettingsData = {
   templates: TemplateRow[];
   research: ResearchTemplateRow[];
   phoneUsage: PhoneValidationUsage | null;
+  phoneValidationEnabled: boolean;
   notificationPrefs: Record<string, boolean>;
 };
 
@@ -172,6 +173,7 @@ function renderPanel(
       return data.phoneUsage ? (
         <BillingSection
           phoneUsage={data.phoneUsage}
+          phoneValidationEnabled={data.phoneValidationEnabled}
           invoiceEmail={currentUser.email}
         />
       ) : (
