@@ -321,12 +321,18 @@ function PieceRow({
   section: Section;
   isBatchChild?: boolean;
 }) {
+  // Three distinct pill styles, anchored on the Settings Members role-tab
+  // family: ink (solid black-filled) for In Transit since it's the
+  // neutral/default state; outlined petrol for Delivered; outlined red
+  // for Returned. The black option is used because In Transit doesn't
+  // share a color with any action button, so no informational vs
+  // clickable conflict.
   const pillClass =
     section === "delivered"
-      ? "border-petrol-500/40 text-petrol-700"
+      ? "border-petrol-500/40 bg-white text-petrol-700"
       : section === "returned"
-        ? "border-danger/40 text-danger"
-        : "border-gray-300 text-ink";
+        ? "border-danger/40 bg-white text-danger"
+        : "border-ink bg-ink text-white";
   const pillLabel =
     section === "delivered"
       ? "Delivered"
