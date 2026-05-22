@@ -70,12 +70,12 @@ export default async function MockupV2() {
 
         {/* LEAD MAIL TAB */}
         <section>
-          <div className="mb-7 border-b border-gray-200 pb-6">
+          <div className="mb-6 border-b border-gray-200 pb-5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0d4b3a]">
               L-2026-0042 · Smith Surplus Case
             </div>
             <h2 className="mt-2 text-[24px] font-semibold tracking-tight text-ink">
-              Mail On This Lead
+              Sent Mail
             </h2>
             <dl className="mt-5 grid grid-cols-4 gap-x-6 gap-y-2">
               <StatPair label="Total Sent" value="3" />
@@ -85,18 +85,14 @@ export default async function MockupV2() {
             </dl>
           </div>
 
-          {/* Compose lives at the top of the lead view */}
-          <div className="mb-4 flex items-center justify-between rounded-lg border border-[#0d4b3a]/15 bg-[#0d4b3a]/[0.03] px-4 py-3">
-            <div>
-              <div className="text-[13px] font-medium text-ink">
-                Compose New Mail
-              </div>
-              <div className="mt-[1px] text-[11.5px] text-gray-500">
-                3 mailing addresses on file for this lead.
-              </div>
-            </div>
-            <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-3 py-2 text-[12px] font-semibold text-white">
-              + New Mail Piece
+          {/* Compact compose bar — about half the previous height. No
+              description, just the action + a quiet inline hint. */}
+          <div className="mb-4 flex items-center justify-between rounded-md border border-[#0d4b3a]/15 bg-[#0d4b3a]/[0.03] px-3 py-2">
+            <span className="text-[11.5px] text-gray-600">
+              3 mailing addresses on file
+            </span>
+            <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-3 py-1.5 text-[11.5px] font-semibold text-white">
+              Send Mail
             </button>
           </div>
 
