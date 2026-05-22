@@ -114,84 +114,95 @@ export default async function MockupV11() {
             </ul>
           </div>
 
-          {/* Right pane — V2 editorial card content for selected piece */}
-          <div className="bg-white p-6">
-            {/* Status pill — outlined (informational) */}
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <div className="text-[18px] font-semibold tracking-tight text-ink">
-                  {selected.recipient}
-                </div>
-                <div className="mt-[1px] text-[12px] text-gray-500">
-                  {selected.role}
-                </div>
-              </div>
-              <span className="inline-flex items-center justify-center rounded-[4px] border border-[#0d4b3a]/40 bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] text-[#0d4b3a]">
-                {selected.status}
-              </span>
-            </div>
-
-            {/* Letter thumbnail */}
-            <div className="relative h-[240px] w-full overflow-hidden rounded-sm border border-gray-200 bg-white">
-              <div className="absolute inset-0 p-4 text-[7px] leading-[1.5] text-ink">
-                <div className="mb-2 text-right text-gray-500">{selected.sentAt}</div>
-                <div className="mb-2">{selected.recipient}</div>
-                <div className="mb-2 text-gray-500">
+          {/* Right pane — letter portrait on the left, meta + actions on
+              the right. Mirrors V2's card layout inside V4's split-pane,
+              so the letter reads as a real 8.5x11 sheet instead of a
+              wide landscape strip. */}
+          <div className="grid grid-cols-[200px_1fr] gap-5 bg-white p-6">
+            {/* Letter thumbnail — 8.5x11 aspect ratio */}
+            <div
+              className="relative shrink-0 overflow-hidden rounded-sm border border-gray-200 bg-white shadow-card"
+              style={{ width: "200px", aspectRatio: "8.5 / 11" }}
+            >
+              <div className="absolute inset-0 p-3 text-[6.5px] leading-[1.4] text-ink">
+                <div className="mb-[3px] text-right text-gray-500">{selected.sentAt}</div>
+                <div className="mb-[3px]">{selected.recipient}</div>
+                <div className="mb-[3px] text-gray-500">
                   {selected.line1}<br />{selected.city}, {selected.state} {selected.postal}
                 </div>
-                <div className="mt-3 mb-1">Dear {selected.recipient.split(" ")[0]},</div>
-                <div className="mb-1 text-gray-700">
-                  Our records indicate you may be entitled to surplus funds
-                  being held by the county following the recent sale of
-                  property...
+                <div className="mt-2 mb-[2px]">Dear {selected.recipient.split(" ")[0]},</div>
+                <div className="mb-[2px] text-gray-700">
+                  Our records indicate you may be entitled to surplus
+                  funds being held by the county following the recent
+                  sale of property...
                 </div>
-                <div className="mb-1 text-gray-700">
-                  Moss Equity Partners specializes in helping rightful owners
-                  recover these funds. If you would like to discuss your
-                  situation, please reply by mail or...
+                <div className="mb-[2px] text-gray-700">
+                  Moss Equity Partners specializes in helping rightful
+                  owners recover these funds. If you would like to
+                  discuss your situation, please reply by mail or
+                  call us...
                 </div>
+                <div className="mt-2 text-gray-700">Sincerely,</div>
+                <div className="text-gray-700">Bree Moss</div>
               </div>
             </div>
 
-            {/* Address */}
-            <div className="mt-4 text-[12.5px] text-gray-600">
-              {selected.line1}, {selected.city}, {selected.state} {selected.postal}
-            </div>
+            {/* Meta + actions column */}
+            <div className="flex min-w-0 flex-col">
+              {/* Name + outlined status pill */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[18px] font-semibold tracking-tight text-ink">
+                    {selected.recipient}
+                  </div>
+                  <div className="mt-[1px] text-[12px] text-gray-500">
+                    {selected.role}
+                  </div>
+                </div>
+                <span className="inline-flex shrink-0 items-center justify-center rounded-[4px] border border-[#0d4b3a]/40 bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] text-[#0d4b3a]">
+                  {selected.status}
+                </span>
+              </div>
 
-            {/* Meta strip — icon-led, no all-caps labels (V2 pattern) */}
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-ink">
-              <Meta icon={IconMail}>{selected.mailClass}</Meta>
-              <Meta icon={IconCalendar}>Sent {selected.sentAt}</Meta>
-              {selected.status === "Delivered" && selected.deliveredAt && (
-                <Meta icon={IconCircleCheck} tone="ok">
-                  Delivered {selected.deliveredAt}
-                </Meta>
-              )}
-              {selected.status === "Returned" && selected.returnedAt && (
-                <Meta icon={IconArrowBackUp} tone="danger">
-                  Returned {selected.returnedAt} ({selected.returnReason})
-                </Meta>
-              )}
-              {selected.status === "In Transit" && (
-                <Meta icon={IconClock}>2 to 4 business days</Meta>
-              )}
-            </div>
+              {/* Address */}
+              <div className="mt-3 text-[12.5px] text-gray-600">
+                {selected.line1}, {selected.city}, {selected.state} {selected.postal}
+              </div>
 
-            {/* Tracking */}
-            <div className="mt-4 inline-flex items-center gap-1.5 text-[12px] text-gray-600">
-              <IconBarcode size={14} stroke={1.75} className="text-gray-400" />
-              <span className="font-mono tabular-nums">{selected.tracking}</span>
-            </div>
+              {/* Meta strip */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-ink">
+                <Meta icon={IconMail}>{selected.mailClass}</Meta>
+                <Meta icon={IconCalendar}>Sent {selected.sentAt}</Meta>
+                {selected.status === "Delivered" && selected.deliveredAt && (
+                  <Meta icon={IconCircleCheck} tone="ok">
+                    Delivered {selected.deliveredAt}
+                  </Meta>
+                )}
+                {selected.status === "Returned" && selected.returnedAt && (
+                  <Meta icon={IconArrowBackUp} tone="danger">
+                    Returned {selected.returnedAt} ({selected.returnReason})
+                  </Meta>
+                )}
+                {selected.status === "In Transit" && (
+                  <Meta icon={IconClock}>2 to 4 business days</Meta>
+                )}
+              </div>
 
-            {/* Actions — solid primary, outlined secondary. No icons
-                per Bree (lead view is uncluttered enough without them). */}
-            <div className="mt-5 flex gap-2 text-[11.5px] font-medium">
-              <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-3 py-1.5 text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-[#0d6c4d]">
-                View Letter
-              </button>
-              <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
-                Track
-              </button>
+              {/* Tracking */}
+              <div className="mt-4 inline-flex items-center gap-1.5 text-[12px] text-gray-600">
+                <IconBarcode size={14} stroke={1.75} className="text-gray-400" />
+                <span className="font-mono tabular-nums">{selected.tracking}</span>
+              </div>
+
+              {/* Actions — pinned to the bottom of the column */}
+              <div className="mt-auto flex gap-2 pt-4 text-[11.5px] font-medium">
+                <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-3 py-1.5 text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-[#0d6c4d]">
+                  View Letter
+                </button>
+                <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-3 py-1.5 text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
+                  Track
+                </button>
+              </div>
             </div>
           </div>
         </div>

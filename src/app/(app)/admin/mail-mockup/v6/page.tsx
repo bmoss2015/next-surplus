@@ -385,11 +385,22 @@ function BatchRow({ batch }: { batch: Batch }) {
             </span>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="rounded-[4px] bg-ink px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-white">
-            Batch
+        {/* Single wide affordance that spans the same visual footprint
+            as the solo-row's View Letter + Track buttons (~188px) so
+            batch and solo rows line up across the right edge. Same
+            button height too. */}
+        <div className="flex shrink-0 items-center">
+          <span
+            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-ink/30 bg-white px-4 py-1.5 text-[11.5px] font-medium text-ink hover:bg-gray-50"
+            style={{ minWidth: "188px" }}
+          >
+            Show {batch.pieces.length} Pieces
+            <IconChevronDown
+              size={14}
+              stroke={2}
+              className="text-gray-500 transition-transform group-open:rotate-180"
+            />
           </span>
-          <IconChevronDown size={16} stroke={1.75} className="text-gray-400 transition-transform group-open:rotate-180" />
         </div>
       </summary>
       <div className="border-t border-gray-100 bg-gray-50/40">
