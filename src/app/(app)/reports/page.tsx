@@ -16,7 +16,7 @@ function fmtBig(n: number): string {
 export default async function ReportsPage() {
   const [data, mailReport] = await Promise.all([
     fetchReports(),
-    fetchMailReport({ months: 6 }),
+    fetchMailReport({ range: "30d" }),
   ]);
 
   return (
@@ -198,8 +198,8 @@ export default async function ReportsPage() {
           )}
         </Card>
 
-        {/* Mail & Cost — last 6 months snapshot, click-through to detail */}
-        <Card title="Mail & Cost (Last 6 Months)" wide>
+        {/* Mail Activity — 30-day snapshot, click-through to full report */}
+        <Card title="Mail Activity (Last 30 Days)" wide>
           <div className="grid grid-cols-4 gap-3 mb-3">
             <Stat label="Sent" value={String(mailReport.totals.sent_total)} />
             <Stat label="Delivered" value={String(mailReport.totals.delivered)} />
@@ -242,7 +242,7 @@ export default async function ReportsPage() {
             href="/reports/mail"
             className="mt-3 inline-flex cursor-pointer items-center gap-1 text-[12px] font-medium text-petrol-500 hover:text-petrol-700"
           >
-            <IconMail size={12} stroke={2} /> Open Full Mail Report
+            <IconMail size={12} stroke={2} /> Open Full Mail Activity Report
             <IconArrowRight size={12} stroke={2} />
           </Link>
         </Card>
