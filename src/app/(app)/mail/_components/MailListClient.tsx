@@ -582,13 +582,10 @@ function NeedsAttentionSection({
   if (needs.length === 0) return null;
   return (
     <section className="mb-5">
-      <div className="mb-2 flex items-baseline justify-between">
+      <div className="mb-2">
         <h2 className="text-[13px] font-medium uppercase tracking-wide text-gray-500">
           Needs Attention
         </h2>
-        <span className="text-[11px] text-gray-500">
-          {needs.length} {needs.length === 1 ? "piece" : "pieces"} can&apos;t reach the recipient
-        </span>
       </div>
       <div className="grid grid-cols-2 gap-3">
         {needs.slice(0, 4).map((r) => (
