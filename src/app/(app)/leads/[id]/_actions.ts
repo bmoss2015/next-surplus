@@ -7,7 +7,6 @@ import { requireAdmin, getCurrentProfile } from "@/lib/auth/current-user";
 import { STAGES, type Stage } from "@/lib/leads/types";
 import { toProperCase } from "@/lib/format/proper-case";
 import { validateSpecificPhones, type RelativePhoneBase } from "@/lib/phone-validate";
-import { parsePhoneNumberFromString } from "libphonenumber-js";
 
 // Phone slots on the relatives table — used to reset per-slot validation
 // state when a slot's value changes.
@@ -645,40 +644,10 @@ export async function upsertContact(
       }
     : {};
 
-  // Same-lead phone duplicate guard: if the value being saved normalizes to
-  // the same E.164 as another phone contact on this same lead, reject the
-  // save. Stops the "I clicked Save twice / I retyped the same number" trap
-  // that would otherwise burn an extra credit and leave a confusing
-  // duplicate row.
-  if (
-    valueChanged &&
-    patch.value &&
-    (patch.channel === "phone" ||
-      (!patch.channel && contactId)) // editing an existing row, channel inferred
-  ) {
-    const parsed = parsePhoneNumberFromString(patch.value.trim(), "US");
-    const incomingE164 = parsed && parsed.isValid() ? parsed.number : null;
-    if (incomingE164) {
-      let existingQuery = sb
-        .from("contacts")
-        .select("id, value")
-        .eq("lead_id", leadId)
-        .eq("channel", "phone")
-        .not("value", "is", null);
-      if (contactId) existingQuery = existingQuery.neq("id", contactId);
-      const { data: existing } = await existingQuery;
-      for (const row of (existing ?? []) as Array<{ id: string; value: string | null }>) {
-        if (!row.value) continue;
-        const p = parsePhoneNumberFromString(row.value.trim(), "US");
-        if (p && p.isValid() && p.number === incomingE164) {
-          return {
-            ok: false,
-            error: "This phone number is already on this lead.",
-          };
-        }
-      }
-    }
-  }
+  // Note: we deliberately do NOT reject duplicate same-lead phones here.
+  // The validator's 90-day cache picks up the prior result and stamps the
+  // new row as Verified instantly without billing a credit. Two rows can
+  // carry the same number with the same status, no flag, no confirmation.
 
   let resolvedId: string;
   if (contactId) {
@@ -729,6 +698,13 @@ export async function upsertContact(
     .maybeSingle();
 
   revalidatePath(`/leads/${leadId}`);
+  // Bust the Settings cache so the Billing credit meter reflects any new
+  // validation on the next navigation. The validator updates the live
+  // balance via Clearout's getcredits endpoint and the meter is otherwise
+  // server-rendered and would serve stale data.
+  if (patch.channel === "phone" || (contactId && valueChanged)) {
+    revalidatePath("/settings");
+  }
   return { ok: true, id: resolvedId, row: refreshed ?? null };
 }
 
@@ -911,6 +887,9 @@ export async function upsertRelative(
     .maybeSingle();
 
   revalidatePath(`/leads/${leadId}`);
+  // Bust Settings cache so the Billing credit meter reflects any new
+  // validation on relative phone slots.
+  revalidatePath("/settings");
   return {
     ok: true,
     id: resolvedId,
