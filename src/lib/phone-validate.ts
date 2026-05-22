@@ -2,14 +2,21 @@ import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { Resend } from "resend";
 import { createServiceClient } from "./supabase/service";
 
-// Veriphone Free tier is 1,000 requests/month — that's the cap. If Veriphone
-// returns 429 on the very last call, the validator just treats it as
-// 'untested' and the next sweep retries next month. Override per-org by
-// inserting a row into app_settings with key='phone_validation_quota_cap'
-// (e.g., 5000 once on Veriphone Starter at $6.99/mo).
-const DEFAULT_QUOTA_CAP = 1000;
-const VERIPHONE_ENDPOINT = "https://api.veriphone.io/v2/verify";
+// Clearout Phone — pay-as-you-go credit pool, no monthly auto-reset.
+// Default cap matches a fresh 5,000-credit top-up. Override per-org via
+// app_settings key='phone_validation_quota_cap' whenever a new bundle is
+// purchased (Clearout doesn't auto-recharge — the user tops off manually,
+// then updates the cap here so the meter reflects the new balance).
+// PAYG price is $0.007/credit at 5k; $0.0058 at 10k. Monthly subscription
+// shaves 10%, annual 20%. Override per-org via app_settings key
+// 'phone_validation_unit_cost_cents' (integer cents, default 70 = $0.0070).
+const DEFAULT_QUOTA_CAP = 5000;
+const CLEAROUT_ENDPOINT = "https://api.clearoutphone.io/v1/phonenumber/validate";
 const ADDON_KEY = "phone_validation";
+// Pay-as-you-go rate Bree confirmed: $35 / 5,000 = $0.0070 per credit.
+// Exported so the Billing meter can render "≈ $X.XX spent" alongside the
+// raw credit count without re-deriving the math.
+export const DEFAULT_CREDIT_COST_USD = 0.007;
 
 export type ValidationStatus = "valid" | "invalid" | "untested";
 
@@ -18,19 +25,19 @@ export type ValidationResult = {
   provider: string | null;
   checkedAt: string | null;
   raw: unknown;
-  // Mapped from Veriphone's phone_type — caller decides whether to overwrite
-  // an existing phone_type on the row. Null when Veriphone didn't return one
-  // (libphonenumber failure, quota exhaustion, or syntax-error response).
+  // Mapped from Clearout's line_type — caller decides whether to overwrite
+  // an existing phone_type on the row. Null when Clearout didn't return one
+  // (invalid number, network error, etc.).
   phoneType: string | null;
 };
 
-// Map Veriphone's phone_type strings to the portal's display values. Anything
-// unmapped (toll_free, premium_rate, shared_cost, unknown) returns null so we
-// leave the existing phone_type column alone.
-function mapVeriphoneType(t: unknown): string | null {
+// Map Clearout's line_type strings to the portal's display values. Anything
+// unmapped (toll_free, satellite, etc.) returns null so we leave the
+// existing phone_type column alone.
+function mapClearoutLineType(t: unknown): string | null {
   if (t === "mobile") return "Mobile";
-  if (t === "fixed_line") return "Landline";
-  if (t === "voip" || t === "non_fixed_voip") return "Mobile";
+  if (t === "landline") return "Landline";
+  if (t === "voip") return "Mobile";
   return null;
 }
 
@@ -55,13 +62,16 @@ async function getQuotaCap(sb: ServiceClient, orgId: string): Promise<number> {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_QUOTA_CAP;
 }
 
-async function getMonthUsage(sb: ServiceClient, orgId: string): Promise<number> {
+// Credits consumed against the current credit pool. Sums ALL historical
+// usage rows — Clearout PAYG doesn't auto-reset monthly, so we treat the
+// meter as a running balance against `phone_validation_quota_cap`. When the
+// user tops off at Clearout they bump the cap and the meter re-headrooms.
+async function getTotalCreditsUsed(sb: ServiceClient, orgId: string): Promise<number> {
   const { data } = await sb
     .from("org_addon_usage")
     .select("units")
     .eq("org_id", orgId)
-    .eq("addon_key", ADDON_KEY)
-    .eq("period_month", currentPeriodMonth());
+    .eq("addon_key", ADDON_KEY);
   if (!data) return 0;
   return data.reduce((sum, row) => sum + (row.units ?? 0), 0);
 }
@@ -69,12 +79,17 @@ async function getMonthUsage(sb: ServiceClient, orgId: string): Promise<number> 
 async function logUsage(
   sb: ServiceClient,
   orgId: string,
+  units: number,
   metadata: Record<string, unknown>
 ): Promise<void> {
   await sb.from("org_addon_usage").insert({
     org_id: orgId,
     addon_key: ADDON_KEY,
-    units: 1,
+    units,
+    // Per-row cost is intentionally 0 — Clearout PAYG rate sits below 1¢
+    // and the unit_cost_cents column is integer cents, so storing it here
+    // would round to zero anyway. The Billing meter renders dollars from
+    // total units × the current per-credit rate instead.
     unit_cost_cents: 0,
     period_month: currentPeriodMonth(),
     metadata,
@@ -93,7 +108,7 @@ async function logUsage(
 const ALERT_THRESHOLDS = [80, 95, 100] as const;
 
 async function checkAndAlertThresholds(sb: ServiceClient, orgId: string): Promise<void> {
-  const [cap, used] = await Promise.all([getQuotaCap(sb, orgId), getMonthUsage(sb, orgId)]);
+  const [cap, used] = await Promise.all([getQuotaCap(sb, orgId), getTotalCreditsUsed(sb, orgId)]);
   if (cap <= 0) return;
   const pct = Math.round((used / cap) * 100);
   const periodMonth = currentPeriodMonth();
@@ -132,21 +147,22 @@ async function sendThresholdEmail(
     .filter((e): e is string => !!e && e.trim().length > 0);
   if (recipients.length === 0) return;
 
+  const remaining = Math.max(0, cap - used);
   const subject =
     threshold === 100
-      ? "Phone validation paused — monthly quota reached"
-      : `Phone validation: ${threshold}% of monthly quota used`;
+      ? "Phone validation paused — credit balance exhausted"
+      : `Phone validation: ${threshold}% of credit balance used`;
 
   const bodyIntro =
     threshold === 100
-      ? "Your Phone Validation add-on has used 100% of this month's quota. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened against Veriphone until the cap is raised or the month resets."
-      : `Your Phone Validation add-on has crossed <strong>${threshold}%</strong> of this month's quota. Validation continues normally — this is a heads-up so you can raise the cap before reaching it.`;
+      ? "Your Phone Validation add-on has consumed 100% of its credit balance. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened against Clearout Phone until the balance is topped off. Clearout doesn't auto-recharge — log in at clearoutphone.io to purchase more credits, then raise the cap in Settings &rarr; Billing."
+      : `Your Phone Validation add-on has consumed <strong>${threshold}%</strong> of its credit balance. Validation continues normally — this is a heads-up so you can top off at Clearout before hitting zero. <strong>${remaining.toLocaleString()}</strong> credits remaining.`;
 
   const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
   <h1 style="margin:0;font-size:20px;font-weight:600;color:#0d4b3a;">${subject}</h1>
   <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">${bodyIntro}</p>
-  <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Used this month: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
-  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Settings &rarr; Billing &amp; Add-ons in the portal shows the live meter and lets you raise the cap or move to a paid Veriphone plan.</p>
+  <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Credits used: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
+  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Settings &rarr; Billing in the portal shows the live meter and lets you raise the cap after topping off at Clearout.</p>
 </div>`;
 
   try {
@@ -163,8 +179,10 @@ async function sendThresholdEmail(
 }
 
 // Validate a single phone for a given org. Pre-filters obvious junk via
-// libphonenumber (free), then calls Veriphone if quota allows. Logs to
-// org_addon_usage only when Veriphone actually consumed a credit.
+// libphonenumber (free), then calls Clearout Phone if credit balance allows.
+// Logs to org_addon_usage only when Clearout actually billed credits — the
+// units logged match `billable_credits` from the response so Smart Validation
+// (1-5 credits per call) is metered accurately.
 export async function validatePhone(
   phoneRaw: string | null | undefined,
   orgId: string
@@ -188,88 +206,110 @@ export async function validatePhone(
   const sb = createServiceClient();
   const [cap, used] = await Promise.all([
     getQuotaCap(sb, orgId),
-    getMonthUsage(sb, orgId),
+    getTotalCreditsUsed(sb, orgId),
   ]);
   if (used >= cap) {
     return {
       status: "untested",
       provider: null,
       checkedAt: null,
-      raw: { reason: "quota_exhausted", cap, used },
+      raw: { reason: "credit_balance_exhausted", cap, used },
       phoneType: null,
     };
   }
 
-  const apiKey = process.env.VERIPHONE_API_KEY;
+  const apiKey = process.env.CLEAROUT_PHONE_API_KEY;
   if (!apiKey) {
     return {
       status: "untested",
       provider: null,
       checkedAt: null,
-      raw: { reason: "missing_veriphone_key" },
+      raw: { reason: "missing_clearout_key" },
       phoneType: null,
     };
   }
 
-  type VeriphoneBody = { status?: string; phone_valid?: boolean; phone_type?: string; [k: string]: unknown };
-  let body: VeriphoneBody | null = null;
+  // Clearout response shape (success):
+  //   { status: 'success', data: { status: 'valid'|'invalid'|'unknown',
+  //       line_type: 'mobile'|'landline'|'voip'|'',
+  //       carrier, location, e164_format, billable_credits, ... } }
+  // Errors come back with { status: 'failure', error: {...} }.
+  type ClearoutData = {
+    status?: string;
+    line_type?: string;
+    carrier?: string;
+    billable_credits?: string | number;
+    [k: string]: unknown;
+  };
+  type ClearoutBody = { status?: string; data?: ClearoutData; error?: unknown; [k: string]: unknown };
+
+  let body: ClearoutBody | null = null;
   let httpOk = false;
   let networkError: string | null = null;
   try {
-    const url = new URL(VERIPHONE_ENDPOINT);
-    url.searchParams.set("phone", e164);
-    url.searchParams.set("default_country", "US");
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${apiKey}` },
+    const res = await fetch(CLEAROUT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ number: e164, country_code: "US" }),
     });
     httpOk = res.ok;
-    body = (await res.json()) as VeriphoneBody;
+    body = (await res.json()) as ClearoutBody;
   } catch (e) {
     networkError = e instanceof Error ? e.message : String(e);
   }
 
   const checkedAt = new Date().toISOString();
-  const phoneType = mapVeriphoneType(body?.phone_type);
+  const data = body?.data;
+  const phoneType = mapClearoutLineType(data?.line_type);
+  const billed = Number(data?.billable_credits ?? 0);
+  const units = Number.isFinite(billed) && billed > 0 ? Math.round(billed) : 1;
 
-  // For "tried but couldn't verify" cases (network error, non-2xx, weird
-  // response shape), we set checkedAt so the row reflects that we attempted
-  // validation — that gives the UI something to show ("Checked [date],
-  // couldn't verify") rather than leaving it indistinguishable from
-  // "never tried". The sweep only skips rows when checkedAt is genuinely null.
+  // "Tried but couldn't verify" cases (network error, non-2xx, unknown)
+  // still set checkedAt so the row reflects that we attempted validation —
+  // the UI shows "Checked [date], couldn't verify" rather than leaving it
+  // indistinguishable from "never tried". The sweep only skips rows when
+  // checkedAt is genuinely null.
 
   if (networkError) {
     return {
       status: "untested",
-      provider: "veriphone",
+      provider: "clearout",
       checkedAt,
       raw: { error: networkError },
       phoneType: null,
     };
   }
-  if (body?.status === "syntax-error") {
-    return { status: "invalid", provider: "veriphone", checkedAt, raw: body, phoneType: null };
+  if (!httpOk || body?.status !== "success" || !data) {
+    return { status: "untested", provider: "clearout", checkedAt, raw: body, phoneType: null };
   }
-  if (!httpOk) {
-    return { status: "untested", provider: "veriphone", checkedAt, raw: body, phoneType: null };
+  if (data.status === "valid") {
+    await logUsage(sb, orgId, units, { phone_e164: e164, result: "valid", line_type: data.line_type });
+    return { status: "valid", provider: "clearout", checkedAt, raw: body, phoneType };
   }
-  if (body?.status === "success" && body?.phone_valid === true) {
-    await logUsage(sb, orgId, { phone_e164: e164, result: "valid" });
-    return { status: "valid", provider: "veriphone", checkedAt, raw: body, phoneType };
+  if (data.status === "invalid") {
+    await logUsage(sb, orgId, units, { phone_e164: e164, result: "invalid" });
+    return { status: "invalid", provider: "clearout", checkedAt, raw: body, phoneType };
   }
-  if (body?.status === "success" && body?.phone_valid === false) {
-    await logUsage(sb, orgId, { phone_e164: e164, result: "invalid" });
-    return { status: "invalid", provider: "veriphone", checkedAt, raw: body, phoneType };
-  }
-  return { status: "untested", provider: "veriphone", checkedAt, raw: body, phoneType: null };
+  // status === 'unknown' — Clearout still bills credits for unknowns, so log
+  // them too, but the row stays untested-with-checkedAt so the sweep won't
+  // re-burn credits on the same number.
+  await logUsage(sb, orgId, units, { phone_e164: e164, result: "unknown" });
+  return { status: "untested", provider: "clearout", checkedAt, raw: body, phoneType: null };
 }
 
-// Helpers for callers that need quota/usage info without performing validation
-// (e.g., the Billing UI in Fix 6).
+// Helpers for callers that need balance/usage info without performing
+// validation (e.g., the Billing UI). `used` is cumulative across all months
+// because Clearout PAYG credits don't auto-reset — the cap is a top-off
+// balance the user maintains manually. period_month is still returned for
+// downstream consumers that key on it (unchanged shape).
 export async function getValidationUsage(orgId: string): Promise<{ used: number; cap: number; period_month: string }> {
   const sb = createServiceClient();
   const [cap, used] = await Promise.all([
     getQuotaCap(sb, orgId),
-    getMonthUsage(sb, orgId),
+    getTotalCreditsUsed(sb, orgId),
   ]);
   return { used, cap, period_month: currentPeriodMonth() };
 }
@@ -482,7 +522,7 @@ export async function validateAllUntestedForOrg(
         // Transient errors / quota-exhausted come back as untested w/ null
         // checkedAt; leave those rows alone so the next sweep retries them.
         if (result.status === "untested" && result.checkedAt === null) return;
-        // Auto-fill phone type from Veriphone IFF the row doesn't already have
+        // Auto-fill phone type from Clearout IFF the row doesn't already have
         // one — never override a manual choice.
         const shouldFillType = !task.existingType && result.phoneType;
         if (task.kind === "contact") {

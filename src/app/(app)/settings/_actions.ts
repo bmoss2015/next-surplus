@@ -1376,9 +1376,9 @@ export async function deleteResearchTemplate(
 // Admin-only one-shot: validates every phone in the org with status='untested'
 // on leads that aren't marked lost. Runs in after() so the UI returns
 // immediately; progress shows up in the Billing meter as validations complete.
-// Whatever VERIPHONE_API_KEY is set in the runtime env at trigger time is what
-// gets charged — swap it in Vercel before clicking if you want a different
-// account to absorb the cost.
+// Whatever CLEAROUT_PHONE_API_KEY is set in the runtime env at trigger time
+// is what gets charged — swap it in Vercel before clicking if you want a
+// different Clearout account to absorb the cost.
 export async function runPhoneValidationBackfill(): Promise<
   { ok: true } | { ok: false; error: string }
 > {

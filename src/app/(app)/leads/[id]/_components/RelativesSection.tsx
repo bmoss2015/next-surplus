@@ -125,7 +125,7 @@ export function RelativesSection({
   const [adding, setAdding] = useState(false);
   // Keys of phone slots currently being validated server-side, formatted as
   // "<relativeId>:<base>" (e.g. "abc-123:phone_2"). Drives the "Verifying…"
-  // pill on the slot while the action awaits Veriphone.
+  // pill on the slot while the action awaits Clearout.
   const [verifyingSlots, setVerifyingSlots] = useState<Set<string>>(() => new Set());
   const [draftName, setDraftName] = useState("");
   const [draftRelationship, setDraftRelationship] = useState("");
