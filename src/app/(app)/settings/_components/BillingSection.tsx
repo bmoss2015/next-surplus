@@ -28,7 +28,7 @@ export type PhoneValidationUsage = {
   usedThisMonth: number;
   usedAllTime: number;
   fallbackCap: number;
-  source: "clearout_live" | "fallback";
+  source: "provider_live" | "fallback";
 };
 
 export function BillingSection({

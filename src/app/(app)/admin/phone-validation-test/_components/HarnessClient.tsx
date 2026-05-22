@@ -124,7 +124,7 @@ export function HarnessClient({
                 ? usage.remainingCredits.toLocaleString()
                 : "—"
             }
-            hint={usage.source === "clearout_live" ? "Live" : "Fallback"}
+            hint={usage.source === "provider_live" ? "Live" : "Fallback"}
           />
           <Stat
             label="Used This Month"

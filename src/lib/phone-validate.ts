@@ -2,16 +2,15 @@ import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { Resend } from "resend";
 import { createServiceClient } from "./supabase/service";
 
-// Clearout Phone — pay-as-you-go credit pool, no monthly auto-reset.
-// Default cap matches a fresh 5,000-credit top-up. Override per-org via
-// app_settings key='phone_validation_quota_cap' whenever a new bundle is
-// purchased (Clearout doesn't auto-recharge — the user tops off manually,
-// then updates the cap here so the meter reflects the new balance).
-// PAYG price is $0.007/credit at 5k; $0.0058 at 10k. Monthly subscription
-// shaves 10%, annual 20%. Override per-org via app_settings key
-// 'phone_validation_unit_cost_cents' (integer cents, default 70 = $0.0070).
+// HLR Lookup — pay-as-you-go credit pool, no monthly auto-reset.
+// Per-credit rate is $0.006. A US mobile live-status check costs 2 credits
+// ($0.012) because we pass `usa_status: "YES"` to get the real LIVE/DEAD
+// result instead of the cheap allocation-only check. US landlines come
+// back free (0 credits) with the line type identified so we can render
+// them without claiming false validation. Override per-org cap via
+// app_settings key='phone_validation_quota_cap'.
 const DEFAULT_QUOTA_CAP = 5000;
-const CLEAROUT_ENDPOINT = "https://api.clearoutphone.io/v1/phonenumber/validate";
+const HLR_ENDPOINT = "https://api.hlrlookup.com/apiv2/hlr";
 const ADDON_KEY = "phone_validation";
 
 // Master kill switch. When PHONE_VALIDATION_ENABLED is set to anything other
@@ -35,18 +34,14 @@ function disabledResult(): ValidationResult {
     phoneType: null,
   };
 }
-// Pay-as-you-go rate Bree confirmed: $35 / 5,000 = $0.0070 per credit.
-// Override via env CLEAROUT_COST_PER_CREDIT_USD when moving to monthly
-// (10% off → 0.0063) or annual (20% off → 0.0056) so the Billing meter's
-// "Spent This Month" reflects what's actually getting charged.
-//
-// FUTURE: when there are multiple paying orgs on the portal, lift this to
-// per-org app_settings instead of an env var.
+// HLR Lookup PAYG rate: $0.006 per credit. A US mobile live-status check
+// burns 2 credits = $0.012/call. Landlines and bad-format numbers cost 0.
+// Override via env HLR_COST_PER_CREDIT_USD if billing tier changes.
 function parseCostFromEnv(): number {
-  const raw = process.env.CLEAROUT_COST_PER_CREDIT_USD;
-  if (!raw) return 0.007;
+  const raw = process.env.HLR_COST_PER_CREDIT_USD;
+  if (!raw) return 0.006;
   const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : 0.007;
+  return Number.isFinite(n) && n > 0 ? n : 0.006;
 }
 export const DEFAULT_CREDIT_COST_USD = parseCostFromEnv();
 
@@ -57,19 +52,17 @@ export type ValidationResult = {
   provider: string | null;
   checkedAt: string | null;
   raw: unknown;
-  // Mapped from Clearout's line_type — caller decides whether to overwrite
-  // an existing phone_type on the row. Null when Clearout didn't return one
-  // (invalid number, network error, etc.).
+  // Mapped from the provider's line type. Caller decides whether to
+  // overwrite an existing phone_type on the row. Null when no line type
+  // could be determined (bad format, network error, etc.).
   phoneType: string | null;
 };
 
-// Map Clearout's line_type strings to the portal's display values. Anything
-// unmapped (toll_free, satellite, etc.) returns null so we leave the
-// existing phone_type column alone.
-function mapClearoutLineType(t: unknown): string | null {
-  if (t === "mobile") return "Mobile";
-  if (t === "landline") return "Landline";
-  if (t === "voip") return "Mobile";
+// Map HLR Lookup's telephone_number_type to portal display values.
+function mapHlrLineType(t: unknown): string | null {
+  if (t === "MOBILE") return "Mobile";
+  if (t === "LANDLINE") return "Landline";
+  if (t === "VOIP") return "VoIP";
   return null;
 }
 
@@ -94,20 +87,16 @@ async function getQuotaCap(sb: ServiceClient, orgId: string): Promise<number> {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_QUOTA_CAP;
 }
 
-// Credits consumed against the current credit pool. Sums ALL historical
-// usage rows — Clearout PAYG doesn't auto-reset monthly, so we treat the
-// meter as a running balance against `phone_validation_quota_cap`. When the
-// user tops off at Clearout they bump the cap and the meter re-headrooms.
+// Credits consumed against the current credit pool. Sums historical usage
+// rows tagged provider='hlr-lookup' so legacy rows from prior providers
+// don't pollute the count.
 async function getTotalCreditsUsed(sb: ServiceClient, orgId: string): Promise<number> {
-  // Filter to provider='clearout' so legacy usage rows from prior providers
-  // don't pollute the count — would otherwise fire threshold alerts at
-  // boot for orgs migrating in and inflate the "Validations All-Time" stat.
   const { data } = await sb
     .from("org_addon_usage")
     .select("units")
     .eq("org_id", orgId)
     .eq("addon_key", ADDON_KEY)
-    .filter("metadata->>provider", "eq", "clearout");
+    .filter("metadata->>provider", "eq", "hlr-lookup");
   if (!data) return 0;
   return data.reduce((sum, row) => sum + (row.units ?? 0), 0);
 }
@@ -258,40 +247,54 @@ export async function validatePhone(
   // The threshold-alert plumbing still warns at 80/95/100% based on the
   // live remaining balance.
 
-  const apiKey = process.env.CLEAROUT_PHONE_API_KEY;
-  if (!apiKey) {
+  const apiKey = process.env.HLR_API_KEY;
+  const apiSecret = process.env.HLR_API_SECRET;
+  if (!apiKey || !apiSecret) {
     return {
       status: "untested",
       provider: null,
       checkedAt: null,
-      raw: { reason: "missing_clearout_key" },
+      raw: { reason: "missing_hlr_credentials" },
       phoneType: null,
     };
   }
 
-  // Clearout response shape (success):
-  //   { status: 'success', data: { status: 'valid'|'invalid'|'unknown',
-  //       line_type: 'mobile'|'landline'|'voip'|'',
-  //       carrier, location, e164_format, billable_credits, ... } }
-  // Errors come back with { status: 'failure', error: {...} }.
-  type ClearoutData = {
-    status?: string;
-    line_type?: string;
-    carrier?: string;
-    billable_credits?: string | number;
+  // HLR Lookup v2 response shape (success):
+  //   { results: [{
+  //       error: "NONE" | "<error_code>",
+  //       credits_spent: 0 | 1 | 2,
+  //       telephone_number_type: "MOBILE" | "LANDLINE" | "VOIP" | "BAD_FORMAT" | ...,
+  //       live_status: "LIVE" | "DEAD" | "ABSENT_SUBSCRIBER" |
+  //                    "NO_TELESERVICE_PROVISIONED" | "INCONCLUSIVE" |
+  //                    "NOT_AVAILABLE_NETWORK_ONLY" | "NOT_APPLICABLE",
+  //       original_network_details: { name, country_iso3, area, ... },
+  //       current_network_details: { name, country_iso3, ... },
+  //       is_ported: "YES" | "NO" | "UNKNOWN", ...
+  //   }] }
+  // usa_status:"YES" is what unlocks the real LIVE/DEAD signal for US mobile
+  // (costs an extra credit, so US mobile lookup = 2 credits = $0.012).
+  // Landlines come back free with telephone_number_type identified.
+  type HlrResult = {
+    error?: string;
+    credits_spent?: number;
+    telephone_number_type?: string;
+    live_status?: string;
+    detected_telephone_number?: string;
+    original_network_details?: Record<string, unknown>;
+    current_network_details?: Record<string, unknown>;
+    is_ported?: string;
     [k: string]: unknown;
   };
-  type ClearoutBody = { status?: string; data?: ClearoutData; error?: unknown; [k: string]: unknown };
+  type HlrBody = { results?: HlrResult[]; statusCode?: number; error?: unknown; [k: string]: unknown };
 
-  let body: ClearoutBody | null = null;
+  let body: HlrBody | null = null;
   let httpOk = false;
   let networkError: string | null = null;
   let attempts = 0;
   // Retry transient failures (network errors, 5xx, 429) with exponential
   // backoff: 250ms, 500ms, 1000ms. 4xx other than 429 means the request is
-  // bad — no retry, just fall through and the row stays untested. Only the
-  // FINAL response is logged + returned, so cache + usage accounting stays
-  // correct (one credit per real billable call).
+  // bad — no retry. Only the FINAL response is logged + returned so usage
+  // accounting stays correct (one charge per real billable call).
   const MAX_ATTEMPTS = 3;
   const backoffMs = [250, 500, 1000];
   while (attempts < MAX_ATTEMPTS) {
@@ -301,17 +304,24 @@ export async function validatePhone(
     body = null;
     let status = 0;
     try {
-      const res = await fetch(CLEAROUT_ENDPOINT, {
+      const res = await fetch(HLR_ENDPOINT, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ number: e164, country_code: "US" }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: apiKey,
+          api_secret: apiSecret,
+          requests: [
+            {
+              // Strip the leading + because HLR Lookup expects digits only.
+              telephone_number: e164.replace(/^\+/, ""),
+              usa_status: "YES",
+            },
+          ],
+        }),
       });
       status = res.status;
       httpOk = res.ok;
-      body = (await res.json()) as ClearoutBody;
+      body = (await res.json()) as HlrBody;
     } catch (e) {
       networkError = e instanceof Error ? e.message : String(e);
     }
@@ -322,70 +332,95 @@ export async function validatePhone(
   }
 
   const checkedAt = new Date().toISOString();
-  const data = body?.data;
-  const phoneType = mapClearoutLineType(data?.line_type);
-  const billed = Number(data?.billable_credits ?? 0);
-  const units = Number.isFinite(billed) && billed > 0 ? Math.round(billed) : 1;
+  const result = body?.results?.[0];
+  const phoneType = mapHlrLineType(result?.telephone_number_type);
+  const credits = Number(result?.credits_spent ?? 0);
+  const units = Number.isFinite(credits) && credits > 0 ? Math.round(credits) : 0;
 
-  // "Tried but couldn't verify" cases (network error, non-2xx, unknown)
-  // still set checkedAt so the row reflects that we attempted validation —
-  // the UI shows "Checked [date], couldn't verify" rather than leaving it
-  // indistinguishable from "never tried". The sweep only skips rows when
-  // checkedAt is genuinely null.
+  // "Tried but couldn't verify" cases (network error, non-2xx, inconclusive)
+  // set checkedAt so the row reflects we attempted validation. The sweep
+  // only skips rows when checkedAt is genuinely null.
 
   if (networkError) {
     return {
       status: "untested",
-      provider: "clearout",
+      provider: "hlr-lookup",
       checkedAt,
       raw: { error: networkError },
       phoneType: null,
     };
   }
-  if (!httpOk || body?.status !== "success" || !data) {
-    return { status: "untested", provider: "clearout", checkedAt, raw: body, phoneType: null };
+  if (!httpOk || !result || result.error !== "NONE") {
+    return { status: "untested", provider: "hlr-lookup", checkedAt, raw: body, phoneType: null };
   }
-  // Stamp `provider: 'clearout'` on every metered row so threshold alerts
-  // and Billing meter stats can filter out pre-migration usage from prior
-  // providers and only count what's actually been spent here.
-  if (data.status === "valid") {
-    await logUsage(sb, orgId, units, { phone_e164: e164, result: "valid", line_type: data.line_type, provider: "clearout" });
-    return { status: "valid", provider: "clearout", checkedAt, raw: body, phoneType };
+
+  const liveStatus = result.live_status;
+  const lineType = result.telephone_number_type;
+
+  // Map HLR Lookup's status enum to portal's three-state status. Landlines
+  // and bad-format numbers are handled before the live-status switch since
+  // they have meaningful line_type signals without a live check.
+  if (lineType === "BAD_FORMAT") {
+    // No credits charged for bad-format; nothing to log.
+    return { status: "invalid", provider: "hlr-lookup", checkedAt, raw: body, phoneType: null };
   }
-  if (data.status === "invalid") {
-    await logUsage(sb, orgId, units, { phone_e164: e164, result: "invalid", provider: "clearout" });
-    return { status: "invalid", provider: "clearout", checkedAt, raw: body, phoneType };
+  if (lineType === "LANDLINE" || lineType === "VOIP") {
+    // US landlines (and VoIP) return free with line type identified and no
+    // live status. Status stays untested-with-checkedAt so the UI can render
+    // "Landline / VoIP" without claiming a verification we didn't perform.
+    // No usage row logged (credits_spent is 0).
+    return { status: "untested", provider: "hlr-lookup", checkedAt, raw: body, phoneType };
   }
-  // status === 'unknown' — Clearout still bills credits for unknowns, so log
-  // them too, but the row stays untested-with-checkedAt so the sweep won't
-  // re-burn credits on the same number.
-  await logUsage(sb, orgId, units, { phone_e164: e164, result: "unknown", provider: "clearout" });
-  return { status: "untested", provider: "clearout", checkedAt, raw: body, phoneType: null };
+
+  // Mobile path: live_status carries the real signal.
+  if (liveStatus === "LIVE" || liveStatus === "ABSENT_SUBSCRIBER") {
+    // LIVE = subscriber active and reachable. ABSENT_SUBSCRIBER = phone is
+    // off or out of network range but the SIM is active. Both mean Rick
+    // can plausibly reach this number, so we mark Verified.
+    if (units > 0) {
+      await logUsage(sb, orgId, units, {
+        phone_e164: e164,
+        result: liveStatus.toLowerCase(),
+        line_type: lineType,
+        provider: "hlr-lookup",
+      });
+    }
+    return { status: "valid", provider: "hlr-lookup", checkedAt, raw: body, phoneType };
+  }
+  if (liveStatus === "DEAD" || liveStatus === "NO_TELESERVICE_PROVISIONED") {
+    // DEAD = subscriber disconnected. NO_TELESERVICE_PROVISIONED = number
+    // is assigned but has no voice/SMS service. Both are dead-line signals.
+    if (units > 0) {
+      await logUsage(sb, orgId, units, {
+        phone_e164: e164,
+        result: liveStatus.toLowerCase(),
+        line_type: lineType,
+        provider: "hlr-lookup",
+      });
+    }
+    return { status: "invalid", provider: "hlr-lookup", checkedAt, raw: body, phoneType };
+  }
+  // INCONCLUSIVE / NOT_AVAILABLE_NETWORK_ONLY / unknown live_status — we
+  // tried but couldn't get a definitive answer. Log if credits were spent.
+  if (units > 0) {
+    await logUsage(sb, orgId, units, {
+      phone_e164: e164,
+      result: "inconclusive",
+      line_type: lineType,
+      provider: "hlr-lookup",
+    });
+  }
+  return { status: "untested", provider: "hlr-lookup", checkedAt, raw: body, phoneType };
 }
 
-// Live balance pull from Clearout. The /getcredits endpoint is free (doesn't
-// consume a credit) so we hit it on every Settings page load — keeps the
-// meter honest when the user tops off at clearoutphone.io without ever
-// having to bump a value in app_settings. Returns null on any failure
-// (missing key, network error, non-2xx) so callers can fall back gracefully.
-async function getClearoutBalance(): Promise<number | null> {
-  const apiKey = process.env.CLEAROUT_PHONE_API_KEY;
-  if (!apiKey) return null;
-  try {
-    const res = await fetch("https://api.clearoutphone.io/v1/phonenumber/getcredits", {
-      method: "GET",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      // Don't let a slow Clearout call freeze the Settings page render.
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { status?: string; data?: { available_credits?: number } };
-    if (body.status !== "success") return null;
-    const n = body.data?.available_credits;
-    return typeof n === "number" && Number.isFinite(n) ? n : null;
-  } catch {
-    return null;
-  }
+// Live balance pull from HLR Lookup. Returns null on any failure so the UI
+// falls back to local cap-minus-used. HLR Lookup's v2 doesn't expose a
+// confirmed-working balance endpoint in their public docs (we probed
+// /apiv2/getbalance and got 404), so for now we always return null and let
+// the Billing meter use the fallback calculation. Replace this stub with
+// a real call when the balance endpoint is published.
+async function getHlrBalance(): Promise<number | null> {
+  return null;
 }
 
 // Org-wide validation cache: if a phone has been validated to a definitive
@@ -403,9 +438,9 @@ async function findCachedValidation(
 ): Promise<ValidationResult | null> {
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
   // PERF FUTURE: JSON path filters here (metadata->>phone_e164,
-  // metadata->>provider) are not indexed. At ~10k+ Clearout-era usage rows
-  // per org this becomes a tablescan and adds ~100ms+ per save. Fix is a
-  // GIN index migration on org_addon_usage.metadata when it bites.
+  // metadata->>provider) are not indexed. At ~10k+ HLR-era usage rows per
+  // org this becomes a tablescan and adds ~100ms+ per save. Fix is a GIN
+  // index migration on org_addon_usage.metadata when it bites.
   const { data, error } = await sb
     .from("org_addon_usage")
     .select("created_at, metadata")
@@ -413,18 +448,23 @@ async function findCachedValidation(
     .eq("addon_key", ADDON_KEY)
     .gte("created_at", ninetyDaysAgo)
     .filter("metadata->>phone_e164", "eq", e164)
-    .filter("metadata->>provider", "eq", "clearout")
+    .filter("metadata->>provider", "eq", "hlr-lookup")
     .order("created_at", { ascending: false })
     .limit(1);
   if (error || !data || data.length === 0) return null;
   const row = data[0] as { created_at: string; metadata: Record<string, unknown> | null };
   const m = row.metadata ?? {};
   const result = m.result;
-  if (result !== "valid" && result !== "invalid") return null;
+  // Cache hit semantics: 'live' and 'absent_subscriber' both map to valid;
+  // 'dead' and 'no_teleservice_provisioned' map to invalid; anything else
+  // (inconclusive, unknown) is treated as a cache miss so we re-validate.
+  const isValid = result === "live" || result === "absent_subscriber";
+  const isInvalid = result === "dead" || result === "no_teleservice_provisioned";
+  if (!isValid && !isInvalid) return null;
   const lineType = (m.line_type as string | null | undefined) ?? null;
   return {
-    status: result === "valid" ? "valid" : "invalid",
-    provider: "clearout-cache",
+    status: isValid ? "valid" : "invalid",
+    provider: "hlr-lookup-cache",
     checkedAt: row.created_at,
     raw: {
       cached: true,
@@ -432,7 +472,7 @@ async function findCachedValidation(
       line_type: lineType,
       e164,
     },
-    phoneType: lineType ? mapClearoutLineType(lineType) : null,
+    phoneType: lineType ? mapHlrLineType(lineType) : null,
   };
 }
 
@@ -440,36 +480,35 @@ async function findCachedValidation(
 // Billing meter a "this billing cycle's spend" figure independent of the
 // running Clearout balance.
 async function getMonthCreditsUsed(sb: ServiceClient, orgId: string): Promise<number> {
-  // Same provider filter as getTotalCreditsUsed: only count Clearout-era
-  // rows so "Spent This Month" reflects what's actually been charged.
+  // Same provider filter as getTotalCreditsUsed: only count current-provider
+  // rows so "Spent This Month" reflects what's actually been charged here.
   const { data } = await sb
     .from("org_addon_usage")
     .select("units")
     .eq("org_id", orgId)
     .eq("addon_key", ADDON_KEY)
     .eq("period_month", currentPeriodMonth())
-    .filter("metadata->>provider", "eq", "clearout");
+    .filter("metadata->>provider", "eq", "hlr-lookup");
   if (!data) return 0;
   return data.reduce((sum, row) => sum + (row.units ?? 0), 0);
 }
 
-// Billing UI's source of truth. `remainingCredits` is pulled live from
-// Clearout when possible — that means a top-off at clearoutphone.io shows up
-// in the portal meter immediately, no manual reconciliation needed. When
-// Clearout is unreachable, `remainingCredits` is null and the UI falls back
-// to the older cap-minus-used calculation against app_settings.
+// Billing UI's source of truth. `remainingCredits` is pulled live from the
+// provider when possible. HLR Lookup's public docs don't expose a confirmed
+// balance endpoint, so for now we always return null here and the UI uses
+// the cap-minus-used fallback computed from app_settings.
 export type ValidationUsageSummary = {
   remainingCredits: number | null;
   usedThisMonth: number;
   usedAllTime: number;
   fallbackCap: number;
-  source: "clearout_live" | "fallback";
+  source: "provider_live" | "fallback";
 };
 
 export async function getValidationUsage(orgId: string): Promise<ValidationUsageSummary> {
   const sb = createServiceClient();
   const [remaining, usedThisMonth, usedAllTime, fallbackCap] = await Promise.all([
-    getClearoutBalance(),
+    getHlrBalance(),
     getMonthCreditsUsed(sb, orgId),
     getTotalCreditsUsed(sb, orgId),
     getQuotaCap(sb, orgId),
@@ -479,7 +518,7 @@ export async function getValidationUsage(orgId: string): Promise<ValidationUsage
     usedThisMonth,
     usedAllTime,
     fallbackCap,
-    source: remaining !== null ? "clearout_live" : "fallback",
+    source: remaining !== null ? "provider_live" : "fallback",
   };
 }
 
