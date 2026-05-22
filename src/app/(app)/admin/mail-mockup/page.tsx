@@ -20,22 +20,34 @@ export default async function MailMockupIndexPage() {
 
   const variants = [
     {
-      slug: "v1",
-      label: "Variant 1 — Constellation",
+      slug: "v2",
+      label: "Variant 2 — Editorial Card (Revised)",
       blurb:
-        "Mail pieces as nodes on a canvas. Position by date, color by status, size by mail class. Hover anchors detail in a side rail. Visual-first; reads like a research wall, not a spreadsheet.",
+        "Updated per feedback. Letter thumbnail + recipient details as a card, but the magazine paragraph at top and per-card prose are gone. Top is a clean header with stat numbers. Cards use key/value fields. Tracking number on one line. View Letter, Track, and Fix Address & Resend kept.",
     },
     {
-      slug: "v2",
-      label: "Variant 2 — Editorial",
+      slug: "v4",
+      label: "Variant 4 — Split-Pane Inbox",
       blurb:
-        "Magazine layout. Bold typographic lead with stats embedded in a sentence, then mail pieces as editorial cards stacked vertically. Each card pairs a letter thumbnail with rich recipient context. Type-first.",
+        "Email-client pattern (Superhuman / Linear inbox / Apple Mail). Left rail is a dense scannable list of pieces with status dots; right pane shows the selected piece full-detail with letter thumbnail + fields + inline resend form. Built for fast triage when many pieces are in flight.",
+    },
+    {
+      slug: "v5",
+      label: "Variant 5 — Timeline / Flow",
+      blurb:
+        "Each piece is a horizontal bar across a time axis. Solid bar from send date to delivery (or return). In-flight pieces get a striped tail showing the expected arrival window. Today marked by a dashed vertical line. See pipeline shape at a glance, spot pieces stuck longer than expected.",
+    },
+    {
+      slug: "v1",
+      label: "Variant 1 — Constellation (rejected)",
+      blurb:
+        "Original concept. Mail pieces as nodes on a canvas, positioned by date and status. Bree's feedback: too sporadic, hard to read precisely. Kept here for reference only.",
     },
     {
       slug: "v3",
-      label: "Variant 3 — Workspace",
+      label: "Variant 3 — Workspace Board (rejected)",
       blurb:
-        "Three-column workflow board. In Transit, Delivered, Needs Attention. Each piece is a card you can scan vertically by column. Compose action floats at the top. Reads like a project board.",
+        "Original concept. Three-column kanban (In Transit, Delivered, Needs Attention). Bree's feedback: same as every other CRM, too standard. Kept here for reference only.",
     },
   ];
 
