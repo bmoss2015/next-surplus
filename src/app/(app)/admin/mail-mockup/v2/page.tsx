@@ -80,16 +80,15 @@ export default async function MockupV2() {
                   Sent Mail
                 </h2>
               </div>
-              {/* Send Mail action lives inline with the header — no
-                  separate compose box anymore. Address-count is a quiet
-                  hint above the button. */}
+              {/* Send Mail action — V4-style button (green pill,
+                  compact). Address count sits underneath. */}
               <div className="text-right">
-                <div className="mb-2 text-[11px] text-gray-500">
-                  3 mailing addresses on file
-                </div>
-                <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-4 py-2 text-[12px] font-semibold text-white">
+                <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-3 py-2 text-[12px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)]">
                   Send Mail
                 </button>
+                <div className="mt-1.5 text-[11px] text-gray-500">
+                  3 mailing addresses on file
+                </div>
               </div>
             </div>
             <dl className="mt-5 grid grid-cols-4 gap-x-6 gap-y-2">
@@ -100,9 +99,11 @@ export default async function MockupV2() {
             </dl>
           </div>
 
-          {/* Cards, scoped to this lead */}
+          {/* Cards, scoped to this lead. Each card has a quiet vertical
+              green inset-shadow on hover (V4's selected-row pattern,
+              applied to V2 cards). */}
           <div className="space-y-4">
-            <Card p={SAMPLE[0]} />
+            <Card p={SAMPLE[0]} highlight />
             <Card p={SAMPLE[1]} />
             <Card p={SAMPLE[3]} />
           </div>
@@ -137,10 +138,20 @@ function StatPair({
   );
 }
 
-function Card({ p }: { p: (typeof SAMPLE)[number] }) {
+function Card({
+  p,
+  highlight,
+}: {
+  p: (typeof SAMPLE)[number];
+  highlight?: boolean;
+}) {
   const sc = STATUS_COLORS[p.status];
   return (
-    <article className="grid grid-cols-[110px_1fr] gap-5 rounded-lg border border-gray-200 bg-white p-4">
+    <article
+      className={`grid grid-cols-[110px_1fr] gap-5 rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-[inset_3px_0_0_#0d4b3a] ${
+        highlight ? "shadow-[inset_3px_0_0_#0d4b3a]" : ""
+      }`}
+    >
       {/* Letter thumbnail — smaller (was 200px tall, now 130px) */}
       <div className="relative h-[130px] overflow-hidden rounded-sm border border-gray-200 bg-white">
         <div className="absolute inset-0 p-2 text-[5.5px] leading-[1.4] text-ink">
