@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useState, useTransition } from "react";
-import { IconCheck, IconX, IconPlayerPlay, IconTrash, IconLoader2 } from "@tabler/icons-react";
+import { IconCheck, IconX, IconPlayerPlay, IconTrash, IconLoader2, IconDatabase } from "@tabler/icons-react";
+import Link from "next/link";
 import { SCENARIOS, type Scenario } from "../_scenarios";
 import {
   seedMailTestArtifacts,
   runMailTestScenario,
   cleanupMailTestArtifacts,
+  seedSampleMailData,
   type RunResult,
 } from "../actions";
 
@@ -22,6 +24,12 @@ type RowState =
   | { kind: "done"; result: RunResult }
   | { kind: "error"; error: string };
 
+type SampleState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "done"; inserted: number; lead_id: string | null }
+  | { kind: "error"; error: string };
+
 function formatCents(c: number | null): string {
   if (c == null) return "—";
   return `$${(c / 100).toFixed(2)}`;
@@ -32,6 +40,19 @@ export function MailTestClient() {
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [, startTransition] = useTransition();
   const [globalErr, setGlobalErr] = useState<string | null>(null);
+  const [sample, setSample] = useState<SampleState>({ kind: "idle" });
+
+  const handleSeedSamples = useCallback(() => {
+    setSample({ kind: "loading" });
+    startTransition(async () => {
+      const res = await seedSampleMailData();
+      if (!res.ok) {
+        setSample({ kind: "error", error: res.error });
+        return;
+      }
+      setSample({ kind: "done", inserted: res.inserted, lead_id: res.lead_id });
+    });
+  }, []);
 
   const ensureSeeded = useCallback(async (): Promise<SeedState | null> => {
     if (seed.kind === "ready") return seed;
@@ -112,6 +133,58 @@ export function MailTestClient() {
 
   return (
     <div className="space-y-6">
+      {/* Quick sample data — for evaluating the new UI on a populated list */}
+      <div className="rounded-md border border-petrol-200 bg-petrol-50/40 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[13px] font-medium text-petrol-800">
+              Sample Mail Data
+            </div>
+            <div className="mt-1 text-[12px] text-petrol-900/80">
+              Inserts 7 realistic mail_jobs rows directly into the DB (no
+              provider calls, no cost). Mix of statuses — delivered, in
+              transit, returned — plus one 2-recipient batch and one
+              check piece. Attaches to your most recent lead so the
+              Overview Mail card and lead Activity tab light up too.
+            </div>
+            {sample.kind === "done" && (
+              <div className="mt-2 text-[12px] text-petrol-900">
+                Inserted {sample.inserted} sample rows.{" "}
+                <Link
+                  href="/mail"
+                  className="cursor-pointer font-medium underline"
+                >
+                  Open /mail
+                </Link>
+                {sample.lead_id && (
+                  <>
+                    {" · "}
+                    <Link
+                      href={`/leads/${sample.lead_id}`}
+                      className="cursor-pointer font-medium underline"
+                    >
+                      Open Lead
+                    </Link>
+                  </>
+                )}
+              </div>
+            )}
+            {sample.kind === "error" && (
+              <div className="mt-2 text-[12px] text-danger">{sample.error}</div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleSeedSamples}
+            disabled={sample.kind === "loading"}
+            className="btn-primary disabled:opacity-50 cursor-pointer inline-flex shrink-0 items-center gap-1.5"
+          >
+            <IconDatabase size={14} stroke={1.75} />
+            {sample.kind === "loading" ? "Seeding..." : "Seed Sample Mail Data"}
+          </button>
+        </div>
+      </div>
+
       {/* Seed status + actions */}
       <div className="flex flex-wrap items-center gap-3 rounded-md border border-gray-200 bg-white p-4">
         <button

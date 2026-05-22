@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { IconArrowRight } from "@tabler/icons-react";
+import { IconArrowRight, IconMail } from "@tabler/icons-react";
 import { fetchReports, STAGE_NAMES } from "@/lib/reports/fetch";
+import { fetchMailReport } from "@/lib/mail/reports";
 import { formatCurrency } from "@/lib/leads/format";
 import { SALE_TYPE_LABELS, type SaleType } from "@/lib/leads/types";
 
@@ -13,26 +14,20 @@ function fmtBig(n: number): string {
 }
 
 export default async function ReportsPage() {
-  const data = await fetchReports();
+  const [data, mailReport] = await Promise.all([
+    fetchReports(),
+    fetchMailReport({ months: 6 }),
+  ]);
 
   return (
     <div className="px-7 py-6">
-      <div className="mb-[22px] flex items-end justify-between gap-4">
-        <div>
-          <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-            Reports
-          </h1>
-          <div className="mt-1 text-[13px] text-gray-500">
-            Read-only summaries of pipeline, conversion, and outcomes.
-          </div>
+      <div className="mb-[22px]">
+        <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
+          Reports
+        </h1>
+        <div className="mt-1 text-[13px] text-gray-500">
+          Read-only summaries of pipeline, conversion, and outcomes.
         </div>
-        <Link
-          href="/reports/mail"
-          className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-[12px] font-medium text-ink hover:bg-gray-50"
-        >
-          Mail &amp; Cost
-          <IconArrowRight size={12} stroke={2} />
-        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-[18px]">
@@ -201,6 +196,55 @@ export default async function ReportsPage() {
               </tbody>
             </table>
           )}
+        </Card>
+
+        {/* Mail & Cost — last 6 months snapshot, click-through to detail */}
+        <Card title="Mail & Cost (Last 6 Months)" wide>
+          <div className="grid grid-cols-4 gap-3 mb-3">
+            <Stat label="Sent" value={String(mailReport.totals.sent_total)} />
+            <Stat label="Delivered" value={String(mailReport.totals.delivered)} />
+            <Stat label="Returned" value={String(mailReport.totals.returned)} />
+            <Stat
+              label="Spent"
+              value={`$${(mailReport.totals.spent_cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
+            />
+          </div>
+          <table className="w-full text-[12.5px]">
+            <thead>
+              <tr className="text-left text-[10px] tracking-[0.4px] text-gray-500">
+                <th className="pb-2 font-medium">Month</th>
+                <th className="pb-2 text-right font-medium">Sent</th>
+                <th className="pb-2 text-right font-medium">Delivered</th>
+                <th className="pb-2 text-right font-medium">Returned</th>
+                <th className="pb-2 text-right font-medium">Spend</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mailReport.months
+                .slice()
+                .reverse()
+                .map((m) => (
+                  <tr key={m.month} className="border-t border-gray-150">
+                    <td className="py-[6px] text-ink">{m.label}</td>
+                    <td className="py-[6px] text-right text-ink">{m.sent_total}</td>
+                    <td className="py-[6px] text-right text-petrol-700">{m.delivered}</td>
+                    <td className={`py-[6px] text-right ${m.returned > 0 ? "text-danger" : "text-gray-500"}`}>
+                      {m.returned}
+                    </td>
+                    <td className="py-[6px] text-right font-medium text-ink">
+                      ${(m.spent_cents / 100).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          <Link
+            href="/reports/mail"
+            className="mt-3 inline-flex cursor-pointer items-center gap-1 text-[12px] font-medium text-petrol-500 hover:text-petrol-700"
+          >
+            <IconMail size={12} stroke={2} /> Open Full Mail Report
+            <IconArrowRight size={12} stroke={2} />
+          </Link>
         </Card>
       </div>
     </div>

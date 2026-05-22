@@ -20,7 +20,7 @@ export async function MailCard({ leadId }: { leadId: string }) {
       <div className="mb-3 flex items-center justify-between">
         <h3 className="section-subheader">Mail</h3>
         <Link
-          href={`/mail?lead=${leadId}`}
+          href={`/leads/${leadId}?tab=mail`}
           className="inline-flex items-center gap-1 text-[11.5px] font-medium text-petrol-500 hover:text-petrol-700"
         >
           View All

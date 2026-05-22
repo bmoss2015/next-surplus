@@ -1,7 +1,10 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { sendMail } from "@/lib/mail/actions";
 import { fetchMailJob } from "@/lib/mail/fetch";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth/current-user";
 
 export type ResendInput = {
   jobId: string;
@@ -66,3 +69,21 @@ export async function resendMailJob(input: ResendInput): Promise<ResendResult> {
   if (!send.ok) return { ok: false, error: send.error };
   return { ok: true, batch_id: send.batch_id, job_ids: send.job_ids };
 }
+
+// Hard-delete a mail_jobs row. Used to clean up old failed records that
+// pre-date the sync-failure-no-persist change, or to remove any record
+// the user no longer wants to see. The activity row tied to the same
+// piece (if any) is left in place because activities are historical
+// truth — what happened on the lead doesn't unhappen.
+export async function deleteMailJob(input: {
+  jobId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+  const { error } = await sb.from("mail_jobs").delete().eq("id", input.jobId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/mail");
+  return { ok: true };
+}
+

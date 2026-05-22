@@ -377,7 +377,7 @@ export function MailListClient({
                 Delivered
               </th>
               <th className="px-4 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                Track
+                Tracking
               </th>
             </tr>
           </thead>
@@ -402,7 +402,6 @@ export function MailListClient({
                       row={r}
                       indent={false}
                       onOpenDetail={() => setDetailId(r.id)}
-                      onOpenLetter={() => void openLetter(r.id)}
                     />,
                   ];
                 }
@@ -468,7 +467,6 @@ export function MailListClient({
                       row={r}
                       indent={true}
                       onOpenDetail={() => setDetailId(r.id)}
-                      onOpenLetter={() => void openLetter(r.id)}
                     />
                   )),
                 ];
@@ -486,6 +484,10 @@ export function MailListClient({
           setDetailId(null);
           router.refresh();
         }}
+        onDeleted={() => {
+          setDetailId(null);
+          router.refresh();
+        }}
       />
 
       <LetterPreviewModal
@@ -500,12 +502,10 @@ function Row({
   row,
   indent,
   onOpenDetail,
-  onOpenLetter,
 }: {
   row: MailJobListRow;
   indent: boolean;
   onOpenDetail: () => void;
-  onOpenLetter: () => void;
 }) {
   return (
     <tr className="border-b border-gray-150 last:border-b-0 hover:bg-gray-50">
@@ -544,29 +544,26 @@ function Row({
         {fmtDate(row.delivered_at ?? row.returned_at)}
       </td>
       <td className="px-4 py-2 text-right text-[12px]">
-        <div className="inline-flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onOpenLetter}
-            className="cursor-pointer text-petrol-500 hover:text-petrol-700"
-            title="View Letter"
-          >
-            View
-          </button>
-          {row.tracking_url ? (
+        {row.tracking_number ? (
+          row.tracking_url ? (
             <a
               href={row.tracking_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex cursor-pointer items-center gap-1 text-petrol-500 hover:text-petrol-700"
+              className="inline-flex cursor-pointer items-center gap-1 font-mono text-[11.5px] text-petrol-500 hover:text-petrol-700"
+              onClick={(e) => e.stopPropagation()}
             >
-              Track
+              {row.tracking_number}
               <IconExternalLink size={11} stroke={1.75} />
             </a>
           ) : (
-            <span className="text-gray-400">—</span>
-          )}
-        </div>
+            <span className="font-mono text-[11.5px] text-ink">
+              {row.tracking_number}
+            </span>
+          )
+        ) : (
+          <span className="text-gray-400">—</span>
+        )}
       </td>
     </tr>
   );

@@ -617,50 +617,13 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     }
 
     if (!send.ok) {
-      // Persist a failed row so the user sees the error in the timeline.
-      const { data: failedInsert } = await sb.from("mail_jobs").insert({
-        batch_id: batchId,
-        lead_id: recipient.lead_id ?? null,
-        relative_id: recipient.relative_id ?? null,
-        lead_party_id: recipient.lead_party_id ?? null,
-        template_id: input.template_id ?? null,
-        recipient_name: recipient.name,
-        recipient_address_line1: recipient.line1,
-        recipient_address_line2: recipient.line2 ?? null,
-        recipient_city: recipient.city,
-        recipient_state: recipient.state,
-        recipient_postal_code: recipient.postal_code,
-        recipient_country: recipient.country ?? "US",
-        from_name: (org.name as string | null) ?? "",
-        from_address_line1: org.address_line1 as string,
-        from_address_line2: (org.address_line2 as string | null) ?? null,
-        from_city: org.city as string,
-        from_state: org.region as string,
-        from_postal_code: org.postal_code as string,
-        from_country: (org.country as string | null) ?? "US",
-        body_html: rendered,
-        mail_class: input.mail_class,
-        include_check: input.include_check ?? false,
-        check_amount_cents: input.check_amount_cents ?? null,
-        check_memo: input.check_memo ?? null,
-        bank_account_id: input.bank_account_id ?? null,
-        provider: input.include_check ? activeCheckProvider() : activeLetterProvider(),
-        status: "failed",
-        error_message: send.error,
-        created_by: profile.id,
-      })
-        .select("id")
-        .single();
-      // Bell notification so the sender sees the failure even if they
-      // navigated away from the modal.
-      await sb.from("notifications").insert({
-        recipient_id: profile.id,
-        actor_id: profile.id,
-        type: "mail_failed",
-        lead_id: recipient.lead_id ?? null,
-        body_preview: `Mail to ${recipient.name} failed: ${truncateForPreview(send.error)}`,
-      });
-      void failedInsert;
+      // Synchronous provider rejections (bad address format, auth, rate
+      // limit, etc.) don't persist to mail_jobs — the user gets the
+      // error back in the modal and can fix and retry. Persisting these
+      // as "failed" rows just clutters the dashboard with records the
+      // user can't act on. Async failures from webhooks still update
+      // the row's status to "failed" because by then there's something
+      // real to track.
       return { ok: false, error: send.error };
     }
 
@@ -763,12 +726,6 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     provider_letter: activeLetterProvider() as "click2mail" | "lob" | "stub",
     provider_check: activeCheckProvider() as "lob" | "stub",
   };
-}
-
-function truncateForPreview(text: string, max = 120): string {
-  const t = text.trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max - 1)}…`;
 }
 
 // Wrap the merge-rendered body in a minimal HTML doc so the print engines

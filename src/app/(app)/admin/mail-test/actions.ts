@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile } from "@/lib/auth/current-user";
@@ -519,6 +521,241 @@ async function fetchRecentNotificationsForScenario(profileId: string) {
     type: n.type as string,
     body_preview: (n.body_preview as string | null) ?? null,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Sample-data seeder — drops 7 realistic mail_jobs rows directly into the
+// table via service client so Bree can evaluate the UI on a populated
+// list without spending real provider credits. All rows are tagged with
+// HARNESS_TAG in the recipient_name so cleanup sweeps them.
+
+const SAMPLE_BODY_HTML = `<!doctype html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0.75in;">
+<div><p>March 14, 2026</p><p>Dear neighbor,</p><p>Our research indicates you may be entitled to funds being held by the county following a recent property sale. Moss Equity Partners specializes in recovering these surplus funds on behalf of rightful owners.</p><p>If you'd like to discuss whether this applies to your situation, please reply by mail or call us at (512) 555-0142. There is no cost to you to learn more.</p><p>Sincerely,<br/>Bree Moss<br/>Moss Equity Partners</p></div>
+</body></html>`;
+
+export async function seedSampleMailData(): Promise<
+  | { ok: true; inserted: number; lead_id: string | null }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  if (!profile.isAdmin) return { ok: false, error: "Admin only" };
+  const sb = await createClient();
+  const admin = createServiceClient();
+
+  // Find the most-recently-touched lead so the sample mail card on the
+  // lead Overview tab has something to render. Falls back to null if no
+  // leads exist on staging.
+  const { data: lead } = await sb
+    .from("leads")
+    .select("id, address, city, state, postal_code")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const leadId = (lead?.id as string | null) ?? null;
+
+  // Pull the org address for the from_* snapshot.
+  const { data: org } = await sb
+    .from("orgs")
+    .select(
+      "name, address_line1, address_line2, city, region, postal_code, country"
+    )
+    .eq("id", profile.orgId)
+    .single();
+  if (!org) return { ok: false, error: "Org settings missing" };
+
+  const daysAgo = (n: number) =>
+    new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+
+  // The 7 sample pieces. Mix of statuses, dates, and one multi-recipient batch.
+  type Sample = {
+    name: string;
+    line1: string;
+    city: string;
+    state: string;
+    zip: string;
+    status: "in_transit" | "delivered" | "returned" | "queued";
+    sent_days_ago: number;
+    delivered_days_ago?: number;
+    returned_days_ago?: number;
+    mail_class?: "first_class" | "standard" | "certified";
+    include_check?: boolean;
+    check_amount_cents?: number;
+    tracking_number?: string;
+    batch_with?: string; // share a batch_id with another sample's name
+  };
+  const samples: Sample[] = [
+    {
+      name: `${HARNESS_TAG} Sample · Margaret Chen`,
+      line1: "412 Oakwood Drive",
+      city: "Austin",
+      state: "TX",
+      zip: "78745",
+      status: "delivered",
+      sent_days_ago: 14,
+      delivered_days_ago: 9,
+      mail_class: "first_class",
+      tracking_number: "9400111899223344556677",
+    },
+    {
+      name: `${HARNESS_TAG} Sample · David Rodriguez`,
+      line1: "78 Pinecrest Avenue",
+      city: "Houston",
+      state: "TX",
+      zip: "77019",
+      status: "delivered",
+      sent_days_ago: 11,
+      delivered_days_ago: 7,
+      mail_class: "certified",
+      tracking_number: "9400111899223344556712",
+    },
+    {
+      name: `${HARNESS_TAG} Sample · Patricia Williams`,
+      line1: "1023 Heritage Lane",
+      city: "Dallas",
+      state: "TX",
+      zip: "75204",
+      status: "in_transit",
+      sent_days_ago: 3,
+      mail_class: "first_class",
+      tracking_number: "9400111899223344556728",
+    },
+    {
+      name: `${HARNESS_TAG} Sample · James O'Brien`,
+      line1: "245 Magnolia Court",
+      city: "San Antonio",
+      state: "TX",
+      zip: "78216",
+      status: "returned",
+      sent_days_ago: 18,
+      returned_days_ago: 5,
+      mail_class: "first_class",
+      tracking_number: "9400111899223344556735",
+    },
+    {
+      name: `${HARNESS_TAG} Sample · Linda Foster (batch)`,
+      line1: "5511 Westbrook Way",
+      city: "Fort Worth",
+      state: "TX",
+      zip: "76107",
+      status: "in_transit",
+      sent_days_ago: 1,
+      mail_class: "first_class",
+      tracking_number: "9400111899223344556742",
+      batch_with: "robert-batch",
+    },
+    {
+      name: `${HARNESS_TAG} Sample · Robert Foster (batch)`,
+      line1: "5511 Westbrook Way",
+      city: "Fort Worth",
+      state: "TX",
+      zip: "76107",
+      status: "in_transit",
+      sent_days_ago: 1,
+      mail_class: "first_class",
+      tracking_number: "9400111899223344556759",
+      batch_with: "robert-batch",
+    },
+    {
+      name: `${HARNESS_TAG} Sample · Susan Park (check)`,
+      line1: "918 Cedar Springs Rd",
+      city: "Austin",
+      state: "TX",
+      zip: "78704",
+      status: "in_transit",
+      sent_days_ago: 5,
+      mail_class: "first_class",
+      include_check: true,
+      check_amount_cents: 482500,
+      tracking_number: "9400111899223344556766",
+    },
+  ];
+
+  // Group by batch_with key so siblings share a batch_id.
+  const batchKeyToId = new Map<string, string>();
+  const rows = samples.map((s) => {
+    const batchKey = s.batch_with ?? `solo-${randomUUID()}`;
+    let batchId = batchKeyToId.get(batchKey);
+    if (!batchId) {
+      batchId = randomUUID();
+      batchKeyToId.set(batchKey, batchId);
+    }
+    return {
+      id: randomUUID(),
+      org_id: profile.orgId,
+      batch_id: batchId,
+      lead_id: leadId,
+      recipient_name: s.name,
+      recipient_address_line1: s.line1,
+      recipient_city: s.city,
+      recipient_state: s.state,
+      recipient_postal_code: s.zip,
+      recipient_country: "US",
+      from_name: (org.name as string | null) ?? "Moss Equity Partners",
+      from_address_line1: (org.address_line1 as string | null) ?? "100 Main St",
+      from_address_line2: (org.address_line2 as string | null) ?? null,
+      from_city: (org.city as string | null) ?? "Austin",
+      from_state: (org.region as string | null) ?? "TX",
+      from_postal_code: (org.postal_code as string | null) ?? "78701",
+      from_country: (org.country as string | null) ?? "US",
+      body_html: SAMPLE_BODY_HTML,
+      mail_class: s.mail_class ?? "first_class",
+      include_check: s.include_check ?? false,
+      check_amount_cents: s.check_amount_cents ?? null,
+      check_memo: s.include_check ? "Surplus Recovery" : null,
+      provider: "click2mail",
+      provider_id: `sample_${randomUUID().slice(0, 8)}`,
+      tracking_number: s.tracking_number ?? null,
+      tracking_url: s.tracking_number
+        ? `https://tools.usps.com/go/TrackConfirmAction?tLabels=${s.tracking_number}`
+        : null,
+      status: s.status,
+      cost_cents: s.include_check ? 144 : 71,
+      sent_at: daysAgo(s.sent_days_ago),
+      delivered_at: s.delivered_days_ago != null ? daysAgo(s.delivered_days_ago) : null,
+      returned_at: s.returned_days_ago != null ? daysAgo(s.returned_days_ago) : null,
+      created_by: profile.id,
+      created_at: daysAgo(s.sent_days_ago),
+    };
+  });
+
+  const { error } = await admin.from("mail_jobs").insert(rows);
+  if (error) return { ok: false, error: error.message };
+
+  // Drop matching activity rows on the lead so the Activity tab + Overview
+  // recent-activity card show them too. Only for the lead-attached rows.
+  if (leadId) {
+    const activityRows = rows.map((r) => ({
+      lead_id: leadId,
+      user_id: profile.id,
+      activity_type:
+        r.status === "delivered"
+          ? "mail_delivered"
+          : r.status === "returned"
+            ? "mail_returned"
+            : "mail_sent",
+      payload: {
+        mail_job_id: r.id,
+        batch_id: r.batch_id,
+        recipient_name: r.recipient_name,
+        recipient_address: `${r.recipient_address_line1}, ${r.recipient_city}, ${r.recipient_state} ${r.recipient_postal_code}`,
+        mail_class: r.mail_class,
+        include_check: r.include_check,
+        check_amount_cents: r.check_amount_cents,
+        tracking_url: r.tracking_url,
+        tracking_number: r.tracking_number,
+        provider: r.provider,
+      },
+      created_at: r.sent_at,
+    }));
+    await admin.from("activities").insert(activityRows);
+  }
+
+  revalidatePath("/mail");
+  if (leadId) revalidatePath(`/leads/${leadId}`);
+  return { ok: true, inserted: rows.length, lead_id: leadId };
 }
 
 function emptyResult(

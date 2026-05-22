@@ -10,6 +10,7 @@ const TABS = [
   { key: "contacts", label: "Contacts" },
   { key: "research", label: "Research" },
   { key: "documents", label: "Documents" },
+  { key: "mail", label: "Mail" },
   { key: "notes", label: "Notes" },
   { key: "tasks", label: "Tasks" },
   { key: "conversation", label: "Conversation" },

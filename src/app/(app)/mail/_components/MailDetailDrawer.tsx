@@ -6,6 +6,7 @@ import {
   IconExternalLink,
   IconArrowBackUp,
   IconMail,
+  IconTrash,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { MailStatusPill, mailStatusLabel } from "@/components/mail/MailStatusPill";
@@ -13,7 +14,7 @@ import { MailStepTimeline } from "@/components/mail/MailStepTimeline";
 import type { LetterPreviewData } from "@/components/mail/LetterPreviewModal";
 import type { MailJobDetailRow } from "@/lib/mail/fetch";
 import { fetchMailJobAction } from "../_fetchers";
-import { resendMailJob } from "../_actions";
+import { resendMailJob, deleteMailJob } from "../_actions";
 
 // Slide-out detail panel that takes ~half the viewport on desktop.
 // Anchors visual focus on a thumbnail of the letter (Linear-style), with
@@ -42,11 +43,13 @@ export function MailDetailDrawer({
   onClose,
   onOpenLetter,
   onResent,
+  onDeleted,
 }: {
   jobId: string | null;
   onClose: () => void;
   onOpenLetter: (data: LetterPreviewData) => void;
   onResent: () => void;
+  onDeleted: () => void;
 }) {
   const [job, setJob] = useState<MailJobDetailRow | null>(null);
   // Derive "is loading" from whether the fetched job matches the current
@@ -102,6 +105,7 @@ export function MailDetailDrawer({
               })
             }
             onResent={onResent}
+            onDeleted={onDeleted}
           />
         )}
       </aside>
@@ -114,12 +118,35 @@ function DetailContent({
   onClose,
   onOpenLetter,
   onResent,
+  onDeleted,
 }: {
   job: MailJobDetailRow;
   onClose: () => void;
   onOpenLetter: () => void;
   onResent: () => void;
+  onDeleted: () => void;
 }) {
+  const [deletePending, startDelete] = useTransition();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDelete = () => {
+    if (
+      !confirm(
+        "Delete this mail record permanently? The activity entry on the lead stays as historical truth."
+      )
+    ) {
+      return;
+    }
+    setDeleteError(null);
+    startDelete(async () => {
+      const res = await deleteMailJob({ jobId: job.id });
+      if (!res.ok) {
+        setDeleteError(res.error);
+        return;
+      }
+      onDeleted();
+    });
+  };
   return (
     <>
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-surface px-6 py-3">
@@ -243,6 +270,37 @@ function DetailContent({
 
         {(job.status === "returned" || job.status === "failed") && (
           <ResendForm job={job} onResent={onResent} />
+        )}
+
+        {/* Delete is only offered for failed pieces — those are records
+            of provider rejections that may pre-date the no-persist-on-
+            sync-failure change. Successful sends stay as history. */}
+        {job.status === "failed" && (
+          <div className="rounded-md border border-gray-200 bg-white p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[12.5px] font-medium text-ink">
+                  Delete Record
+                </div>
+                <div className="mt-[2px] text-[11.5px] text-gray-500">
+                  Permanently remove this row from the dashboard. The
+                  activity entry on the lead (if any) is kept.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deletePending}
+                className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-danger/40 bg-white px-3 py-1.5 text-[12px] font-medium text-danger hover:bg-danger-bg/40 disabled:opacity-50"
+              >
+                <IconTrash size={12} stroke={2} />
+                {deletePending ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+            {deleteError && (
+              <div className="mt-2 text-[11.5px] text-danger">{deleteError}</div>
+            )}
+          </div>
         )}
       </div>
     </>
