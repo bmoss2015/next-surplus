@@ -26,6 +26,11 @@ export type MailJobListRow = {
   delivered_at: string | null;
   returned_at: string | null;
   created_at: string;
+  // Lead context surfaced under the recipient name in the row — case
+  // identifier + estimated surplus give an operator immediate "what
+  // deal is this on" recognition without leaving the dashboard.
+  lead_label: string | null;
+  lead_surplus_cents: number | null;
 };
 
 export type MailJobDetailRow = MailJobListRow & {
@@ -129,6 +134,51 @@ export async function fetchMailDashboard(
   if (error) throw error;
 
   const rows: MailJobListRow[] = (data ?? []).map(mapRow);
+
+  // Enrich rows with lead context (case identifier + estimated surplus)
+  // so the dashboard can show "Smith case · $42K surplus" under the
+  // recipient name. One in() query covers all the lead_ids in this
+  // page; small cost relative to the main fetch.
+  const leadIds = Array.from(
+    new Set(rows.map((r) => r.lead_id).filter((x): x is string => Boolean(x)))
+  );
+  if (leadIds.length > 0) {
+    const { data: leadRows } = await sb
+      .from("leads")
+      .select("id, lead_id, address, city, state, estimated_surplus")
+      .in("id", leadIds);
+    const leadMap = new Map<string, { label: string; surplus: number | null }>();
+    for (const l of leadRows ?? []) {
+      const caseId = (l.lead_id as string | null)?.trim();
+      const addr = (l.address as string | null)?.trim();
+      const cityState = [l.city, l.state].filter(Boolean).join(", ");
+      // Prefer the case identifier ("L-2026-0042") since that's what
+      // operators look up by. Fall back to a city-anchored address if
+      // there's no case id yet.
+      const label =
+        caseId && caseId.length > 0
+          ? caseId
+          : addr && addr.length > 0
+            ? cityState
+              ? `${addr}, ${cityState}`
+              : addr
+            : "";
+      leadMap.set(l.id as string, {
+        label,
+        surplus: (l.estimated_surplus as number | null) ?? null,
+      });
+    }
+    for (const r of rows) {
+      if (!r.lead_id) continue;
+      const lead = leadMap.get(r.lead_id);
+      if (!lead) continue;
+      r.lead_label = lead.label || null;
+      // estimated_surplus is stored as dollars (numeric/integer), not
+      // cents — convert to cents for consistency with cost_cents.
+      r.lead_surplus_cents = lead.surplus != null ? Math.round(lead.surplus * 100) : null;
+    }
+  }
+
   // Sort: returned/failed first, then by created_at desc.
   rows.sort((a, b) => {
     const pri = (s: MailStatus) =>
@@ -202,5 +252,7 @@ function mapRow(r: Record<string, unknown>): MailJobListRow {
     delivered_at: (r.delivered_at as string | null) ?? null,
     returned_at: (r.returned_at as string | null) ?? null,
     created_at: (r.created_at as string) ?? new Date().toISOString(),
+    lead_label: null,
+    lead_surplus_cents: null,
   };
 }

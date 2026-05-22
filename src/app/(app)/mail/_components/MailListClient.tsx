@@ -9,10 +9,18 @@ import {
   IconChevronRight,
   IconDownload,
   IconExternalLink,
+  IconTruckDelivery,
+  IconHomeCheck,
+  IconArrowBackUp,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { MailStatusPill } from "@/components/mail/MailStatusPill";
 import { LetterPreviewModal, type LetterPreviewData } from "@/components/mail/LetterPreviewModal";
+import {
+  displayRecipientName,
+  recipientInitials,
+  recipientAvatarStyle,
+} from "@/components/mail/displayName";
 import type {
   MailJobListRow,
   MailStats,
@@ -32,6 +40,13 @@ const STATUS_CHIPS: Array<{ id: MailStatusFilter; label: string }> = [
   { id: "delivered", label: "Delivered" },
   { id: "returned", label: "Returned" },
 ];
+
+function fmtSurplus(cents: number): string {
+  const dollars = cents / 100;
+  if (dollars >= 1_000_000) return `$${(dollars / 1_000_000).toFixed(1)}M`;
+  if (dollars >= 1_000) return `$${Math.round(dollars / 1_000)}K`;
+  return `$${Math.round(dollars)}`;
+}
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -238,13 +253,30 @@ export function MailListClient({
     });
   }, []);
 
-  const statCards = [
-    { label: "In Transit", value: stats.in_flight, sub: "Pieces Moving" },
-    { label: "Delivered", value: stats.delivered, sub: "Reached Recipient" },
+  const statCards: Array<{
+    label: string;
+    value: number;
+    sub: string;
+    Icon: typeof IconTruckDelivery;
+    warn?: boolean;
+  }> = [
+    {
+      label: "In Transit",
+      value: stats.in_flight,
+      sub: "Pieces Moving",
+      Icon: IconTruckDelivery,
+    },
+    {
+      label: "Delivered",
+      value: stats.delivered,
+      sub: "Reached Recipient",
+      Icon: IconHomeCheck,
+    },
     {
       label: "Returned",
       value: stats.returned,
       sub: "Re-Verify Address",
+      Icon: IconArrowBackUp,
       warn: stats.returned > 0,
     },
   ];
@@ -272,26 +304,51 @@ export function MailListClient({
       )}
 
       <div className="mb-5 grid grid-cols-3 gap-3">
-        {statCards.map((card) => (
-          <div
-            key={card.label}
-            className={`rounded-lg border bg-surface p-4 shadow-card ${
-              card.warn ? "border-danger" : "border-gray-200"
-            }`}
-          >
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
-              {card.label}
-            </div>
+        {statCards.map((card) => {
+          const Icon = card.Icon;
+          return (
             <div
-              className={`mt-1 text-[22px] font-medium ${
-                card.warn ? "text-danger" : "text-ink"
-              }`}
+              key={card.label}
+              className={cn(
+                "relative overflow-hidden rounded-xl border bg-surface p-5 shadow-card transition-shadow hover:shadow-card-hover",
+                card.warn ? "border-danger" : "border-gray-200"
+              )}
             >
-              {card.value}
+              {/* Big watermark icon in the corner gives the cards a
+                  distinct visual identity instead of generic stat tiles */}
+              <div
+                aria-hidden
+                className={cn(
+                  "absolute -right-3 -top-3 opacity-[0.07]",
+                  card.warn ? "text-danger" : "text-ink"
+                )}
+              >
+                <Icon size={104} stroke={1.25} />
+              </div>
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <Icon
+                    size={14}
+                    stroke={1.75}
+                    className={card.warn ? "text-danger" : "text-petrol-500"}
+                  />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-gray-500">
+                    {card.label}
+                  </span>
+                </div>
+                <div
+                  className={cn(
+                    "mt-3 text-[32px] font-semibold leading-none tracking-tight",
+                    card.warn ? "text-danger" : "text-ink"
+                  )}
+                >
+                  {card.value}
+                </div>
+                <div className="mt-1.5 text-[11.5px] text-gray-500">{card.sub}</div>
+              </div>
             </div>
-            <div className="text-[11px] text-gray-500">{card.sub}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Needs Attention — lead-scoped only. Hides on the global /mail
@@ -349,27 +406,27 @@ export function MailListClient({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-card">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-surface shadow-card">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="px-4 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-gray-500"></th>
-              <th className="px-4 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-gray-500">
+            <tr className="border-b border-gray-200 bg-gray-50/60">
+              <th className="w-[64px] px-4 py-3"></th>
+              <th className="px-2 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-gray-500">
                 Recipient
               </th>
-              <th className="px-4 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-gray-500">
                 Class
               </th>
-              <th className="px-4 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-gray-500">
                 Status
               </th>
-              <th className="px-4 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-gray-500">
                 Sent
               </th>
-              <th className="px-4 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-gray-500">
                 Delivered
               </th>
-              <th className="px-4 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-gray-500">
                 Tracking
               </th>
             </tr>
@@ -502,17 +559,32 @@ function Row({
 }) {
   return (
     <tr className="border-b border-gray-150 last:border-b-0 hover:bg-gray-50">
-      <td className={cn("px-4 py-2", indent && "pl-10")}></td>
-      <td className="px-4 py-2 text-[13px]">
+      <td className={cn("px-4 py-3", indent && "pl-10")}>
+        <RecipientAvatar name={row.recipient_name} />
+      </td>
+      <td className="px-2 py-3 text-[13px]">
         <button
           type="button"
           onClick={onOpenDetail}
           className="cursor-pointer text-left"
         >
-          <div className="font-medium text-ink hover:text-petrol-700">
-            {row.recipient_name}
+          <div className="font-semibold text-ink hover:text-petrol-700">
+            {displayRecipientName(row.recipient_name)}
           </div>
-          <div className="text-[11px] text-gray-500">
+          {(row.lead_label || row.lead_surplus_cents != null) && (
+            <div className="mt-[1px] text-[11px] text-gray-500">
+              {row.lead_label && (
+                <span className="text-ink/70">{row.lead_label}</span>
+              )}
+              {row.lead_label && row.lead_surplus_cents != null && (
+                <span className="text-gray-400"> · </span>
+              )}
+              {row.lead_surplus_cents != null && (
+                <span>{fmtSurplus(row.lead_surplus_cents)} surplus</span>
+              )}
+            </div>
+          )}
+          <div className="text-[11.5px] text-gray-500">
             {row.recipient_address_line1}, {row.recipient_city},{" "}
             {row.recipient_state} {row.recipient_postal_code}
             {row.include_check && row.check_amount_cents != null
@@ -521,10 +593,10 @@ function Row({
           </div>
         </button>
       </td>
-      <td className="px-4 py-2 text-[12px] text-ink">
+      <td className="px-4 py-3 text-[12px] text-ink">
         {MAIL_CLASS_LABEL[row.mail_class]}
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-3">
         <MailStatusPill status={row.status} />
         {row.status === "failed" && row.error_message && (
           <div className="mt-[2px] text-[10px] text-danger max-w-[200px] truncate" title={row.error_message}>
@@ -532,11 +604,11 @@ function Row({
           </div>
         )}
       </td>
-      <td className="px-4 py-2 text-[12px] text-gray-600">{fmtDate(row.sent_at)}</td>
-      <td className="px-4 py-2 text-[12px] text-gray-600">
+      <td className="px-4 py-3 text-[12px] text-gray-600">{fmtDate(row.sent_at)}</td>
+      <td className="px-4 py-3 text-[12px] text-gray-600">
         {fmtDate(row.delivered_at ?? row.returned_at)}
       </td>
-      <td className="px-4 py-2 text-left text-[12px]">
+      <td className="px-4 py-3 text-left text-[12px]">
         {row.tracking_number ? (
           row.tracking_url ? (
             <a
@@ -598,7 +670,7 @@ function NeedsAttentionSection({
             <div className="flex items-baseline justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[14px] font-medium text-ink">
-                  {r.recipient_name}
+                  {displayRecipientName(r.recipient_name)}
                 </div>
                 <div className="truncate text-[11.5px] text-gray-500">
                   {r.recipient_address_line1}, {r.recipient_city},{" "}
@@ -626,6 +698,23 @@ function NeedsAttentionSection({
         </div>
       )}
     </section>
+  );
+}
+
+function RecipientAvatar({ name }: { name: string }) {
+  const initials = recipientInitials(name);
+  const style = recipientAvatarStyle(name);
+  return (
+    <div
+      className={cn(
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold tracking-wide",
+        style.bg,
+        style.text
+      )}
+      aria-hidden
+    >
+      {initials}
+    </div>
   );
 }
 

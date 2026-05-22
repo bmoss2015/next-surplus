@@ -8,6 +8,7 @@ import {
   type LetterPreviewData,
 } from "@/components/mail/LetterPreviewModal";
 import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
+import { displayRecipientName } from "@/components/mail/displayName";
 import type { MailJobListRow } from "@/lib/mail/fetch";
 
 function fmtDate(iso: string | null): string {
@@ -25,7 +26,7 @@ export function MailCardClient({ rows }: { rows: MailJobListRow[] }) {
     const detail = await fetchMailJobAction(row.id);
     setPreview({
       jobId: row.id,
-      recipientName: row.recipient_name,
+      recipientName: displayRecipientName(row.recipient_name),
       bodyHtml: detail?.body_html ?? null,
       trackingUrl: row.tracking_url,
     });
@@ -43,7 +44,7 @@ export function MailCardClient({ rows }: { rows: MailJobListRow[] }) {
               <div className="flex items-center gap-2">
                 <MailStatusPill status={r.status} />
                 <div className="truncate text-[12.5px] font-medium text-ink">
-                  {r.recipient_name}
+                  {displayRecipientName(r.recipient_name)}
                 </div>
               </div>
               <div className="truncate text-[11px] text-gray-500">

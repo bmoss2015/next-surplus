@@ -12,6 +12,7 @@ import Link from "next/link";
 import { MailStatusPill, mailStatusLabel } from "@/components/mail/MailStatusPill";
 import { MailStepTimeline } from "@/components/mail/MailStepTimeline";
 import type { LetterPreviewData } from "@/components/mail/LetterPreviewModal";
+import { displayRecipientName } from "@/components/mail/displayName";
 import type { MailJobDetailRow } from "@/lib/mail/fetch";
 import { fetchMailJobAction } from "../_fetchers";
 import { resendMailJob, deleteMailJob } from "../_actions";
@@ -99,7 +100,7 @@ export function MailDetailDrawer({
             onOpenLetter={() =>
               onOpenLetter({
                 jobId: job.id,
-                recipientName: job.recipient_name,
+                recipientName: displayRecipientName(job.recipient_name),
                 bodyHtml: job.body_html,
                 trackingUrl: job.tracking_url,
               })
@@ -156,7 +157,7 @@ function DetailContent({
             {MAIL_CLASS_LABEL[job.mail_class]}
           </div>
           <div className="truncate text-[15px] font-medium text-ink">
-            {job.recipient_name}
+            {displayRecipientName(job.recipient_name)}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -210,7 +211,7 @@ function DetailContent({
         {/* Recipient + Sender + Provider details */}
         <div className="grid grid-cols-2 gap-4 text-[12.5px]">
           <DetailBlock title="Recipient">
-            <div className="font-medium text-ink">{job.recipient_name}</div>
+            <div className="font-medium text-ink">{displayRecipientName(job.recipient_name)}</div>
             <div className="text-gray-600">{job.recipient_address_line1}</div>
             {job.recipient_address_line2 && (
               <div className="text-gray-600">{job.recipient_address_line2}</div>
