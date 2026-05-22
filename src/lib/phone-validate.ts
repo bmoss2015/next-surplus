@@ -155,14 +155,14 @@ async function sendThresholdEmail(
 
   const bodyIntro =
     threshold === 100
-      ? "Your Phone Validation add-on has consumed 100% of its credit balance. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened against Clearout Phone until the balance is topped off. Clearout doesn't auto-recharge — log in at clearoutphone.io to purchase more credits, then raise the cap in Settings &rarr; Billing."
-      : `Your Phone Validation add-on has consumed <strong>${threshold}%</strong> of its credit balance. Validation continues normally — this is a heads-up so you can top off at Clearout before hitting zero. <strong>${remaining.toLocaleString()}</strong> credits remaining.`;
+      ? "Your Phone Validation add-on has consumed 100% of its credit balance. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened until more credits are added. The add-on does not auto-recharge."
+      : `Your Phone Validation add-on has consumed <strong>${threshold}%</strong> of its credit balance. Validation continues normally. This is a heads-up so you can add more credits before hitting zero. <strong>${remaining.toLocaleString()}</strong> credits remaining.`;
 
   const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
   <h1 style="margin:0;font-size:20px;font-weight:600;color:#0d4b3a;">${subject}</h1>
   <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">${bodyIntro}</p>
   <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Credits used: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
-  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Settings &rarr; Billing in the portal shows the live meter and lets you raise the cap after topping off at Clearout.</p>
+  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Open Settings &rsaquo; Billing in the portal to see the live meter and add more credits.</p>
 </div>`;
 
   try {
@@ -204,19 +204,16 @@ export async function validatePhone(
   const e164 = parsed.number;
 
   const sb = createServiceClient();
-  const [cap, used] = await Promise.all([
-    getQuotaCap(sb, orgId),
-    getTotalCreditsUsed(sb, orgId),
-  ]);
-  if (used >= cap) {
-    return {
-      status: "untested",
-      provider: null,
-      checkedAt: null,
-      raw: { reason: "credit_balance_exhausted", cap, used },
-      phoneType: null,
-    };
-  }
+
+  // Note: we used to pre-check `local_usage_count >= cap` here as a quota
+  // gate. That broke after the Veriphone-to-Clearout swap because the
+  // local usage count includes pre-migration rows that have nothing to do
+  // with the live Clearout balance. Result: rows silently stayed
+  // "Not Verified" even with thousands of credits actually available.
+  // The fix is to let the provider be the source of truth: if credits are
+  // really gone, the upstream call returns an error and we surface that
+  // as a transient untested state. The threshold-alert plumbing still
+  // warns at 80/95/100% based on Clearout's live remaining balance.
 
   const apiKey = process.env.CLEAROUT_PHONE_API_KEY;
   if (!apiKey) {
@@ -510,10 +507,75 @@ export async function validateSpecificPhones(
   return { processed };
 }
 
-// Explicit backfill — sweeps every untested phone in the org. Never called
+// Dry-run version of the backfill that returns how many UNIQUE phones the
+// sweep would actually send to Clearout (after libphonenumber pre-filtering
+// + E.164 dedup), without consuming a single credit. Powers the pre-count
+// confirmation modal on the Run Backfill button so the user sees the
+// real cost before committing.
+export async function previewBackfillCount(
+  orgId: string,
+  opts: { excludeLostLeads?: boolean } = {}
+): Promise<{ uniquePhones: number; totalRows: number }> {
+  const excludeLostLeads = opts.excludeLostLeads ?? true;
+  const sb = createServiceClient();
+
+  let contactsQuery = sb
+    .from("contacts")
+    .select(
+      excludeLostLeads
+        ? "id, value, leads!inner(stage)"
+        : "id, value"
+    )
+    .eq("org_id", orgId)
+    .eq("channel", "phone")
+    .eq("status", "untested")
+    .not("value", "is", null);
+  if (excludeLostLeads) contactsQuery = contactsQuery.neq("leads.stage", "lost");
+  const contactsRes = await contactsQuery;
+
+  let relativesQuery = sb
+    .from("relatives")
+    .select(
+      excludeLostLeads
+        ? "phone, phone_status, phone_2, phone_2_status, phone_3, phone_3_status, phone_4, phone_4_status, phone_5, phone_5_status, leads!inner(stage)"
+        : "phone, phone_status, phone_2, phone_2_status, phone_3, phone_3_status, phone_4, phone_4_status, phone_5, phone_5_status"
+    )
+    .eq("org_id", orgId)
+    .or(
+      "phone_status.eq.untested,phone_2_status.eq.untested,phone_3_status.eq.untested,phone_4_status.eq.untested,phone_5_status.eq.untested"
+    );
+  if (excludeLostLeads) relativesQuery = relativesQuery.neq("leads.stage", "lost");
+  const relativesRes = await relativesQuery;
+
+  const phones: string[] = [];
+  for (const c of ((contactsRes.data ?? []) as unknown) as Array<{ value: string | null }>) {
+    if (c.value) phones.push(c.value);
+  }
+  for (const r of ((relativesRes.data ?? []) as unknown) as Record<string, unknown>[]) {
+    for (const base of RELATIVE_PHONE_BASES) {
+      const value = r[base] as string | null;
+      const status = r[`${base}_status`] as string | null;
+      if (value && status === "untested") phones.push(value);
+    }
+  }
+
+  // Apply the same E.164 dedup the real sweep uses so the preview matches
+  // the actual credit cost exactly.
+  const unique = new Set<string>();
+  for (const p of phones) {
+    const parsed = parsePhoneNumberFromString(p.trim(), "US");
+    if (parsed && parsed.isValid()) unique.add(parsed.number);
+    // Bad-format numbers won't reach Clearout (libphonenumber rejects them),
+    // so we don't count them toward the credit estimate.
+  }
+
+  return { uniquePhones: unique.size, totalRows: phones.length };
+}
+
+// Explicit backfill: sweeps every untested phone in the org. Never called
 // from import or upsert paths (those use validateSpecificPhones for the IDs
 // they just inserted). Wire this to a dedicated "Run Backfill" button so the
-// spend is always intentional. excludeLostLeads is on by default — skip
+// spend is always intentional. excludeLostLeads is on by default; skip
 // phones on leads the user has already given up on.
 export async function validateAllUntestedForOrg(
   orgId: string,
