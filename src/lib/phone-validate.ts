@@ -14,9 +14,19 @@ const DEFAULT_QUOTA_CAP = 5000;
 const CLEAROUT_ENDPOINT = "https://api.clearoutphone.io/v1/phonenumber/validate";
 const ADDON_KEY = "phone_validation";
 // Pay-as-you-go rate Bree confirmed: $35 / 5,000 = $0.0070 per credit.
-// Exported so the Billing meter can render "≈ $X.XX spent" alongside the
-// raw credit count without re-deriving the math.
-export const DEFAULT_CREDIT_COST_USD = 0.007;
+// Override via env CLEAROUT_COST_PER_CREDIT_USD when moving to monthly
+// (10% off → 0.0063) or annual (20% off → 0.0056) so the Billing meter's
+// "Spent This Month" reflects what's actually getting charged.
+//
+// FUTURE: when there are multiple paying orgs on the portal, lift this to
+// per-org app_settings instead of an env var.
+function parseCostFromEnv(): number {
+  const raw = process.env.CLEAROUT_COST_PER_CREDIT_USD;
+  if (!raw) return 0.007;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 0.007;
+}
+export const DEFAULT_CREDIT_COST_USD = parseCostFromEnv();
 
 export type ValidationStatus = "valid" | "invalid" | "untested";
 
@@ -67,11 +77,15 @@ async function getQuotaCap(sb: ServiceClient, orgId: string): Promise<number> {
 // meter as a running balance against `phone_validation_quota_cap`. When the
 // user tops off at Clearout they bump the cap and the meter re-headrooms.
 async function getTotalCreditsUsed(sb: ServiceClient, orgId: string): Promise<number> {
+  // Filter to provider='clearout' so legacy usage rows from prior providers
+  // don't pollute the count — would otherwise fire threshold alerts at
+  // boot for orgs migrating in and inflate the "Validations All-Time" stat.
   const { data } = await sb
     .from("org_addon_usage")
     .select("units")
     .eq("org_id", orgId)
-    .eq("addon_key", ADDON_KEY);
+    .eq("addon_key", ADDON_KEY)
+    .filter("metadata->>provider", "eq", "clearout");
   if (!data) return 0;
   return data.reduce((sum, row) => sum + (row.units ?? 0), 0);
 }
@@ -249,19 +263,39 @@ export async function validatePhone(
   let body: ClearoutBody | null = null;
   let httpOk = false;
   let networkError: string | null = null;
-  try {
-    const res = await fetch(CLEAROUT_ENDPOINT, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ number: e164, country_code: "US" }),
-    });
-    httpOk = res.ok;
-    body = (await res.json()) as ClearoutBody;
-  } catch (e) {
-    networkError = e instanceof Error ? e.message : String(e);
+  let attempts = 0;
+  // Retry transient failures (network errors, 5xx, 429) with exponential
+  // backoff: 250ms, 500ms, 1000ms. 4xx other than 429 means the request is
+  // bad — no retry, just fall through and the row stays untested. Only the
+  // FINAL response is logged + returned, so cache + usage accounting stays
+  // correct (one credit per real billable call).
+  const MAX_ATTEMPTS = 3;
+  const backoffMs = [250, 500, 1000];
+  while (attempts < MAX_ATTEMPTS) {
+    attempts += 1;
+    networkError = null;
+    httpOk = false;
+    body = null;
+    let status = 0;
+    try {
+      const res = await fetch(CLEAROUT_ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ number: e164, country_code: "US" }),
+      });
+      status = res.status;
+      httpOk = res.ok;
+      body = (await res.json()) as ClearoutBody;
+    } catch (e) {
+      networkError = e instanceof Error ? e.message : String(e);
+    }
+    const transient = !!networkError || status >= 500 || status === 429;
+    if (!transient || attempts >= MAX_ATTEMPTS) break;
+    const delay = backoffMs[attempts - 1] ?? 1000;
+    await new Promise((r) => setTimeout(r, delay));
   }
 
   const checkedAt = new Date().toISOString();
@@ -288,18 +322,21 @@ export async function validatePhone(
   if (!httpOk || body?.status !== "success" || !data) {
     return { status: "untested", provider: "clearout", checkedAt, raw: body, phoneType: null };
   }
+  // Stamp `provider: 'clearout'` on every metered row so threshold alerts
+  // and Billing meter stats can filter out pre-migration usage from prior
+  // providers and only count what's actually been spent here.
   if (data.status === "valid") {
-    await logUsage(sb, orgId, units, { phone_e164: e164, result: "valid", line_type: data.line_type });
+    await logUsage(sb, orgId, units, { phone_e164: e164, result: "valid", line_type: data.line_type, provider: "clearout" });
     return { status: "valid", provider: "clearout", checkedAt, raw: body, phoneType };
   }
   if (data.status === "invalid") {
-    await logUsage(sb, orgId, units, { phone_e164: e164, result: "invalid" });
+    await logUsage(sb, orgId, units, { phone_e164: e164, result: "invalid", provider: "clearout" });
     return { status: "invalid", provider: "clearout", checkedAt, raw: body, phoneType };
   }
   // status === 'unknown' — Clearout still bills credits for unknowns, so log
   // them too, but the row stays untested-with-checkedAt so the sweep won't
   // re-burn credits on the same number.
-  await logUsage(sb, orgId, units, { phone_e164: e164, result: "unknown" });
+  await logUsage(sb, orgId, units, { phone_e164: e164, result: "unknown", provider: "clearout" });
   return { status: "untested", provider: "clearout", checkedAt, raw: body, phoneType: null };
 }
 
@@ -342,6 +379,10 @@ async function findCachedValidation(
   e164: string
 ): Promise<ValidationResult | null> {
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  // PERF FUTURE: JSON path filters here (metadata->>phone_e164,
+  // metadata->>provider) are not indexed. At ~10k+ Clearout-era usage rows
+  // per org this becomes a tablescan and adds ~100ms+ per save. Fix is a
+  // GIN index migration on org_addon_usage.metadata when it bites.
   const { data, error } = await sb
     .from("org_addon_usage")
     .select("created_at, metadata")
@@ -349,6 +390,7 @@ async function findCachedValidation(
     .eq("addon_key", ADDON_KEY)
     .gte("created_at", ninetyDaysAgo)
     .filter("metadata->>phone_e164", "eq", e164)
+    .filter("metadata->>provider", "eq", "clearout")
     .order("created_at", { ascending: false })
     .limit(1);
   if (error || !data || data.length === 0) return null;
@@ -375,12 +417,15 @@ async function findCachedValidation(
 // Billing meter a "this billing cycle's spend" figure independent of the
 // running Clearout balance.
 async function getMonthCreditsUsed(sb: ServiceClient, orgId: string): Promise<number> {
+  // Same provider filter as getTotalCreditsUsed: only count Clearout-era
+  // rows so "Spent This Month" reflects what's actually been charged.
   const { data } = await sb
     .from("org_addon_usage")
     .select("units")
     .eq("org_id", orgId)
     .eq("addon_key", ADDON_KEY)
-    .eq("period_month", currentPeriodMonth());
+    .eq("period_month", currentPeriodMonth())
+    .filter("metadata->>provider", "eq", "clearout");
   if (!data) return 0;
   return data.reduce((sum, row) => sum + (row.units ?? 0), 0);
 }
