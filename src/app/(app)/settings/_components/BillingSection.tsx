@@ -61,7 +61,7 @@ export function BillingSection({
         return;
       }
       setBackfillMsg(
-        "Started — every untested phone on non-lost leads is queueing now. The counter above updates as each one finishes."
+        "Started. Every untested phone on non-lost leads is queueing now. The counter above updates as each one finishes."
       );
     });
   }

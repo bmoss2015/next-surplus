@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   IconMail,
   IconCalendar,
@@ -15,6 +15,12 @@ import { cn } from "@/lib/cn";
 import { displayRecipientName } from "@/components/mail/displayName";
 import type { MailJobListRow, MailJobDetailRow } from "@/lib/mail/fetch";
 import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
+import {
+  SendMailModal,
+  type SendMailModalRecipient,
+} from "@/components/mail/SendMailModal";
+import type { SendMailFromAddress } from "@/components/mail/SendMailButton";
+import type { MailTemplateRow } from "@/lib/settings/fetch";
 
 // V11 — lead Mail tab. Stats header on top, split-pane below.
 // Left rail: compact list of pieces with status dot + name + sent
@@ -23,9 +29,10 @@ import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
 // the right (V2 content inside V4's split-pane). Sized so the letter
 // reads as an 8.5x11 sheet, not a landscape strip.
 //
-// Defensible departure from Attio/Stripe's click-to-open: Moss's
-// core work product IS mail, so the letter as a first-class visual
-// on the lead view earns its space.
+// Mounts its own SendMailModal so both the "Send Mail" header button
+// and per-piece Fix & Resend buttons can open the compose flow without
+// hopping to the Contacts tab. Auto-opens when ?resend=<piece_id> is
+// in the URL (used by /mail's Fix & Resend button to deep-link in).
 
 const STATUS_DOT: Record<string, string> = {
   queued: "bg-gray-400",
@@ -58,6 +65,30 @@ function fmtDateCompact(iso: string | null): string {
   });
 }
 
+// Best-effort match between a returned piece and an existing candidate.
+// We pick by (line1 + city + state) since the recipient may have several
+// rows under the same name. Returns the candidate key if a match exists.
+function findCandidateKeyForPiece(
+  piece: MailJobListRow,
+  candidates: SendMailModalRecipient[]
+): string | null {
+  const normalize = (s: string) =>
+    s.trim().toLowerCase().replace(/\s+/g, " ");
+  const pLine1 = normalize(piece.recipient_address_line1);
+  const pCity = normalize(piece.recipient_city);
+  const pState = normalize(piece.recipient_state);
+  for (const c of candidates) {
+    if (
+      normalize(c.contact.line1) === pLine1 &&
+      normalize(c.contact.city) === pCity &&
+      normalize(c.contact.state) === pState
+    ) {
+      return c.key;
+    }
+  }
+  return null;
+}
+
 export function LeadMailV11Client({
   rows,
   totalSent,
@@ -66,6 +97,11 @@ export function LeadMailV11Client({
   returnedCount,
   leadId,
   mailingAddressCount,
+  candidates,
+  templates,
+  bankAccounts,
+  mailReady,
+  fromAddress,
 }: {
   rows: MailJobListRow[];
   totalSent: number;
@@ -74,12 +110,28 @@ export function LeadMailV11Client({
   returnedCount: number;
   leadId: string;
   mailingAddressCount: number;
+  candidates: SendMailModalRecipient[];
+  templates: MailTemplateRow[];
+  bankAccounts: { id: string; label: string; verified: boolean }[];
+  mailReady: boolean;
+  fromAddress: SendMailFromAddress;
 }) {
+  void leadId;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [selectedId, setSelectedId] = useState<string | null>(
     rows[0]?.id ?? null
   );
   const [detail, setDetail] = useState<MailJobDetailRow | null>(null);
   const [letterModalOpen, setLetterModalOpen] = useState(false);
+
+  // Send Mail modal state. resendingFor carries the failed piece when
+  // opened via Fix & Resend; null when the user clicks the header
+  // "Send Mail" button (regular compose).
+  const [sendMailOpen, setSendMailOpen] = useState(false);
+  const [resendingFor, setResendingFor] = useState<MailJobListRow | null>(null);
 
   // When selection changes, fetch the full detail (body_html for the
   // thumbnail). Only one request in flight at a time.
@@ -98,16 +150,54 @@ export function LeadMailV11Client({
     };
   }, [selectedId]);
 
+  // Auto-open Send Mail in resend mode when ?resend=<piece_id> is in
+  // the URL. Used by /mail's Fix & Resend button to deep-link straight
+  // into the compose flow. Clears the param after consuming so a page
+  // refresh doesn't keep re-opening the modal.
+  useEffect(() => {
+    const resendId = searchParams.get("resend");
+    if (!resendId) return;
+    const piece = rows.find((r) => r.id === resendId);
+    if (!piece) return;
+    setResendingFor(piece);
+    setSendMailOpen(true);
+    setSelectedId(resendId);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("resend");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const selected = detail ?? rows.find((r) => r.id === selectedId) ?? null;
 
-  const openSendMail = useCallback(() => {
-    // The Send Mail modal is wired elsewhere on the lead — for v11
-    // we trigger it by clicking the existing SendMailButton in the
-    // wrapping server component. This client renders only the
-    // history surface; the compose action sits in the lead header.
-    // Stub for the mockup-style click.
-    void leadId;
-  }, [leadId]);
+  const openCompose = useCallback(() => {
+    setResendingFor(null);
+    setSendMailOpen(true);
+  }, []);
+
+  const openResend = useCallback((piece: MailJobListRow) => {
+    setResendingFor(piece);
+    setSendMailOpen(true);
+  }, []);
+
+  // Pre-selected candidate keys for resend mode. Best-effort match on
+  // the failed address; if no match, modal falls back to the first
+  // candidate as usual (user can still pick the right one).
+  const resendDefaultKeys = useMemo(() => {
+    if (!resendingFor) return undefined;
+    const key = findCandidateKeyForPiece(resendingFor, candidates);
+    return key ? [key] : undefined;
+  }, [resendingFor, candidates]);
+
+  const resendNotice = useMemo(() => {
+    if (!resendingFor) return null;
+    const name = displayRecipientName(resendingFor.recipient_name);
+    const reason = resendingFor.error_message
+      ? `: ${resendingFor.error_message}`
+      : ".";
+    return `Resending to ${name}. The previous send was returned${reason} Verify the address is correct before sending again.`;
+  }, [resendingFor]);
 
   return (
     <div className="space-y-5">
@@ -127,7 +217,7 @@ export function LeadMailV11Client({
           </div>
           <button
             type="button"
-            onClick={openSendMail}
+            onClick={openCompose}
             className="cursor-pointer rounded-md bg-petrol-500 px-4 py-2 text-[12px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-petrol-600"
           >
             Send Mail
@@ -198,6 +288,7 @@ export function LeadMailV11Client({
               piece={selected}
               detail={detail}
               onOpenLetter={() => setLetterModalOpen(true)}
+              onFixAndResend={() => openResend(selected)}
             />
           )}
         </div>
@@ -210,6 +301,27 @@ export function LeadMailV11Client({
           recipient={displayRecipientName(selected.recipient_name)}
           bodyHtml={detail?.body_html ?? null}
           onClose={() => setLetterModalOpen(false)}
+        />
+      )}
+
+      {/* Send Mail modal — handles both regular compose and Fix &
+          Resend. Re-mounts with a fresh key when resendingFor changes
+          so the initial selection logic runs again. */}
+      {sendMailOpen && (
+        <SendMailModal
+          key={resendingFor?.id ?? "compose"}
+          open={sendMailOpen}
+          onClose={() => {
+            setSendMailOpen(false);
+            setResendingFor(null);
+          }}
+          templates={templates}
+          candidates={candidates}
+          bankAccounts={bankAccounts}
+          mailReady={mailReady}
+          fromAddress={fromAddress}
+          defaultSelectedKeys={resendDefaultKeys}
+          notice={resendNotice}
         />
       )}
     </div>
@@ -246,10 +358,12 @@ function DetailPane({
   piece,
   detail,
   onOpenLetter,
+  onFixAndResend,
 }: {
   piece: MailJobListRow | MailJobDetailRow;
   detail: MailJobDetailRow | null;
   onOpenLetter: () => void;
+  onFixAndResend: () => void;
 }) {
   const bodyHtml = detail?.body_html ?? null;
   const trackingUrl = piece.tracking_url;
@@ -372,7 +486,8 @@ function DetailPane({
           {(piece.status === "returned" || piece.status === "failed") && (
             <button
               type="button"
-              className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md bg-danger px-3 font-semibold text-white"
+              onClick={onFixAndResend}
+              className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md bg-danger px-3 font-semibold text-white hover:opacity-90"
             >
               Fix &amp; Resend
             </button>

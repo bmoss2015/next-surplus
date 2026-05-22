@@ -119,7 +119,7 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
           <div className="pref-row-title">Minimum Surplus Threshold</div>
           <div className="pref-row-desc">
             Leads with an estimated surplus under this amount are tagged Below
-            Minimum. Soft warning only — you can still pursue them.
+            Minimum. Soft warning only, you can still pursue them.
           </div>
         </div>
         <div className="field" style={{ width: 160 }}>

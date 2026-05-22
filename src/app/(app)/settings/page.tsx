@@ -21,6 +21,7 @@ import {
   fetchOrgInfo,
   fetchMailSettings,
   fetchMailBankAccounts,
+  fetchLobPricingSettings,
   fetchTemplates,
   fetchResearchTemplates,
   fetchMyNotificationPrefs,
@@ -65,6 +66,7 @@ export default async function SettingsPreviewJsxPage() {
     orgInfo,
     mailSettings,
     mailBank,
+    lobPricing,
     phoneUsage,
   ] = isAdmin
     ? await Promise.all([
@@ -75,9 +77,10 @@ export default async function SettingsPreviewJsxPage() {
         fetchOrgInfo(),
         fetchMailSettings(),
         fetchMailBankAccounts(),
+        fetchLobPricingSettings(),
         getValidationUsage(profile.orgId),
       ])
-    : [null, null, [], [], null, null, [], null];
+    : [null, null, [], [], null, null, [], null, null];
 
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "(app)", "settings", "preview.css"),
@@ -143,6 +146,7 @@ export default async function SettingsPreviewJsxPage() {
           emailAccounts,
           mailSettings,
           mailBank,
+          lobPricing,
           templates,
           research,
           phoneUsage,

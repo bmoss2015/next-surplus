@@ -456,15 +456,18 @@ function PieceRow({
         isBatchChild && "pl-12 bg-gray-50/40"
       )}
     >
-      {/* Left column — strict order: name + pill, address, meta */}
+      {/* Left column — strict order: name + pill, address, meta.
+          Name column is fixed width (280px) so the pill always lands
+          at the same X across rows, regardless of name length. Longer
+          names truncate. */}
       <div className="min-w-0">
-        <div className="flex items-center gap-3">
-          <span className="text-[15px] font-semibold text-ink">
+        <div className="grid grid-cols-[280px_auto] items-center gap-3">
+          <span className="truncate text-[15px] font-semibold text-ink">
             {displayRecipientName(piece.recipient_name)}
           </span>
           <span
             className={cn(
-              "inline-flex min-w-[76px] items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em]",
+              "inline-flex min-w-[76px] items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] justify-self-start",
               pillClass
             )}
           >
@@ -517,12 +520,24 @@ function PieceRow({
           same hue as the status pill but different weight. */}
       <div className="flex shrink-0 items-center gap-2">
         {section === "returned" ? (
-          <button
-            type="button"
-            className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md bg-danger px-3 text-[11.5px] font-semibold text-white"
-          >
-            Fix &amp; Resend
-          </button>
+          piece.lead_id ? (
+            <Link
+              href={`/leads/${piece.lead_id}?tab=mail&resend=${piece.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md bg-danger px-3 text-[11.5px] font-semibold text-white hover:opacity-90"
+            >
+              Fix &amp; Resend
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="inline-flex h-[30px] min-w-[110px] cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-[11.5px] font-semibold text-gray-400"
+              title="This piece isn't tied to a lead, open it via the lead it belongs to."
+            >
+              Fix &amp; Resend
+            </button>
+          )
         ) : (
           <>
             {/* All three action buttons (View Letter, Track, Fix &
@@ -575,11 +590,11 @@ function BatchRow({
     <details className="group">
       <summary className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50">
         <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <span className="text-[15px] font-semibold text-ink">
+          <div className="grid grid-cols-[280px_auto] items-center gap-3">
+            <span className="truncate text-[15px] font-semibold text-ink">
               Batch of {batch.length}
             </span>
-            <span className="inline-flex min-w-[76px] items-center justify-center rounded-[4px] border border-ink bg-ink px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] text-white">
+            <span className="inline-flex min-w-[76px] items-center justify-center rounded-[4px] border border-ink bg-ink px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] text-white justify-self-start">
               In Transit
             </span>
           </div>

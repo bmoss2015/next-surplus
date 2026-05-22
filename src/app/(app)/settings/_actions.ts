@@ -411,6 +411,67 @@ export async function updateOrgInfo(input: {
 
 // Admins update the human-facing mail fields (signer + default class) on the
 // org row. Signature image upload is a separate flow (storage bucket).
+// Admin-editable Lob rate schedule. Values stored as cents in
+// orgs.lob_pricing_cents (JSONB). The send-letter / send-check code
+// reads this to compute per-piece cost since Lob doesn't return cost
+// at send time. Defaults match Lob's published Developer-tier rates;
+// override per-org to reflect actual contract pricing.
+export async function updateLobPricing(input: {
+  tier_label: string;
+  check_base: number;
+  check_extra_attachment_page: number;
+  letter_first_class_bw: number;
+  letter_first_class_color: number;
+  letter_standard_bw: number;
+  letter_standard_color: number;
+  letter_certified_bw: number;
+  letter_certified_color: number;
+  letter_extra_page_bw: number;
+  letter_extra_page_color: number;
+  auto_sync: boolean;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+
+  const numericKeys = [
+    "check_base",
+    "check_extra_attachment_page",
+    "letter_first_class_bw",
+    "letter_first_class_color",
+    "letter_standard_bw",
+    "letter_standard_color",
+    "letter_certified_bw",
+    "letter_certified_color",
+    "letter_extra_page_bw",
+    "letter_extra_page_color",
+  ] as const;
+
+  const pricing: Record<string, string | number> = {
+    tier_label: input.tier_label.trim() || "Custom",
+  };
+  for (const k of numericKeys) {
+    const v = input[k];
+    if (!Number.isFinite(v) || v < 0) {
+      return { ok: false, error: `${k} must be a non-negative number` };
+    }
+    pricing[k] = Math.round(v);
+  }
+
+  const sb = await createClient();
+  const { error } = await sb
+    .from("orgs")
+    .update({
+      lob_pricing_cents: pricing,
+      lob_pricing_auto_sync: Boolean(input.auto_sync),
+    })
+    .eq("id", profile.orgId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 export async function updateMailSettings(input: {
   signer_name: string | null;
   signer_title: string | null;

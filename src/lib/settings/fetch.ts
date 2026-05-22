@@ -120,6 +120,93 @@ export async function fetchOrgInfo(): Promise<OrgInfo> {
   };
 }
 
+// Lob pricing settings — admin-editable. Reads orgs.lob_pricing_cents
+// (the rate schedule the send-letter / send-check code uses to compute
+// spend) plus the cron-managed snapshot fields. Settings UI surfaces
+// all four so admins can see drift between their contract pricing and
+// Lob's published list, and toggle the weekly auto-sync.
+export type LobPricingCents = {
+  tier_label: string;
+  check_base: number;
+  check_extra_attachment_page: number;
+  letter_first_class_bw: number;
+  letter_first_class_color: number;
+  letter_standard_bw: number;
+  letter_standard_color: number;
+  letter_certified_bw: number;
+  letter_certified_color: number;
+  letter_extra_page_bw: number;
+  letter_extra_page_color: number;
+};
+
+export type LobPricingSettings = {
+  current: LobPricingCents;
+  published: LobPricingCents | null;
+  auto_sync: boolean;
+  last_checked_at: string | null;
+};
+
+const LOB_PRICING_DEFAULTS: LobPricingCents = {
+  tier_label: "Developer (published)",
+  check_base: 116,
+  check_extra_attachment_page: 22,
+  letter_first_class_bw: 103,
+  letter_first_class_color: 119,
+  letter_standard_bw: 81,
+  letter_standard_color: 97,
+  letter_certified_bw: 103,
+  letter_certified_color: 119,
+  letter_extra_page_bw: 10,
+  letter_extra_page_color: 20,
+};
+
+function coerceLobPricing(raw: unknown): LobPricingCents {
+  if (!raw || typeof raw !== "object") return LOB_PRICING_DEFAULTS;
+  const r = raw as Record<string, unknown>;
+  const num = (k: keyof LobPricingCents) => {
+    const v = r[k];
+    return typeof v === "number" && Number.isFinite(v)
+      ? Math.round(v)
+      : (LOB_PRICING_DEFAULTS[k] as number);
+  };
+  return {
+    tier_label:
+      typeof r.tier_label === "string" && r.tier_label.trim().length > 0
+        ? r.tier_label
+        : LOB_PRICING_DEFAULTS.tier_label,
+    check_base: num("check_base"),
+    check_extra_attachment_page: num("check_extra_attachment_page"),
+    letter_first_class_bw: num("letter_first_class_bw"),
+    letter_first_class_color: num("letter_first_class_color"),
+    letter_standard_bw: num("letter_standard_bw"),
+    letter_standard_color: num("letter_standard_color"),
+    letter_certified_bw: num("letter_certified_bw"),
+    letter_certified_color: num("letter_certified_color"),
+    letter_extra_page_bw: num("letter_extra_page_bw"),
+    letter_extra_page_color: num("letter_extra_page_color"),
+  };
+}
+
+export async function fetchLobPricingSettings(): Promise<LobPricingSettings> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("orgs")
+    .select(
+      "lob_pricing_cents, lob_published_pricing_cents, lob_pricing_auto_sync, lob_pricing_last_checked_at"
+    )
+    .single();
+  if (error) throw error;
+  return {
+    current: coerceLobPricing(data.lob_pricing_cents),
+    published: data.lob_published_pricing_cents
+      ? coerceLobPricing(data.lob_published_pricing_cents)
+      : null,
+    auto_sync: Boolean(data.lob_pricing_auto_sync),
+    last_checked_at:
+      (data.lob_pricing_last_checked_at as string | null) ?? null,
+  };
+}
+
 export type MailSettings = {
   signer_name: string | null;
   signer_title: string | null;

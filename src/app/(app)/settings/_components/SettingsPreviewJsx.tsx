@@ -23,11 +23,13 @@ import { AttorneysSection } from "./AttorneysSection";
 import { ContactRolesSection } from "./ContactRolesSection";
 import { MailSettingsSection } from "./MailSettingsSection";
 import { MailBankAccountsSection } from "./MailBankAccountsSection";
+import { LobPricingSection } from "./LobPricingSection";
 import { TemplatesSection } from "./TemplatesSection";
 
 import type {
   AppSettings,
   AttorneyRow,
+  LobPricingSettings,
   LostReasonAdminRow,
   MailBankAccountRow,
   MailSettings,
@@ -60,6 +62,7 @@ export type SettingsData = {
   emailAccounts: EmailAccountRow[];
   mailSettings: MailSettings | null;
   mailBank: MailBankAccountRow[];
+  lobPricing: LobPricingSettings | null;
   templates: TemplateRow[];
   research: ResearchTemplateRow[];
   phoneUsage: PhoneValidationUsage | null;
@@ -194,6 +197,12 @@ function renderPanel(
       );
     case "mail-bank":
       return <MailBankAccountsSection initial={data.mailBank} />;
+    case "mail-pricing":
+      return data.lobPricing ? (
+        <LobPricingSection initial={data.lobPricing} />
+      ) : (
+        <AdminGate />
+      );
     case "templates":
       return (
         <TemplatesSection

@@ -622,7 +622,7 @@ function NeedsAttentionSection({
       </div>
       {needs.length > 4 && (
         <div className="mt-2 text-[11px] text-gray-500">
-          + {needs.length - 4} more — use the Returned filter below to see all.
+          + {needs.length - 4} more. Use the Returned filter below to see all.
         </div>
       )}
     </section>

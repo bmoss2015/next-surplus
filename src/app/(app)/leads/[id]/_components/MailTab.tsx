@@ -1,5 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { fetchMailDashboard } from "@/lib/mail/fetch";
+import {
+  fetchMailTemplates,
+  fetchMailBankAccounts,
+  fetchOrgInfo,
+} from "@/lib/settings/fetch";
+import { buildLeadSendMailCandidates } from "@/lib/mail/lead-candidates";
 import { LeadMailV11Client } from "./LeadMailV11Client";
 
 // V11 lead Mail tab. Stats header + split-pane below (compact left
@@ -11,8 +17,15 @@ import { LeadMailV11Client } from "./LeadMailV11Client";
 export async function MailTab({ leadId }: { leadId: string }) {
   const sb = await createClient();
 
-  // Pull mail for this lead + count addresses on file in parallel.
-  const [{ rows }, addressCountRes] = await Promise.all([
+  // Pull everything in parallel — mail history + Send Mail modal data.
+  const [
+    { rows },
+    addressCountRes,
+    candidates,
+    templates,
+    bankAccounts,
+    org,
+  ] = await Promise.all([
     fetchMailDashboard({
       leadId,
       windowDays: 365,
@@ -23,7 +36,12 @@ export async function MailTab({ leadId }: { leadId: string }) {
       .select("id", { count: "exact", head: true })
       .eq("lead_id", leadId)
       .eq("channel", "mailing_address"),
+    buildLeadSendMailCandidates(leadId),
+    fetchMailTemplates(),
+    fetchMailBankAccounts(),
+    fetchOrgInfo(),
   ]);
+
   const mailingAddressCount = addressCountRes.count ?? 0;
 
   const inTransitCount = rows.filter(
@@ -34,6 +52,34 @@ export async function MailTab({ leadId }: { leadId: string }) {
     (r) => r.status === "returned" || r.status === "failed"
   ).length;
 
+  // Map bank accounts to the shape SendMailModal wants — same logic
+  // SendMailButtonServer uses, kept here so the lead Mail tab doesn't
+  // depend on the contacts-tab button being mounted to send mail.
+  const banks = bankAccounts.map((b) => ({
+    id: b.id,
+    label: [
+      b.bank_name,
+      b.account_holder_name,
+      b.account_last_four ? `**** ${b.account_last_four}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    verified: b.status === "verified",
+  }));
+
+  const mailReady = Boolean(
+    org.address_line1 && org.city && org.region && org.postal_code
+  );
+
+  const fromAddress = {
+    name: org.name || "",
+    line1: org.address_line1 ?? "",
+    line2: org.address_line2 ?? null,
+    city: org.city ?? "",
+    region: org.region ?? "",
+    postal_code: org.postal_code ?? "",
+  };
+
   return (
     <LeadMailV11Client
       rows={rows}
@@ -43,6 +89,11 @@ export async function MailTab({ leadId }: { leadId: string }) {
       returnedCount={returnedCount}
       leadId={leadId}
       mailingAddressCount={mailingAddressCount}
+      candidates={candidates}
+      templates={templates}
+      bankAccounts={banks}
+      mailReady={mailReady}
+      fromAddress={fromAddress}
     />
   );
 }

@@ -71,7 +71,7 @@ export function LetterPreviewModal({
                 Letter Content Not Stored
               </div>
               <div>
-                This piece doesn&apos;t have a stored body — it was sent
+                This piece doesn&apos;t have a stored body. It was sent
                 using a Word document template that the provider rendered
                 directly. Open the provider preview above to see the
                 rendered letter.

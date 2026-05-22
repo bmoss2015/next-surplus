@@ -57,6 +57,7 @@ export const GROUPS: RailGroup[] = [
     items: [
       { key: "mail-settings", label: "Configuration", adminOnly: true },
       { key: "mail-bank", label: "Bank Accounts", adminOnly: true },
+      { key: "mail-pricing", label: "Lob Pricing", adminOnly: true },
     ],
   },
   {

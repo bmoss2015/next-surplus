@@ -10,6 +10,8 @@ import {
   getMailTemplateAttachmentPageCount,
   type RecipientInput,
 } from "@/lib/mail/actions";
+import { verifyAddressAction } from "@/app/(app)/mail/_verify-action";
+import type { AddressVerifyResult } from "@/lib/mail/verify-address";
 import { renderMerge, MERGE_FIELDS, MERGE_GROUP_LABELS } from "@/lib/mail/merge";
 import type { MailTemplateRow } from "@/lib/settings/fetch";
 import type { SendMailFromAddress } from "./SendMailButton";
@@ -67,6 +69,15 @@ export type SendMailModalProps = {
   // blocked at the UI level and a callout explains where to fix it.
   mailReady: boolean;
   fromAddress: SendMailFromAddress;
+  // Optional pre-selection. When provided, the modal opens with these
+  // candidate keys checked. Used for "Fix & Resend" flow where we want
+  // the user to send to the same recipient(s) again (after they fix
+  // the address). If none of the keys match a candidate, falls back to
+  // the default first-candidate selection.
+  defaultSelectedKeys?: string[];
+  // Optional banner shown at the top of the modal — typically the
+  // "resending to <name> after <reason>" callout for Fix & Resend.
+  notice?: string | null;
 };
 
 export function SendMailModal({
@@ -78,12 +89,26 @@ export function SendMailModal({
   defaultMailClass = "first_class",
   mailReady,
   fromAddress,
+  defaultSelectedKeys,
+  notice,
 }: SendMailModalProps) {
   const hasVerifiedBank = bankAccounts.some((b) => b.verified);
   const router = useRouter();
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(
-    new Set(candidates.slice(0, 1).map((c) => c.key))
-  );
+  // If the caller passes defaultSelectedKeys (Fix & Resend flow), use the
+  // ones that actually match a candidate. Falls back to first candidate.
+  const initialSelected = useMemo(() => {
+    if (defaultSelectedKeys && defaultSelectedKeys.length > 0) {
+      const valid = defaultSelectedKeys.filter((k) =>
+        candidates.some((c) => c.key === k)
+      );
+      if (valid.length > 0) return new Set(valid);
+    }
+    return new Set(candidates.slice(0, 1).map((c) => c.key));
+    // We only want to initialize once when the modal mounts/opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [selectedKeys, setSelectedKeys] =
+    useState<Set<string>>(initialSelected);
   const [templateId, setTemplateId] = useState<string | "blank">(
     templates[0]?.id ?? "blank"
   );
@@ -110,6 +135,17 @@ export function SendMailModal({
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [bodyRef, setBodyRef] = useState<HTMLTextAreaElement | null>(null);
+
+  // Pre-send address verification (Lob /us_verifications) results,
+  // keyed by recipient.key. Populated when the user clicks Send;
+  // an "undeliverable" result blocks the actual send and shows an
+  // inline error on the offending recipient. Normalized addresses
+  // replace the raw user input in the send payload so the printer
+  // gets the deliverable form.
+  const [verifyResults, setVerifyResults] = useState<
+    Record<string, AddressVerifyResult>
+  >({});
+  const [verifying, setVerifying] = useState(false);
 
   // Templates show in alphabetical order. Folder-aware grouping in the
   // picker UI happens at render time below.
@@ -233,7 +269,7 @@ export function SendMailModal({
     } as Record<string, string | number | null | undefined>;
   }
 
-  function send() {
+  async function send() {
     setErr(null);
     if (selectedRecipients.length === 0) {
       setErr("Pick at least one recipient");
@@ -253,20 +289,90 @@ export function SendMailModal({
         return;
       }
     }
-    const payload = {
-      recipients: selectedRecipients.map<RecipientInput>((r) => ({
-        relative_id: r.relative_id ?? null,
-        lead_party_id: r.lead_party_id ?? null,
-        lead_id: r.lead_id ?? null,
-        name: r.contact.full_name,
+
+    // Pre-send address verification (Lob /us_verifications). One call
+    // per recipient in parallel. Undeliverable blocks the send and the
+    // user sees an inline error on the offending recipient row. We
+    // store the normalized addresses for the payload below.
+    setVerifying(true);
+    const verifyEntries = await Promise.all(
+      selectedRecipients.map(async (r) => {
+        const res = await verifyAddressAction({
+          line1: r.contact.line1,
+          line2: r.contact.line2 ?? null,
+          city: r.contact.city,
+          state: r.contact.state,
+          postal_code: r.contact.postal_code,
+        });
+        return [r.key, res] as const;
+      })
+    );
+    const nextResults: Record<string, AddressVerifyResult> = {};
+    for (const [key, res] of verifyEntries) nextResults[key] = res;
+    setVerifyResults(nextResults);
+    setVerifying(false);
+
+    const undeliverable = verifyEntries.filter(
+      ([, res]) => res.ok && res.deliverability === "undeliverable"
+    );
+    if (undeliverable.length > 0) {
+      setErr(
+        undeliverable.length === 1
+          ? "1 recipient has an undeliverable address. Fix it or remove them, then send again."
+          : `${undeliverable.length} recipients have undeliverable addresses. Fix or remove them, then send again.`
+      );
+      return;
+    }
+    const verifyErrors = verifyEntries.filter(([, res]) => !res.ok);
+    if (verifyErrors.length > 0) {
+      // Lob itself errored. Don't block the send — surface the issue
+      // but let the user proceed (verification is a courtesy, not a
+      // hard gate when the verifier itself is down).
+      setErr(
+        "Address verification failed for one or more recipients. You can still send, but addresses won't be normalized."
+      );
+    }
+
+    // Use Lob's normalized address when we have one, otherwise the raw
+    // user input. Lob fixes things like "St" vs "Street" and adds the
+    // ZIP+4 — the printer prefers the normalized form.
+    const normalizedFor = (r: SendMailModalRecipient) => {
+      const v = nextResults[r.key];
+      if (v && v.ok && v.deliverability !== "undeliverable") {
+        return {
+          line1: v.normalized.line1,
+          line2: v.normalized.line2,
+          city: v.normalized.city,
+          state: v.normalized.state,
+          postal_code: v.normalized.postal_code,
+        };
+      }
+      return {
         line1: r.contact.line1,
         line2: r.contact.line2 ?? null,
         city: r.contact.city,
         state: r.contact.state,
         postal_code: r.contact.postal_code,
-        country: "US",
-        merge_context: buildMergeContext(r),
-      })),
+      };
+    };
+
+    const payload = {
+      recipients: selectedRecipients.map<RecipientInput>((r) => {
+        const addr = normalizedFor(r);
+        return {
+          relative_id: r.relative_id ?? null,
+          lead_party_id: r.lead_party_id ?? null,
+          lead_id: r.lead_id ?? null,
+          name: r.contact.full_name,
+          line1: addr.line1,
+          line2: addr.line2,
+          city: addr.city,
+          state: addr.state,
+          postal_code: addr.postal_code,
+          country: "US",
+          merge_context: buildMergeContext(r),
+        };
+      }),
       template_id: templateId === "blank" ? null : templateId,
       body_html: body,
       mail_class: mailClass,
@@ -337,6 +443,11 @@ export function SendMailModal({
               Address in Settings before sending mail.
             </div>
           )}
+          {notice && (
+            <div className="rounded-md border border-petrol-200 bg-petrol-50 px-3 py-2 text-[12px] text-petrol-700">
+              {notice}
+            </div>
+          )}
 
           {/* Recipients */}
           <div className={sectionClass}>
@@ -385,10 +496,11 @@ export function SendMailModal({
                               Not Mailed
                             </span>
                           )}
+                          <AddressBadge result={verifyResults[c.key] ?? null} />
                         </div>
                         <div className="mt-[2px] text-[11.5px] text-gray-500">
                           {c.contact.line1}
-                          {c.contact.line2 ? `, ${c.contact.line2}` : ""} —{" "}
+                          {c.contact.line2 ? `, ${c.contact.line2}` : ""},{" "}
                           {c.contact.city}, {c.contact.state}{" "}
                           {c.contact.postal_code}
                         </div>
@@ -633,6 +745,7 @@ export function SendMailModal({
               onClick={send}
               disabled={
                 pending ||
+                verifying ||
                 !mailReady ||
                 selectedRecipients.length === 0 ||
                 (!isFileTemplate && !body.trim()) ||
@@ -643,16 +756,18 @@ export function SendMailModal({
                 !mailReady
                   ? "Add a Company Address in Settings before sending mail"
                   : !hasPreviewed && selectedRecipients.length > 0
-                    ? "Preview the letter before sending — printed mail can't be unsent"
+                    ? "Preview the letter before sending, printed mail can't be unsent"
                     : undefined
               }
               className="cursor-pointer rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white disabled:opacity-50"
             >
               {pending
                 ? "Sending..."
-                : selectedRecipients.length <= 1
-                  ? "Send Letter"
-                  : `Send ${selectedRecipients.length} Letters`}
+                : verifying
+                  ? "Verifying addresses..."
+                  : selectedRecipients.length <= 1
+                    ? "Send Letter"
+                    : `Send ${selectedRecipients.length} Letters`}
             </button>
           </div>
         </div>
@@ -714,8 +829,8 @@ function CostEstimate({
         {includeCheck ? ` · Lob check ${fmt(1.16)} each` : ""}
       </div>
       <div className="mt-[2px] text-[10px] italic text-gray-400">
-        Starting price per Click2Mail's letter listing — final charge
-        depends on rendered page count + paper / class options, and
+        Starting price per Click2Mail&apos;s letter listing. Final charge
+        depends on rendered page count plus paper and class options, and
         comes back from C2M when the job is accepted.
       </div>
     </div>
@@ -819,6 +934,57 @@ function PdfPreview({ blob }: { blob: Blob }) {
         </div>
       )}
     </div>
+  );
+}
+
+// Inline badge that surfaces the Lob /us_verifications result on each
+// recipient row after the user clicks Send. Shows nothing pre-verify.
+function AddressBadge({ result }: { result: AddressVerifyResult | null }) {
+  if (!result) return null;
+  if (!result.ok) {
+    return (
+      <span
+        className="rounded-full border border-gray-200 bg-white px-2 py-[1px] text-[10px] font-medium text-gray-500"
+        title={result.error}
+      >
+        Address Check Failed
+      </span>
+    );
+  }
+  if (result.deliverability === "undeliverable") {
+    return (
+      <span
+        className="rounded-full border border-danger/30 bg-red-50 px-2 py-[1px] text-[10px] font-medium text-danger"
+        title="USPS will not deliver mail to this address. Fix the address or remove this recipient."
+      >
+        Undeliverable
+      </span>
+    );
+  }
+  if (
+    result.deliverability === "deliverable_incorrect_unit" ||
+    result.deliverability === "deliverable_missing_unit"
+  ) {
+    return (
+      <span
+        className="rounded-full border border-gray-300 bg-white px-2 py-[1px] text-[10px] font-medium text-ink"
+        title="Lob suggests the unit number is missing or wrong. Mail may still deliver but consider fixing the unit."
+      >
+        Unit Warning
+      </span>
+    );
+  }
+  return (
+    <span
+      className="rounded-full border border-petrol-500/30 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700"
+      title={
+        result.test_mode
+          ? "Lob test mode, verification is non-functional in dev"
+          : "Address verified deliverable by Lob"
+      }
+    >
+      {result.test_mode ? "Test Verified" : "Verified"}
+    </span>
   );
 }
 
