@@ -25,10 +25,22 @@ type RowState =
   | { kind: "done"; result: RunResult }
   | { kind: "error"; error: string };
 
+type SampleStage = {
+  lead_id: string;
+  label: string;
+  stage_name: string;
+  piece_count: number;
+};
+
 type SampleState =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "done"; inserted: number; lead_id: string | null }
+  | {
+      kind: "done";
+      inserted: number;
+      lead_id: string | null;
+      stages: SampleStage[];
+    }
   | { kind: "error"; error: string };
 
 type SweepState =
@@ -70,7 +82,12 @@ export function MailTestClient() {
         setSample({ kind: "error", error: res.error });
         return;
       }
-      setSample({ kind: "done", inserted: res.inserted, lead_id: res.lead_id });
+      setSample({
+        kind: "done",
+        inserted: res.inserted,
+        lead_id: res.lead_id,
+        stages: res.stages,
+      });
     });
   }, []);
 
@@ -162,31 +179,47 @@ export function MailTestClient() {
             </div>
             <div className="mt-1 text-[12px] text-petrol-900/80">
               Inserts 7 realistic mail_jobs rows directly into the DB (no
-              provider calls, no cost). Mix of statuses — delivered, in
-              transit, returned — plus one 2-recipient batch and one
-              check piece. Attaches to your most recent lead so the
-              Overview Mail card and lead Activity tab light up too.
+              provider calls, no cost). Distributed across your 4 most
+              recent leads so each lead demonstrates a distinct stage —
+              just sent, delivered, needs attention, active campaign.
             </div>
             {sample.kind === "done" && (
-              <div className="mt-2 text-[12px] text-petrol-900">
-                Inserted {sample.inserted} sample rows.{" "}
-                <Link
-                  href="/mail"
-                  className="cursor-pointer font-medium underline"
-                >
-                  Open /mail
-                </Link>
-                {sample.lead_id && (
-                  <>
-                    {" · "}
-                    <Link
-                      href={`/leads/${sample.lead_id}`}
-                      className="cursor-pointer font-medium underline"
-                    >
-                      Open Lead
-                    </Link>
-                  </>
-                )}
+              <div className="mt-3 space-y-2">
+                <div className="text-[12px] text-petrol-900">
+                  Inserted {sample.inserted} sample rows.{" "}
+                  <Link
+                    href="/mail"
+                    className="cursor-pointer font-medium underline"
+                  >
+                    Open /mail dashboard
+                  </Link>
+                </div>
+                <div className="rounded-md border border-petrol-200 bg-white p-3">
+                  <div className="mb-2 text-[10.5px] font-medium uppercase tracking-wide text-gray-500">
+                    Lead Samples By Stage
+                  </div>
+                  <ul className="space-y-1.5">
+                    {sample.stages.map((s) => (
+                      <li
+                        key={s.lead_id}
+                        className="flex items-baseline justify-between gap-3 text-[12px]"
+                      >
+                        <Link
+                          href={`/leads/${s.lead_id}?tab=mail`}
+                          className="cursor-pointer font-medium text-petrol-700 underline hover:text-petrol-900"
+                        >
+                          {s.label}
+                        </Link>
+                        <span className="text-gray-600">
+                          {s.stage_name}{" "}
+                          <span className="text-gray-400">
+                            ({s.piece_count} {s.piece_count === 1 ? "piece" : "pieces"})
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             )}
             {sample.kind === "error" && (

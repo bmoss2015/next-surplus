@@ -567,8 +567,20 @@ const SAMPLE_BODY_HTML = `<!doctype html>
 <div><p>March 14, 2026</p><p>Dear neighbor,</p><p>Our research indicates you may be entitled to funds being held by the county following a recent property sale. Moss Equity Partners specializes in recovering these surplus funds on behalf of rightful owners.</p><p>If you'd like to discuss whether this applies to your situation, please reply by mail or call us at (512) 555-0142. There is no cost to you to learn more.</p><p>Sincerely,<br/>Bree Moss<br/>Moss Equity Partners</p></div>
 </body></html>`;
 
+export type SeededLeadStage = {
+  lead_id: string;
+  label: string;
+  stage_name: string;
+  piece_count: number;
+};
+
 export async function seedSampleMailData(): Promise<
-  | { ok: true; inserted: number; lead_id: string | null }
+  | {
+      ok: true;
+      inserted: number;
+      lead_id: string | null;
+      stages: SeededLeadStage[];
+    }
   | { ok: false; error: string }
 > {
   const profile = await getCurrentProfile();
@@ -577,16 +589,24 @@ export async function seedSampleMailData(): Promise<
   const sb = await createClient();
   const admin = createServiceClient();
 
-  // Find the most-recently-touched lead so the sample mail card on the
-  // lead Overview tab has something to render. Falls back to null if no
-  // leads exist on staging.
-  const { data: lead } = await sb
+  // Pull the 4 most-recently-touched leads so the seeder can distribute
+  // pieces across them. Each lead ends up representing a distinct mail
+  // stage (just sent / delivered / needs attention / advanced) so Bree
+  // can navigate between them and compare the lead surfaces side-by-
+  // side. Falls back to null if no leads exist on staging.
+  const { data: leadsData } = await sb
     .from("leads")
-    .select("id, address, city, state, postal_code")
+    .select("id, address, city, state, lead_id")
     .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const leadId = (lead?.id as string | null) ?? null;
+    .limit(4);
+  const leads = (leadsData ?? []) as Array<{
+    id: string;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    lead_id: string | null;
+  }>;
+  const leadId = leads[0]?.id ?? null;
 
   // Pull the org address for the from_* snapshot.
   const { data: org } = await sb
@@ -601,7 +621,13 @@ export async function seedSampleMailData(): Promise<
   const daysAgo = (n: number) =>
     new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
 
-  // The 7 sample pieces. Mix of statuses, dates, and one multi-recipient batch.
+  // The 7 sample pieces. Mix of statuses, dates, and one multi-recipient
+  // batch. Distributed across leads[0..3] so each lead represents a
+  // distinct mail stage:
+  //   leads[0] → "Just Sent"        (1 in-transit)
+  //   leads[1] → "Delivered"        (1 delivered + 1 certified delivered)
+  //   leads[2] → "Needs Attention"  (1 returned)
+  //   leads[3] → "Active Campaign"  (batch of 2 + 1 check)
   type Sample = {
     name: string;
     line1: string;
@@ -616,7 +642,8 @@ export async function seedSampleMailData(): Promise<
     include_check?: boolean;
     check_amount_cents?: number;
     tracking_number?: string;
-    batch_with?: string; // share a batch_id with another sample's name
+    batch_with?: string;
+    lead_idx: number; // which seeded lead this piece attaches to
   };
   const samples: Sample[] = [
     {
@@ -630,6 +657,7 @@ export async function seedSampleMailData(): Promise<
       delivered_days_ago: 9,
       mail_class: "first_class",
       tracking_number: "9400111899223344556677",
+      lead_idx: 1,
     },
     {
       name: `David Rodriguez`,
@@ -642,6 +670,7 @@ export async function seedSampleMailData(): Promise<
       delivered_days_ago: 7,
       mail_class: "certified",
       tracking_number: "9400111899223344556712",
+      lead_idx: 1,
     },
     {
       name: `Patricia Williams`,
@@ -653,6 +682,7 @@ export async function seedSampleMailData(): Promise<
       sent_days_ago: 3,
       mail_class: "first_class",
       tracking_number: "9400111899223344556728",
+      lead_idx: 0,
     },
     {
       name: `James O'Brien`,
@@ -665,6 +695,7 @@ export async function seedSampleMailData(): Promise<
       returned_days_ago: 5,
       mail_class: "first_class",
       tracking_number: "9400111899223344556735",
+      lead_idx: 2,
     },
     {
       name: `Linda Foster (batch)`,
@@ -677,6 +708,7 @@ export async function seedSampleMailData(): Promise<
       mail_class: "first_class",
       tracking_number: "9400111899223344556742",
       batch_with: "robert-batch",
+      lead_idx: 3,
     },
     {
       name: `Robert Foster (batch)`,
@@ -689,6 +721,7 @@ export async function seedSampleMailData(): Promise<
       mail_class: "first_class",
       tracking_number: "9400111899223344556759",
       batch_with: "robert-batch",
+      lead_idx: 3,
     },
     {
       name: `Susan Park (check)`,
@@ -702,6 +735,7 @@ export async function seedSampleMailData(): Promise<
       include_check: true,
       check_amount_cents: 482500,
       tracking_number: "9400111899223344556766",
+      lead_idx: 3,
     },
   ];
 
@@ -714,11 +748,12 @@ export async function seedSampleMailData(): Promise<
       batchId = randomUUID();
       batchKeyToId.set(batchKey, batchId);
     }
+    const attachedLeadId = leads[s.lead_idx]?.id ?? leadId;
     return {
       id: randomUUID(),
       org_id: profile.orgId,
       batch_id: batchId,
-      lead_id: leadId,
+      lead_id: attachedLeadId,
       recipient_name: s.name,
       recipient_address_line1: s.line1,
       recipient_city: s.city,
@@ -756,11 +791,12 @@ export async function seedSampleMailData(): Promise<
   const { error } = await admin.from("mail_jobs").insert(rows);
   if (error) return { ok: false, error: error.message };
 
-  // Drop matching activity rows on the lead so the Activity tab + Overview
-  // recent-activity card show them too. Only for the lead-attached rows.
-  if (leadId) {
-    const activityRows = rows.map((r) => ({
-      lead_id: leadId,
+  // Drop matching activity rows on each attached lead so the Activity
+  // tab + Overview recent-activity card show them too.
+  const activityRows = rows
+    .filter((r) => r.lead_id)
+    .map((r) => ({
+      lead_id: r.lead_id as string,
       user_id: profile.id,
       activity_type:
         r.status === "delivered"
@@ -782,12 +818,36 @@ export async function seedSampleMailData(): Promise<
       },
       created_at: r.sent_at,
     }));
+  if (activityRows.length > 0) {
     await admin.from("activities").insert(activityRows);
   }
 
+  // Build the stage list so the harness UI can show clickable URLs to
+  // each lead, labeled with what state they demonstrate.
+  const STAGE_NAMES = [
+    "Just Sent — 1 in transit",
+    "Delivered — successful contact",
+    "Needs Attention — returned piece",
+    "Active Campaign — batch + check",
+  ];
+  const stages: SeededLeadStage[] = leads.slice(0, 4).map((l, idx) => {
+    const pieces = rows.filter((r) => r.lead_id === l.id);
+    return {
+      lead_id: l.id,
+      label:
+        (l.lead_id as string | null) ??
+        [l.address, l.city, l.state].filter(Boolean).join(", ") ??
+        l.id,
+      stage_name: STAGE_NAMES[idx] ?? "Sample",
+      piece_count: pieces.length,
+    };
+  });
+
   revalidatePath("/mail");
-  if (leadId) revalidatePath(`/leads/${leadId}`);
-  return { ok: true, inserted: rows.length, lead_id: leadId };
+  for (const stage of stages) {
+    revalidatePath(`/leads/${stage.lead_id}`);
+  }
+  return { ok: true, inserted: rows.length, lead_id: leadId, stages };
 }
 
 function emptyResult(
