@@ -21,21 +21,33 @@ export default async function MailMockupIndexPage() {
   const mainVariants = [
     {
       slug: "v6",
-      label: "V6 — Operations Dashboard",
+      label: "V6 — KPI Dashboard + status lists",
       blurb:
-        "KPI strip on top (delivery rate, avg time to delivered, return rate, each with period-over-period delta). Horizontal pipeline bar. \"Action Required\" surfaces only returned pieces with inline Fix & Resend buttons. In Transit + Delivered collapse to summary rows. Not a list; it's a control room.",
+        "The report-look aesthetic Bree liked: big KPI tiles + horizontal pipeline bar, now wired to operational data (In Transit / Sent Today / Delivered This Week / Returned This Month). Status-grouped lists below for the working surface. No Action Required block (lead-only per agreement).",
+    },
+    {
+      slug: "v9",
+      label: "V9 — KPI Dashboard + activity stream",
+      blurb:
+        "Same KPI + pipeline hero, then the body is a chronological activity stream of mail events instead of status lists. Each row is a thing that happened: \"Margaret Chen's letter reached Austin 20 min ago.\" Reads like a Stripe events log. Same visual language as V6.",
+    },
+    {
+      slug: "v10",
+      label: "V10 — KPI Dashboard + horizontal swimlanes",
+      blurb:
+        "Same KPI + pipeline hero, then three horizontal swimlanes — one row per status — each a 4-up grid of compact piece cards. Different from V3's vertical kanban; scans left-to-right per lane. More gallery + dashboard than dashboard + list.",
     },
     {
       slug: "v7",
-      label: "V7 — Stripe-style List",
+      label: "V7 — Stripe-style List (alternative)",
       blurb:
-        "Dense, refined transaction list (Stripe Payments / Linear issue-list). No harsh borders or pill blocks. Status as a small inline dot + uppercase label. Tabular-nums for dates + tracking. Search + filter chips at top. Hover-revealed row actions. Built to scan 100+ pieces fast without losing density.",
+        "Dense refined transaction list, kept as an alternative if the KPI-dashboard hero feels like too much. Different aesthetic from V6/V9/V10.",
     },
     {
       slug: "v8",
-      label: "V8 — Inbox Zero",
+      label: "V8 — Inbox Zero (alternative)",
       blurb:
-        "Shows only what needs a human. Returned pieces loud at the top. Everything else (in-transit, delivered) collapses to one-line count rows. Most days the page is mostly empty. \"What should I do next\" over \"show me everything.\"",
+        "Minimal view; only loud thing is returned pieces. Doesn't fit the report-look direction Bree liked; kept for reference.",
     },
   ];
 

@@ -2,23 +2,23 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 
-// Variant 6 (revised) — Operations Dashboard.
-// Bree loved the layout; pulled out the report-y content (delivery
-// rate %, period-over-period deltas, "view all pieces" link, paragraph
-// headline). This is the main /mail tab itself, not a click-through
-// preview of one. Content swapped to active operational state:
-//   - Active counts of in-flight pieces, delivered this week, sent
-//     today, needs attention. No rates or comparisons (those live
-//     in /reports/mail).
-//   - Action Required surfaces returned pieces with inline Fix &
-//     Resend buttons.
-//   - In Transit + Delivered are visible-but-quiet sections beneath,
-//     each a clean list (no collapse).
+// Variant 6 (locked-in baseline).
+// Same report-look aesthetic Bree liked (big KPI tiles with sub-
+// captions + horizontal pipeline bar) but with operational data
+// only. No Action Required block here — per our agreement, returned
+// pieces surface on the LEAD Mail tab, not the global /mail dashboard.
+// Lists below are status-grouped (In Transit, Delivered Recent), the
+// table-equivalent the user uses to scan everything.
 
 export default async function MockupV6() {
   if (process.env.VERCEL_ENV === "production") notFound();
   const profile = await getCurrentProfile();
   if (!profile?.isAdmin) notFound();
+
+  const inTransit = 3;
+  const delivered = 18;
+  const returned = 3;
+  const total = inTransit + delivered + returned;
 
   return (
     <div className="min-h-screen bg-gray-50 px-7 py-7">
@@ -30,76 +30,43 @@ export default async function MockupV6() {
           ← All Mockups
         </Link>
         <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-400">
-          V6 · Operations Dashboard (revised)
+          V6 · KPI Dashboard
         </span>
       </div>
 
       <header className="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="m-0 text-[28px] font-semibold tracking-tight text-ink">
-            Sent Mail
-          </h1>
-        </div>
-        <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-4 py-2 text-[12px] font-semibold text-white">
+        <h1 className="m-0 text-[28px] font-semibold tracking-tight text-ink">
+          Sent Mail
+        </h1>
+        <button className="cursor-pointer rounded-md bg-[#0d4b3a] px-4 py-2 text-[12px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)]">
           Send Mail
         </button>
       </header>
 
-      {/* Active operational KPIs — no rates, no period comparisons */}
-      <div className="grid grid-cols-4 gap-4">
-        <Kpi label="In Transit" value="3" sub="moving toward delivery" />
-        <Kpi label="Sent Today" value="2" sub="went out in this morning's print run" />
-        <Kpi label="Delivered This Week" value="6" sub="confirmed by USPS" />
-        <Kpi label="Needs Attention" value="3" sub="returned, awaiting new address" warn />
-      </div>
+      <KpiStrip
+        tiles={[
+          { label: "In Transit", value: inTransit, sub: "moving toward delivery" },
+          { label: "Sent Today", value: 2, sub: "went out in this morning's run" },
+          { label: "Delivered This Week", value: 6, sub: "confirmed by USPS" },
+          { label: "Returned This Month", value: returned, sub: "awaiting new address", warn: true },
+        ]}
+      />
 
-      {/* Action Required — only renders when returned pieces exist */}
-      <section className="mt-5 rounded-2xl border border-[#c4253c]/20 bg-white p-6">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c4253c]">
-          Action Required
-        </div>
-        <div className="mt-4 divide-y divide-gray-150">
-          <ActionRow
-            name="James O'Brien"
-            lead="L-2026-0051"
-            surplus="$19K"
-            address="245 Magnolia Court, San Antonio, TX 78216"
-            returnReason="Forward expired"
-            daysAgo={5}
-          />
-          <ActionRow
-            name="George Wu"
-            lead="L-2026-0062"
-            surplus="$31K"
-            address="6111 Llano Estacado, Lubbock, TX 79407"
-            returnReason="Vacant"
-            daysAgo={11}
-          />
-          <ActionRow
-            name="Helen Reyes"
-            lead="L-2026-0067"
-            surplus="$8K"
-            address="3402 W Slaughter Ln, Austin, TX 78748"
-            returnReason="No such number"
-            daysAgo={14}
-          />
-        </div>
-      </section>
+      <PipelineBar inTransit={inTransit} delivered={delivered} returned={returned} total={total} />
 
-      {/* In Transit — quiet but visible */}
+      {/* Lists below — status-grouped, the working surface */}
       <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-6">
         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
           In Transit
         </div>
         <div className="mt-4 divide-y divide-gray-150">
-          <PieceRow name="Patricia Williams" lead="L-2026-0046" surplus="$61K" city="Dallas, TX" status="In Transit" classLabel="First Class" since="3d ago" />
-          <PieceRow name="Linda Foster" lead="L-2026-0048" surplus="$33K" city="Fort Worth, TX" status="In Transit" classLabel="First Class · Batch" since="1d ago" />
-          <PieceRow name="Robert Foster" lead="L-2026-0048" surplus="$33K" city="Fort Worth, TX" status="In Transit" classLabel="First Class · Batch" since="1d ago" />
-          <PieceRow name="Susan Park" lead="L-2026-0050" surplus="$14K" city="Austin, TX" status="In Transit" classLabel="First Class · Check $4,825" since="5d ago" />
+          <PieceRow name="Patricia Williams" lead="L-2026-0046" surplus="$61K" city="Dallas, TX" classLabel="First Class" since="3d ago" />
+          <PieceRow name="Linda Foster" lead="L-2026-0048" surplus="$33K" city="Fort Worth, TX" classLabel="First Class · Batch" since="1d ago" />
+          <PieceRow name="Robert Foster" lead="L-2026-0048" surplus="$33K" city="Fort Worth, TX" classLabel="First Class · Batch" since="1d ago" />
+          <PieceRow name="Susan Park" lead="L-2026-0050" surplus="$14K" city="Austin, TX" classLabel="First Class · Check $4,825" since="5d ago" />
         </div>
       </section>
 
-      {/* Delivered — quiet, recent only */}
       <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-6">
         <div className="flex items-baseline justify-between">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
@@ -110,92 +77,103 @@ export default async function MockupV6() {
           </Link>
         </div>
         <div className="mt-4 divide-y divide-gray-150">
-          <PieceRow name="Margaret Chen" lead="L-2026-0042" surplus="$42K" city="Austin, TX" status="Delivered" classLabel="First Class" since="Delivered Jan 18" tone="ok" />
-          <PieceRow name="David Rodriguez" lead="L-2026-0044" surplus="$28K" city="Houston, TX" status="Delivered" classLabel="Certified" since="Delivered Jan 20" tone="ok" />
-          <PieceRow name="Carlos Mendez" lead="L-2026-0058" surplus="$22K" city="El Paso, TX" status="Delivered" classLabel="First Class" since="Delivered Jan 17" tone="ok" />
+          <PieceRow name="Margaret Chen" lead="L-2026-0042" surplus="$42K" city="Austin, TX" classLabel="First Class" since="Delivered Jan 18" tone="ok" />
+          <PieceRow name="David Rodriguez" lead="L-2026-0044" surplus="$28K" city="Houston, TX" classLabel="Certified" since="Delivered Jan 20" tone="ok" />
+          <PieceRow name="Carlos Mendez" lead="L-2026-0058" surplus="$22K" city="El Paso, TX" classLabel="First Class" since="Delivered Jan 17" tone="ok" />
         </div>
       </section>
     </div>
   );
 }
 
-function Kpi({
+export function KpiStrip({
+  tiles,
+}: {
+  tiles: Array<{ label: string; value: number | string; sub: string; warn?: boolean }>;
+}) {
+  return (
+    <div className={`grid grid-cols-${tiles.length} gap-4`} style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
+      {tiles.map((t) => (
+        <div key={t.label} className="rounded-2xl border border-gray-200 bg-white p-6">
+          <div className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${t.warn ? "text-[#c4253c]" : "text-gray-500"}`}>
+            {t.label}
+          </div>
+          <div className={`mt-2 text-[42px] font-semibold leading-none tracking-tight ${t.warn ? "text-[#c4253c]" : "text-ink"}`}>
+            {t.value}
+          </div>
+          <div className="mt-3 text-[11px] text-gray-500">{t.sub}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function PipelineBar({
+  inTransit,
+  delivered,
+  returned,
+  total,
+}: {
+  inTransit: number;
+  delivered: number;
+  returned: number;
+  total: number;
+}) {
+  return (
+    <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="flex items-baseline justify-between">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+          Pipeline
+        </div>
+        <div className="text-[11px] text-gray-500">{total} pieces total</div>
+      </div>
+      <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-gray-100">
+        <div className="bg-ink" style={{ width: `${(inTransit / total) * 100}%` }} />
+        <div className="bg-[#0d4b3a]" style={{ width: `${(delivered / total) * 100}%` }} />
+        <div className="bg-[#c4253c]" style={{ width: `${(returned / total) * 100}%` }} />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-4 text-[12px]">
+        <BreakdownPair color="bg-ink" label="In Transit" count={inTransit} />
+        <BreakdownPair color="bg-[#0d4b3a]" label="Delivered" count={delivered} />
+        <BreakdownPair color="bg-[#c4253c]" label="Returned" count={returned} warn />
+      </div>
+    </section>
+  );
+}
+
+export function BreakdownPair({
+  color,
   label,
-  value,
-  sub,
+  count,
   warn,
 }: {
+  color: string;
   label: string;
-  value: string;
-  sub: string;
+  count: number;
   warn?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6">
-      <div className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${warn ? "text-[#c4253c]" : "text-gray-500"}`}>
+    <div className="flex items-baseline gap-2">
+      <span className={`h-2 w-2 rounded-full ${color}`} />
+      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
         {label}
-      </div>
-      <div
-        className={`mt-2 text-[42px] font-semibold leading-none tracking-tight ${
+      </span>
+      <span
+        className={`ml-auto text-[16px] font-semibold tabular-nums ${
           warn ? "text-[#c4253c]" : "text-ink"
         }`}
       >
-        {value}
-      </div>
-      <div className="mt-3 text-[11px] text-gray-500">{sub}</div>
+        {count}
+      </span>
     </div>
   );
 }
 
-function ActionRow({
-  name,
-  lead,
-  surplus,
-  address,
-  returnReason,
-  daysAgo,
-}: {
-  name: string;
-  lead: string;
-  surplus: string;
-  address: string;
-  returnReason: string;
-  daysAgo: number;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-4">
-      <div className="min-w-0">
-        <div className="text-[14px] font-semibold text-ink">{name}</div>
-        <div className="mt-[1px] text-[11.5px] text-gray-500">{address}</div>
-        <div className="mt-[2px] text-[11px]">
-          <span className="font-medium text-[#c4253c]">{returnReason}</span>
-          <span className="text-gray-400"> · returned {daysAgo}d ago</span>
-          <span className="text-gray-400"> · </span>
-          <Link href="#" className="cursor-pointer text-[#0d4b3a] underline decoration-[#0d4b3a]/30 underline-offset-2">
-            {lead}
-          </Link>
-          <span className="text-gray-400"> · </span>
-          <span className="text-ink">{surplus} surplus</span>
-        </div>
-      </div>
-      <div className="flex shrink-0 gap-2">
-        <button className="cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[11.5px] font-medium text-ink hover:bg-gray-50">
-          View Letter
-        </button>
-        <button className="cursor-pointer rounded-md bg-[#c4253c] px-3 py-1.5 text-[11.5px] font-medium text-white">
-          Fix &amp; Resend
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PieceRow({
+export function PieceRow({
   name,
   lead,
   surplus,
   city,
-  status,
   classLabel,
   since,
   tone,
@@ -204,13 +182,12 @@ function PieceRow({
   lead: string;
   surplus: string;
   city: string;
-  status: string;
   classLabel: string;
   since: string;
   tone?: "ok";
 }) {
   return (
-    <div className="group flex items-center justify-between gap-4 py-3">
+    <div className="flex items-center justify-between gap-4 py-3">
       <div className="min-w-0">
         <div className="flex items-baseline gap-2">
           <span className="text-[13.5px] font-semibold text-ink">{name}</span>
@@ -230,11 +207,12 @@ function PieceRow({
         <span className={`text-[11px] ${tone === "ok" ? "text-[#0d4b3a]" : "text-gray-500"}`}>
           {since}
         </span>
-        <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <button className="cursor-pointer rounded-md border border-gray-200 bg-white px-2 py-1 text-[10.5px] font-medium text-ink hover:bg-gray-50">
+        {/* Always-visible action buttons (no hover-only) */}
+        <div className="flex gap-1">
+          <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-2.5 py-1 text-[10.5px] font-medium text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
             View
           </button>
-          <button className="cursor-pointer rounded-md border border-gray-200 bg-white px-2 py-1 text-[10.5px] font-medium text-ink hover:bg-gray-50">
+          <button className="cursor-pointer rounded-md border border-[#0d4b3a]/25 bg-white px-2.5 py-1 text-[10.5px] font-medium text-[#0d4b3a] hover:bg-[#0d4b3a]/[0.04]">
             Track
           </button>
         </div>
