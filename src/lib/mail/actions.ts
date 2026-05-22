@@ -408,7 +408,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   const { data: org } = await sb
     .from("orgs")
     .select(
-      "name, legal_name, email, phone, website, address_line1, address_line2, city, region, postal_code, country, signer_name, signer_title, signature_image_path"
+      "name, legal_name, email, phone, website, address_line1, address_line2, city, region, postal_code, country, signer_name, signer_title, signature_image_path, lob_pricing_cents"
     )
     .eq("id", profile.orgId)
     .single();
@@ -574,6 +574,11 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       mail_class: input.mail_class,
       color: input.color === true,
       correlation_id: correlationId,
+      // Per-org Lob pricing schedule for cost computation. Loaded once
+      // from orgs.lob_pricing_cents up top.
+      lob_pricing: (org.lob_pricing_cents as
+        | import("./types").LobPricing
+        | null) ?? undefined,
     };
 
     let send;

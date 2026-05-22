@@ -23,6 +23,25 @@ export type Address = {
   country?: string;
 };
 
+// Per-piece rate schedule the org has configured. Matches the JSONB
+// shape stored on orgs.lob_pricing_cents. All values in cents. Defaults
+// to the published Developer-tier rates; admin can override from
+// /settings to reflect actual contract pricing (volume discounts,
+// tier upgrades, custom enterprise rates).
+export type LobPricing = {
+  tier_label: string;
+  check_base: number;
+  check_extra_attachment_page: number;
+  letter_first_class_bw: number;
+  letter_first_class_color: number;
+  letter_standard_bw: number;
+  letter_standard_color: number;
+  letter_certified_bw: number;
+  letter_certified_color: number;
+  letter_extra_page_bw: number;
+  letter_extra_page_color: number;
+};
+
 export type SendLetterInput = {
   to: Address;
   from: Address;
@@ -36,6 +55,9 @@ export type SendLetterInput = {
   // webhook can map back to our mail_jobs row even if our provider_id
   // hasn't been persisted yet.
   correlation_id: string;
+  // Org's Lob rate schedule. Optional so non-org callers still work;
+  // when missing the cost computation falls back to nulls.
+  lob_pricing?: LobPricing;
 };
 
 export type SendCheckInput = SendLetterInput & {

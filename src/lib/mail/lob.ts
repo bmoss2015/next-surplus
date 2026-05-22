@@ -1,55 +1,52 @@
 import "server-only";
-import type { SendLetterInput, SendCheckInput, SendResult } from "./types";
+import type {
+  SendLetterInput,
+  SendCheckInput,
+  SendResult,
+  LobPricing,
+} from "./types";
 
 // Lob doesn't return per-piece cost in their create-check or create-
 // letter API responses. Their billing reconciles monthly. To report
-// spend accurately at send time without fabricating numbers, we look
-// up the published per-piece rate from Lob's pricing schedule for
-// the configured tier.
+// spend at send time, the caller passes a per-org pricing schedule
+// (stored on orgs.lob_pricing_cents) which we use to compute cost.
 //
-// Source: Lob Developer-tier pricing (verified via Lob docs
-// https://help.lob.com/llms-full.txt fetch on 2026-05-22). If Moss
-// upgrades to Growth/Startup/Enterprise, set LOB_PRICING_TIER env to
-// adjust — defaults to "developer".
-//
-// Cents-precision so we don't lose half-pennies in display math.
-type LobTier = "developer";
-const LOB_TIER: LobTier = (process.env.LOB_PRICING_TIER as LobTier) ?? "developer";
+// If pricing isn't provided (older callers, dev environments), cost
+// returns null so the report shows "spend not tracked" rather than
+// inventing a number.
 
-const LOB_PRICES_CENTS: Record<LobTier, {
-  check_base: number;
-  check_extra_attachment_page: number;
-  letter: {
-    first_class: { bw: number; color: number };
-    standard: { bw: number; color: number };
-    certified: { bw: number; color: number };
-  };
-  letter_extra_page: { bw: number; color: number };
-}> = {
-  developer: {
-    check_base: 116, // $1.159 → 116 cents (rounded to nearest cent)
-    check_extra_attachment_page: 22, // $0.220
-    letter: {
-      first_class: { bw: 103, color: 119 }, // $1.029 / $1.189
-      standard: { bw: 81, color: 97 }, // $0.806 / $0.966
-      // Certified isn't tier-priced in the published table (shown as
-      // "—") — treat as first-class price + a flat certified surcharge
-      // until Lob publishes one. The send code currently only routes
-      // first_class / standard to Lob for letters anyway; check routing
-      // is independent of class.
-      certified: { bw: 103, color: 119 },
-    },
-    letter_extra_page: { bw: 10, color: 20 }, // $0.10 / $0.20
-  },
+// Published Lob Developer-tier defaults, used by the migration to
+// seed the per-org config and surfaced here as a fallback for callers
+// that don't pass a schedule. Verified via Lob docs llms-full.txt on
+// 2026-05-22.
+export const LOB_PUBLISHED_DEVELOPER_PRICING: LobPricing = {
+  tier_label: "Developer (published)",
+  check_base: 116,
+  check_extra_attachment_page: 22,
+  letter_first_class_bw: 103,
+  letter_first_class_color: 119,
+  letter_standard_bw: 81,
+  letter_standard_color: 97,
+  letter_certified_bw: 103,
+  letter_certified_color: 119,
+  letter_extra_page_bw: 10,
+  letter_extra_page_color: 20,
 };
 
-function lobLetterCostCents(mc: SendLetterInput["mail_class"], color: boolean): number {
-  const rate = LOB_PRICES_CENTS[LOB_TIER].letter[mc];
-  return color ? rate.color : rate.bw;
+function lobLetterCostCents(
+  mc: SendLetterInput["mail_class"],
+  color: boolean,
+  pricing: LobPricing | undefined
+): number | null {
+  if (!pricing) return null;
+  if (mc === "standard") return color ? pricing.letter_standard_color : pricing.letter_standard_bw;
+  if (mc === "certified") return color ? pricing.letter_certified_color : pricing.letter_certified_bw;
+  return color ? pricing.letter_first_class_color : pricing.letter_first_class_bw;
 }
 
-function lobCheckCostCents(): number {
-  return LOB_PRICES_CENTS[LOB_TIER].check_base;
+function lobCheckCostCents(pricing: LobPricing | undefined): number | null {
+  if (!pricing) return null;
+  return pricing.check_base;
 }
 
 // Lob.com client. Used for two things:
@@ -154,7 +151,7 @@ export async function lobSendCheck(
       // compute from the published Developer-tier rate schedule above.
       // Accurate to Lob's list pricing; volume discounts (if any) come
       // out in the monthly invoice reconciliation.
-      cost_cents: lobCheckCostCents(),
+      cost_cents: lobCheckCostCents(input.lob_pricing),
     };
   } catch (err) {
     return {
@@ -227,7 +224,7 @@ export async function lobSendLetter(
       provider_id: json.id,
       tracking_number: json.tracking_number ?? null,
       tracking_url: json.url ?? null,
-      cost_cents: lobLetterCostCents(input.mail_class, input.color === true),
+      cost_cents: lobLetterCostCents(input.mail_class, input.color === true, input.lob_pricing),
     };
   } catch (err) {
     return {
