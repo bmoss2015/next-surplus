@@ -180,20 +180,25 @@ function DetailContent({
           className="group block w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-shadow hover:shadow-card cursor-pointer"
           title="Open Letter Preview"
         >
-          <div className="relative h-72 w-full overflow-hidden">
+          <div className="relative h-80 w-full overflow-hidden bg-white">
             {job.body_html ? (
               <iframe
                 title="Letter thumbnail"
                 sandbox=""
                 srcDoc={job.body_html}
-                className="absolute -top-12 left-1/2 -translate-x-1/2 h-[900px] w-[680px] origin-top scale-[0.55] bg-white"
+                // Render at full letter dimensions (8.5x11 → 612x792 at 72dpi)
+                // then scale down to fit. Origin top-left ensures the
+                // top of the letter (date / address block / greeting) is
+                // visible, not pushed off-screen.
+                className="absolute left-0 top-0 origin-top-left scale-[0.46] bg-white"
+                style={{ width: "612px", height: "792px" }}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-[12px] text-gray-500">
                 <IconMail size={32} stroke={1.25} className="text-gray-300" />
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/0 to-transparent group-hover:from-black/10" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/0 to-transparent group-hover:from-black/5" />
           </div>
           <div className="border-t border-gray-200 px-3 py-2 text-left text-[11.5px] text-gray-600 group-hover:text-petrol-700">
             Click to View Full Letter
@@ -254,7 +259,7 @@ function DetailContent({
               rel="noopener noreferrer"
               className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-gray-50"
             >
-              Track With Provider
+              Track Package
               <IconExternalLink size={12} stroke={2} />
             </a>
           ) : null}
@@ -269,7 +274,7 @@ function DetailContent({
         </div>
 
         {(job.status === "returned" || job.status === "failed") && (
-          <ResendForm job={job} onResent={onResent} />
+          <ResendForm job={job} onResent={onResent} onDeleted={onDeleted} />
         )}
 
         {/* Delete is only offered for failed pieces — those are records
@@ -327,15 +332,18 @@ function DetailBlock({
 function ResendForm({
   job,
   onResent,
+  onDeleted,
 }: {
   job: MailJobDetailRow;
   onResent: () => void;
+  onDeleted: () => void;
 }) {
   const [line1, setLine1] = useState(job.recipient_address_line1);
   const [line2, setLine2] = useState(job.recipient_address_line2 ?? "");
   const [city, setCity] = useState(job.recipient_city);
   const [state, setState] = useState(job.recipient_state);
   const [postal, setPostal] = useState(job.recipient_postal_code);
+  const [saveToLead, setSaveToLead] = useState(true);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -349,12 +357,32 @@ function ResendForm({
         city,
         state,
         postal_code: postal,
+        save_address_to_lead: saveToLead,
       });
       if (!res.ok) {
         setError(res.error);
         return;
       }
       onResent();
+    });
+  };
+
+  const cancel = () => {
+    if (
+      !confirm(
+        "Delete this returned record without resending? Activity entry on the lead is kept; the row goes away."
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const res = await deleteMailJob({ jobId: job.id });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      onDeleted();
     });
   };
 
@@ -367,9 +395,10 @@ function ResendForm({
         </div>
       </div>
       <p className="mb-3 text-[11.5px] text-gray-700">
-        The recipient&apos;s address didn&apos;t deliver. Fix it below and send a
-        new piece — the original returned record stays in the history for
-        reference.
+        The recipient&apos;s address didn&apos;t deliver. Fix it below and send
+        a new piece — or, if you don&apos;t have a corrected address yet,
+        delete this record. The original returned activity entry on the
+        lead is kept either way.
       </p>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Address Line 1" value={line1} onChange={setLine1} colSpan={2} />
@@ -380,17 +409,34 @@ function ResendForm({
           <Field label="ZIP" value={postal} onChange={setPostal} />
         </div>
       </div>
+      <label className="mt-3 flex cursor-pointer items-center gap-2 text-[12px] text-charcoal">
+        <input
+          type="checkbox"
+          checked={saveToLead}
+          onChange={(e) => setSaveToLead(e.target.checked)}
+          className="cursor-pointer"
+        />
+        Save This Corrected Address To The Lead
+      </label>
       {error && (
         <div className="mt-3 rounded-md border border-danger/40 bg-danger-bg/40 px-3 py-2 text-[12px] text-danger">
           {error}
         </div>
       )}
-      <div className="mt-3 flex justify-end">
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={cancel}
+          disabled={pending}
+          className="cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Don&apos;t Resend — Delete Record
+        </button>
         <button
           type="button"
           onClick={submit}
           disabled={pending}
-          className="btn-primary disabled:opacity-50 cursor-pointer"
+          className="btn btn-primary disabled:opacity-50 cursor-pointer"
         >
           {pending ? "Sending..." : "Resend"}
         </button>

@@ -24,6 +24,7 @@ export async function MailTab({ leadId }: { leadId: string }) {
         initialSearch=""
         initialStatus="all"
         initialLeadId={leadId}
+        showNeedsAttention
       />
     </div>
   );

@@ -230,7 +230,7 @@ export function MailTestClient() {
             type="button"
             onClick={handleSeedSamples}
             disabled={sample.kind === "loading"}
-            className="btn-primary disabled:opacity-50 cursor-pointer inline-flex shrink-0 items-center gap-1.5"
+            className="btn btn-primary disabled:opacity-50 cursor-pointer inline-flex shrink-0 items-center gap-1.5"
           >
             <IconDatabase size={14} stroke={1.75} />
             {sample.kind === "loading" ? "Seeding..." : "Seed Sample Mail Data"}
@@ -279,7 +279,7 @@ export function MailTestClient() {
           type="button"
           onClick={() => void ensureSeeded()}
           disabled={seed.kind === "loading" || seed.kind === "ready"}
-          className="btn-primary disabled:opacity-50 cursor-pointer"
+          className="btn btn-primary disabled:opacity-50 cursor-pointer"
         >
           {seed.kind === "loading" ? "Seeding..." : seed.kind === "ready" ? "Seeded" : "Seed Test Artifacts"}
         </button>

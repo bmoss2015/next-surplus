@@ -155,12 +155,18 @@ export function MailListClient({
   initialSearch,
   initialStatus,
   initialLeadId,
+  showNeedsAttention = false,
 }: {
   initialRows: MailJobListRow[];
   initialStats: MailStats;
   initialSearch: string;
   initialStatus: MailStatusFilter;
   initialLeadId: string | null;
+  // Needs Attention surfaces returned/failed pieces above the table.
+  // Only renders when scoped to a single lead — on the global /mail
+  // dashboard it'd surface returned pieces across all leads which is
+  // noise. Lead Mail tab passes true; /mail leaves it false.
+  showNeedsAttention?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -288,13 +294,15 @@ export function MailListClient({
         ))}
       </div>
 
-      {/* Needs Attention — only renders when there are returned/failed
-          pieces. Visually distinct from the table (card layout, danger
-          border) so the actionable items don't get buried. */}
-      <NeedsAttentionSection
-        rows={rows}
-        onOpen={(id) => setDetailId(id)}
-      />
+      {/* Needs Attention — lead-scoped only. Hides on the global /mail
+          dashboard because surfacing returned pieces across every lead
+          is noise; an operator works on one lead at a time. */}
+      {showNeedsAttention && (
+        <NeedsAttentionSection
+          rows={rows}
+          onOpen={(id) => setDetailId(id)}
+        />
+      )}
 
       {/* Search + filter chips + actions */}
       <div className="mb-3 flex flex-wrap items-center gap-2">

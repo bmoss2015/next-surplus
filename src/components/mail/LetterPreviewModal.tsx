@@ -53,7 +53,7 @@ export function LetterPreviewModal({
                 rel="noopener noreferrer"
                 className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11.5px] font-medium text-ink hover:bg-gray-50"
               >
-                Provider Preview
+                Track Package
                 <IconExternalLink size={11} stroke={2} />
               </a>
             )}

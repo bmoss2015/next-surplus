@@ -13,10 +13,19 @@ export type ResendInput = {
   city: string;
   state: string;
   postal_code: string;
+  // When true, also update the contact row (relative or lead_party) the
+  // original piece was sent to, so the corrected address sticks on the
+  // lead and future sends pull the right one.
+  save_address_to_lead?: boolean;
 };
 
 export type ResendResult =
-  | { ok: true; batch_id: string; job_ids: string[] }
+  | {
+      ok: true;
+      batch_id: string;
+      job_ids: string[];
+      address_saved_to: "relative" | "lead_party" | "none";
+    }
   | { ok: false; error: string };
 
 // Take a returned (or any) mail job, copy its body / template / class /
@@ -40,10 +49,62 @@ export async function resendMailJob(input: ResendInput): Promise<ResendResult> {
     };
   }
 
+  // Pull the entity link of the original send so we know where to save
+  // the corrected address. mail_jobs has relative_id and lead_party_id
+  // alongside lead_id; those aren't on the fetchMailJob type, so query
+  // direct.
+  const sb = await createClient();
+  const { data: linkRow } = await sb
+    .from("mail_jobs")
+    .select("relative_id, lead_party_id")
+    .eq("id", input.jobId)
+    .maybeSingle();
+  const relativeId = (linkRow?.relative_id as string | null) ?? null;
+  const leadPartyId = (linkRow?.lead_party_id as string | null) ?? null;
+
+  // Compose the new mailing-address string the same way the rest of the
+  // portal stores it on contacts.value — single line with line2 folded in.
+  const addrLine = [
+    trimmed.line1,
+    input.line2?.trim() || null,
+    `${trimmed.city}, ${trimmed.state} ${trimmed.postal_code}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  let addressSavedTo: "relative" | "lead_party" | "none" = "none";
+  if (input.save_address_to_lead) {
+    if (relativeId) {
+      addressSavedTo = await upsertMailingAddressContact(sb, {
+        relative_id: relativeId,
+        lead_party_id: null,
+        lead_id: job.lead_id ?? null,
+        recipient_label: job.recipient_name,
+        value: addrLine,
+      })
+        ? "relative"
+        : "none";
+    } else if (leadPartyId) {
+      addressSavedTo = await upsertMailingAddressContact(sb, {
+        relative_id: null,
+        lead_party_id: leadPartyId,
+        lead_id: job.lead_id ?? null,
+        recipient_label: job.recipient_name,
+        value: addrLine,
+      })
+        ? "lead_party"
+        : "none";
+    }
+    // If neither relative_id nor lead_party_id is set, we have nowhere
+    // to attach the address — silently skip (the resend still goes).
+  }
+
   const send = await sendMail({
     recipients: [
       {
         lead_id: job.lead_id ?? null,
+        relative_id: relativeId,
+        lead_party_id: leadPartyId,
         name: job.recipient_name,
         line1: trimmed.line1,
         line2: input.line2 ?? null,
@@ -67,7 +128,60 @@ export async function resendMailJob(input: ResendInput): Promise<ResendResult> {
     bank_account_id: job.bank_account_id ?? null,
   });
   if (!send.ok) return { ok: false, error: send.error };
-  return { ok: true, batch_id: send.batch_id, job_ids: send.job_ids };
+  if (job.lead_id) revalidatePath(`/leads/${job.lead_id}`);
+  return {
+    ok: true,
+    batch_id: send.batch_id,
+    job_ids: send.job_ids,
+    address_saved_to: addressSavedTo,
+  };
+}
+
+// Best-effort upsert of a mailing_address contact for the given entity.
+// Returns true if the row was inserted or updated, false on any error
+// (we keep this non-fatal — the resend itself still proceeds even if
+// the address persist fails).
+async function upsertMailingAddressContact(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  input: {
+    relative_id: string | null;
+    lead_party_id: string | null;
+    lead_id: string | null;
+    recipient_label: string;
+    value: string;
+  }
+): Promise<boolean> {
+  try {
+    // Find the existing mailing_address contact for this entity.
+    let q = sb
+      .from("contacts")
+      .select("id")
+      .eq("channel", "mailing_address");
+    if (input.relative_id) q = q.eq("relative_id", input.relative_id);
+    else if (input.lead_party_id) q = q.eq("lead_party_id", input.lead_party_id);
+    else return false;
+    const { data: existing } = await q.maybeSingle();
+
+    if (existing?.id) {
+      const { error } = await sb
+        .from("contacts")
+        .update({ value: input.value })
+        .eq("id", existing.id);
+      return !error;
+    }
+    // No existing contact — insert one.
+    const { error } = await sb.from("contacts").insert({
+      channel: "mailing_address",
+      value: input.value,
+      relative_id: input.relative_id,
+      lead_party_id: input.lead_party_id,
+      lead_id: input.lead_id,
+      notes: input.recipient_label,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
 }
 
 // Hard-delete a mail_jobs row. Used to clean up old failed records that
@@ -86,4 +200,3 @@ export async function deleteMailJob(input: {
   revalidatePath("/mail");
   return { ok: true };
 }
-
