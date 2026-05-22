@@ -192,10 +192,6 @@ export function BillingSection({
             <div className="billing-stat-lab">Validations All-Time</div>
           </div>
         </div>
-        <div className="billing-card-foot">
-          Credits do not auto-recharge. Add more before the balance runs low
-          so new phones keep getting screened.
-        </div>
         <div className="billing-card-action">
           <button
             type="button"

@@ -7,6 +7,7 @@ import { requireAdmin, getCurrentProfile } from "@/lib/auth/current-user";
 import { STAGES, type Stage } from "@/lib/leads/types";
 import { toProperCase } from "@/lib/format/proper-case";
 import { validateSpecificPhones, type RelativePhoneBase } from "@/lib/phone-validate";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 
 // Phone slots on the relatives table — used to reset per-slot validation
 // state when a slot's value changes.
@@ -643,6 +644,41 @@ export async function upsertContact(
         validation_raw: null,
       }
     : {};
+
+  // Same-lead phone duplicate guard: if the value being saved normalizes to
+  // the same E.164 as another phone contact on this same lead, reject the
+  // save. Stops the "I clicked Save twice / I retyped the same number" trap
+  // that would otherwise burn an extra credit and leave a confusing
+  // duplicate row.
+  if (
+    valueChanged &&
+    patch.value &&
+    (patch.channel === "phone" ||
+      (!patch.channel && contactId)) // editing an existing row, channel inferred
+  ) {
+    const parsed = parsePhoneNumberFromString(patch.value.trim(), "US");
+    const incomingE164 = parsed && parsed.isValid() ? parsed.number : null;
+    if (incomingE164) {
+      let existingQuery = sb
+        .from("contacts")
+        .select("id, value")
+        .eq("lead_id", leadId)
+        .eq("channel", "phone")
+        .not("value", "is", null);
+      if (contactId) existingQuery = existingQuery.neq("id", contactId);
+      const { data: existing } = await existingQuery;
+      for (const row of (existing ?? []) as Array<{ id: string; value: string | null }>) {
+        if (!row.value) continue;
+        const p = parsePhoneNumberFromString(row.value.trim(), "US");
+        if (p && p.isValid() && p.number === incomingE164) {
+          return {
+            ok: false,
+            error: "This phone number is already on this lead.",
+          };
+        }
+      }
+    }
+  }
 
   let resolvedId: string;
   if (contactId) {

@@ -205,15 +205,21 @@ export async function validatePhone(
 
   const sb = createServiceClient();
 
+  // Cache check before spending a credit: if this exact E.164 was validated
+  // to a definitive result in the last 90 days, reuse that. Saves credits
+  // on cross-lead dupes, accidental re-adds, and import overlap.
+  const cached = await findCachedValidation(sb, orgId, e164);
+  if (cached) return cached;
+
   // Note: we used to pre-check `local_usage_count >= cap` here as a quota
-  // gate. That broke after the Veriphone-to-Clearout swap because the
-  // local usage count includes pre-migration rows that have nothing to do
-  // with the live Clearout balance. Result: rows silently stayed
-  // "Not Verified" even with thousands of credits actually available.
-  // The fix is to let the provider be the source of truth: if credits are
-  // really gone, the upstream call returns an error and we surface that
-  // as a transient untested state. The threshold-alert plumbing still
-  // warns at 80/95/100% based on Clearout's live remaining balance.
+  // gate. That broke after a provider swap because the local usage count
+  // included pre-migration rows that had nothing to do with the live
+  // balance, so rows silently stayed "Not Verified" even with thousands of
+  // credits actually available. The fix is to let the provider be the
+  // source of truth: if credits are really gone, the upstream call
+  // returns an error and we surface that as a transient untested state.
+  // The threshold-alert plumbing still warns at 80/95/100% based on the
+  // live remaining balance.
 
   const apiKey = process.env.CLEAROUT_PHONE_API_KEY;
   if (!apiKey) {
@@ -322,7 +328,50 @@ async function getClearoutBalance(): Promise<number | null> {
   }
 }
 
-// Sums org_addon_usage units inside the current calendar month — gives the
+// Org-wide validation cache: if a phone has been validated to a definitive
+// result (valid/invalid) within the staleness window, reuse that result
+// instead of calling the provider again. Saves credits when the same number
+// shows up on a different lead or gets re-added to the same one.
+//
+// 90-day staleness window — surplus-recovery cold-call lists go stale fast
+// (numbers get disconnected). Older results trigger a fresh validation so we
+// don't show a stale "Verified" on a now-dead line. Returns null on miss.
+async function findCachedValidation(
+  sb: ServiceClient,
+  orgId: string,
+  e164: string
+): Promise<ValidationResult | null> {
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb
+    .from("org_addon_usage")
+    .select("created_at, metadata")
+    .eq("org_id", orgId)
+    .eq("addon_key", ADDON_KEY)
+    .gte("created_at", ninetyDaysAgo)
+    .filter("metadata->>phone_e164", "eq", e164)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  const row = data[0] as { created_at: string; metadata: Record<string, unknown> | null };
+  const m = row.metadata ?? {};
+  const result = m.result;
+  if (result !== "valid" && result !== "invalid") return null;
+  const lineType = (m.line_type as string | null | undefined) ?? null;
+  return {
+    status: result === "valid" ? "valid" : "invalid",
+    provider: "clearout-cache",
+    checkedAt: row.created_at,
+    raw: {
+      cached: true,
+      original_validated_at: row.created_at,
+      line_type: lineType,
+      e164,
+    },
+    phoneType: lineType ? mapClearoutLineType(lineType) : null,
+  };
+}
+
+// Sums org_addon_usage units inside the current calendar month, gives the
 // Billing meter a "this billing cycle's spend" figure independent of the
 // running Clearout balance.
 async function getMonthCreditsUsed(sb: ServiceClient, orgId: string): Promise<number> {
