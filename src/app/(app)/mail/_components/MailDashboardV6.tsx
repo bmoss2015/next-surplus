@@ -407,17 +407,19 @@ function PieceRow({
         {section === "returned" ? (
           <button
             type="button"
-            className="inline-flex h-[30px] cursor-pointer items-center justify-center rounded-md bg-danger px-3 text-[11.5px] font-semibold text-white"
+            className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md bg-danger px-3 text-[11.5px] font-semibold text-white"
           >
             Fix &amp; Resend
           </button>
         ) : (
           <>
-            {/* Explicit h-[30px] on BOTH so View Letter and Track render
-                at identical heights, regardless of border-box math. */}
+            {/* All three action buttons (View Letter, Track, Fix &
+                Resend) share min-w-[110px] so they read as a consistent
+                button family regardless of label length. Width set to
+                fit the longest phrase ("Fix & Resend"). */}
             <button
               type="button"
-              className="inline-flex h-[30px] cursor-pointer items-center justify-center rounded-md bg-petrol-500 px-3 text-[11.5px] font-medium text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-petrol-600"
+              className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md bg-petrol-500 px-3 text-[11.5px] font-medium text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-petrol-600"
             >
               View Letter
             </button>
@@ -427,7 +429,7 @@ function PieceRow({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex h-[30px] cursor-pointer items-center justify-center rounded-md border border-petrol-500/25 bg-white px-3 text-[11.5px] font-medium text-petrol-700 hover:bg-petrol-50"
+                className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md border border-petrol-500/25 bg-white px-3 text-[11.5px] font-medium text-petrol-700 hover:bg-petrol-50"
               >
                 Track
               </a>
@@ -435,7 +437,7 @@ function PieceRow({
               <button
                 type="button"
                 disabled
-                className="inline-flex h-[30px] cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-[11.5px] font-medium text-gray-400"
+                className="inline-flex h-[30px] min-w-[110px] cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-[11.5px] font-medium text-gray-400"
               >
                 Track
               </button>
@@ -479,13 +481,12 @@ function BatchRow({
             <span>Sent {fmtDateLong(first.sent_at)}</span>
           </div>
         </div>
-        {/* Batch affordance spans the solo-row's View Letter + Track
-            footprint: same petrol fill, identical h-[30px], min-width
-            188px so batch and solo rows line up across the right edge. */}
+        {/* Batch affordance spans View Letter + gap + Track exactly:
+            110 + 8 + 110 = 228px. Solid petrol fill, same h-[30px]. */}
         <div className="flex shrink-0 items-center">
           <span
             className="inline-flex h-[30px] cursor-pointer items-center justify-center gap-2 rounded-md bg-petrol-500 px-3 text-[11.5px] font-medium text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-petrol-600"
-            style={{ minWidth: "188px" }}
+            style={{ minWidth: "228px" }}
           >
             Expand Batch
             <IconChevronDown

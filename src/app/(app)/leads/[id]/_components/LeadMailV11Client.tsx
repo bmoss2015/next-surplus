@@ -349,10 +349,12 @@ function DetailPane({
         )}
 
         <div className="mt-auto flex gap-2 pt-4 text-[11.5px] font-medium">
+          {/* Same min-w-[110px] / h-[30px] family as V6 so the button
+              set reads consistent across surfaces. */}
           <button
             type="button"
             onClick={onOpenLetter}
-            className="cursor-pointer rounded-md bg-petrol-500 px-3 py-1.5 text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-petrol-600"
+            className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md bg-petrol-500 px-3 text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-petrol-600"
           >
             View Letter
           </button>
@@ -361,7 +363,7 @@ function DetailPane({
               href={trackingUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="cursor-pointer rounded-md border border-petrol-500/25 bg-white px-3 py-1.5 text-petrol-700 hover:bg-petrol-50"
+              className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md border border-petrol-500/25 bg-white px-3 text-petrol-700 hover:bg-petrol-50"
             >
               Track
             </a>
@@ -369,7 +371,7 @@ function DetailPane({
             <button
               type="button"
               disabled
-              className="cursor-not-allowed rounded-md border border-gray-200 bg-white px-3 py-1.5 text-gray-400"
+              className="inline-flex h-[30px] min-w-[110px] cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-gray-400"
             >
               Track
             </button>
