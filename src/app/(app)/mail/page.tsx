@@ -1,64 +1,28 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/current-user";
-import { fetchMailDashboard, type MailStatusFilter } from "@/lib/mail/fetch";
+import { fetchMailDashboard } from "@/lib/mail/fetch";
 import { MailSectionTabs } from "./_components/MailSectionTabs";
-import { MailListClient } from "./_components/MailListClient";
+import { MailDashboardV6 } from "./_components/MailDashboardV6";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{
-  q?: string;
-  status?: string;
-  lead?: string;
-}>;
-
-function parseStatus(s: string | undefined): MailStatusFilter {
-  if (s === "in_flight" || s === "delivered" || s === "returned") {
-    return s;
-  }
-  return "all";
-}
-
-export default async function MailDashboardPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function MailDashboardPage() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/");
-  const params = await searchParams;
-  const status = parseStatus(params.status);
-  const search = (params.q ?? "").trim() || null;
-  const leadId = (params.lead ?? "").trim() || null;
-  const { stats, rows } = await fetchMailDashboard({
-    windowDays: 30,
-    search,
-    status,
-    leadId,
-  });
+  const { stats, rows } = await fetchMailDashboard({ windowDays: 30 });
 
   return (
     <div className="px-7 py-6">
       <MailSectionTabs />
-      <div className="mb-[22px] flex items-end justify-between gap-4">
-        <div>
-          <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-            Sent Mail
-          </h1>
-          <div className="mt-1 text-[13px] text-gray-500">
-            Status of physical mail sent through the portal. Returned items
-            appear first so you can fix the address and resend.
-          </div>
+      <div className="mb-6">
+        <h1 className="m-0 text-[28px] font-semibold tracking-tight text-ink">
+          Sent Mail
+        </h1>
+        <div className="mt-1 text-[12.5px] text-gray-500">
+          Last 30 days. Older pieces are archived under each lead.
         </div>
       </div>
-
-      <MailListClient
-        initialRows={rows}
-        initialStats={stats}
-        initialSearch={search ?? ""}
-        initialStatus={status}
-        initialLeadId={leadId}
-      />
+      <MailDashboardV6 rows={rows} stats={stats} />
     </div>
   );
 }
