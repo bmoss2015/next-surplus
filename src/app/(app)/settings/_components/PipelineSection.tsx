@@ -63,11 +63,23 @@ export function PipelineSection({
     });
   }
 
+  const [confirmingArchive, setConfirmingArchive] = useState<string | null>(null);
+
   function archive(id: string) {
+    // Click 1: arm the confirm state. Click 2: actually archive. The
+    // armed state expires when the user clicks a different row or
+    // archives this one.
+    if (confirmingArchive !== id) {
+      setConfirmingArchive(id);
+      return;
+    }
     startTransition(async () => {
       const res = await setLostReasonArchived(id, true);
       if (!res.ok) setErrMsg(res.error);
-      else router.refresh();
+      else {
+        setConfirmingArchive(null);
+        router.refresh();
+      }
     });
   }
 
@@ -170,12 +182,29 @@ export function PipelineSection({
                 <div className="flex-1 min-w-0">
                   <div className="text-[13.5px] font-medium">{r.label}</div>
                 </div>
-                <div className="overflow flex items-center gap-0.5 ml-2">
+                <div className="overflow flex items-center gap-2 ml-2">
+                  {confirmingArchive === r.id && (
+                    <span
+                      className="text-[11.5px]"
+                      style={{ color: "var(--danger)" }}
+                    >
+                      Click again to archive
+                    </span>
+                  )}
                   <button
                     type="button"
                     className="icon-btn"
-                    title="Archive"
+                    title={
+                      confirmingArchive === r.id
+                        ? "Confirm archive"
+                        : "Archive (existing leads keep this label; new leads won't see it)"
+                    }
                     onClick={() => archive(r.id)}
+                    style={
+                      confirmingArchive === r.id
+                        ? { color: "var(--danger)" }
+                        : undefined
+                    }
                   >
                     <i className="icon icon-trash" />
                   </button>

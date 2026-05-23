@@ -15,23 +15,24 @@ import {
   deleteAttorney,
 } from "@/app/(app)/settings/_actions";
 import type { AttorneyRow } from "@/lib/settings/fetch";
+import { StatesPicker } from "@/components/StatesPicker";
 
 type Form = {
   name: string;
   email: string;
-  states: string;
+  states: string[];
   cost: string;
   notes: string;
 };
 
-const EMPTY: Form = { name: "", email: "", states: "", cost: "", notes: "" };
+const EMPTY: Form = { name: "", email: "", states: [], cost: "", notes: "" };
 
 function seedFrom(attorney: AttorneyRow | null): Form {
   if (!attorney) return EMPTY;
   return {
     name: attorney.name,
     email: attorney.email ?? "",
-    states: attorney.states_covered.join(", "),
+    states: [...attorney.states_covered],
     cost: attorney.default_cost != null ? String(attorney.default_cost) : "",
     notes: attorney.notes ?? "",
   };
@@ -69,14 +70,10 @@ export function AttorneyDrawer({
 
   function onSave() {
     setErrMsg(null);
-    const states = form.states
-      .split(",")
-      .map((s) => s.trim().toUpperCase())
-      .filter(Boolean);
     const cost = form.cost.trim();
     const costNum = cost ? Number(cost.replace(/[,\s$]/g, "")) : null;
-    if (cost && !Number.isFinite(costNum)) {
-      setErrMsg("Default cost must be a number");
+    if (cost && (!Number.isFinite(costNum) || (costNum ?? -1) < 0)) {
+      setErrMsg("Default cost must be a positive number");
       return;
     }
     startTransition(async () => {
@@ -84,7 +81,7 @@ export function AttorneyDrawer({
         id: attorney?.id ?? null,
         name: form.name.trim(),
         email: form.email.trim() || null,
-        states_covered: states,
+        states_covered: form.states,
         default_cost: costNum,
         notes: form.notes.trim() || null,
       });
@@ -186,6 +183,10 @@ export function AttorneyDrawer({
         <div className="field" style={{ width: 180 }}>
           <span className="prefix">$</span>
           <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step="1"
             className="input tabular has-prefix text-right"
             value={form.cost}
             onChange={(e) => set("cost", e.target.value)}
@@ -196,15 +197,12 @@ export function AttorneyDrawer({
       <div className="drawer-field">
         <label className="drawer-label">States Covered</label>
         <div className="drawer-hint">
-          Two-letter codes, comma-separated. Use the literal string{" "}
-          <code>ALL</code> if they cover all 50 states.
+          Click each state this attorney handles, or toggle All States for
+          national coverage.
         </div>
-        <input
-          className="input"
-          style={{ width: "100%" }}
+        <StatesPicker
           value={form.states}
-          onChange={(e) => set("states", e.target.value.toUpperCase())}
-          placeholder="TN, KY, MS"
+          onChange={(next) => set("states", next)}
         />
       </div>
       <div className="drawer-field">
