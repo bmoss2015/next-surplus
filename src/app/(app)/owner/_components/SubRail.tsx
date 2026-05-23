@@ -56,7 +56,7 @@ export function SubRail({
               fontWeight: 600,
               letterSpacing: "0.05em",
               textTransform: "uppercase",
-              color: "#9298a3",
+              color: "#5b606a",
               padding: "16px 18px 8px 18px",
             }}
           >

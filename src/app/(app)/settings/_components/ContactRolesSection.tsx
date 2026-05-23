@@ -34,31 +34,24 @@ export function ContactRolesSection({
 
       <div className="role-chip-grid">
         {initial.length === 0 ? (
-          <span style={{ color: "var(--text-3)", fontSize: 13 }}>
-            No custom roles yet. Add one from any lead&apos;s Contacts panel.
+          <span style={{ color: "var(--text-2)", fontSize: 13 }}>
+            No custom roles yet. Roles are created when you add a contact to
+            a lead with a custom label (Contacts panel on any lead).
           </span>
         ) : (
           initial.map((label) => (
             <span key={label} className="role-chip">
               {label}
-              <span
-                className="role-chip-x"
-                title="Remove (coming in Phase D)"
-                style={{ pointerEvents: "none", opacity: 0.5 }}
-              >
-                ×
-              </span>
             </span>
           ))
         )}
-        <button
-          type="button"
-          className="role-chip role-chip-add"
-          title="Add roles from inside a lead's Contacts panel"
-          disabled
-        >
-          + Add Role
-        </button>
+      </div>
+      <div
+        className="mt-3"
+        style={{ color: "var(--text-2)", fontSize: 12 }}
+      >
+        To add a new role: open any lead → Contacts panel → add a contact and
+        type a custom role label. It appears here for everyone in your org.
       </div>
     </section>
   );

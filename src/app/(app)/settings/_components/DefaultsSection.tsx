@@ -1,55 +1,75 @@
 "use client";
 
-// Settings clone · Phase C.2 — Defaults wired to real data.
-//
-// Recovery fee %, attorney fee $, surplus floor $. Each saves on blur via
-// updateAppSetting. The live-example hero updates as you type so you can
-// preview the net before committing.
+// Defaults panel — Recovery Fee %, Default Attorney Fee, Minimum Surplus
+// Threshold. Wired into the global SettingsSaveBar so commits flow
+// through the same bottom-right Save / Discard control as every other
+// inline panel. Inputs are type="number" to block alphabetic characters.
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { updateAppSetting } from "@/app/(app)/settings/_actions";
+import { useSaveBarSection } from "@/components/SettingsSaveBar";
 import type { AppSettings } from "@/lib/settings/fetch";
 
-function fmtMoney(n: number): string {
-  if (!Number.isFinite(n)) return "0";
-  return Math.round(n).toLocaleString("en-US");
-}
-
-function parseMoney(s: string): number | null {
-  const n = Number(s.replace(/[,\s]/g, ""));
-  return Number.isFinite(n) ? n : null;
-}
-
 export function DefaultsSection({ initial }: { initial: AppSettings }) {
-  const [feePct, setFeePct] = useState(
-    String(initial.default_recovery_fee_percent ?? 33)
-  );
-  const [attorneyFee, setAttorneyFee] = useState(
-    fmtMoney(initial.default_attorney_cost ?? 1500)
-  );
-  const [floor, setFloor] = useState(
-    fmtMoney(initial.surplus_floor ?? 10000)
-  );
-  const [savedKey, setSavedKey] = useState<string | null>(null);
-  const [errMsg, setErrMsg] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const router = useRouter();
+  const initialFeePct = String(initial.default_recovery_fee_percent ?? 33);
+  const initialAttorney = String(initial.default_attorney_cost ?? 1500);
+  const initialFloor = String(initial.surplus_floor ?? 10000);
 
-  function save(
-    key: "default_recovery_fee_percent" | "default_attorney_cost" | "surplus_floor",
-    value: number | null
-  ) {
-    if (value == null || !Number.isFinite(value) || value < 0) return;
-    startTransition(async () => {
-      const res = await updateAppSetting(key, value);
-      if (!res.ok) {
-        setErrMsg(res.error);
-        return;
-      }
-      setErrMsg(null);
-      setSavedKey(key);
-      window.setTimeout(() => setSavedKey((k) => (k === key ? null : k)), 1500);
-    });
+  const [feePct, setFeePct] = useState(initialFeePct);
+  const [attorneyFee, setAttorneyFee] = useState(initialAttorney);
+  const [floor, setFloor] = useState(initialFloor);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  const dirty =
+    feePct !== initialFeePct ||
+    attorneyFee !== initialAttorney ||
+    floor !== initialFloor;
+
+  function parseField(s: string): number | null {
+    const n = Number(String(s).trim());
+    if (!Number.isFinite(n) || n < 0) return null;
+    return n;
   }
+
+  async function save() {
+    const fp = parseField(feePct);
+    const af = parseField(attorneyFee);
+    const fl = parseField(floor);
+    if (fp == null) return { ok: false as const, error: "Recovery fee must be a number" };
+    if (af == null) return { ok: false as const, error: "Attorney fee must be a number" };
+    if (fl == null) return { ok: false as const, error: "Surplus threshold must be a number" };
+
+    const tasks: Promise<{ ok: boolean; error?: string }>[] = [];
+    if (feePct !== initialFeePct) {
+      tasks.push(updateAppSetting("default_recovery_fee_percent", fp));
+    }
+    if (attorneyFee !== initialAttorney) {
+      tasks.push(updateAppSetting("default_attorney_cost", af));
+    }
+    if (floor !== initialFloor) {
+      tasks.push(updateAppSetting("surplus_floor", fl));
+    }
+    const results = await Promise.all(tasks);
+    const firstErr = results.find((r) => !r.ok);
+    if (firstErr) {
+      setErrMsg(firstErr.error ?? "Save failed");
+      return { ok: false as const, error: firstErr.error ?? "Save failed" };
+    }
+    setErrMsg(null);
+    router.refresh();
+    return { ok: true as const };
+  }
+
+  function discard() {
+    setFeePct(initialFeePct);
+    setAttorneyFee(initialAttorney);
+    setFloor(initialFloor);
+    setErrMsg(null);
+  }
+
+  useSaveBarSection("settings-defaults", { isDirty: dirty, save, discard });
 
   return (
     <section id="panel-defaults" className="panel active">
@@ -80,13 +100,14 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
         </div>
         <div className="field" style={{ width: 160 }}>
           <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            max={100}
+            step="0.1"
             className="input tabular has-suffix text-right"
             value={feePct}
             onChange={(e) => setFeePct(e.target.value)}
-            onBlur={(e) => {
-              const n = Number(e.target.value);
-              save("default_recovery_fee_percent", Number.isFinite(n) ? n : null);
-            }}
           />
           <span className="suffix">%</span>
         </div>
@@ -102,14 +123,13 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
         <div className="field" style={{ width: 160 }}>
           <span className="prefix">$</span>
           <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step="1"
             className="input tabular has-prefix text-right"
             value={attorneyFee}
             onChange={(e) => setAttorneyFee(e.target.value)}
-            onBlur={(e) => {
-              const n = parseMoney(e.target.value);
-              save("default_attorney_cost", n);
-              if (n != null) setAttorneyFee(fmtMoney(n));
-            }}
           />
         </div>
       </div>
@@ -125,14 +145,13 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
         <div className="field" style={{ width: 160 }}>
           <span className="prefix">$</span>
           <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step="100"
             className="input tabular has-prefix text-right"
             value={floor}
             onChange={(e) => setFloor(e.target.value)}
-            onBlur={(e) => {
-              const n = parseMoney(e.target.value);
-              save("surplus_floor", n);
-              if (n != null) setFloor(fmtMoney(n));
-            }}
           />
         </div>
       </div>
@@ -140,14 +159,6 @@ export function DefaultsSection({ initial }: { initial: AppSettings }) {
       {errMsg && (
         <div className="mt-3" style={{ color: "var(--danger)", fontSize: 12.5 }}>
           {errMsg}
-        </div>
-      )}
-      {savedKey && (
-        <div
-          className="mt-3"
-          style={{ color: "var(--success)", fontSize: 12.5 }}
-        >
-          Saved.
         </div>
       )}
     </section>
