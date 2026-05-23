@@ -278,6 +278,152 @@ export async function previewMailMergeDocx(input: {
   }
 }
 
+// Server action — render a preview of a previously-sent mail_job. For
+// HTML-body sends, we already have the merged HTML stored on the
+// mail_jobs row and just return it. For Word-template sends we
+// reconstruct a minimal merge context (sender from the org, recipient
+// from mail_jobs.recipient_* fields) and re-run the docxtemplater +
+// Gotenberg/mammoth path used at send time. Lead-specific tokens are
+// best-effort: if a lead_id is on the row, we refetch the lead and
+// surface the case identifier + estimated surplus. Templates that lean
+// heavily on niche lead fields may show [Missing: ...] placeholders;
+// that's the trade-off for not storing the rendered PDF at send time.
+export async function previewMailJob(input: {
+  mail_job_id: string;
+}): Promise<
+  | { ok: true; kind: "html"; html: string; recipient_name: string }
+  | { ok: true; kind: "pdf"; base64: string; recipient_name: string }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+
+  const { data: job } = await sb
+    .from("mail_jobs")
+    .select(
+      "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html"
+    )
+    .eq("id", input.mail_job_id)
+    .maybeSingle();
+  if (!job) return { ok: false, error: "Mail job not found" };
+
+  // HTML-body path: we stored the merged HTML at send time. Just hand
+  // it back. The modal renders it in a sandboxed iframe.
+  const storedBody = (job.body_html as string | null) ?? "";
+  if (storedBody.trim().length > 0) {
+    return {
+      ok: true,
+      kind: "html",
+      html: storedBody,
+      recipient_name: (job.recipient_name as string | null) ?? "",
+    };
+  }
+
+  // Word-template path: no stored HTML. Re-render through the same
+  // docxtemplater + Gotenberg/mammoth pipeline previewMailMergeDocx
+  // uses. Reconstruct the merge context as best we can.
+  const templateId = job.template_id as string | null;
+  if (!templateId) {
+    return {
+      ok: false,
+      error: "No stored body and no template — cannot render preview",
+    };
+  }
+
+  // Pull a fresh lead context so case-specific merge tokens have values.
+  let leadContext: MergeContext = {};
+  const leadId = job.lead_id as string | null;
+  if (leadId) {
+    const { data: lead } = await sb
+      .from("leads")
+      .select("lead_id, address, city, state, postal_code, estimated_surplus, attorney_name")
+      .eq("id", leadId)
+      .maybeSingle();
+    if (lead) {
+      leadContext = {
+        "lead.case_id": (lead.lead_id as string | null) ?? "",
+        "lead.address": (lead.address as string | null) ?? "",
+        "lead.city": (lead.city as string | null) ?? "",
+        "lead.state": (lead.state as string | null) ?? "",
+        "lead.postal_code": (lead.postal_code as string | null) ?? "",
+        "lead.estimated_surplus": (lead.estimated_surplus as number | null) ?? "",
+        "lead.attorney": (lead.attorney_name as string | null) ?? "",
+      };
+    }
+  }
+
+  // Recipient context — pulled from the mail_jobs row, since the
+  // original merge_context isn't persisted.
+  const recipientName = (job.recipient_name as string | null) ?? "";
+  const [firstName, ...rest] = recipientName.split(/\s+/);
+  const recipientContext: MergeContext = {
+    "contact.full_name": recipientName,
+    "contact.first_name": firstName ?? "",
+    "contact.last_name": rest.join(" "),
+    "contact.line1": (job.recipient_address_line1 as string | null) ?? "",
+    "contact.line2": (job.recipient_address_line2 as string | null) ?? "",
+    "contact.city": (job.recipient_city as string | null) ?? "",
+    "contact.state": (job.recipient_state as string | null) ?? "",
+    "contact.postal_code": (job.recipient_postal_code as string | null) ?? "",
+  };
+
+  const preview = await previewMailMergeDocx({
+    template_id: templateId,
+    recipient_merge_context: { ...recipientContext, ...leadContext },
+  });
+  if (!preview.ok) return { ok: false, error: preview.error };
+  return {
+    ok: true,
+    kind: preview.kind,
+    base64: preview.kind === "pdf" ? preview.base64 : "",
+    html:
+      preview.kind === "html"
+        ? Buffer.from(preview.base64, "base64").toString("utf-8")
+        : "",
+    recipient_name: recipientName,
+  } as
+    | { ok: true; kind: "html"; html: string; recipient_name: string }
+    | { ok: true; kind: "pdf"; base64: string; recipient_name: string };
+}
+
+// Renders HTML through Gotenberg's Chromium engine and counts pages.
+// Used to detect the > 6-sheet USPS surcharge for HTML-body letters
+// (without this, the cost would silently miss multi-page sends and
+// margin would disappear on Lob's invoice). Returns null when
+// Gotenberg isn't configured or the render fails — caller treats null
+// as "I don't know" and skips the surcharge rather than over-charge.
+async function countHtmlPagesViaGotenberg(
+  html: string
+): Promise<number | null> {
+  const gotenbergUrl = process.env.GOTENBERG_URL;
+  if (!gotenbergUrl) return null;
+  try {
+    const fd = new FormData();
+    fd.append("files", new Blob([html], { type: "text/html" }), "index.html");
+    const res = await fetch(`${gotenbergUrl}/forms/chromium/convert/html`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) return null;
+    const pdfBytes = Buffer.from(await res.arrayBuffer());
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    (pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: string } })
+      .GlobalWorkerOptions.workerSrc = "";
+    const doc = await (
+      pdfjs as unknown as {
+        getDocument: (opts: { data: Uint8Array; useWorker: false }) => {
+          promise: Promise<{ numPages: number }>;
+        };
+      }
+    ).getDocument({ data: new Uint8Array(pdfBytes), useWorker: false })
+      .promise;
+    return doc.numPages ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Runs docxtemplater against a Word doc buffer using a MergeContext that
 // uses dotted keys (e.g. "contact.first_name"). docxtemplater expects
 // nested data by default; we configure it to read flat dotted keys so the
@@ -634,6 +780,35 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
           // but better than inflating it.
         }
       }
+    }
+  }
+
+  // For HTML body letters (no file template), Lob renders the HTML to a
+  // PDF at print time. To detect the over-6-sheet surcharge we render
+  // the merged body via Gotenberg ourselves before send and count pages
+  // on the resulting PDF. Done ONCE for the first recipient's context;
+  // we assume page count is stable across recipients (recipient name
+  // variations don't typically change page break behavior).
+  //
+  // Skipped when Gotenberg isn't configured — the surcharge would just
+  // not apply, customer pays the base rate, we eat the loss on Lob's
+  // invoice. Fine for low-volume and dev.
+  if (!isFileTemplate && body && input.recipients.length > 0) {
+    const previewToday = new Date();
+    const firstCtx: MergeContext = {
+      ...senderContext,
+      ...input.recipients[0].merge_context,
+      "system.today": previewToday.toLocaleDateString("en-US"),
+      "system.today_long": previewToday.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+    };
+    const firstHtml = wrapBodyHtml(renderMerge(body, firstCtx));
+    const htmlPages = await countHtmlPagesViaGotenberg(firstHtml);
+    if (htmlPages !== null && htmlPages > totalSheets) {
+      totalSheets = htmlPages;
     }
   }
 
