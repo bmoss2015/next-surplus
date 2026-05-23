@@ -137,6 +137,7 @@ export type LobPricingCents = {
   letter_certified_color: number;
   letter_extra_page_bw: number;
   letter_extra_page_color: number;
+  letter_over_6_sheet_fee?: number;
 };
 
 export type LobPricingSettings = {
@@ -150,6 +151,7 @@ const LOB_PRICING_DEFAULTS: LobPricingCents = {
   tier_label: "Developer (published)",
   check_base: 116,
   check_extra_attachment_page: 22,
+  letter_over_6_sheet_fee: 244,
   letter_first_class_bw: 103,
   letter_first_class_color: 119,
   letter_standard_bw: 81,
@@ -184,6 +186,11 @@ function coerceLobPricing(raw: unknown): LobPricingCents {
     letter_certified_color: num("letter_certified_color"),
     letter_extra_page_bw: num("letter_extra_page_bw"),
     letter_extra_page_color: num("letter_extra_page_color"),
+    letter_over_6_sheet_fee: (() => {
+      const v = r.letter_over_6_sheet_fee;
+      if (typeof v === "number" && Number.isFinite(v)) return Math.round(v);
+      return LOB_PRICING_DEFAULTS.letter_over_6_sheet_fee;
+    })(),
   };
 }
 

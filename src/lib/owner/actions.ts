@@ -20,6 +20,7 @@ const PRICING_KEYS: Array<keyof Omit<LobPricing, "tier_label">> = [
   "letter_certified_color",
   "letter_extra_page_bw",
   "letter_extra_page_color",
+  "letter_over_6_sheet_fee",
 ];
 
 function sanitizePricing(input: unknown): LobPricing | null {
@@ -33,7 +34,17 @@ function sanitizePricing(input: unknown): LobPricing | null {
   };
   for (const k of PRICING_KEYS) {
     const v = src[k];
-    if (typeof v !== "number" || !Number.isFinite(v) || v < 0) return null;
+    // letter_over_6_sheet_fee is optional in the type — when the
+    // payload is missing it, default to 0 instead of refusing to save
+    // (so older form submissions that don't include the field still
+    // succeed). All other keys remain strictly required.
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0) {
+      if (k === "letter_over_6_sheet_fee") {
+        out[k] = 0;
+        continue;
+      }
+      return null;
+    }
     out[k] = Math.round(v);
   }
   return out as LobPricing;
