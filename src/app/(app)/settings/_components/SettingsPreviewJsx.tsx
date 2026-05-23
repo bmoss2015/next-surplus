@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { SubRail, GROUPS } from "./SubRail";
 import { Placeholder } from "./Placeholder";
+import { SettingsSaveProvider } from "@/components/SettingsSaveBar";
 
 import { ProfileSection } from "./ProfileSection";
 import { SecuritySection } from "./SecuritySection";
@@ -115,17 +116,21 @@ export function SettingsPreviewJsx({
   // and Topbar handle the global chrome. This component only renders the
   // settings-internal sub-rail + active panel.
   return (
-    <div className="flex h-full">
-      <SubRail
-        active={railActive}
-        onSelect={pick}
-        isAdmin={currentUser.isAdmin}
-        counts={counts}
-      />
-      <main className="flex-1 overflow-y-auto scroll-area">
-        <div className="content">{renderPanel(active, currentUser, data)}</div>
-      </main>
-    </div>
+    <SettingsSaveProvider>
+      <div className="flex h-full">
+        <SubRail
+          active={railActive}
+          onSelect={pick}
+          isAdmin={currentUser.isAdmin}
+          counts={counts}
+        />
+        <main className="flex-1 overflow-y-auto scroll-area">
+          <div className="content">
+            {renderPanel(active, currentUser, data)}
+          </div>
+        </main>
+      </div>
+    </SettingsSaveProvider>
   );
 }
 
