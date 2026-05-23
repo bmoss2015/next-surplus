@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
 import {
@@ -16,16 +15,11 @@ import { renderMerge, MERGE_FIELDS, MERGE_GROUP_LABELS } from "@/lib/mail/merge"
 import type { MailTemplateRow } from "@/lib/settings/fetch";
 import type { SendMailFromAddress } from "./SendMailButton";
 
-// SuperDoc is heavy — only load it on the client when a Word-doc preview
-// actually needs to render. Mirrors the dynamic import in the settings
-// template editor.
-const SuperDocEditor = dynamic(
-  () =>
-    import("@/app/(app)/settings/_components/SuperDocEditor").then(
-      (m) => m.SuperDocEditor
-    ),
-  { ssr: false }
-);
+// SuperDoc remains the in-app docx editor (Settings > Mail Templates) but
+// is intentionally NOT used as a preview renderer here. Its font handling
+// diverged from the printer's render. The Send Mail preview now goes
+// through Gotenberg (PDF) or mammoth HTML fallback — see
+// previewMailMergeDocx in src/lib/mail/actions.ts.
 
 export type SendMailModalRecipient = {
   // Stable id we use for the multi-select toggle in the picker UI
@@ -905,6 +899,37 @@ function CostEstimate({
 // Used by the Send Mail preview pane to show the merged-and-PDF-rendered
 // letter exactly as Click2Mail will print it. pdfjs is already a project
 // dependency. Worker is configured via CDN so we don't need to bundle it.
+// Simple HTML-in-iframe preview for the mammoth-converted docx output.
+// Sandboxed so any inline styles inside can't escape into the host page.
+function HtmlDocxPreview({ blob }: { blob: Blob }) {
+  const [srcDoc, setSrcDoc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    blob.text().then((text) => {
+      if (!cancelled) setSrcDoc(text);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [blob]);
+  if (!srcDoc) {
+    return (
+      <div className="rounded-md border border-gray-200 bg-white p-6 text-center text-[11px] text-gray-500 shadow-card">
+        Loading preview...
+      </div>
+    );
+  }
+  return (
+    <iframe
+      title="Letter preview"
+      sandbox=""
+      srcDoc={srcDoc}
+      className="w-full rounded-md border border-gray-200 bg-white shadow-card"
+      style={{ height: 680 }}
+    />
+  );
+}
+
 function PdfPreview({ blob }: { blob: Blob }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [pageCount, setPageCount] = useState(0);
@@ -1136,7 +1161,7 @@ function PreviewPane({
   // actually mails, so pixel accuracy here = pixel accuracy in the
   // recipient's mailbox. Falls back to docx if Gotenberg isn't configured.
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
-  const [previewKind, setPreviewKind] = useState<"pdf" | "docx">("pdf");
+  const [previewKind, setPreviewKind] = useState<"pdf" | "html">("pdf");
   const [docxLoading, setDocxLoading] = useState(false);
   const [docxErr, setDocxErr] = useState<string | null>(null);
   useEffect(() => {
@@ -1163,10 +1188,7 @@ function PreviewPane({
       setPreviewKind(res.kind);
       setPreviewBlob(
         new Blob([bytes], {
-          type:
-            res.kind === "pdf"
-              ? "application/pdf"
-              : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          type: res.kind === "pdf" ? "application/pdf" : "text/html",
         })
       );
       setDocxLoading(false);
@@ -1292,11 +1314,7 @@ function PreviewPane({
               previewKind === "pdf" ? (
                 <PdfPreview blob={previewBlob} />
               ) : (
-                <SuperDocEditor
-                  source={previewBlob}
-                  autoHeight
-                  documentMode="viewing"
-                />
+                <HtmlDocxPreview blob={previewBlob} />
               )
             ) : null}
           </div>

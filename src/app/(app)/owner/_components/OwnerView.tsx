@@ -1,13 +1,13 @@
 "use client";
 
 // Owner area client wrapper. Renders the sub-rail + the selected panel.
-// Single panel for now (Customer Pricing) — the Provider Costs panel was
-// folded into Customer Pricing's "Your Cost (Lob)" column so the owner
-// sees cost + retail + margin in one place.
+// Wrapped in SettingsSaveProvider so any inline editable panel can use
+// the unified bottom-right save bar pattern.
 
 import { useState } from "react";
 import { SubRail, GROUPS } from "./SubRail";
 import { CustomerPricingSection } from "./CustomerPricingSection";
+import { SettingsSaveProvider } from "@/components/SettingsSaveBar";
 import type { CustomerPricingData } from "@/lib/owner/fetch";
 
 export type OwnerData = {
@@ -18,13 +18,15 @@ export function OwnerView({ data }: { data: OwnerData }) {
   const [active, setActive] = useState<string>(GROUPS[0].items[0].key);
 
   return (
-    <div className="flex w-full">
-      <SubRail active={active} onSelect={setActive} />
-      <div className="min-w-0 flex-1">
-        {active === "customer-pricing" && (
-          <CustomerPricingSection data={data.customerPricing} />
-        )}
+    <SettingsSaveProvider>
+      <div className="flex w-full">
+        <SubRail active={active} onSelect={setActive} />
+        <div className="min-w-0 flex-1">
+          {active === "customer-pricing" && (
+            <CustomerPricingSection data={data.customerPricing} />
+          )}
+        </div>
       </div>
-    </div>
+    </SettingsSaveProvider>
   );
 }

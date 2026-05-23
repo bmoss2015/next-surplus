@@ -10,11 +10,12 @@
 //
 // No subscription card. No Quick Math footer. Just price grids.
 
-import { useState, useTransition } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerPricingData } from "@/lib/owner/fetch";
 import type { LobPricing } from "@/lib/mail/types";
 import { updateCustomerPricing } from "@/lib/owner/actions";
+import { useSaveBarSection } from "@/components/SettingsSaveBar";
 
 type PriceKey = keyof Omit<LobPricing, "tier_label">;
 
@@ -76,9 +77,6 @@ export function CustomerPricingSection({
   data: CustomerPricingData;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   const allKeys: PriceKey[] = [
     ...LETTER_CLASSES.flatMap((c) => [c.bwKey, c.colorKey]),
@@ -87,28 +85,29 @@ export function CustomerPricingSection({
     ...SURCHARGE_ROWS.map((r) => r.key),
   ];
 
-  const [retails, setRetails] = useState<Record<string, string>>(() => {
+  const initialRetails = (() => {
     const out: Record<string, string> = {};
     for (const k of allKeys) {
       const v = data.customer_mail_pricing_cents[k];
       out[k] = centsToDollarsInput(typeof v === "number" ? v : 0);
     }
     return out;
-  });
+  })();
+  const [retails, setRetails] = useState<Record<string, string>>(initialRetails);
 
   function setRetail(key: string, value: string) {
     setRetails((prev) => ({ ...prev, [key]: value }));
-    setSaved(false);
   }
 
-  function save() {
-    setError(null);
-    setSaved(false);
+  // Dirty when any input no longer matches the initial value.
+  const isDirty = allKeys.some(
+    (k) => (retails[k] ?? "") !== (initialRetails[k] ?? "")
+  );
+
+  const save = useCallback(async () => {
     const built: Partial<LobPricing> = {
       tier_label: data.customer_mail_pricing_cents.tier_label ?? "Standard",
     };
-    // Carry forward the certified rows untouched (still in DB, just not
-    // edited here). Same for any other key not in the visible set.
     for (const k of Object.keys(
       data.customer_mail_pricing_cents
     ) as Array<keyof LobPricing>) {
@@ -118,53 +117,34 @@ export function CustomerPricingSection({
     for (const k of allKeys) {
       built[k] = dollarsToCents(retails[k] ?? "0");
     }
-    startTransition(async () => {
-      const res = await updateCustomerPricing({
-        subscription_monthly_cents: data.subscription_monthly_cents,
-        customer_mail_pricing_cents: built,
-      });
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      setSaved(true);
-      router.refresh();
+    const res = await updateCustomerPricing({
+      subscription_monthly_cents: data.subscription_monthly_cents,
+      customer_mail_pricing_cents: built,
     });
-  }
+    if (!res.ok) return { ok: false as const, error: res.error };
+    router.refresh();
+    return { ok: true as const };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retails, data]);
+
+  const discard = useCallback(() => {
+    setRetails(initialRetails);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  useSaveBarSection("owner-customer-pricing", { isDirty, save, discard });
 
   return (
     <div className="mx-auto max-w-[1100px] px-8 py-8">
-      <div className="mb-6 flex items-end justify-between">
-        <div>
-          <h1 className="text-[22px] font-semibold text-ink">
-            Customer Pricing
-          </h1>
-          <p className="mt-1 text-[13px] text-gray-600">
-            What Lob charges you, what you charge customers, and the margin
-            per piece. Edit any retail price and Save.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {saved && (
-            <span className="text-[12px]" style={{ color: "#067647" }}>
-              Saved.
-            </span>
-          )}
-          {error && (
-            <span className="text-[12px]" style={{ color: "#b42318" }}>
-              {error}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={save}
-            disabled={pending}
-            className="cursor-pointer rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
-            style={{ background: "#0d4b3a" }}
-          >
-            {pending ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-[22px] font-semibold text-ink">
+          Customer Pricing
+        </h1>
+        <p className="mt-1 text-[13px] text-gray-600">
+          What Lob charges you, what you charge customers, and the margin
+          per piece. Edit any retail price; changes save via the bar at
+          the bottom-right.
+        </p>
       </div>
 
       {/* Letters card — B&W on the left, Color on the right ---------- */}

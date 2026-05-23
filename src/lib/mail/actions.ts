@@ -151,7 +151,7 @@ export async function previewMailMergeDocx(input: {
   template_id: string;
   recipient_merge_context: MergeContext;
 }): Promise<
-  | { ok: true; base64: string; kind: "pdf" | "docx" }
+  | { ok: true; base64: string; kind: "pdf" | "html" }
   | { ok: false; error: string }
 > {
   const profile = await getCurrentProfile();
@@ -210,15 +210,41 @@ export async function previewMailMergeDocx(input: {
   const merged = await fillDocxTemplate(buffer, fullCtx);
   if (!merged.ok) return { ok: false, error: merged.error };
   // Convert the merged docx to a PDF via Gotenberg so the preview shows
-  // pixel-accurate layout (SuperDoc's docx renderer was overlapping
-  // tables / text boxes on complex templates). Gotenberg uses
-  // LibreOffice headless under the hood — same engine the printer
-  // will use for final rendering, so what we preview matches what
-  // gets mailed. Falls back to returning the docx if GOTENBERG_URL
-  // isn't set so local-dev without the URL still works.
+  // pixel-accurate layout. Gotenberg uses LibreOffice headless — same
+  // engine the printer uses for final rendering, so the preview matches
+  // what gets mailed.
+  //
+  // SuperDoc was the previous fallback but its docx renderer mangled
+  // custom fonts, so we removed it from the preview path (per Bree).
+  // When Gotenberg isn't configured we now fall back to mammoth
+  // (docx → HTML) which strips fancy formatting but at least surfaces
+  // the merged text content instead of nothing.
   const gotenbergUrl = process.env.GOTENBERG_URL;
   if (!gotenbergUrl) {
-    return { ok: true, base64: merged.value.toString("base64"), kind: "docx" };
+    try {
+      const mammoth = await import("mammoth");
+      const result = await mammoth.convertToHtml({ buffer: merged.value });
+      const wrapped = `<!doctype html><html><head><meta charset="utf-8"><style>
+        body { font-family: Georgia, 'Times New Roman', serif; padding: 40px 60px; color: #0a0d14; }
+        p { margin: 0 0 10px; line-height: 1.45; }
+        h1, h2, h3 { font-weight: 600; margin: 16px 0 8px; }
+        table { border-collapse: collapse; }
+        td, th { border: 1px solid #ddd; padding: 6px 10px; }
+      </style></head><body>${result.value}</body></html>`;
+      return {
+        ok: true,
+        base64: Buffer.from(wrapped, "utf-8").toString("base64"),
+        kind: "html",
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        error:
+          err instanceof Error
+            ? `Preview render failed: ${err.message}`
+            : "Preview render failed",
+      };
+    }
   }
   try {
     const fd = new FormData();
