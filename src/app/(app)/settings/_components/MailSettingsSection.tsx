@@ -20,6 +20,9 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   updateMailSettings,
+} from "@/app/(app)/settings/_actions";
+import { useSaveBarSection } from "@/components/SettingsSaveBar";
+import {
   uploadSignatureImage,
   removeSignatureImage,
 } from "@/app/(app)/settings/_actions";
@@ -107,10 +110,22 @@ export function MailSettingsSection({
     setSaving(false);
     if (!res.ok) {
       setErrMsg(res.error);
-      return;
+      return { ok: false as const, error: res.error };
     }
     router.refresh();
+    return { ok: true as const };
   }
+
+  useSaveBarSection("settings-mail-settings", {
+    isDirty: dirty,
+    save: onSave,
+    discard: () => {
+      setSignerName(initial.signer_name ?? "");
+      setSignerTitle(initial.signer_title ?? "");
+      setMailClass(initial.default_mail_class);
+      setErrMsg(null);
+    },
+  });
 
   const previewName = signerName || "Your Name";
   const previewTitle = signerTitle ? `${signerTitle} · ${initial.signer_title ? "" : ""}` : "";
@@ -275,34 +290,12 @@ export function MailSettingsSection({
         </div>
       </div>
 
-      {(dirty || errMsg) && (
-        <div className="mt-6 flex items-center gap-3">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={saving}
-            onClick={onSave}
-          >
-            {saving ? "Saving…" : "Save Changes"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={saving}
-            onClick={() => {
-              setSignerName(initial.signer_name ?? "");
-              setSignerTitle(initial.signer_title ?? "");
-              setMailClass(initial.default_mail_class);
-              setErrMsg(null);
-            }}
-          >
-            Discard
-          </button>
-          {errMsg && (
-            <span style={{ color: "var(--danger)", fontSize: 12.5 }}>
-              {errMsg}
-            </span>
-          )}
+      {/* Inline Save / Discard removed — commits flow through the
+          global SettingsSaveBar so the controls are reachable without
+          scrolling. errMsg stays here for in-context feedback. */}
+      {errMsg && (
+        <div className="mt-6 text-[12.5px]" style={{ color: "var(--danger)" }}>
+          {errMsg}
         </div>
       )}
     </section>

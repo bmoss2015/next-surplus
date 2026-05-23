@@ -6,6 +6,11 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   IconMail,
   IconChevronDown,
+  IconCalendarTime,
+  IconChecks,
+  IconArrowBack,
+  IconCash,
+  IconMailbox,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { displayRecipientName } from "@/components/mail/displayName";
@@ -224,9 +229,9 @@ export function MailDashboardV6({
           "none match"). With no filters, empty sections show the empty
           state row. */}
       {(inTransitGrouped.length > 0 || !hasActiveFilters) && (
-        <ListSection eyebrow="In Transit">
+        <ListSection eyebrow="In Transit" count={inTransitRows.length}>
           {inTransitGrouped.length === 0 ? (
-            <EmptyRow text="No pieces in transit." />
+            <EmptyRow text="Nothing in transit right now. Send a letter from any lead to get started." />
           ) : (
             inTransitGrouped.map((item) =>
               item.kind === "batch" ? (
@@ -240,7 +245,7 @@ export function MailDashboardV6({
       )}
 
       {(deliveredRows.length > 0 || !hasActiveFilters) && (
-        <ListSection eyebrow="Delivered">
+        <ListSection eyebrow="Delivered" count={deliveredRows.length}>
           {deliveredRows.length === 0 ? (
             <EmptyRow text="No deliveries in the last 30 days." />
           ) : (
@@ -252,9 +257,13 @@ export function MailDashboardV6({
       )}
 
       {(returnedRows.length > 0 || !hasActiveFilters) && (
-        <ListSection eyebrow="Returned" tone="danger">
+        <ListSection
+          eyebrow="Returned"
+          count={returnedRows.length}
+          tone="danger"
+        >
           {returnedRows.length === 0 ? (
-            <EmptyRow text="No returned pieces." />
+            <EmptyRow text="No returned pieces. Keep it that way." />
           ) : (
             returnedRows.map((p) => (
               <PieceRow piece={p} section="returned" key={p.id} />
@@ -305,11 +314,13 @@ function Kpi({
 
 function ListSection({
   eyebrow,
+  count,
   trailing,
   tone,
   children,
 }: {
   eyebrow: string;
+  count?: number;
   trailing?: React.ReactNode;
   tone?: "danger";
   children: React.ReactNode;
@@ -322,13 +333,27 @@ function ListSection({
       )}
     >
       <header className="flex items-baseline justify-between border-b border-gray-100 px-6 py-3.5">
-        <div
-          className={cn(
-            "text-[10px] font-semibold uppercase tracking-[0.14em]",
-            tone === "danger" ? "text-danger" : "text-gray-500"
+        <div className="flex items-baseline gap-2.5">
+          <div
+            className={cn(
+              "text-[10px] font-semibold uppercase tracking-[0.14em]",
+              tone === "danger" ? "text-danger" : "text-gray-500"
+            )}
+          >
+            {eyebrow}
+          </div>
+          {typeof count === "number" && (
+            <span
+              className={cn(
+                "inline-flex h-[18px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums",
+                tone === "danger"
+                  ? "bg-danger/10 text-danger"
+                  : "bg-gray-100 text-gray-600"
+              )}
+            >
+              {count}
+            </span>
           )}
-        >
-          {eyebrow}
         </div>
         {trailing}
       </header>
@@ -339,8 +364,13 @@ function ListSection({
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="px-6 py-6 text-center text-[12px] text-gray-500">
-      {text}
+    <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+      <IconMailbox
+        size={28}
+        stroke={1.5}
+        className="text-gray-300"
+      />
+      <div className="text-[12.5px] text-gray-500">{text}</div>
     </div>
   );
 }
@@ -409,17 +439,24 @@ function PieceRow({
           {`, ${piece.recipient_city}, ${piece.recipient_state} ${piece.recipient_postal_code}`}
         </div>
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-gray-600">
-          <span className="inline-flex items-center gap-1.5">
-            <IconMail size={13} stroke={1.75} className="text-petrol-500" />
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+          {/* Class — petrol icon, uppercase tracked label */}
+          <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-petrol-700">
+            <IconMail size={12} stroke={2} />
             {mailClassLabel(piece.mail_class)}
           </span>
           <span className="text-gray-300">·</span>
-          <span>Sent {fmtDateLong(piece.sent_at) || daysAgoLabel(piece.sent_at)}</span>
+          {/* Sent date — gray, calendar icon */}
+          <span className="inline-flex items-center gap-1 text-gray-600">
+            <IconCalendarTime size={12} stroke={1.75} className="text-gray-400" />
+            Sent {fmtDateLong(piece.sent_at) || daysAgoLabel(piece.sent_at)}
+          </span>
           {section === "delivered" && piece.delivered_at && (
             <>
               <span className="text-gray-300">·</span>
-              <span className="text-petrol-700">
+              {/* Delivered — petrol with double-check icon, slightly bolder */}
+              <span className="inline-flex items-center gap-1 font-medium text-petrol-700">
+                <IconChecks size={12} stroke={2} />
                 Delivered {fmtDateLong(piece.delivered_at)}
               </span>
             </>
@@ -427,7 +464,9 @@ function PieceRow({
           {section === "returned" && piece.returned_at && (
             <>
               <span className="text-gray-300">·</span>
-              <span className="text-danger">
+              {/* Returned — danger with arrow-back icon */}
+              <span className="inline-flex items-center gap-1 font-medium text-danger">
+                <IconArrowBack size={12} stroke={2} />
                 Returned {fmtDateLong(piece.returned_at)}
                 {piece.error_message ? ` (${piece.error_message})` : ""}
               </span>
@@ -436,7 +475,9 @@ function PieceRow({
           {piece.include_check && piece.check_amount_cents != null && (
             <>
               <span className="text-gray-300">·</span>
-              <span className="text-petrol-700">
+              {/* Check — petrol with $ icon */}
+              <span className="inline-flex items-center gap-1 font-medium text-petrol-700">
+                <IconCash size={12} stroke={2} />
                 Check ${(piece.check_amount_cents / 100).toFixed(2)}
               </span>
             </>

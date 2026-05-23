@@ -10,6 +10,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateMyProfile } from "@/app/(app)/settings/_actions";
+import { useSaveBarSection } from "@/components/SettingsSaveBar";
 import {
   uploadMyAvatar,
   removeMyAvatar,
@@ -78,9 +79,10 @@ export function ProfileSection({
     setSaving(false);
     if (!res.ok) {
       setErrMsg(res.error);
-      return;
+      return { ok: false as const, error: res.error };
     }
     router.refresh();
+    return { ok: true as const };
   }
 
   function onDiscard() {
@@ -89,6 +91,15 @@ export function ProfileSection({
     setEmail(initial.email);
     setErrMsg(null);
   }
+
+  useSaveBarSection("settings-profile", {
+    isDirty: dirty,
+    save: async () => {
+      if (!ready) return { ok: false, error: "First and last name + email are required" };
+      return await onSave();
+    },
+    discard: onDiscard,
+  });
 
   async function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -253,29 +264,12 @@ export function ProfileSection({
         </select>
       </div>
 
-      {(dirty || errMsg) && (
-        <div className="mt-6 flex items-center gap-3">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={!ready || saving}
-            onClick={onSave}
-          >
-            {saving ? "Saving…" : "Save Changes"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={saving}
-            onClick={onDiscard}
-          >
-            Discard
-          </button>
-          {errMsg && (
-            <span style={{ color: "var(--danger)", fontSize: 12.5 }}>
-              {errMsg}
-            </span>
-          )}
+      {/* Inline Save / Discard removed — commits flow through the
+          global SettingsSaveBar so the controls are reachable without
+          scrolling. errMsg stays here for in-context feedback. */}
+      {errMsg && (
+        <div className="mt-6 text-[12.5px]" style={{ color: "var(--danger)" }}>
+          {errMsg}
         </div>
       )}
     </section>
