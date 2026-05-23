@@ -49,6 +49,32 @@ function lobCheckCostCents(pricing: LobPricing | undefined): number | null {
   return pricing.check_base;
 }
 
+// Compute the {customer charge, provider cost} pair for a letter from
+// the two schedules we now carry around. Either may be undefined (older
+// callers or first-run when wholesale isn't synced yet) in which case the
+// matching column becomes null.
+function lobLetterCostPair(
+  mc: SendLetterInput["mail_class"],
+  color: boolean,
+  customer: LobPricing | undefined,
+  wholesale: LobPricing | undefined
+): { cost_cents: number | null; provider_cost_cents: number | null } {
+  return {
+    cost_cents: lobLetterCostCents(mc, color, customer),
+    provider_cost_cents: lobLetterCostCents(mc, color, wholesale),
+  };
+}
+
+function lobCheckCostPair(
+  customer: LobPricing | undefined,
+  wholesale: LobPricing | undefined
+): { cost_cents: number | null; provider_cost_cents: number | null } {
+  return {
+    cost_cents: lobCheckCostCents(customer),
+    provider_cost_cents: lobCheckCostCents(wholesale),
+  };
+}
+
 // Lob.com client. Used for two things:
 //   * Sending checks (Click2Mail has no check product)
 //   * Creating + verifying bank accounts (we never store the routing/account
@@ -141,6 +167,10 @@ export async function lobSendCheck(
     if (!json.id) {
       return { ok: false, error: "Lob check create returned no id" };
     }
+    const { cost_cents, provider_cost_cents } = lobCheckCostPair(
+      input.customer_pricing,
+      input.wholesale_pricing
+    );
     return {
       ok: true,
       provider: "lob",
@@ -148,10 +178,10 @@ export async function lobSendCheck(
       tracking_number: json.tracking_number ?? null,
       tracking_url: json.url ?? null,
       // Lob's create-check API doesn't return per-piece cost, so we
-      // compute from the published Developer-tier rate schedule above.
-      // Accurate to Lob's list pricing; volume discounts (if any) come
-      // out in the monthly invoice reconciliation.
-      cost_cents: lobCheckCostCents(input.lob_pricing),
+      // compute both customer charge + wholesale cost from the schedules
+      // the caller passed in (loaded from app_pricing_config at send time).
+      cost_cents,
+      provider_cost_cents,
     };
   } catch (err) {
     return {
@@ -161,7 +191,7 @@ export async function lobSendCheck(
   }
 }
 
-// -- Letters (fallback path, not used in v1) --------------------------------
+// -- Letters ---------------------------------------------------------------
 
 export async function lobSendLetter(
   input: SendLetterInput
@@ -218,13 +248,20 @@ export async function lobSendLetter(
     if (!json.id) {
       return { ok: false, error: "Lob letter create returned no id" };
     }
+    const { cost_cents, provider_cost_cents } = lobLetterCostPair(
+      input.mail_class,
+      input.color === true,
+      input.customer_pricing,
+      input.wholesale_pricing
+    );
     return {
       ok: true,
       provider: "lob",
       provider_id: json.id,
       tracking_number: json.tracking_number ?? null,
       tracking_url: json.url ?? null,
-      cost_cents: lobLetterCostCents(input.mail_class, input.color === true, input.lob_pricing),
+      cost_cents,
+      provider_cost_cents,
     };
   } catch (err) {
     return {

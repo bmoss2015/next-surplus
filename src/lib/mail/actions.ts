@@ -408,10 +408,24 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   const { data: org } = await sb
     .from("orgs")
     .select(
-      "name, legal_name, email, phone, website, address_line1, address_line2, city, region, postal_code, country, signer_name, signer_title, signature_image_path, lob_pricing_cents"
+      "name, legal_name, email, phone, website, address_line1, address_line2, city, region, postal_code, country, signer_name, signer_title, signature_image_path"
     )
     .eq("id", profile.orgId)
     .single();
+  // Load SaaS-wide pricing config. customer_pricing → cost_cents (what we
+  // charge the customer). wholesale_pricing → provider_cost_cents (what
+  // Lob actually bills us). Single global config, applies to every org.
+  const { data: pricingCfg } = await sb
+    .from("app_pricing_config")
+    .select("customer_mail_pricing_cents, wholesale_pricing_cents")
+    .eq("id", 1)
+    .maybeSingle();
+  const customerPricing = (pricingCfg?.customer_mail_pricing_cents as
+    | import("./types").LobPricing
+    | null) ?? undefined;
+  const wholesalePricing = (pricingCfg?.wholesale_pricing_cents as
+    | import("./types").LobPricing
+    | null) ?? undefined;
   if (
     !org ||
     !org.address_line1 ||
@@ -574,11 +588,12 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       mail_class: input.mail_class,
       color: input.color === true,
       correlation_id: correlationId,
-      // Per-org Lob pricing schedule for cost computation. Loaded once
-      // from orgs.lob_pricing_cents up top.
-      lob_pricing: (org.lob_pricing_cents as
-        | import("./types").LobPricing
-        | null) ?? undefined,
+      // customer_pricing = what we charge this org's customer. Stored on
+      // mail_jobs.cost_cents and used by reports as revenue.
+      // wholesale_pricing = what Lob (or C2M) actually charges us. Stored
+      // on mail_jobs.provider_cost_cents and used for margin reporting.
+      customer_pricing: customerPricing,
+      wholesale_pricing: wholesalePricing,
     };
 
     let send;
@@ -607,6 +622,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
             mail_class: sendInput.mail_class,
             color: sendInput.color,
             correlation_id: sendInput.correlation_id,
+            customer_pricing: sendInput.customer_pricing,
           });
         }
       }
@@ -665,6 +681,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         tracking_number: send.tracking_number,
         tracking_url: send.tracking_url,
         cost_cents: send.cost_cents,
+        provider_cost_cents: send.provider_cost_cents,
         status: "queued",
         sent_at: new Date().toISOString(),
         created_by: profile.id,

@@ -102,6 +102,7 @@ export function LeadMailV11Client({
   bankAccounts,
   mailReady,
   fromAddress,
+  pricing,
 }: {
   rows: MailJobListRow[];
   totalSent: number;
@@ -115,6 +116,17 @@ export function LeadMailV11Client({
   bankAccounts: { id: string; label: string; verified: boolean }[];
   mailReady: boolean;
   fromAddress: SendMailFromAddress;
+  pricing: {
+    letter_first_class_bw: number;
+    letter_first_class_color: number;
+    letter_standard_bw: number;
+    letter_standard_color: number;
+    letter_certified_bw: number;
+    letter_certified_color: number;
+    letter_extra_page_bw: number;
+    letter_extra_page_color: number;
+    check_base: number;
+  } | null;
 }) {
   void leadId;
   const router = useRouter();
@@ -320,6 +332,7 @@ export function LeadMailV11Client({
           bankAccounts={bankAccounts}
           mailReady={mailReady}
           fromAddress={fromAddress}
+          pricing={pricing}
           defaultSelectedKeys={resendDefaultKeys}
           notice={resendNotice}
         />

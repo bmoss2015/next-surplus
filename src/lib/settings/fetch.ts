@@ -187,6 +187,32 @@ function coerceLobPricing(raw: unknown): LobPricingCents {
   };
 }
 
+export type CustomerPricingViewData = {
+  subscription_monthly_cents: number;
+  customer_mail_pricing_cents: LobPricing;
+};
+
+// Customer-facing pricing read. Available to any authenticated user via
+// RLS on app_pricing_config (select policy is open to authenticated).
+// Returns null only if the singleton row is missing, which means the
+// owner has not configured pricing yet.
+export async function fetchMyCustomerPricing(): Promise<CustomerPricingViewData | null> {
+  const sb = await createClient();
+  const { data } = await sb
+    .from("app_pricing_config")
+    .select("subscription_monthly_cents, customer_mail_pricing_cents")
+    .eq("id", 1)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    subscription_monthly_cents:
+      (data.subscription_monthly_cents as number | null) ?? 0,
+    customer_mail_pricing_cents: coerceLobPricing(
+      data.customer_mail_pricing_cents
+    ),
+  };
+}
+
 export async function fetchLobPricingSettings(): Promise<LobPricingSettings> {
   const sb = await createClient();
   const { data, error } = await sb

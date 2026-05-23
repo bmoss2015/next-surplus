@@ -48,6 +48,19 @@ export async function GET(req: Request) {
   const { pricing: published, fetched_at } = fetchRes;
 
   const admin = createServiceClient();
+
+  // Mirror the published rates onto the SaaS-wide singleton so
+  // src/lib/mail/actions.ts has a single source of truth for wholesale
+  // at send time. The per-org snapshots below are still updated so the
+  // existing Provider Costs panel keeps working.
+  await admin
+    .from("app_pricing_config")
+    .update({
+      wholesale_pricing_cents: published,
+      wholesale_last_checked_at: fetched_at,
+    })
+    .eq("id", 1);
+
   const { data: orgs, error: orgErr } = await admin
     .from("orgs")
     .select("id, lob_pricing_cents, lob_published_pricing_cents, lob_pricing_auto_sync");

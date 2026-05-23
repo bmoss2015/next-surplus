@@ -4,6 +4,7 @@ import {
   fetchMailTemplates,
   fetchMailBankAccounts,
   fetchOrgInfo,
+  fetchMyCustomerPricing,
 } from "@/lib/settings/fetch";
 import { buildLeadSendMailCandidates } from "@/lib/mail/lead-candidates";
 import { LeadMailV11Client } from "./LeadMailV11Client";
@@ -25,6 +26,7 @@ export async function MailTab({ leadId }: { leadId: string }) {
     templates,
     bankAccounts,
     org,
+    customerPricing,
   ] = await Promise.all([
     fetchMailDashboard({
       leadId,
@@ -40,6 +42,7 @@ export async function MailTab({ leadId }: { leadId: string }) {
     fetchMailTemplates(),
     fetchMailBankAccounts(),
     fetchOrgInfo(),
+    fetchMyCustomerPricing(),
   ]);
 
   const mailingAddressCount = addressCountRes.count ?? 0;
@@ -94,6 +97,7 @@ export async function MailTab({ leadId }: { leadId: string }) {
       bankAccounts={banks}
       mailReady={mailReady}
       fromAddress={fromAddress}
+      pricing={customerPricing?.customer_mail_pricing_cents ?? null}
     />
   );
 }

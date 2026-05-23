@@ -12,16 +12,17 @@ import {
   click2mailSendFromDocumentId,
   isClick2MailConfigured,
 } from "./click2mail";
-import { lobSendCheck, isLobConfigured } from "./lob";
+import { lobSendCheck, lobSendLetter, isLobConfigured } from "./lob";
 import { stubSendLetter, stubSendCheck } from "./stub";
 
 export type { SendLetterInput, SendCheckInput, SendResult, MailClass, MailProvider };
 
-// Entry points the rest of the app uses. Provider selection rules (per
-// Bree's mail-vendor strategy):
-//   * Letters → Click2Mail ONLY. No silent fallback to Lob — Lob letters
-//     cost ~50% more, and we'd rather fail loudly and force a config fix
-//     than ship the bill. Falls back to stub when C2M isn't configured.
+// Entry points the rest of the app uses. Provider selection rules:
+//   * Letters → Lob ONLY. Verified May 2026 against C2M qty=1 pricing:
+//     Lob is $1.65 cheaper per piece for single-letter sends (no $1.59
+//     single-piece surcharge that C2M applies at qty=1). Falls back to
+//     stub when Lob isn't configured. C2M code is retained for rollback
+//     but not in the active path.
 //   * Checks → Lob ONLY (Lob is the only check provider we integrate).
 //     Falls back to stub if Lob isn't configured.
 //
@@ -31,7 +32,7 @@ export type { SendLetterInput, SendCheckInput, SendResult, MailClass, MailProvid
 export async function sendLetter(
   input: SendLetterInput
 ): Promise<SendResult> {
-  if (isClick2MailConfigured()) return click2mailSendLetter(input);
+  if (isLobConfigured()) return lobSendLetter(input);
   return stubSendLetter(input);
 }
 
@@ -41,7 +42,7 @@ export async function sendCheck(input: SendCheckInput): Promise<SendResult> {
 }
 
 export function activeLetterProvider(): MailProvider {
-  if (isClick2MailConfigured()) return "click2mail";
+  if (isLobConfigured()) return "lob";
   return "stub";
 }
 

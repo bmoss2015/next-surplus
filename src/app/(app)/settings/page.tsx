@@ -22,6 +22,7 @@ import {
   fetchMailSettings,
   fetchMailBankAccounts,
   fetchLobPricingSettings,
+  fetchMyCustomerPricing,
   fetchTemplates,
   fetchResearchTemplates,
   fetchMyNotificationPrefs,
@@ -48,6 +49,7 @@ export default async function SettingsPreviewJsxPage() {
     templates,
     research,
     notificationPrefs,
+    customerPricing,
   ] = await Promise.all([
     fetchAttorneys(),
     fetchOrgCustomRoles(),
@@ -55,6 +57,7 @@ export default async function SettingsPreviewJsxPage() {
     fetchTemplates(),
     fetchResearchTemplates(),
     fetchMyNotificationPrefs(),
+    fetchMyCustomerPricing(),
   ]);
 
   // Admin-only data.
@@ -151,6 +154,7 @@ export default async function SettingsPreviewJsxPage() {
           research,
           phoneUsage,
           notificationPrefs,
+          customerPricing,
         }}
       />
     </>

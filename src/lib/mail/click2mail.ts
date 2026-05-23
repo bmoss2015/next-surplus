@@ -1,5 +1,16 @@
 import "server-only";
-import type { SendLetterInput, SendResult } from "./types";
+import type { SendLetterInput, SendResult, LobPricing } from "./types";
+
+function letterCustomerCharge(
+  mc: SendLetterInput["mail_class"],
+  color: boolean,
+  pricing: LobPricing | undefined
+): number | null {
+  if (!pricing) return null;
+  if (mc === "standard") return color ? pricing.letter_standard_color : pricing.letter_standard_bw;
+  if (mc === "certified") return color ? pricing.letter_certified_color : pricing.letter_certified_bw;
+  return color ? pricing.letter_first_class_color : pricing.letter_first_class_bw;
+}
 
 // Click2Mail Mailing Online Pro REST API client. Letters route here.
 // Checks do NOT route here — Click2Mail does not offer a check product.
@@ -72,7 +83,10 @@ function mailClassParams(mc: SendLetterInput["mail_class"], color: boolean) {
 // (click2mailSendFromDocumentId).
 async function createAddressListAndSubmitJob(
   documentId: string,
-  input: Pick<SendLetterInput, "to" | "mail_class" | "color" | "correlation_id">
+  input: Pick<
+    SendLetterInput,
+    "to" | "mail_class" | "color" | "correlation_id" | "customer_pricing"
+  >
 ): Promise<SendResult> {
   const addrRes = await fetch(`${C2M_BASE_URL}/addressLists`, {
     method: "POST",
@@ -146,16 +160,26 @@ async function createAddressListAndSubmitJob(
     return { ok: false, error: "Click2Mail submitJob returned no id" };
   }
 
+  // cost_cents = what we charge the customer (from customer_pricing
+  // schedule). provider_cost_cents = what C2M billed us, which they
+  // return as totalCost on the submitJob response.
+  const provider_cost_cents =
+    typeof jobJson.totalCost === "number"
+      ? Math.round(jobJson.totalCost * 100)
+      : null;
+  const cost_cents = letterCustomerCharge(
+    input.mail_class,
+    input.color === true,
+    input.customer_pricing
+  );
   return {
     ok: true,
     provider: "click2mail",
     provider_id: String(jobJson.id),
     tracking_number: null,
     tracking_url: jobJson.jobStatusURL ?? null,
-    cost_cents:
-      typeof jobJson.totalCost === "number"
-        ? Math.round(jobJson.totalCost * 100)
-        : null,
+    cost_cents,
+    provider_cost_cents,
   };
 }
 
@@ -212,7 +236,10 @@ export async function click2mailCreateMergedDocument(
 // path after click2mailCreateMergedDocument has returned an id.
 export async function click2mailSendFromDocumentId(
   documentId: string,
-  input: Pick<SendLetterInput, "to" | "mail_class" | "color" | "correlation_id">
+  input: Pick<
+    SendLetterInput,
+    "to" | "mail_class" | "color" | "correlation_id" | "customer_pricing"
+  >
 ): Promise<SendResult> {
   if (!isClick2MailConfigured()) {
     return { ok: false, error: "Click2Mail is not configured (missing CLICK2MAIL_USERNAME/PASSWORD)" };

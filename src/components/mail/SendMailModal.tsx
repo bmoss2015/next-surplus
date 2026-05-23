@@ -78,6 +78,20 @@ export type SendMailModalProps = {
   // Optional banner shown at the top of the modal — typically the
   // "resending to <name> after <reason>" callout for Fix & Resend.
   notice?: string | null;
+  // Customer-facing rate schedule from app_pricing_config. Drives the
+  // CostEstimate "Estimated total" line. Optional so any existing caller
+  // that doesn't pass it gets a "pricing not configured" placeholder.
+  pricing?: {
+    letter_first_class_bw: number;
+    letter_first_class_color: number;
+    letter_standard_bw: number;
+    letter_standard_color: number;
+    letter_certified_bw: number;
+    letter_certified_color: number;
+    letter_extra_page_bw: number;
+    letter_extra_page_color: number;
+    check_base: number;
+  } | null;
 };
 
 export function SendMailModal({
@@ -91,6 +105,7 @@ export function SendMailModal({
   fromAddress,
   defaultSelectedKeys,
   notice,
+  pricing,
 }: SendMailModalProps) {
   const hasVerifiedBank = bankAccounts.some((b) => b.verified);
   const router = useRouter();
@@ -700,6 +715,7 @@ export function SendMailModal({
             <CostEstimate
               recipients={selectedRecipients.length}
               mailClass={mailClass}
+              isColor={colorPrint}
               attachmentPdfPages={
                 isFileTemplate && attachmentPdfPages != null
                   ? attachmentPdfPages
@@ -712,6 +728,7 @@ export function SendMailModal({
               }
               isFileTemplate={isFileTemplate}
               includeCheck={includeCheck}
+              pricing={pricing ?? null}
             />
           )}
 
@@ -776,62 +793,86 @@ export function SendMailModal({
   );
 }
 
-// Cost estimate showing C2M's published starting-from prices from
-// https://click2mail.com/letter-8-5-x-11 (verified Feb 2026) plus real
-// PDF page counts (counted server-side via pdfjs-dist). The Word cover
-// page count isn't knowable until C2M renders it, so we surface it as
-// "1+". The exact charge comes back on each mail_jobs row after C2M
-// accepts the job.
+// Cost estimate displaying YOUR pricing for the selected class + color.
+// Reads the customer-facing rate schedule passed in by the parent (from
+// app_pricing_config.customer_mail_pricing_cents). All-inclusive rates
+// (printing + postage + envelope).
+type LetterPricing = {
+  letter_first_class_bw: number;
+  letter_first_class_color: number;
+  letter_standard_bw: number;
+  letter_standard_color: number;
+  letter_certified_bw: number;
+  letter_certified_color: number;
+  letter_extra_page_bw: number;
+  letter_extra_page_color: number;
+  check_base: number;
+};
+
 function CostEstimate({
   recipients,
   mailClass,
+  isColor,
   attachmentPdfPages,
   attachmentFileCount,
   isFileTemplate,
   includeCheck,
+  pricing,
 }: {
   recipients: number;
   mailClass: "standard" | "first_class" | "certified";
+  isColor: boolean;
   attachmentPdfPages: number | null;
   attachmentFileCount: number;
   isFileTemplate: boolean;
   includeCheck: boolean;
+  pricing: LetterPricing | null;
 }) {
-  // Source: click2mail.com/letter-8-5-x-11 "Starting from" list prices.
-  const c2mFloorByClass: Record<typeof mailClass, number> = {
-    standard: 0.59,
-    first_class: 0.59,
-    certified: 6.66,
-  };
-  const c2mFloor = c2mFloorByClass[mailClass];
   const fmt = (n: number) =>
     `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   // Page summary string — only as specific as we can verify.
   const pagesPerPiece = (() => {
-    if (!isFileTemplate) return "1+"; // HTML body, unknown until rendered
+    if (!isFileTemplate) return "1+";
     if (attachmentPdfPages == null) {
       return attachmentFileCount > 0 ? "Word cover + attachments" : "1+";
     }
     return `Word cover + ${attachmentPdfPages} PDF page${attachmentPdfPages === 1 ? "" : "s"}`;
   })();
-  const c2mTotalFloor = c2mFloor * recipients;
-  const checkTotal = includeCheck ? 1.16 * recipients : 0;
-  const grandFloor = c2mTotalFloor + checkTotal;
+
+  if (!pricing) {
+    return (
+      <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] text-gray-600">
+        Pricing not configured. Contact your administrator.
+      </div>
+    );
+  }
+
+  // Per-letter rate from the customer pricing schedule.
+  const letterCents = (() => {
+    if (mailClass === "standard")
+      return isColor ? pricing.letter_standard_color : pricing.letter_standard_bw;
+    if (mailClass === "certified")
+      return isColor ? pricing.letter_certified_color : pricing.letter_certified_bw;
+    return isColor ? pricing.letter_first_class_color : pricing.letter_first_class_bw;
+  })();
+  const letterDollars = letterCents / 100;
+  const checkDollars = includeCheck ? pricing.check_base / 100 : 0;
+  const grand = (letterDollars + checkDollars) * recipients;
+
   return (
     <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] text-ink">
       <div className="flex items-center justify-between">
-        <span className="font-medium">Estimated minimum</span>
-        <span className="font-mono text-ink">{fmt(grandFloor)}</span>
+        <span className="font-medium">Estimated total</span>
+        <span className="font-mono text-ink">{fmt(grand)}</span>
       </div>
       <div className="mt-[2px] text-[10px] text-gray-600">
         {recipients} {recipients === 1 ? "piece" : "pieces"} · {pagesPerPiece}{" "}
-        per piece · letter from {fmt(c2mFloor)} each
-        {includeCheck ? ` · Lob check ${fmt(1.16)} each` : ""}
+        per piece · letter {fmt(letterDollars)} each
+        {includeCheck ? ` · check ${fmt(checkDollars)} each` : ""}
       </div>
       <div className="mt-[2px] text-[10px] italic text-gray-400">
-        Starting price per Click2Mail&apos;s letter listing. Final charge
-        depends on rendered page count plus paper and class options, and
-        comes back from C2M when the job is accepted.
+        Rate from your pricing plan. Additional pages may add to the total
+        if the rendered content runs long.
       </div>
     </div>
   );

@@ -24,11 +24,13 @@ import { ContactRolesSection } from "./ContactRolesSection";
 import { MailSettingsSection } from "./MailSettingsSection";
 import { MailBankAccountsSection } from "./MailBankAccountsSection";
 import { LobPricingSection } from "./LobPricingSection";
+import { CustomerPricingViewSection } from "./CustomerPricingViewSection";
 import { TemplatesSection } from "./TemplatesSection";
 
 import type {
   AppSettings,
   AttorneyRow,
+  CustomerPricingViewData,
   LobPricingSettings,
   LostReasonAdminRow,
   MailBankAccountRow,
@@ -63,6 +65,7 @@ export type SettingsData = {
   mailSettings: MailSettings | null;
   mailBank: MailBankAccountRow[];
   lobPricing: LobPricingSettings | null;
+  customerPricing: CustomerPricingViewData | null;
   templates: TemplateRow[];
   research: ResearchTemplateRow[];
   phoneUsage: PhoneValidationUsage | null;
@@ -197,12 +200,12 @@ function renderPanel(
       );
     case "mail-bank":
       return <MailBankAccountsSection initial={data.mailBank} />;
+    case "mail-customer-pricing":
+      return <CustomerPricingViewSection data={data.customerPricing} />;
     case "mail-pricing":
-      return data.lobPricing ? (
-        <LobPricingSection initial={data.lobPricing} />
-      ) : (
-        <AdminGate />
-      );
+      // Legacy key kept for back-compat with any saved hash URLs.
+      // Renders the same customer-facing view as the new key above.
+      return <CustomerPricingViewSection data={data.customerPricing} />;
     case "templates":
       return (
         <TemplatesSection

@@ -55,9 +55,15 @@ export type SendLetterInput = {
   // webhook can map back to our mail_jobs row even if our provider_id
   // hasn't been persisted yet.
   correlation_id: string;
-  // Org's Lob rate schedule. Optional so non-org callers still work;
-  // when missing the cost computation falls back to nulls.
-  lob_pricing?: LobPricing;
+  // What we charge the customer for this piece. Becomes mail_jobs.cost_cents.
+  // Optional so non-org callers still work; missing → cost_cents = null.
+  customer_pricing?: LobPricing;
+  // What the provider (Lob, C2M) actually charges us. Becomes
+  // mail_jobs.provider_cost_cents. For C2M, this is overridden by the
+  // totalCost returned in their submitJob response (which is the actual
+  // billed amount). For Lob, computed from this schedule since Lob's
+  // create-letter / create-check APIs don't return per-piece cost.
+  wholesale_pricing?: LobPricing;
 };
 
 export type SendCheckInput = SendLetterInput & {
@@ -73,6 +79,9 @@ export type SendResult =
       provider_id: string;
       tracking_number: string | null;
       tracking_url: string | null;
+      // Customer-facing charge. Sums to revenue across mail_jobs.
       cost_cents: number | null;
+      // What the provider billed us. Sums to cost-to-Bree across mail_jobs.
+      provider_cost_cents: number | null;
     }
   | { ok: false; error: string };
