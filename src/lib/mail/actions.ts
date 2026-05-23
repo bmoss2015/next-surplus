@@ -544,6 +544,38 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     }
   }
 
+  // Count total sheets for the over-6 USPS surcharge gate. Cover sheet
+  // (HTML body or Word doc) = 1; each PDF attachment contributes its
+  // page count. The same value is used for every recipient in the batch
+  // since the rendered piece is the same shape per recipient.
+  let totalSheets = 1;
+  if (isFileTemplate && attachmentFiles.length > 0) {
+    for (const f of attachmentFiles) {
+      if (f.contentType === "application/pdf") {
+        try {
+          const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+          (pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: string } })
+            .GlobalWorkerOptions.workerSrc = "";
+          const doc = await (
+            pdfjs as unknown as {
+              getDocument: (opts: { data: Uint8Array; useWorker: false }) => {
+                promise: Promise<{ numPages: number }>;
+              };
+            }
+          ).getDocument({
+            data: new Uint8Array(f.buffer),
+            useWorker: false,
+          }).promise;
+          totalSheets += doc.numPages ?? 0;
+        } catch {
+          // Parse failure — leave the contribution at 0 rather than
+          // invent a count. Surcharge may be missed for this attachment
+          // but better than inflating it.
+        }
+      }
+    }
+  }
+
   const batchId = randomUUID();
   const jobIds: string[] = [];
   const today = new Date();
@@ -594,6 +626,10 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       // on mail_jobs.provider_cost_cents and used for margin reporting.
       customer_pricing: customerPricing,
       wholesale_pricing: wholesalePricing,
+      // Pass the sheet count so lob.ts can add the > 6-sheet surcharge
+      // to both the customer charge and the wholesale cost when this
+      // piece pushes past USPS's first-class weight tier.
+      total_sheets: totalSheets,
     };
 
     let send;

@@ -53,15 +53,31 @@ function lobCheckCostCents(pricing: LobPricing | undefined): number | null {
 // the two schedules we now carry around. Either may be undefined (older
 // callers or first-run when wholesale isn't synced yet) in which case the
 // matching column becomes null.
+//
+// When totalSheets is provided and exceeds 6, the > 6-sheet surcharge is
+// added to BOTH the customer charge and the provider cost. Surcharge is
+// pulled from each schedule's letter_over_6_sheet_fee. Lob bills the
+// surcharge as a USPS weight-tier passthrough; we mirror that bill
+// directly so margin is preserved (customer rate covers wholesale).
 function lobLetterCostPair(
   mc: SendLetterInput["mail_class"],
   color: boolean,
   customer: LobPricing | undefined,
-  wholesale: LobPricing | undefined
+  wholesale: LobPricing | undefined,
+  totalSheets: number | undefined
 ): { cost_cents: number | null; provider_cost_cents: number | null } {
+  const baseCustomer = lobLetterCostCents(mc, color, customer);
+  const baseWholesale = lobLetterCostCents(mc, color, wholesale);
+  const triggerSurcharge = typeof totalSheets === "number" && totalSheets > 6;
+  const customerSurcharge =
+    triggerSurcharge ? (customer?.letter_over_6_sheet_fee ?? 0) : 0;
+  const wholesaleSurcharge =
+    triggerSurcharge ? (wholesale?.letter_over_6_sheet_fee ?? 0) : 0;
   return {
-    cost_cents: lobLetterCostCents(mc, color, customer),
-    provider_cost_cents: lobLetterCostCents(mc, color, wholesale),
+    cost_cents:
+      baseCustomer == null ? null : baseCustomer + customerSurcharge,
+    provider_cost_cents:
+      baseWholesale == null ? null : baseWholesale + wholesaleSurcharge,
   };
 }
 
@@ -252,7 +268,8 @@ export async function lobSendLetter(
       input.mail_class,
       input.color === true,
       input.customer_pricing,
-      input.wholesale_pricing
+      input.wholesale_pricing,
+      input.total_sheets
     );
     return {
       ok: true,

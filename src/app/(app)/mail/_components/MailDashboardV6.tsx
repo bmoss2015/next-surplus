@@ -379,12 +379,12 @@ function PieceRow({
     <Link
       href={href}
       className={cn(
-        "group relative grid grid-cols-[1fr_120px_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50",
-        // Batch-child rows: subtle gray background + a thin petrol bar
-        // on the left edge. Background reads as "grouped"; the bar adds
-        // a stronger visual signal so a member of a batch doesn't blend
-        // into the surrounding rows. Absolute-positioned so it doesn't
-        // shift the content grid and the pill column stays aligned.
+        "group relative grid grid-cols-[1fr_88px_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50",
+        // Batch-child rows: subtle gray background + a 3px dark brand
+        // bar on the left edge. Bar uses the full brand emerald (not the
+        // softer petrol) so a child row reads clearly as "part of this
+        // group". Absolute-positioned so it doesn't shift the content
+        // grid and the pill column stays aligned.
         isBatchChild && "bg-gray-50/60"
       )}
     >
@@ -392,7 +392,7 @@ function PieceRow({
         <span
           aria-hidden
           className="absolute left-0 top-0 bottom-0"
-          style={{ width: 3, background: "rgba(13, 75, 58, 0.45)" }}
+          style={{ width: 3, background: "#0d4b3a" }}
         />
       )}
       {/* Left column — name, address, meta. Pill moved out to its own
@@ -447,10 +447,10 @@ function PieceRow({
       {/* Middle column — status pill, in its own column so it has
           breathing room from the meta line below. Top-aligned with a
           small vertical nudge to sit on the name's baseline. */}
-      <div className="flex justify-end pt-[2px]">
+      <div className="flex justify-start pt-[2px]">
         <span
           className={cn(
-            "inline-flex min-w-[88px] items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em]",
+            "inline-flex items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] whitespace-nowrap",
             pillClass
           )}
         >
@@ -531,7 +531,7 @@ function BatchRow({
   return (
     <details className="group">
       <summary
-        className="grid cursor-pointer list-none grid-cols-[1fr_120px_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50"
+        className="grid cursor-pointer list-none grid-cols-[1fr_88px_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50"
       >
         <div className="min-w-0">
           {/* Batch header: name only, no status pill. Pills live on the

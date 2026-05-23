@@ -91,6 +91,7 @@ export type SendMailModalProps = {
     letter_extra_page_bw: number;
     letter_extra_page_color: number;
     check_base: number;
+    letter_over_6_sheet_fee?: number;
   } | null;
 };
 
@@ -807,6 +808,9 @@ type LetterPricing = {
   letter_extra_page_bw: number;
   letter_extra_page_color: number;
   check_base: number;
+  // USPS over-6-sheets weight-tier surcharge. Optional so older callers
+  // that don't pass it still render. Same rate regardless of color.
+  letter_over_6_sheet_fee?: number;
 };
 
 function CostEstimate({
@@ -855,15 +859,38 @@ function CostEstimate({
       return isColor ? pricing.letter_certified_color : pricing.letter_certified_bw;
     return isColor ? pricing.letter_first_class_color : pricing.letter_first_class_bw;
   })();
+  // USPS weight-tier surcharge kicks in past 6 single-sided sheets. We
+  // only know the sheet count for the file-template path (Word cover +
+  // PDF attachments). HTML-body letters are assumed to fit within 6.
+  const totalSheets = isFileTemplate
+    ? 1 + (attachmentPdfPages ?? 0)
+    : 1;
+  const triggersOver6Fee = totalSheets > 6;
+  const over6FeeCents =
+    triggersOver6Fee ? (pricing.letter_over_6_sheet_fee ?? 0) : 0;
   const letterDollars = letterCents / 100;
+  const over6FeeDollars = over6FeeCents / 100;
   const checkDollars = includeCheck ? pricing.check_base / 100 : 0;
-  const grand = (letterDollars + checkDollars) * recipients;
+  const grand = (letterDollars + over6FeeDollars + checkDollars) * recipients;
 
   return (
     <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] text-ink">
+      {triggersOver6Fee && (
+        <div
+          className="mb-2 rounded px-2 py-1.5 text-[10.5px]"
+          style={{
+            background: "#fef2f2",
+            color: "#b42318",
+            border: "1px solid rgba(180, 35, 24, 0.20)",
+          }}
+        >
+          This letter is {totalSheets} sheets. USPS adds a {fmt(over6FeeDollars)}{" "}
+          weight surcharge per piece beyond 6 sheets.
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <span className="font-medium">Estimated total</span>
-        <span className="font-mono text-ink">{fmt(grand)}</span>
+        <span className="tabular-nums text-ink">{fmt(grand)}</span>
       </div>
       <div className="mt-[2px] text-[10px] text-gray-600">
         {recipients} {recipients === 1 ? "piece" : "pieces"} · {pagesPerPiece}{" "}

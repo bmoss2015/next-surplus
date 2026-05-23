@@ -84,7 +84,7 @@ export function CustomerPricingViewSection({
       </section>
 
       <section
-        className="rounded-lg bg-white"
+        className="mb-5 rounded-lg bg-white"
         style={{ border: "1px solid #ebedf0" }}
       >
         <header
@@ -97,6 +97,26 @@ export function CustomerPricingViewSection({
           rows={[
             { label: "Check (Base)", cents: p.check_base },
             { label: "Check Attachment Page", cents: p.check_extra_attachment_page },
+          ]}
+        />
+      </section>
+
+      <section
+        className="rounded-lg bg-white"
+        style={{ border: "1px solid #ebedf0" }}
+      >
+        <header
+          className="px-5 py-3.5"
+          style={{ borderBottom: "1px solid #ebedf0" }}
+        >
+          <div className="text-[14px] font-semibold text-ink">Surcharges</div>
+        </header>
+        <FlatRowsView
+          rows={[
+            {
+              label: "Letter Over 6 Sheets (USPS Weight Surcharge)",
+              cents: p.letter_over_6_sheet_fee ?? 0,
+            },
           ]}
         />
       </section>

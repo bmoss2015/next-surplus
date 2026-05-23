@@ -40,6 +40,11 @@ export type LobPricing = {
   letter_certified_color: number;
   letter_extra_page_bw: number;
   letter_extra_page_color: number;
+  // USPS weight-tier passthrough. Applies when a single piece exceeds 6
+  // single-sided sheets (about 1 oz). Same rate regardless of color.
+  // Optional so older config rows that don't have it yet don't break;
+  // missing → treated as 0 (no surcharge applied).
+  letter_over_6_sheet_fee?: number;
 };
 
 export type SendLetterInput = {
@@ -64,6 +69,11 @@ export type SendLetterInput = {
   // billed amount). For Lob, computed from this schedule since Lob's
   // create-letter / create-check APIs don't return per-piece cost.
   wholesale_pricing?: LobPricing;
+  // Total sheet count for this piece (cover + every additional sheet
+  // from PDF attachments). Used to detect when the > 6-sheet USPS
+  // surcharge applies. Optional — when missing, the surcharge is not
+  // added (caller didn't know the count yet).
+  total_sheets?: number;
 };
 
 export type SendCheckInput = SendLetterInput & {

@@ -63,6 +63,13 @@ const CHECK_ROWS: { label: string; key: PriceKey }[] = [
   { label: "Check Attachment Page", key: "check_extra_attachment_page" },
 ];
 
+const SURCHARGE_ROWS: { label: string; key: PriceKey }[] = [
+  {
+    label: "Letter Over 6 Sheets (USPS Weight Surcharge)",
+    key: "letter_over_6_sheet_fee" as PriceKey,
+  },
+];
+
 export function CustomerPricingSection({
   data,
 }: {
@@ -77,12 +84,14 @@ export function CustomerPricingSection({
     ...LETTER_CLASSES.flatMap((c) => [c.bwKey, c.colorKey]),
     ...EXTRA_PAGE_ROWS.map((r) => r.key),
     ...CHECK_ROWS.map((r) => r.key),
+    ...SURCHARGE_ROWS.map((r) => r.key),
   ];
 
   const [retails, setRetails] = useState<Record<string, string>>(() => {
     const out: Record<string, string> = {};
     for (const k of allKeys) {
-      out[k] = centsToDollarsInput(data.customer_mail_pricing_cents[k]);
+      const v = data.customer_mail_pricing_cents[k];
+      out[k] = centsToDollarsInput(typeof v === "number" ? v : 0);
     }
     return out;
   });
@@ -194,6 +203,16 @@ export function CustomerPricingSection({
       <PriceCard title="Checks">
         <FlatRowsTable
           rows={CHECK_ROWS}
+          data={data}
+          retails={retails}
+          setRetail={setRetail}
+        />
+      </PriceCard>
+
+      {/* Surcharges card ------------------------------------------------ */}
+      <PriceCard title="Surcharges">
+        <FlatRowsTable
+          rows={SURCHARGE_ROWS}
           data={data}
           retails={retails}
           setRetail={setRetail}
