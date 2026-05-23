@@ -164,6 +164,37 @@ function authHeader(): string {
   return `Basic ${basic}`;
 }
 
+// Wraps a fetch with exponential-backoff retries on transient failures
+// (429 rate limit + any 5xx). Lob's own SDK uses the same pattern.
+// Three retries max, total wait under 8 seconds (1s + 2s + 4s). After
+// retries are exhausted the final response is returned so the caller
+// can surface its error string to the user.
+async function lobFetch(
+  url: string,
+  init: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      // Network-level failure (DNS, socket reset, etc.) — treat as
+      // transient and retry. Last attempt re-throws so the caller's
+      // try/catch surfaces a clean error.
+      if (attempt === maxRetries) throw err;
+      await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 1000));
+      continue;
+    }
+    const transient = res.status === 429 || res.status >= 500;
+    if (!transient) return res;
+    if (attempt === maxRetries) return res;
+    await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 1000));
+  }
+  // Unreachable; loop always returns or throws.
+  throw new Error("lobFetch loop exhausted");
+}
+
 // Lob accepts our internal class names directly via mail_type for checks
 // and use_type for letters. The mappings below match Lob's published values.
 function lobMailType(
@@ -211,7 +242,7 @@ export async function lobSendCheck(
       mail_type: lobMailType(input.mail_class),
       metadata: { correlation_id: input.correlation_id },
     };
-    const res = await fetch(`${LOB_BASE_URL}/checks`, {
+    const res = await lobFetch(`${LOB_BASE_URL}/checks`, {
       method: "POST",
       headers: {
         Authorization: authHeader(),
@@ -292,7 +323,7 @@ export async function lobSendLetter(
       use_type: "marketing",
       metadata: { correlation_id: input.correlation_id },
     };
-    const res = await fetch(`${LOB_BASE_URL}/letters`, {
+    const res = await lobFetch(`${LOB_BASE_URL}/letters`, {
       method: "POST",
       headers: {
         Authorization: authHeader(),
@@ -463,7 +494,7 @@ export async function lobCreateBankAccount(
     return { ok: false, error: "Lob is not configured (missing LOB_API_KEY)" };
   }
   try {
-    const res = await fetch(`${LOB_BASE_URL}/bank_accounts`, {
+    const res = await lobFetch(`${LOB_BASE_URL}/bank_accounts`, {
       method: "POST",
       headers: {
         Authorization: authHeader(),
@@ -515,7 +546,7 @@ export async function lobVerifyBankAccount(
     return { ok: false, error: "Lob is not configured (missing LOB_API_KEY)" };
   }
   try {
-    const res = await fetch(`${LOB_BASE_URL}/bank_accounts/${bnkId}/verify`, {
+    const res = await lobFetch(`${LOB_BASE_URL}/bank_accounts/${bnkId}/verify`, {
       method: "POST",
       headers: {
         Authorization: authHeader(),

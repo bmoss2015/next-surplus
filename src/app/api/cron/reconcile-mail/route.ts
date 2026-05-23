@@ -133,6 +133,92 @@ export async function GET(req: Request) {
     });
   }
 
+  // Plan-cap warning. Lob Developer tier caps at 500 mailings/month.
+  // We watch the global month-to-date count (across all customer orgs,
+  // since they all share Bree's one Lob account) and email the owner
+  // when usage crosses 75% / 90% / hits the cap. Sample-data rows are
+  // excluded.
+  try {
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const { count: monthSends } = await admin
+      .from("mail_jobs")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", monthStart.toISOString())
+      .eq("provider", "lob")
+      .not("provider_id", "ilike", "sample_%");
+
+    const sends = monthSends ?? 0;
+    const LOB_CAP = 500;
+    const tier =
+      sends >= LOB_CAP
+        ? "cap_hit"
+        : sends >= Math.round(LOB_CAP * 0.9)
+          ? "ninety"
+          : sends >= Math.round(LOB_CAP * 0.75)
+            ? "seventyfive"
+            : null;
+
+    if (tier) {
+      const { data: owners } = await admin
+        .from("profiles")
+        .select("id, org_id, email")
+        .eq("role", "owner");
+      const subjectByTier: Record<string, string> = {
+        cap_hit: `Lob mailing cap hit (${sends} of ${LOB_CAP} this month)`,
+        ninety: `Lob mailing cap 90% used (${sends} of ${LOB_CAP} this month)`,
+        seventyfive: `Lob mailing cap 75% used (${sends} of ${LOB_CAP} this month)`,
+      };
+      const bodyByTier: Record<string, string> = {
+        cap_hit: `You've hit Lob's Developer-tier monthly limit of ${LOB_CAP} mailings. New sends will fail until next month or until you upgrade to the Startup plan ($260/mo, 3000 mailings).`,
+        ninety: `You've used ${sends} of your ${LOB_CAP} Lob mailings this month. Sends will start failing at ${LOB_CAP}. Plan for an upgrade if you expect more volume.`,
+        seventyfive: `You've used ${sends} of your ${LOB_CAP} Lob mailings this month. Heads up — the cap is approaching.`,
+      };
+
+      const apiKey = process.env.RESEND_API_KEY;
+      const from =
+        process.env.RESEND_FROM ?? "notifications@mossequitypartners.com";
+      if (apiKey && owners && owners.length > 0) {
+        for (const o of owners) {
+          const email = (o.email as string | null) ?? null;
+          if (!email) continue;
+          // Best-effort send; failures just log so the cron's other
+          // work continues.
+          try {
+            await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                from,
+                to: email,
+                subject: subjectByTier[tier],
+                text: bodyByTier[tier],
+              }),
+            });
+          } catch {
+            // ignore — see comment above
+          }
+          // Also write a bell notification so it shows up in-app.
+          await admin.from("notifications").insert({
+            org_id: o.org_id as string,
+            recipient_id: o.id as string,
+            actor_id: null,
+            type: "lob_cap_warning",
+            body_preview: subjectByTier[tier],
+          });
+        }
+      }
+    }
+  } catch {
+    // Plan-cap check is a defensive add — never block the reconcile
+    // cron's main job. If RESEND_API_KEY isn't set or owners can't be
+    // read, just skip silently.
+  }
+
   return NextResponse.json({
     ok: true,
     candidates_checked: candidates?.length ?? 0,

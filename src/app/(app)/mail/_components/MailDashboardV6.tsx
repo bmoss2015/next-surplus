@@ -423,19 +423,18 @@ function PieceRow({
           style={{ width: 3, background: "#0d4b3a" }}
         />
       )}
-      {/* Left column — name + pill on row 1 (pill sits right next to
-          the name, left-anchored), then address, then meta line. */}
+      {/* Left column — name + pill on row 1. Name column is fixed 280px
+          so the pill always lands at the same X across rows regardless
+          of name length (short names don't pull it left, long names
+          truncate). */}
       <div className="min-w-0">
-        <div className="flex items-center gap-3">
-          <span
-            className="truncate text-[15px] font-semibold text-ink"
-            style={{ maxWidth: 280 }}
-          >
+        <div className="grid grid-cols-[280px_auto] items-center gap-3">
+          <span className="truncate text-[15px] font-semibold text-ink">
             {displayRecipientName(piece.recipient_name)}
           </span>
           <span
             className={cn(
-              "inline-flex shrink-0 items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] whitespace-nowrap",
+              "inline-flex shrink-0 items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] whitespace-nowrap justify-self-start",
               pillClass
             )}
           >
