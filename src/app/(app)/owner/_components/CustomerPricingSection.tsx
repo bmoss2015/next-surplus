@@ -2,15 +2,13 @@
 
 // Owner Customer Pricing panel.
 //
-// One screen showing every mail product. Three columns of truth per row:
-// what Lob charges you, what you charge the customer, and the resulting
-// margin. Grouped by product family (Letters | Extra Pages | Checks) so
-// the B&W-vs-Color and First-Class-vs-Standard-vs-Certified variations
-// stack visually instead of cramming into one flat list.
+// Layout per Bree's spec: B&W on the left, Color on the right. Mail
+// classes (Standard, First Class) listed within each color. Sort order
+// is cheapest-to-most-expensive: Standard before First Class. Certified
+// is hidden entirely until the Lob Startup plan is active (Developer
+// tier doesn't support certified).
 //
-// Subscription field intentionally not exposed yet. Bree is launching
-// pay-per-piece only (matching Excess Elite's model). Subscription tier
-// is a later add-on. The database column stays in place for that future.
+// No subscription card. No Quick Math footer. Just price grids.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -35,43 +33,34 @@ function dollarsToCents(s: string): number {
   return Math.round(n * 100);
 }
 
-type RowSpec = {
-  key: PriceKey;
+type LetterClassRow = {
   label: string;
+  bwKey: PriceKey;
+  colorKey: PriceKey;
 };
 
-const LETTER_ROWS: Array<{ heading: string; rows: RowSpec[] }> = [
+// Cheapest first per Bree's preference (Standard postage < First Class).
+const LETTER_CLASSES: LetterClassRow[] = [
   {
-    heading: "First Class",
-    rows: [
-      { key: "letter_first_class_bw", label: "B&W" },
-      { key: "letter_first_class_color", label: "Color" },
-    ],
+    label: "Standard Class",
+    bwKey: "letter_standard_bw",
+    colorKey: "letter_standard_color",
   },
   {
-    heading: "Standard Class",
-    rows: [
-      { key: "letter_standard_bw", label: "B&W" },
-      { key: "letter_standard_color", label: "Color" },
-    ],
-  },
-  {
-    heading: "Certified",
-    rows: [
-      { key: "letter_certified_bw", label: "B&W" },
-      { key: "letter_certified_color", label: "Color" },
-    ],
+    label: "First Class",
+    bwKey: "letter_first_class_bw",
+    colorKey: "letter_first_class_color",
   },
 ];
 
-const EXTRA_PAGE_ROWS: RowSpec[] = [
-  { key: "letter_extra_page_bw", label: "B&W extra page" },
-  { key: "letter_extra_page_color", label: "Color extra page" },
+const EXTRA_PAGE_ROWS: { label: string; key: PriceKey }[] = [
+  { label: "B&W extra page", key: "letter_extra_page_bw" },
+  { label: "Color extra page", key: "letter_extra_page_color" },
 ];
 
-const CHECK_ROWS: RowSpec[] = [
-  { key: "check_base", label: "Check (base)" },
-  { key: "check_extra_attachment_page", label: "Check attachment page" },
+const CHECK_ROWS: { label: string; key: PriceKey }[] = [
+  { label: "Check (base)", key: "check_base" },
+  { label: "Check attachment page", key: "check_extra_attachment_page" },
 ];
 
 export function CustomerPricingSection({
@@ -84,18 +73,16 @@ export function CustomerPricingSection({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Inputs hold the retail price (what you charge customers) as a
-  // dollars-with-decimals string so the user can type "1.25" naturally.
-  // Lob cost and margin are computed live from the cost data and never
-  // typed in.
+  const allKeys: PriceKey[] = [
+    ...LETTER_CLASSES.flatMap((c) => [c.bwKey, c.colorKey]),
+    ...EXTRA_PAGE_ROWS.map((r) => r.key),
+    ...CHECK_ROWS.map((r) => r.key),
+  ];
+
   const [retails, setRetails] = useState<Record<string, string>>(() => {
     const out: Record<string, string> = {};
-    for (const r of [
-      ...LETTER_ROWS.flatMap((g) => g.rows),
-      ...EXTRA_PAGE_ROWS,
-      ...CHECK_ROWS,
-    ]) {
-      out[r.key] = centsToDollarsInput(data.customer_mail_pricing_cents[r.key]);
+    for (const k of allKeys) {
+      out[k] = centsToDollarsInput(data.customer_mail_pricing_cents[k]);
     }
     return out;
   });
@@ -111,12 +98,16 @@ export function CustomerPricingSection({
     const built: Partial<LobPricing> = {
       tier_label: data.customer_mail_pricing_cents.tier_label ?? "Standard",
     };
-    for (const r of [
-      ...LETTER_ROWS.flatMap((g) => g.rows),
-      ...EXTRA_PAGE_ROWS,
-      ...CHECK_ROWS,
-    ]) {
-      built[r.key] = dollarsToCents(retails[r.key] ?? "0");
+    // Carry forward the certified rows untouched (still in DB, just not
+    // edited here). Same for any other key not in the visible set.
+    for (const k of Object.keys(
+      data.customer_mail_pricing_cents
+    ) as Array<keyof LobPricing>) {
+      if (k === "tier_label") continue;
+      built[k] = data.customer_mail_pricing_cents[k] as number;
+    }
+    for (const k of allKeys) {
+      built[k] = dollarsToCents(retails[k] ?? "0");
     }
     startTransition(async () => {
       const res = await updateCustomerPricing({
@@ -167,49 +158,52 @@ export function CustomerPricingSection({
         </div>
       </div>
 
-      {/* Letters card --------------------------------------------------- */}
-      <PriceCard title="Letters">
-        <PriceTable>
-          {LETTER_ROWS.map((group) => (
-            <PriceGroupRows
-              key={group.heading}
-              groupLabel={group.heading}
-              rows={group.rows}
-              data={data}
-              retails={retails}
-              setRetail={setRetail}
-              note={
-                group.heading === "Certified"
-                  ? "Certified mail requires Lob Startup plan ($260/mo). Your account is on Developer; certified sends will fail until you upgrade. Wholesale shows the Startup rate."
-                  : undefined
-              }
-            />
-          ))}
-        </PriceTable>
+      {/* Letters card — B&W on the left, Color on the right ---------- */}
+      <PriceCard title="Letters" subtitle="Standard and First Class only. Certified is not available on your current Lob plan; ask to enable when you upgrade.">
+        <div className="grid grid-cols-2 divide-x divide-gray-200">
+          <ClassGrid
+            heading="Black &amp; White"
+            classes={LETTER_CLASSES}
+            keySelector={(c) => c.bwKey}
+            data={data}
+            retails={retails}
+            setRetail={setRetail}
+          />
+          <ClassGrid
+            heading="Color"
+            classes={LETTER_CLASSES}
+            keySelector={(c) => c.colorKey}
+            data={data}
+            retails={retails}
+            setRetail={setRetail}
+          />
+        </div>
       </PriceCard>
 
       {/* Extra pages card ----------------------------------------------- */}
-      <PriceCard title="Extra Pages" subtitle="Added per extra page beyond the first page of a letter.">
-        <PriceTable>
-          <PriceGroupRows
-            rows={EXTRA_PAGE_ROWS}
-            data={data}
-            retails={retails}
-            setRetail={setRetail}
-          />
-        </PriceTable>
+      <PriceCard
+        title="Extra Pages"
+        subtitle="Added per extra page beyond the first page of a letter."
+      >
+        <FlatRowsTable
+          rows={EXTRA_PAGE_ROWS}
+          data={data}
+          retails={retails}
+          setRetail={setRetail}
+        />
       </PriceCard>
 
       {/* Checks card ---------------------------------------------------- */}
-      <PriceCard title="Checks" subtitle="Lob check products. Printed B&W on standard MICR stock; no color variant. Attachment page applies when the check is mailed with an enclosed letter.">
-        <PriceTable>
-          <PriceGroupRows
-            rows={CHECK_ROWS}
-            data={data}
-            retails={retails}
-            setRetail={setRetail}
-          />
-        </PriceTable>
+      <PriceCard
+        title="Checks"
+        subtitle="Printed B&W on standard MICR check stock; no color variant. Attachment page applies when the check is mailed with an enclosed letter."
+      >
+        <FlatRowsTable
+          rows={CHECK_ROWS}
+          data={data}
+          retails={retails}
+          setRetail={setRetail}
+        />
       </PriceCard>
     </div>
   );
@@ -243,7 +237,97 @@ function PriceCard({
   );
 }
 
-function PriceTable({ children }: { children: React.ReactNode }) {
+function ClassGrid({
+  heading,
+  classes,
+  keySelector,
+  data,
+  retails,
+  setRetail,
+}: {
+  heading: string;
+  classes: LetterClassRow[];
+  keySelector: (c: LetterClassRow) => PriceKey;
+  data: CustomerPricingData;
+  retails: Record<string, string>;
+  setRetail: (key: string, value: string) => void;
+}) {
+  return (
+    <div className="px-5 py-4">
+      <div
+        className="mb-2 text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: "#5b606a" }}
+        dangerouslySetInnerHTML={{ __html: heading }}
+      />
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr
+            className="text-left text-[10.5px] uppercase tracking-wider text-gray-500"
+            style={{ borderBottom: "1px solid #f1f2f4" }}
+          >
+            <th className="py-1.5 pr-2 font-medium">Class</th>
+            <th className="py-1.5 px-2 text-right font-medium">Your Cost</th>
+            <th className="py-1.5 px-2 text-right font-medium">Customer Pays</th>
+            <th className="py-1.5 pl-2 text-right font-medium">Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {classes.map((c) => {
+            const k = keySelector(c);
+            const costCents = data.wholesale_pricing_cents?.[k];
+            const retailCents = dollarsToCents(retails[k] ?? "0");
+            const margin =
+              typeof costCents === "number" ? retailCents - costCents : null;
+            const isLoss = margin !== null && margin < 0;
+            return (
+              <tr key={k} style={{ borderBottom: "1px solid #f1f2f4" }}>
+                <td className="py-2 pr-2 text-ink">{c.label}</td>
+                <td className="py-2 px-2 text-right font-mono text-gray-600">
+                  {fmtMoney(costCents)}
+                </td>
+                <td className="py-2 px-2 text-right">
+                  <div className="inline-flex items-center gap-1">
+                    <span className="text-[12px] text-gray-400">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={retails[k] ?? ""}
+                      onChange={(e) => setRetail(k, e.target.value)}
+                      className="w-[80px] rounded-md px-2 py-1 text-right font-mono text-[13px] text-ink focus:outline-none"
+                      style={{ border: "1px solid #ebedf0" }}
+                    />
+                  </div>
+                </td>
+                <td
+                  className="py-2 pl-2 text-right font-mono"
+                  style={{
+                    color:
+                      margin == null ? "#9298a3" : isLoss ? "#b42318" : "#067647",
+                  }}
+                >
+                  {margin == null ? "—" : fmtMoney(margin)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function FlatRowsTable({
+  rows,
+  data,
+  retails,
+  setRetail,
+}: {
+  rows: { label: string; key: PriceKey }[];
+  data: CustomerPricingData;
+  retails: Record<string, string>;
+  setRetail: (key: string, value: string) => void;
+}) {
   return (
     <table className="w-full text-[13px]">
       <thead>
@@ -252,102 +336,51 @@ function PriceTable({ children }: { children: React.ReactNode }) {
           style={{ borderBottom: "1px solid #ebedf0" }}
         >
           <th className="px-5 py-2 font-medium">Product</th>
-          <th className="px-5 py-2 text-right font-medium">Your Cost (Lob)</th>
+          <th className="px-5 py-2 text-right font-medium">Your Cost</th>
           <th className="px-5 py-2 text-right font-medium">Customer Pays</th>
           <th className="px-5 py-2 text-right font-medium">Margin</th>
         </tr>
       </thead>
-      <tbody>{children}</tbody>
+      <tbody>
+        {rows.map((r) => {
+          const costCents = data.wholesale_pricing_cents?.[r.key];
+          const retailCents = dollarsToCents(retails[r.key] ?? "0");
+          const margin =
+            typeof costCents === "number" ? retailCents - costCents : null;
+          const isLoss = margin !== null && margin < 0;
+          return (
+            <tr key={r.key} style={{ borderBottom: "1px solid #f1f2f4" }}>
+              <td className="px-5 py-2.5 text-ink">{r.label}</td>
+              <td className="px-5 py-2.5 text-right font-mono text-gray-600">
+                {fmtMoney(costCents)}
+              </td>
+              <td className="px-5 py-2.5 text-right">
+                <div className="inline-flex items-center gap-1">
+                  <span className="text-[12px] text-gray-400">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={retails[r.key] ?? ""}
+                    onChange={(e) => setRetail(r.key, e.target.value)}
+                    className="w-[88px] rounded-md px-2 py-1 text-right font-mono text-[13px] text-ink focus:outline-none"
+                    style={{ border: "1px solid #ebedf0" }}
+                  />
+                </div>
+              </td>
+              <td
+                className="px-5 py-2.5 text-right font-mono"
+                style={{
+                  color:
+                    margin == null ? "#9298a3" : isLoss ? "#b42318" : "#067647",
+                }}
+              >
+                {margin == null ? "—" : fmtMoney(margin)}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
     </table>
-  );
-}
-
-function PriceGroupRows({
-  groupLabel,
-  rows,
-  data,
-  retails,
-  setRetail,
-  note,
-}: {
-  groupLabel?: string;
-  rows: RowSpec[];
-  data: CustomerPricingData;
-  retails: Record<string, string>;
-  setRetail: (key: string, value: string) => void;
-  note?: string;
-}) {
-  return (
-    <>
-      {groupLabel && (
-        <tr>
-          <td
-            colSpan={4}
-            className="px-5 pt-3 pb-1 text-[11px] uppercase tracking-wider"
-            style={{ color: "#5b606a", fontWeight: 600 }}
-          >
-            {groupLabel}
-          </td>
-        </tr>
-      )}
-      {note && (
-        <tr>
-          <td colSpan={4} className="px-5 pb-2">
-            <div
-              className="rounded-md px-3 py-2 text-[11.5px]"
-              style={{
-                background: "#fef2f2",
-                color: "#b42318",
-                border: "1px solid rgba(180, 35, 24, 0.20)",
-              }}
-            >
-              {note}
-            </div>
-          </td>
-        </tr>
-      )}
-      {rows.map((r) => {
-        const costCents = data.wholesale_pricing_cents?.[r.key];
-        const retailCents = dollarsToCents(retails[r.key] ?? "0");
-        const margin =
-          typeof costCents === "number" ? retailCents - costCents : null;
-        const isLoss = margin !== null && margin < 0;
-        return (
-          <tr
-            key={r.key}
-            style={{ borderBottom: "1px solid #f1f2f4" }}
-          >
-            <td className="px-5 py-2.5 text-ink" style={{ paddingLeft: 32 }}>
-              {r.label}
-            </td>
-            <td className="px-5 py-2.5 text-right font-mono text-gray-600">
-              {fmtMoney(costCents)}
-            </td>
-            <td className="px-5 py-2.5 text-right">
-              <div className="inline-flex items-center gap-1">
-                <span className="text-[12px] text-gray-400">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={retails[r.key] ?? ""}
-                  onChange={(e) => setRetail(r.key, e.target.value)}
-                  className="w-[88px] rounded-md px-2 py-1 text-right font-mono text-[13px] text-ink focus:outline-none"
-                  style={{ border: "1px solid #ebedf0" }}
-                />
-              </div>
-            </td>
-            <td
-              className="px-5 py-2.5 text-right font-mono"
-              style={{
-                color: margin == null ? "#9298a3" : isLoss ? "#b42318" : "#067647",
-              }}
-            >
-              {margin == null ? "—" : fmtMoney(margin)}
-            </td>
-          </tr>
-        );
-      })}
-    </>
   );
 }

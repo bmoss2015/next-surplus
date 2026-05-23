@@ -215,12 +215,9 @@ export function MailDashboardV6({
         />
       </div>
 
-      {/* Pipeline bar */}
-      <PipelineSection
-        inTransit={displayStats.in_flight}
-        delivered={displayStats.delivered}
-        returned={displayStats.returned}
-      />
+      {/* Pipeline bar removed — the four-tile KPI strip above already
+          surfaces in-transit / delivered / returned counts. The bar
+          added visual noise without decision-relevant signal. */}
 
       {/* Three status sections. With filters active, empty sections hide
           (so the page doesn't claim "no deliveries" when it really means
@@ -306,76 +303,6 @@ function Kpi({
   );
 }
 
-function PipelineSection({
-  inTransit,
-  delivered,
-  returned,
-}: {
-  inTransit: number;
-  delivered: number;
-  returned: number;
-}) {
-  const total = inTransit + delivered + returned;
-  if (total === 0) return null;
-  return (
-    <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
-      <div className="flex items-baseline justify-between">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-          Pipeline
-        </div>
-        <div className="text-[11px] text-gray-500">{total} pieces total</div>
-      </div>
-      <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-gray-100">
-        <div className="bg-ink" style={{ width: `${(inTransit / total) * 100}%` }} />
-        <div
-          className="bg-petrol-500"
-          style={{ width: `${(delivered / total) * 100}%` }}
-        />
-        <div className="bg-danger" style={{ width: `${(returned / total) * 100}%` }} />
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-4 text-[12px]">
-        <PipelinePair color="bg-ink" label="In Transit" count={inTransit} />
-        <PipelinePair color="bg-petrol-500" label="Delivered" count={delivered} />
-        <PipelinePair
-          color="bg-danger"
-          label="Returned"
-          count={returned}
-          warn={returned > 0}
-        />
-      </div>
-    </section>
-  );
-}
-
-function PipelinePair({
-  color,
-  label,
-  count,
-  warn,
-}: {
-  color: string;
-  label: string;
-  count: number;
-  warn?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <span className={cn("h-2 w-2 rounded-full", color)} />
-      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-        {label}
-      </span>
-      <span
-        className={cn(
-          "ml-auto text-[16px] font-semibold tabular-nums",
-          warn ? "text-danger" : "text-ink"
-        )}
-      >
-        {count}
-      </span>
-    </div>
-  );
-}
-
 function ListSection({
   eyebrow,
   trailing,
@@ -453,7 +380,11 @@ function PieceRow({
       href={href}
       className={cn(
         "group grid grid-cols-[1fr_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50",
-        isBatchChild && "pl-12 bg-gray-50/40"
+        // Batch-child indent removed so the status pill lines up at the
+        // same X across batched rows, individual rows, and rows in other
+        // batches. Light gray background still signals "I'm a batch
+        // child" without needing extra indentation.
+        isBatchChild && "bg-gray-50/40"
       )}
     >
       {/* Left column — strict order: name + pill, address, meta.
@@ -483,7 +414,7 @@ function PieceRow({
 
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-gray-600">
           <span className="inline-flex items-center gap-1.5">
-            <IconMail size={13} stroke={1.75} className="text-gray-400" />
+            <IconMail size={13} stroke={1.75} className="text-petrol-500" />
             {mailClassLabel(piece.mail_class)}
           </span>
           <span className="text-gray-300">·</span>
@@ -590,18 +521,18 @@ function BatchRow({
     <details className="group">
       <summary className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50">
         <div className="min-w-0">
+          {/* Batch header: name only, no status pill. Pills live on the
+              individual recipient rows below so the pill column is
+              consistent across the whole list. */}
           <div className="grid grid-cols-[280px_auto] items-center gap-3">
             <span className="truncate text-[15px] font-semibold text-ink">
               Batch of {batch.length}
-            </span>
-            <span className="inline-flex min-w-[76px] items-center justify-center rounded-[4px] border border-ink bg-ink px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] text-white justify-self-start">
-              In Transit
             </span>
           </div>
           <div className="mt-1 text-[12.5px] text-gray-600">{names}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-gray-600">
             <span className="inline-flex items-center gap-1.5">
-              <IconMail size={13} stroke={1.75} className="text-gray-400" />
+              <IconMail size={13} stroke={1.75} className="text-petrol-500" />
               {mailClassLabel(first.mail_class)}
             </span>
             <span className="text-gray-300">·</span>
