@@ -359,6 +359,12 @@ export type SendMailInput = {
   check_amount_cents?: number | null;
   check_memo?: string | null;
   bank_account_id?: string | null;
+  // Idempotency key from the client. The Send button mints a uuid at
+  // open time and passes it on every submit. If the same key shows up
+  // twice (double-click, retried fetch, refresh-while-sending), the
+  // server returns the original batch's result instead of doing the
+  // work twice and billing the customer twice.
+  idempotency_key?: string | null;
 };
 
 export type SendMailResult =
@@ -377,6 +383,35 @@ export type SendMailResult =
 export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   const profile = await getCurrentProfile();
   if (!profile) return { ok: false, error: "Not signed in" };
+
+  // Idempotency check — if the same client key was already submitted in
+  // the last 5 minutes, return the original batch's job_ids. Prevents
+  // double-billing on a double-click, a retried fetch, or a refresh
+  // while the first request was still in flight. The batch_id column is
+  // used as the storage key because mail_jobs already groups by batch.
+  if (input.idempotency_key) {
+    const sb = await createClient();
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: existing } = await sb
+      .from("mail_jobs")
+      .select("id, batch_id, provider")
+      .eq("batch_id", input.idempotency_key)
+      .gte("created_at", fiveMinAgo)
+      .order("created_at", { ascending: true });
+    if (existing && existing.length > 0) {
+      return {
+        ok: true,
+        batch_id: existing[0].batch_id as string,
+        job_ids: existing.map((r) => r.id as string),
+        provider_letter:
+          ((existing[0].provider as string | null) ?? "stub") as
+            | "click2mail"
+            | "lob"
+            | "stub",
+        provider_check: "lob",
+      };
+    }
+  }
   if (input.recipients.length === 0) {
     return { ok: false, error: "Pick at least one recipient" };
   }
@@ -602,7 +637,11 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     }
   }
 
-  const batchId = randomUUID();
+  // Use the client's idempotency key as the batch id so a re-submission
+  // with the same key (caught by the early-return guard up top) maps
+  // back to the same batch. Falls back to a fresh uuid when the client
+  // didn't pass one (older callers).
+  const batchId = input.idempotency_key ?? randomUUID();
   const jobIds: string[] = [];
   const today = new Date();
 
@@ -751,9 +790,29 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       .select("id")
       .single();
     if (insertErr || !inserted) {
+      // Lob already accepted the piece but our DB write failed. If we
+      // leave it alone, customer gets charged for a piece we have no
+      // record of. Best-effort cancel against Lob (only works within
+      // their ~5-minute window) so the bill is reversed. Errors from
+      // the cancel call are logged into the error string so an admin
+      // can investigate, but we still return failure so the user knows
+      // their send didn't go through.
+      let cancelNote = "";
+      if (send.provider === "lob" && send.provider_id) {
+        const { lobCancelPiece } = await import("./lob");
+        const cancel = await lobCancelPiece({
+          kind: input.include_check ? "check" : "letter",
+          provider_id: send.provider_id,
+        });
+        if (!cancel.ok) {
+          cancelNote = ` Cancel attempt failed: ${cancel.error}. Check Lob dashboard.`;
+        } else {
+          cancelNote = " Lob send was cancelled to avoid double-billing.";
+        }
+      }
       return {
         ok: false,
-        error: insertErr?.message ?? "Failed to record mail job",
+        error: `${insertErr?.message ?? "Failed to record mail job"}.${cancelNote}`,
       };
     }
     jobIds.push(inserted.id as string);

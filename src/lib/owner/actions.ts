@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
-import { requireOwner } from "@/lib/auth/current-user";
+import { createClient } from "@/lib/supabase/server";
+import { requireOwner, getCurrentProfile } from "@/lib/auth/current-user";
 import type { LobPricing } from "@/lib/mail/types";
 
 // Owner-only server actions. Each must call requireOwner() before any
@@ -72,6 +73,14 @@ export async function updateCustomerPricing(input: {
   }
 
   const admin = createServiceClient();
+
+  // Capture the prior values so the audit row can show the diff.
+  const { data: prior } = await admin
+    .from("app_pricing_config")
+    .select("subscription_monthly_cents, customer_mail_pricing_cents")
+    .eq("id", 1)
+    .maybeSingle();
+
   const { error } = await admin
     .from("app_pricing_config")
     .update({
@@ -80,6 +89,37 @@ export async function updateCustomerPricing(input: {
     })
     .eq("id", 1);
   if (error) return { ok: false, error: error.message };
+
+  // Audit pricing changes — the bill basis for every customer. If a
+  // dispute comes up later, this is the trail. Diff captures only the
+  // fields that actually changed so the row stays compact.
+  const priorPricing =
+    (prior?.customer_mail_pricing_cents as Partial<LobPricing> | null) ?? {};
+  const priorSubscription =
+    (prior?.subscription_monthly_cents as number | null) ?? null;
+  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  for (const k of PRICING_KEYS) {
+    const before = (priorPricing as Record<string, unknown>)[k];
+    const after = (sanitized as unknown as Record<string, unknown>)[k];
+    if (before !== after) changes[k] = { from: before, to: after };
+  }
+  const newSubscription = Math.round(input.subscription_monthly_cents);
+  if (priorSubscription !== newSubscription) {
+    changes.subscription_monthly_cents = {
+      from: priorSubscription,
+      to: newSubscription,
+    };
+  }
+
+  if (Object.keys(changes).length > 0) {
+    const profile = await getCurrentProfile();
+    const sb = await createClient();
+    await sb.from("audit_log").insert({
+      actor_id: profile?.id ?? null,
+      action: "customer_pricing_changed",
+      payload: { changes },
+    });
+  }
 
   revalidatePath("/owner");
   revalidatePath("/settings");

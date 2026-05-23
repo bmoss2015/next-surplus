@@ -288,6 +288,105 @@ export async function lobSendLetter(
   }
 }
 
+// Fetch current state of a Lob letter / check. Used by the
+// reconciliation cron to self-heal mail_jobs rows whose webhook never
+// arrived (Lob webhook delivery is reliable but not guaranteed). Maps
+// Lob's status values to our internal MailStatus enum.
+export type LobPieceStatus =
+  | { ok: true; status: "queued" | "in_transit" | "delivered" | "returned" | "failed"; tracking_number: string | null; tracking_url: string | null }
+  | { ok: false; error: string };
+
+export async function lobGetPiece(opts: {
+  kind: "letter" | "check";
+  provider_id: string;
+}): Promise<LobPieceStatus> {
+  if (!isLobConfigured()) return { ok: false, error: "Lob not configured" };
+  try {
+    const path = opts.kind === "check" ? "checks" : "letters";
+    const res = await fetch(
+      `${LOB_BASE_URL}/${path}/${opts.provider_id}`,
+      {
+        method: "GET",
+        headers: { Authorization: authHeader(), Accept: "application/json" },
+      }
+    );
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `Lob get-piece failed: ${res.status} ${await res.text()}`,
+      };
+    }
+    const json = (await res.json()) as {
+      tracking_events?: Array<{ name?: string; type?: string }>;
+      tracking_number?: string;
+      url?: string;
+      delivered?: boolean;
+      // Some responses include a top-level status; we don't rely on it
+      // and instead derive from tracking events which are authoritative.
+    };
+    const events = json.tracking_events ?? [];
+    const lastEvent = events[events.length - 1];
+    const lastName = (lastEvent?.name ?? "").toLowerCase();
+    // Map Lob's tracking event names to our internal status. Lob's
+    // event vocabulary: "Mailed", "In Transit", "In Local Area",
+    // "Processed for Delivery", "Re-Routed", "Returned to Sender",
+    // "Delivered", "Failed". We collapse anything in-flight to
+    // "in_transit", anything terminal to its specific status.
+    let status: LobPieceStatus["status"] = "queued";
+    if (json.delivered || /delivered/.test(lastName)) status = "delivered";
+    else if (/return/.test(lastName)) status = "returned";
+    else if (/failed/.test(lastName)) status = "failed";
+    else if (events.length > 0) status = "in_transit";
+
+    return {
+      ok: true,
+      status,
+      tracking_number: json.tracking_number ?? null,
+      tracking_url: json.url ?? null,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Lob get-piece unknown error",
+    };
+  }
+}
+
+// Best-effort cancel for a Lob piece. Lob allows cancellation of
+// letters / checks within roughly 5 minutes of create — used as the
+// undo path when our own mail_jobs insert fails AFTER Lob accepted the
+// piece (so the customer doesn't get billed for a piece we never
+// tracked). Never throws; failures here are logged but don't propagate
+// since the caller is already in an error-handling branch.
+export async function lobCancelPiece(opts: {
+  kind: "letter" | "check";
+  provider_id: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isLobConfigured()) return { ok: false, error: "Lob not configured" };
+  try {
+    const path = opts.kind === "check" ? "checks" : "letters";
+    const res = await fetch(
+      `${LOB_BASE_URL}/${path}/${opts.provider_id}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: authHeader(), Accept: "application/json" },
+      }
+    );
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `Lob cancel failed: ${res.status} ${await res.text()}`,
+      };
+    }
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Lob cancel unknown error",
+    };
+  }
+}
+
 // -- Bank account operations -------------------------------------------------
 
 export type LobBankAccountInput = {

@@ -136,6 +136,15 @@ export function SendMailModal({
     bankAccounts.find((b) => b.verified)?.id ?? ""
   );
   const [colorPrint, setColorPrint] = useState(false);
+  // Stable idempotency key per modal open. Reused across retries so a
+  // double-click / refresh during send doesn't double-bill. Rotated only
+  // when the server returns an error (the operator is correcting then
+  // resubmitting — that should be a fresh attempt).
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `idem_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  );
   const [previewIdx, setPreviewIdx] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   // Track whether the user has previewed the CURRENT body+recipient combo.
@@ -391,6 +400,11 @@ export function SendMailModal({
       check_amount_cents: includeCheck ? checkAmountCents : null,
       check_memo: includeCheck ? checkMemo || null : null,
       bank_account_id: includeCheck ? bankAccountId || null : null,
+      // Idempotency key tied to this submit attempt. If the same key
+      // reaches the server twice (double-click, retried fetch, refresh
+      // during in-flight), sendMail returns the original result without
+      // re-charging or re-sending.
+      idempotency_key: idempotencyKey,
     };
     startTransition(async () => {
       const res = await sendMail(payload);
@@ -399,6 +413,11 @@ export function SendMailModal({
         onClose();
       } else {
         setErr(res.error);
+        // Rotate the idempotency key so a retry after fixing the error
+        // doesn't get short-circuited by the cache. Only mint a new one
+        // on a real failure — a passive double-click should still hit
+        // the same key.
+        setIdempotencyKey(crypto.randomUUID());
       }
     });
   }

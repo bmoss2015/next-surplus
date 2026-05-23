@@ -40,6 +40,32 @@ export async function GET(req: Request) {
 
   const fetchRes = await fetchPublishedLobPricing();
   if (!fetchRes.ok) {
+    // Alert every owner so wholesale doesn't silently drift. Without
+    // this, a Lob docs page format change goes unnoticed for weeks and
+    // the customer pricing margin slowly stops matching reality. Best-
+    // effort notification insert; if it fails we still return 502 so
+    // Vercel marks the cron as errored in its dashboard.
+    try {
+      const admin = createServiceClient();
+      const { data: owners } = await admin
+        .from("profiles")
+        .select("id, org_id")
+        .eq("role", "owner");
+      const rows = (owners ?? []).map((o) => ({
+        org_id: o.org_id as string,
+        recipient_id: o.id as string,
+        actor_id: null,
+        type: "lob_pricing_sync_failed",
+        body_preview: `Lob pricing sync failed: ${fetchRes.error}. Wholesale rates may be stale.`,
+      }));
+      if (rows.length > 0) {
+        await admin.from("notifications").insert(rows);
+      }
+    } catch {
+      // Notification write itself failed — already in the error path,
+      // don't compound the problem. The Vercel cron log + 502 is the
+      // signal of last resort.
+    }
     return NextResponse.json(
       { ok: false, stage: "fetch", error: fetchRes.error },
       { status: 502 }

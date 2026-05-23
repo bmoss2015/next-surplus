@@ -91,9 +91,16 @@ export async function fetchMailDashboard(
   ).toISOString();
 
   // Stats (always for the full window, regardless of search/status filter
-  // so the totals don't lie based on what's filtered out)
+  // so the totals don't lie based on what's filtered out). Sample-data
+  // rows inserted by the /admin/mail-test harness are excluded from
+  // every count and total, so a stray harness run doesn't pollute the
+  // dashboard customers see.
   const baseStat = () =>
-    sb.from("mail_jobs").select("id", { count: "exact", head: true }).gte("created_at", since);
+    sb
+      .from("mail_jobs")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", since)
+      .not("provider_id", "ilike", "sample_%");
   const statsLeadEq = (q: ReturnType<typeof baseStat>) =>
     opts.leadId ? q.eq("lead_id", opts.leadId) : q;
   const [inFlightRes, deliveredRes, returnedRes, costRes] = await Promise.all([
@@ -101,8 +108,17 @@ export async function fetchMailDashboard(
     statsLeadEq(baseStat()).eq("status", "delivered"),
     statsLeadEq(baseStat()).in("status", ["returned", "failed"]),
     (opts.leadId
-      ? sb.from("mail_jobs").select("cost_cents").gte("created_at", since).eq("lead_id", opts.leadId)
-      : sb.from("mail_jobs").select("cost_cents").gte("created_at", since)),
+      ? sb
+          .from("mail_jobs")
+          .select("cost_cents")
+          .gte("created_at", since)
+          .eq("lead_id", opts.leadId)
+          .not("provider_id", "ilike", "sample_%")
+      : sb
+          .from("mail_jobs")
+          .select("cost_cents")
+          .gte("created_at", since)
+          .not("provider_id", "ilike", "sample_%")),
   ]);
   const spent = (costRes.data ?? []).reduce(
     (sum, r) => sum + ((r.cost_cents as number | null) ?? 0),
@@ -110,12 +126,15 @@ export async function fetchMailDashboard(
   );
 
   // List query — filters apply here only (stats stay un-filtered).
+  // Same sample-data exclusion so harness rows never show up in the
+  // customer-visible list.
   let q = sb
     .from("mail_jobs")
     .select(
       "id, batch_id, lead_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, mail_class, provider, tracking_url, tracking_number, status, include_check, check_amount_cents, cost_cents, error_message, sent_at, delivered_at, returned_at, created_at"
     )
     .order("created_at", { ascending: false })
+    .not("provider_id", "ilike", "sample_%")
     .limit(limit);
   if (opts.leadId) q = q.eq("lead_id", opts.leadId);
   const statusList = STATUS_FILTERS[opts.status ?? "all"];

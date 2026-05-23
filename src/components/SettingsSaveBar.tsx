@@ -108,6 +108,24 @@ function SaveBarUI({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Warn before unloading / navigating away if there are unsaved changes.
+  // Browsers ignore the custom message in modern Chrome/Firefox/Safari and
+  // show their own confirmation, but they all respect the preventDefault
+  // signal. Won't fire on Next.js client-side navigation (Link clicks);
+  // that's a separate concern handled at the Link / Router level. This
+  // catches the most common loss vector: tab close, back button, full
+  // page reload, typed-URL navigation.
+  useEffect(() => {
+    if (dirty.length === 0) return;
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      // Some legacy browsers still need returnValue set.
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty.length]);
+
   async function saveAll() {
     setPending(true);
     setError(null);

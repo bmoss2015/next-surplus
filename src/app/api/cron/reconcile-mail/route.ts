@@ -1,0 +1,141 @@
+import { NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { lobGetPiece } from "@/lib/mail/lob";
+
+export const dynamic = "force-dynamic";
+
+// Daily reconciliation cron. Lob's webhook delivery is reliable but not
+// guaranteed — if a webhook is dropped or never fires, a mail_jobs row
+// can sit in "queued" forever even though the piece has been delivered
+// or returned. This cron picks up rows that have been queued for >= 24
+// hours, queries Lob's GET /letters/{id} (or /checks/{id}) for the
+// actual status, and updates our row to match.
+//
+// Self-heal philosophy: if Lob says delivered, we say delivered. If Lob
+// says returned, we say returned. If Lob still says queued after 7
+// days, the piece is genuinely stuck and we flip it to failed so the
+// customer sees it on the Returned section and can Fix & Resend.
+//
+// Auth: same CRON_SECRET pattern as the pricing sync cron.
+
+const STUCK_QUEUE_HOURS = 24;
+const HARD_FAIL_DAYS = 7;
+
+export async function GET(req: Request) {
+  const authHeader = req.headers.get("authorization");
+  const expected = process.env.CRON_SECRET
+    ? `Bearer ${process.env.CRON_SECRET}`
+    : null;
+  if (expected && authHeader !== expected) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const admin = createServiceClient();
+  const stuckSince = new Date(
+    Date.now() - STUCK_QUEUE_HOURS * 60 * 60 * 1000
+  ).toISOString();
+  const hardFailSince = new Date(
+    Date.now() - HARD_FAIL_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  const { data: candidates, error } = await admin
+    .from("mail_jobs")
+    .select("id, provider, provider_id, include_check, sent_at, status")
+    .eq("status", "queued")
+    .eq("provider", "lob")
+    .lte("sent_at", stuckSince)
+    .not("provider_id", "is", null)
+    .limit(200);
+  if (error) {
+    return NextResponse.json(
+      { ok: false, stage: "query", error: error.message },
+      { status: 500 }
+    );
+  }
+
+  type Outcome = {
+    job_id: string;
+    new_status: string;
+    reason: string;
+  };
+  const outcomes: Outcome[] = [];
+
+  for (const row of candidates ?? []) {
+    const providerId = row.provider_id as string;
+    const isCheck = Boolean(row.include_check);
+    const sentAt = row.sent_at as string | null;
+
+    const res = await lobGetPiece({
+      kind: isCheck ? "check" : "letter",
+      provider_id: providerId,
+    });
+
+    if (!res.ok) {
+      // Lob returned an error for this specific piece (deleted, bad
+      // id, etc.). Skip and let the next run try again.
+      outcomes.push({
+        job_id: row.id as string,
+        new_status: "queued",
+        reason: `Lob lookup failed: ${res.error}`,
+      });
+      continue;
+    }
+
+    // If Lob still says queued after the hard-fail window, flip to
+    // failed so the operator sees it in the Returned section. They can
+    // Fix & Resend from there.
+    if (
+      res.status === "queued" &&
+      sentAt &&
+      sentAt <= hardFailSince
+    ) {
+      await admin
+        .from("mail_jobs")
+        .update({
+          status: "failed",
+          error_message: "Stuck in queue for over 7 days; check Lob dashboard.",
+        })
+        .eq("id", row.id as string);
+      outcomes.push({
+        job_id: row.id as string,
+        new_status: "failed",
+        reason: "stuck > 7 days",
+      });
+      continue;
+    }
+
+    if (res.status === row.status) {
+      outcomes.push({
+        job_id: row.id as string,
+        new_status: res.status,
+        reason: "no change",
+      });
+      continue;
+    }
+
+    // Lob has fresher state. Update us to match.
+    const updates: Record<string, unknown> = { status: res.status };
+    if (res.tracking_number) updates.tracking_number = res.tracking_number;
+    if (res.tracking_url) updates.tracking_url = res.tracking_url;
+    if (res.status === "delivered") {
+      updates.delivered_at = new Date().toISOString();
+    } else if (res.status === "returned") {
+      updates.returned_at = new Date().toISOString();
+    }
+    await admin
+      .from("mail_jobs")
+      .update(updates)
+      .eq("id", row.id as string);
+    outcomes.push({
+      job_id: row.id as string,
+      new_status: res.status,
+      reason: "synced from Lob",
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    candidates_checked: candidates?.length ?? 0,
+    outcomes,
+  });
+}
