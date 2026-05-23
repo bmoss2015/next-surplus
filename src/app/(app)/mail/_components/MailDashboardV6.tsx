@@ -409,12 +409,10 @@ function PieceRow({
     <Link
       href={href}
       className={cn(
-        "group relative grid grid-cols-[1fr_88px_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50",
+        "group relative grid grid-cols-[1fr_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50",
         // Batch-child rows: subtle gray background + a 3px dark brand
-        // bar on the left edge. Bar uses the full brand emerald (not the
-        // softer petrol) so a child row reads clearly as "part of this
-        // group". Absolute-positioned so it doesn't shift the content
-        // grid and the pill column stays aligned.
+        // bar on the left edge. Absolute-positioned so it doesn't shift
+        // the content grid.
         isBatchChild && "bg-gray-50/60"
       )}
     >
@@ -425,12 +423,24 @@ function PieceRow({
           style={{ width: 3, background: "#0d4b3a" }}
         />
       )}
-      {/* Left column — name, address, meta. Pill moved out to its own
-          column so it never visually collides with the meta line below
-          (e.g., "Check $X.XX" used to sit beneath the pill). */}
+      {/* Left column — name + pill on row 1 (pill sits right next to
+          the name, left-anchored), then address, then meta line. */}
       <div className="min-w-0">
-        <div className="truncate text-[15px] font-semibold text-ink">
-          {displayRecipientName(piece.recipient_name)}
+        <div className="flex items-center gap-3">
+          <span
+            className="truncate text-[15px] font-semibold text-ink"
+            style={{ maxWidth: 280 }}
+          >
+            {displayRecipientName(piece.recipient_name)}
+          </span>
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] whitespace-nowrap",
+              pillClass
+            )}
+          >
+            {pillLabel}
+          </span>
         </div>
 
         <div className="mt-1 text-[12.5px] text-gray-600">
@@ -483,20 +493,6 @@ function PieceRow({
             </>
           )}
         </div>
-      </div>
-
-      {/* Middle column — status pill, in its own column so it has
-          breathing room from the meta line below. Top-aligned with a
-          small vertical nudge to sit on the name's baseline. */}
-      <div className="flex justify-start pt-[2px]">
-        <span
-          className={cn(
-            "inline-flex items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] whitespace-nowrap",
-            pillClass
-          )}
-        >
-          {pillLabel}
-        </span>
       </div>
 
       {/* Right column — actions. Solid buttons (clickable affordance);
@@ -572,7 +568,7 @@ function BatchRow({
   return (
     <details className="group">
       <summary
-        className="grid cursor-pointer list-none grid-cols-[1fr_88px_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50"
+        className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50"
       >
         <div className="min-w-0">
           {/* Batch header: name only, no status pill. Pills live on the
@@ -591,9 +587,6 @@ function BatchRow({
             <span>Sent {fmtDateLong(first.sent_at)}</span>
           </div>
         </div>
-        {/* Empty middle column so action right-edge lines up across
-            batched and solo rows. Batch row has no status pill. */}
-        <div />
         {/* Batch affordance spans View Letter + gap + Track exactly:
             110 + 8 + 110 = 228px. Solid petrol fill, same h-[30px]. */}
         <div className="flex shrink-0 items-center">
