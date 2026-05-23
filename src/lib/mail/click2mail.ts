@@ -115,7 +115,12 @@ async function createAddressListAndSubmitJob(
   if (!addrRes.ok) {
     return {
       ok: false,
-      error: `Click2Mail address list create failed: ${addrRes.status} ${await addrRes.text()}`,
+      error:
+        addrRes.status === 422
+          ? "This address can't be delivered to. Update the recipient address and try again."
+          : addrRes.status >= 500
+            ? "The mail service is having problems right now. Please try again in a few minutes."
+            : "The send couldn't be completed. Please try again, or contact support if this keeps happening.",
     };
   }
   const addrJson = (await addrRes.json()) as { id?: string };
@@ -148,7 +153,10 @@ async function createAddressListAndSubmitJob(
   if (!jobRes.ok) {
     return {
       ok: false,
-      error: `Click2Mail submitJob failed: ${jobRes.status} ${await jobRes.text()}`,
+      error:
+        jobRes.status >= 500
+          ? "The mail service is having problems right now. Please try again in a few minutes."
+          : "The send couldn't be completed. Please try again, or contact support if this keeps happening.",
     };
   }
   const jobJson = (await jobRes.json()) as {
@@ -216,7 +224,10 @@ export async function click2mailCreateMergedDocument(
     if (!res.ok) {
       return {
         ok: false,
-        error: `Click2Mail create2 failed: ${res.status} ${await res.text()}`,
+        error:
+          res.status >= 500
+            ? "The mail service is having problems right now. Please try again in a few minutes."
+            : "Could not prepare the document for sending. Please try again.",
       };
     }
     const json = (await res.json()) as { id?: string };
@@ -279,7 +290,10 @@ export async function click2mailSendLetter(
     if (!docRes.ok) {
       return {
         ok: false,
-        error: `Click2Mail document upload failed: ${docRes.status} ${await docRes.text()}`,
+        error:
+          docRes.status >= 500
+            ? "The mail service is having problems right now. Please try again in a few minutes."
+            : "Could not upload the letter content. Please try again.",
       };
     }
     const docJson = (await docRes.json()) as { id?: string };

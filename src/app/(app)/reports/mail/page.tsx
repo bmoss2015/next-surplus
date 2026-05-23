@@ -99,9 +99,26 @@ export default async function MailActivityReportPage({
           warn={totals.returned > 0}
         />
         <StatCard
-          label="Spent"
+          label="Customer Revenue"
           value={fmtUSD(totals.spent_cents)}
-          sub="Provider Charges"
+          sub="What you billed customers"
+        />
+        <StatCard
+          label="Provider Cost"
+          value={fmtUSD(totals.provider_cost_cents)}
+          sub="What Lob charged you"
+        />
+        <StatCard
+          label="Margin"
+          value={fmtUSD(totals.margin_cents)}
+          sub={
+            totals.spent_cents > 0
+              ? `${Math.round(
+                  (totals.margin_cents / totals.spent_cents) * 100
+                )}% gross margin`
+              : "No mail this window"
+          }
+          warn={totals.margin_cents < 0}
         />
       </div>
 
@@ -169,7 +186,9 @@ export default async function MailActivityReportPage({
               <th className="px-4 py-2 text-right font-medium">Certified</th>
               <th className="px-4 py-2 text-right font-medium">Delivered</th>
               <th className="px-4 py-2 text-right font-medium">Returned</th>
-              <th className="px-4 py-2 text-right font-medium">Spend</th>
+              <th className="px-4 py-2 text-right font-medium">Revenue</th>
+              <th className="px-4 py-2 text-right font-medium">Lob Cost</th>
+              <th className="px-4 py-2 text-right font-medium">Margin</th>
             </tr>
           </thead>
           <tbody>
@@ -192,6 +211,21 @@ export default async function MailActivityReportPage({
                   </td>
                   <td className="px-4 py-2 text-right font-medium text-ink">
                     {fmtUSD(m.spent_cents)}
+                  </td>
+                  <td className="px-4 py-2 text-right text-gray-600">
+                    {fmtUSD(m.provider_cost_cents)}
+                  </td>
+                  <td
+                    className={
+                      "px-4 py-2 text-right font-medium " +
+                      (m.margin_cents < 0
+                        ? "text-danger"
+                        : m.margin_cents === 0
+                          ? "text-gray-500"
+                          : "text-petrol-700")
+                    }
+                  >
+                    {fmtUSD(m.margin_cents)}
                   </td>
                 </tr>
               ))}

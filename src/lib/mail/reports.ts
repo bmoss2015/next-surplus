@@ -16,7 +16,16 @@ export type MailMonthRow = {
     standard: number;
     certified: number;
   };
+  // Customer revenue (sum of mail_jobs.cost_cents — what we billed the
+  // customer for each piece).
   spent_cents: number;
+  // Provider cost (sum of mail_jobs.provider_cost_cents — what Lob /
+  // C2M actually charged us). Populated on rows recorded after the
+  // pricing split landed; older rows return 0 for this column.
+  provider_cost_cents: number;
+  // Derived: spent_cents - provider_cost_cents. Stored as a separate
+  // field so the UI doesn't have to compute it per render.
+  margin_cents: number;
 };
 
 export type MailReportData = {
@@ -27,6 +36,8 @@ export type MailReportData = {
     returned: number;
     failed: number;
     spent_cents: number;
+    provider_cost_cents: number;
+    margin_cents: number;
   };
   // Cost transparency — we want the UI to be honest about which numbers
   // are pulled from the provider and which are placeholders.
@@ -69,7 +80,9 @@ export async function fetchMailReport(opts: {
   // distort spend numbers materially.
   let q = sb
     .from("mail_jobs")
-    .select("status, mail_class, cost_cents, created_at, provider")
+    .select(
+      "status, mail_class, cost_cents, provider_cost_cents, created_at, provider"
+    )
     .not("provider_id", "ilike", "sample_%");
   if (startDate) q = q.gte("created_at", startDate.toISOString());
   const { data } = await q;
@@ -93,6 +106,8 @@ export async function fetchMailReport(opts: {
       failed: 0,
       by_class: { first_class: 0, standard: 0, certified: 0 },
       spent_cents: 0,
+      provider_cost_cents: 0,
+      margin_cents: 0,
     });
   }
 
@@ -112,12 +127,19 @@ export async function fetchMailReport(opts: {
     const mc = row.mail_class as "first_class" | "standard" | "certified";
     bucket.by_class[mc] = (bucket.by_class[mc] ?? 0) + 1;
     bucket.spent_cents += (row.cost_cents as number | null) ?? 0;
+    bucket.provider_cost_cents +=
+      (row.provider_cost_cents as number | null) ?? 0;
     const provider = row.provider as string;
     if (provider === "lob") hasLob = true;
     if (provider === "click2mail") hasC2M = true;
   }
 
   const monthsArr = Array.from(byMonth.values());
+  // Compute per-month margin now that both numerator and denominator are
+  // populated.
+  for (const m of monthsArr) {
+    m.margin_cents = m.spent_cents - m.provider_cost_cents;
+  }
   const totals = monthsArr.reduce(
     (acc, m) => {
       acc.sent_total += m.sent_total;
@@ -125,9 +147,19 @@ export async function fetchMailReport(opts: {
       acc.returned += m.returned;
       acc.failed += m.failed;
       acc.spent_cents += m.spent_cents;
+      acc.provider_cost_cents += m.provider_cost_cents;
+      acc.margin_cents += m.margin_cents;
       return acc;
     },
-    { sent_total: 0, delivered: 0, returned: 0, failed: 0, spent_cents: 0 }
+    {
+      sent_total: 0,
+      delivered: 0,
+      returned: 0,
+      failed: 0,
+      spent_cents: 0,
+      provider_cost_cents: 0,
+      margin_cents: 0,
+    }
   );
 
   return {

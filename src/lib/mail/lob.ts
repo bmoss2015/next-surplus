@@ -103,6 +103,58 @@ function lobCheckCostPair(
 const LOB_BASE_URL = process.env.LOB_BASE_URL ?? "https://api.lob.com/v1";
 const LOB_API_KEY = process.env.LOB_API_KEY ?? "";
 
+// Translate raw Lob HTTP responses into something a non-technical
+// customer can read in the Send Mail modal. Server-side console keeps
+// the full response for our debugging via the secondary message, but
+// the user only sees the friendly first line.
+export function friendlyLobError(status: number, rawBody: string): string {
+  let parsedMsg = "";
+  try {
+    const json = JSON.parse(rawBody) as {
+      error?: { message?: string; code?: string };
+    };
+    parsedMsg = (json.error?.message ?? "").toLowerCase();
+  } catch {
+    parsedMsg = rawBody.slice(0, 200).toLowerCase();
+  }
+
+  // Address-related rejections (most common; the address-verify gate in
+  // the modal usually catches these first, but Lob can still reject a
+  // pass-the-gate address if it changes between verify + send).
+  if (/undeliverable|address.*invalid|invalid.*address|cannot deliver/i.test(parsedMsg)) {
+    return "This address can't be delivered to. Update the recipient address and try again.";
+  }
+  if (/zip|postal/i.test(parsedMsg) && /invalid|missing|short|long/i.test(parsedMsg)) {
+    return "The ZIP / postal code looks wrong. Check it and try again.";
+  }
+  if (/missing|required/i.test(parsedMsg)) {
+    return "Some recipient details are missing. Check the address fields and try again.";
+  }
+
+  // Service / infrastructure-level errors. Don't dump status codes on the
+  // user — they can't do anything with "401".
+  if (status === 401 || status === 403) {
+    return "Mail service is temporarily unavailable. Please contact support.";
+  }
+  if (status === 429) {
+    return "Mail service is busy right now. Wait a few seconds and try again.";
+  }
+  if (status === 422) {
+    // Generic 422 with no recognized message string — still likely an
+    // address/data issue from the user's perspective.
+    return "The recipient details were rejected by the mail service. Check the address and try again.";
+  }
+  if (status >= 500) {
+    return "The mail service is having problems right now. Please try again in a few minutes.";
+  }
+  if (status === 400) {
+    return "Something about this send couldn't be processed. Check the recipient details and try again.";
+  }
+
+  // Catch-all that doesn't leak internals.
+  return "The send couldn't be completed. Please try again, or contact support if this keeps happening.";
+}
+
 export function isLobConfigured(): boolean {
   return Boolean(LOB_API_KEY);
 }
@@ -169,10 +221,9 @@ export async function lobSendCheck(
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      return {
-        ok: false,
-        error: `Lob check create failed: ${res.status} ${await res.text()}`,
-      };
+      const raw = await res.text();
+      console.error("Lob check create failed", res.status, raw);
+      return { ok: false, error: friendlyLobError(res.status, raw) };
     }
     const json = (await res.json()) as {
       id?: string;
@@ -251,10 +302,9 @@ export async function lobSendLetter(
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      return {
-        ok: false,
-        error: `Lob letter create failed: ${res.status} ${await res.text()}`,
-      };
+      const raw = await res.text();
+      console.error("Lob letter create failed", res.status, raw);
+      return { ok: false, error: friendlyLobError(res.status, raw) };
     }
     const json = (await res.json()) as {
       id?: string;
