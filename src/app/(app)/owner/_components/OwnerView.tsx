@@ -1,17 +1,16 @@
 "use client";
 
-// Owner area client wrapper. Holds the active-panel state and renders the
-// sub-rail + the selected panel. Mirrors how SettingsPreviewJsx works,
-// just slimmer since there are only a few panels.
+// Owner area client wrapper. Renders the sub-rail + the selected panel.
+// Single panel for now (Customer Pricing) — the Provider Costs panel was
+// folded into Customer Pricing's "Your Cost (Lob)" column so the owner
+// sees cost + retail + margin in one place.
 
 import { useState } from "react";
 import { SubRail, GROUPS } from "./SubRail";
-import { ProviderCostsSection } from "./ProviderCostsSection";
 import { CustomerPricingSection } from "./CustomerPricingSection";
-import type { ProviderCostsData, CustomerPricingData } from "@/lib/owner/fetch";
+import type { CustomerPricingData } from "@/lib/owner/fetch";
 
 export type OwnerData = {
-  providerCosts: ProviderCostsData;
   customerPricing: CustomerPricingData;
 };
 
@@ -24,9 +23,6 @@ export function OwnerView({ data }: { data: OwnerData }) {
       <div className="min-w-0 flex-1">
         {active === "customer-pricing" && (
           <CustomerPricingSection data={data.customerPricing} />
-        )}
-        {active === "provider-costs" && (
-          <ProviderCostsSection data={data.providerCosts} />
         )}
       </div>
     </div>

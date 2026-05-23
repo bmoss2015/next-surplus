@@ -1,7 +1,7 @@
-// Owner area sub-rail. Mirrors the Settings rail pattern (group headers
-// + items) but with owner-only sections. New panels can be added by
-// appending to GROUPS. The /owner route page renders this on the left
-// and OwnerView swaps the active panel into the content column.
+// Owner area sub-rail. Visual style matches Settings sub-rail
+// (preview.css .nav-item / .nav-item.active): solid brand-emerald
+// background on the active item, subtle gray on hover. Keeps the
+// portal's left rails feeling like one product.
 
 import { Fragment } from "react";
 
@@ -18,10 +18,7 @@ export type RailGroup = {
 export const GROUPS: RailGroup[] = [
   {
     name: "Mail",
-    items: [
-      { key: "customer-pricing", label: "Customer Pricing" },
-      { key: "provider-costs", label: "Provider Costs" },
-    ],
+    items: [{ key: "customer-pricing", label: "Customer Pricing" }],
   },
 ];
 
@@ -43,12 +40,26 @@ export function SubRail({
 }) {
   return (
     <aside
-      className="w-[220px] shrink-0 overflow-y-auto border-r border-gray-200 bg-white py-5"
-      style={{ position: "sticky", top: 0, height: "calc(100vh - 56px)" }}
+      className="w-[220px] shrink-0 overflow-y-auto bg-white py-3"
+      style={{
+        position: "sticky",
+        top: 0,
+        height: "calc(100vh - 56px)",
+        borderRight: "1px solid #ebedf0",
+      }}
     >
       {GROUPS.map((g) => (
         <Fragment key={g.name}>
-          <div className="px-5 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              color: "#9298a3",
+              padding: "16px 18px 8px 18px",
+            }}
+          >
             {g.name}
           </div>
           {g.items.map((i) => {
@@ -58,19 +69,37 @@ export function SubRail({
                 key={i.key}
                 type="button"
                 onClick={() => onSelect(i.key)}
-                className={
-                  "flex w-full cursor-pointer items-center px-5 py-2 text-left text-[13px] transition-colors " +
-                  (isActive
-                    ? "bg-petrol-50 font-medium text-petrol-700"
-                    : "text-ink hover:bg-gray-50")
-                }
-                style={
-                  isActive
-                    ? {
-                        boxShadow: "inset 3px 0 0 var(--color-petrol-500)",
-                      }
-                    : undefined
-                }
+                style={{
+                  display: "flex",
+                  width: "calc(100% - 20px)",
+                  margin: "0 10px",
+                  padding: "7px 12px",
+                  alignItems: "center",
+                  textAlign: "left",
+                  borderRadius: 7,
+                  fontSize: 13.25,
+                  fontWeight: isActive ? 500 : 400,
+                  cursor: "pointer",
+                  transition: "background 0.12s, color 0.12s",
+                  background: isActive ? "#0d4b3a" : "transparent",
+                  color: isActive ? "#fff" : "#5b606a",
+                  boxShadow: isActive
+                    ? "0 1px 2px rgba(13, 75, 58, 0.20), 0 4px 12px -4px rgba(13, 75, 58, 0.30), inset 0 1px 0 rgba(255,255,255,0.10)"
+                    : "none",
+                  border: "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "rgba(12,13,16,0.04)";
+                    e.currentTarget.style.color = "#0a0d14";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "#5b606a";
+                  }
+                }}
               >
                 {i.label}
               </button>
