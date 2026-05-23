@@ -22,6 +22,7 @@ import {
   FileUp,
   BarChart3,
   Settings,
+  ShieldCheck,
   LogOut,
   ChevronsLeft,
   type LucideIcon,
@@ -34,6 +35,10 @@ type NavItem = {
   href: string;
   Icon: LucideIcon;
   adminOnly?: boolean;
+  // ownerOnly items are visible only to the SaaS operator (role = 'owner').
+  // Org admins never see them, even in expanded state. The role is set in
+  // the database; no UI can promote a user to owner.
+  ownerOnly?: boolean;
 };
 
 const NAV: NavItem[] = [
@@ -46,6 +51,7 @@ const NAV: NavItem[] = [
   { label: "Imports",   href: "/imports",  Icon: FileUp },
   { label: "Reports",   href: "/reports",  Icon: BarChart3 },
   { label: "Settings",  href: "/settings", Icon: Settings },
+  { label: "Owner",     href: "/owner",    Icon: ShieldCheck, ownerOnly: true },
 ];
 
 function initials(name: string): string {
@@ -61,13 +67,18 @@ export function IconSidebar({
   userName,
   userEmail,
   isAdmin,
+  isOwner,
 }: {
   userName: string;
   userEmail: string | null;
   isAdmin: boolean;
+  isOwner: boolean;
 }) {
   const pathname = usePathname();
-  const items = NAV.filter((item) => isAdmin || !item.adminOnly);
+  const items = NAV.filter(
+    (item) =>
+      (isAdmin || !item.adminOnly) && (isOwner || !item.ownerOnly)
+  );
   // Default collapsed (icons only). Hydrate from localStorage on mount.
   const [expanded, setExpanded] = useState(false);
 
@@ -198,6 +209,7 @@ export function IconSidebar({
           userName={userName}
           userEmail={userEmail}
           isAdmin={isAdmin}
+          isOwner={isOwner}
           expanded={expanded}
         />
       </div>
@@ -209,13 +221,19 @@ function AccountMenu({
   userName,
   userEmail,
   isAdmin,
+  isOwner,
   expanded,
 }: {
   userName: string;
   userEmail: string | null;
   isAdmin: boolean;
+  isOwner: boolean;
   expanded: boolean;
 }) {
+  // Display label for the account chip. Owner reads as Owner (not Admin)
+  // since it's a strictly higher tier; we want the chip to reflect the
+  // actual role, not the inherited admin powers.
+  const roleLabel = isOwner ? "Owner" : isAdmin ? "Admin" : "Member";
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [mounted, setMounted] = useState(false);
@@ -289,7 +307,7 @@ function AccountMenu({
               {userName}
             </div>
             <div className="truncate text-[10.5px] text-white/55">
-              {isAdmin ? "Admin" : "Member"}
+              {roleLabel}
             </div>
           </div>
         )}
@@ -327,7 +345,7 @@ function AccountMenu({
                   color: isAdmin ? "#fff" : "var(--color-gray-700)",
                 }}
               >
-                {isAdmin ? "Admin" : "Member"}
+                {roleLabel}
               </div>
             </div>
             <div className="h-px bg-gray-200" />
