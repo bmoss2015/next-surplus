@@ -45,8 +45,7 @@ export function CustomerPricingViewSection({
         <h1 className="text-[22px] font-semibold text-ink">Pricing</h1>
         <p className="mt-1 text-[13px] text-gray-600">
           What you pay per piece of mail sent through the platform. All
-          rates include printing, postage, and envelope. Same rate
-          regardless of batch size.
+          rates include printing, postage, and envelope.
         </p>
       </div>
 
@@ -59,9 +58,6 @@ export function CustomerPricingViewSection({
           style={{ borderBottom: "1px solid #ebedf0" }}
         >
           <div className="text-[14px] font-semibold text-ink">Letters</div>
-          <div className="text-[11.5px] text-gray-500">
-            Standard and First Class one-page letters.
-          </div>
         </header>
         <div className="grid grid-cols-2 divide-x divide-gray-200">
           <CustomerPriceColumn heading="Black & White" classes={classes} pick="bw" />
@@ -78,14 +74,11 @@ export function CustomerPricingViewSection({
           style={{ borderBottom: "1px solid #ebedf0" }}
         >
           <div className="text-[14px] font-semibold text-ink">Extra Pages</div>
-          <div className="text-[11.5px] text-gray-500">
-            Added per extra page beyond the first page of a letter.
-          </div>
         </header>
         <FlatRowsView
           rows={[
-            { label: "B&W extra page", cents: p.letter_extra_page_bw },
-            { label: "Color extra page", cents: p.letter_extra_page_color },
+            { label: "B&W Extra Page", cents: p.letter_extra_page_bw },
+            { label: "Color Extra Page", cents: p.letter_extra_page_color },
           ]}
         />
       </section>
@@ -99,22 +92,14 @@ export function CustomerPricingViewSection({
           style={{ borderBottom: "1px solid #ebedf0" }}
         >
           <div className="text-[14px] font-semibold text-ink">Checks</div>
-          <div className="text-[11.5px] text-gray-500">
-            Printed on standard MICR check stock. Attachment page applies
-            when a check is mailed with an enclosed letter.
-          </div>
         </header>
         <FlatRowsView
           rows={[
-            { label: "Check (base)", cents: p.check_base },
-            { label: "Check attachment page", cents: p.check_extra_attachment_page },
+            { label: "Check (Base)", cents: p.check_base },
+            { label: "Check Attachment Page", cents: p.check_extra_attachment_page },
           ]}
         />
       </section>
-
-      <div className="mt-4 text-[12px] text-gray-500">
-        Pricing managed centrally. Reach out if you need a custom rate.
-      </div>
     </div>
   );
 }
@@ -141,7 +126,7 @@ function CustomerPriceColumn({
           {classes.map((c) => (
             <tr key={c.label} style={{ borderBottom: "1px solid #f1f2f4" }}>
               <td className="py-2 text-ink">{c.label}</td>
-              <td className="py-2 text-right font-mono text-ink">
+              <td className="py-2 text-right tabular-nums text-ink">
                 {fmt(c[pick])}
               </td>
             </tr>
@@ -167,7 +152,7 @@ function FlatRowsView({
             className="last:border-b-0"
           >
             <td className="px-5 py-2.5 text-ink">{r.label}</td>
-            <td className="px-5 py-2.5 text-right font-mono text-ink">
+            <td className="px-5 py-2.5 text-right tabular-nums text-ink">
               {fmt(r.cents)}
             </td>
           </tr>

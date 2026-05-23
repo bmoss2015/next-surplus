@@ -379,31 +379,28 @@ function PieceRow({
     <Link
       href={href}
       className={cn(
-        "group grid grid-cols-[1fr_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50",
-        // Batch-child indent removed so the status pill lines up at the
-        // same X across batched rows, individual rows, and rows in other
-        // batches. Light gray background still signals "I'm a batch
-        // child" without needing extra indentation.
-        isBatchChild && "bg-gray-50/40"
+        "group relative grid grid-cols-[1fr_120px_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50",
+        // Batch-child rows: subtle gray background + a thin petrol bar
+        // on the left edge. Background reads as "grouped"; the bar adds
+        // a stronger visual signal so a member of a batch doesn't blend
+        // into the surrounding rows. Absolute-positioned so it doesn't
+        // shift the content grid and the pill column stays aligned.
+        isBatchChild && "bg-gray-50/60"
       )}
     >
-      {/* Left column — strict order: name + pill, address, meta.
-          Name column is fixed width (280px) so the pill always lands
-          at the same X across rows, regardless of name length. Longer
-          names truncate. */}
+      {isBatchChild && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 bottom-0"
+          style={{ width: 3, background: "rgba(13, 75, 58, 0.45)" }}
+        />
+      )}
+      {/* Left column — name, address, meta. Pill moved out to its own
+          column so it never visually collides with the meta line below
+          (e.g., "Check $X.XX" used to sit beneath the pill). */}
       <div className="min-w-0">
-        <div className="grid grid-cols-[280px_auto] items-center gap-3">
-          <span className="truncate text-[15px] font-semibold text-ink">
-            {displayRecipientName(piece.recipient_name)}
-          </span>
-          <span
-            className={cn(
-              "inline-flex min-w-[76px] items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] justify-self-start",
-              pillClass
-            )}
-          >
-            {pillLabel}
-          </span>
+        <div className="truncate text-[15px] font-semibold text-ink">
+          {displayRecipientName(piece.recipient_name)}
         </div>
 
         <div className="mt-1 text-[12.5px] text-gray-600">
@@ -445,6 +442,20 @@ function PieceRow({
             </>
           )}
         </div>
+      </div>
+
+      {/* Middle column — status pill, in its own column so it has
+          breathing room from the meta line below. Top-aligned with a
+          small vertical nudge to sit on the name's baseline. */}
+      <div className="flex justify-end pt-[2px]">
+        <span
+          className={cn(
+            "inline-flex min-w-[88px] items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em]",
+            pillClass
+          )}
+        >
+          {pillLabel}
+        </span>
       </div>
 
       {/* Right column — actions. Solid buttons (clickable affordance);
@@ -519,15 +530,15 @@ function BatchRow({
   const names = batch.map((p) => displayRecipientName(p.recipient_name)).join(", ");
   return (
     <details className="group">
-      <summary className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50">
+      <summary
+        className="grid cursor-pointer list-none grid-cols-[1fr_120px_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50"
+      >
         <div className="min-w-0">
           {/* Batch header: name only, no status pill. Pills live on the
               individual recipient rows below so the pill column is
               consistent across the whole list. */}
-          <div className="grid grid-cols-[280px_auto] items-center gap-3">
-            <span className="truncate text-[15px] font-semibold text-ink">
-              Batch of {batch.length}
-            </span>
+          <div className="truncate text-[15px] font-semibold text-ink">
+            Batch of {batch.length}
           </div>
           <div className="mt-1 text-[12.5px] text-gray-600">{names}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-gray-600">
@@ -539,6 +550,9 @@ function BatchRow({
             <span>Sent {fmtDateLong(first.sent_at)}</span>
           </div>
         </div>
+        {/* Empty middle column so action right-edge lines up across
+            batched and solo rows. Batch row has no status pill. */}
+        <div />
         {/* Batch affordance spans View Letter + gap + Track exactly:
             110 + 8 + 110 = 228px. Solid petrol fill, same h-[30px]. */}
         <div className="flex shrink-0 items-center">

@@ -870,10 +870,6 @@ function CostEstimate({
         per piece · letter {fmt(letterDollars)} each
         {includeCheck ? ` · check ${fmt(checkDollars)} each` : ""}
       </div>
-      <div className="mt-[2px] text-[10px] italic text-gray-400">
-        Rate from your pricing plan. Additional pages may add to the total
-        if the rendered content runs long.
-      </div>
     </div>
   );
 }

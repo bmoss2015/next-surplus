@@ -18,9 +18,9 @@ import { updateCustomerPricing } from "@/lib/owner/actions";
 
 type PriceKey = keyof Omit<LobPricing, "tier_label">;
 
-function fmtMoney(cents: number | null | undefined, places = 3): string {
+function fmtMoney(cents: number | null | undefined): string {
   if (cents == null) return "—";
-  return `$${(cents / 100).toFixed(places)}`;
+  return `$${(cents / 100).toFixed(2)}`;
 }
 
 function centsToDollarsInput(c: number): string {
@@ -54,13 +54,13 @@ const LETTER_CLASSES: LetterClassRow[] = [
 ];
 
 const EXTRA_PAGE_ROWS: { label: string; key: PriceKey }[] = [
-  { label: "B&W extra page", key: "letter_extra_page_bw" },
-  { label: "Color extra page", key: "letter_extra_page_color" },
+  { label: "B&W Extra Page", key: "letter_extra_page_bw" },
+  { label: "Color Extra Page", key: "letter_extra_page_color" },
 ];
 
 const CHECK_ROWS: { label: string; key: PriceKey }[] = [
-  { label: "Check (base)", key: "check_base" },
-  { label: "Check attachment page", key: "check_extra_attachment_page" },
+  { label: "Check (Base)", key: "check_base" },
+  { label: "Check Attachment Page", key: "check_extra_attachment_page" },
 ];
 
 export function CustomerPricingSection({
@@ -159,7 +159,7 @@ export function CustomerPricingSection({
       </div>
 
       {/* Letters card — B&W on the left, Color on the right ---------- */}
-      <PriceCard title="Letters" subtitle="Standard and First Class only. Certified is not available on your current Lob plan; ask to enable when you upgrade.">
+      <PriceCard title="Letters">
         <div className="grid grid-cols-2 divide-x divide-gray-200">
           <ClassGrid
             heading="Black &amp; White"
@@ -181,10 +181,7 @@ export function CustomerPricingSection({
       </PriceCard>
 
       {/* Extra pages card ----------------------------------------------- */}
-      <PriceCard
-        title="Extra Pages"
-        subtitle="Added per extra page beyond the first page of a letter."
-      >
+      <PriceCard title="Extra Pages">
         <FlatRowsTable
           rows={EXTRA_PAGE_ROWS}
           data={data}
@@ -194,10 +191,7 @@ export function CustomerPricingSection({
       </PriceCard>
 
       {/* Checks card ---------------------------------------------------- */}
-      <PriceCard
-        title="Checks"
-        subtitle="Printed B&W on standard MICR check stock; no color variant. Attachment page applies when the check is mailed with an enclosed letter."
-      >
+      <PriceCard title="Checks">
         <FlatRowsTable
           rows={CHECK_ROWS}
           data={data}
@@ -267,7 +261,7 @@ function ClassGrid({
           >
             <th className="py-1.5 pr-2 font-medium">Class</th>
             <th className="py-1.5 px-2 text-right font-medium">Your Cost</th>
-            <th className="py-1.5 px-2 text-right font-medium">Customer Pays</th>
+            <th className="py-1.5 px-2 text-right font-medium">Customer</th>
             <th className="py-1.5 pl-2 text-right font-medium">Margin</th>
           </tr>
         </thead>
@@ -282,7 +276,7 @@ function ClassGrid({
             return (
               <tr key={k} style={{ borderBottom: "1px solid #f1f2f4" }}>
                 <td className="py-2 pr-2 text-ink">{c.label}</td>
-                <td className="py-2 px-2 text-right font-mono text-gray-600">
+                <td className="py-2 px-2 text-right tabular-nums text-gray-600">
                   {fmtMoney(costCents)}
                 </td>
                 <td className="py-2 px-2 text-right">
@@ -294,13 +288,13 @@ function ClassGrid({
                       min="0"
                       value={retails[k] ?? ""}
                       onChange={(e) => setRetail(k, e.target.value)}
-                      className="w-[80px] rounded-md px-2 py-1 text-right font-mono text-[13px] text-ink focus:outline-none"
+                      className="w-[80px] rounded-md px-2 py-1 text-right tabular-nums text-[13px] text-ink focus:outline-none"
                       style={{ border: "1px solid #ebedf0" }}
                     />
                   </div>
                 </td>
                 <td
-                  className="py-2 pl-2 text-right font-mono"
+                  className="py-2 pl-2 text-right tabular-nums"
                   style={{
                     color:
                       margin == null ? "#9298a3" : isLoss ? "#b42318" : "#067647",
@@ -351,7 +345,7 @@ function FlatRowsTable({
           return (
             <tr key={r.key} style={{ borderBottom: "1px solid #f1f2f4" }}>
               <td className="px-5 py-2.5 text-ink">{r.label}</td>
-              <td className="px-5 py-2.5 text-right font-mono text-gray-600">
+              <td className="px-5 py-2.5 text-right tabular-nums text-gray-600">
                 {fmtMoney(costCents)}
               </td>
               <td className="px-5 py-2.5 text-right">
@@ -363,13 +357,13 @@ function FlatRowsTable({
                     min="0"
                     value={retails[r.key] ?? ""}
                     onChange={(e) => setRetail(r.key, e.target.value)}
-                    className="w-[88px] rounded-md px-2 py-1 text-right font-mono text-[13px] text-ink focus:outline-none"
+                    className="w-[88px] rounded-md px-2 py-1 text-right tabular-nums text-[13px] text-ink focus:outline-none"
                     style={{ border: "1px solid #ebedf0" }}
                   />
                 </div>
               </td>
               <td
-                className="px-5 py-2.5 text-right font-mono"
+                className="px-5 py-2.5 text-right tabular-nums"
                 style={{
                   color:
                     margin == null ? "#9298a3" : isLoss ? "#b42318" : "#067647",

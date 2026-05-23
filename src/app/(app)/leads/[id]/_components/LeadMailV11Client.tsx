@@ -220,12 +220,6 @@ export function LeadMailV11Client({
             <h2 className="text-[20px] font-semibold tracking-tight text-ink">
               Sent Mail
             </h2>
-            {mailingAddressCount > 0 && (
-              <div className="mt-[2px] text-[11.5px] text-gray-500">
-                {mailingAddressCount} mailing{" "}
-                {mailingAddressCount === 1 ? "address" : "addresses"} on file
-              </div>
-            )}
           </div>
           <button
             type="button"
