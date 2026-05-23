@@ -132,12 +132,6 @@ export function CustomerPricingSection({
     });
   }
 
-  // Quick-math helpers for the ROI footer.
-  const bwFcCustomerCents = dollarsToCents(retails.letter_first_class_bw ?? "0");
-  const bwFcLobCents =
-    data.wholesale_pricing_cents?.letter_first_class_bw ?? 0;
-  const bwFcMarginCents = bwFcCustomerCents - bwFcLobCents;
-
   return (
     <div className="mx-auto max-w-[1100px] px-8 py-8">
       <div className="mb-6 flex items-end justify-between">
@@ -184,6 +178,11 @@ export function CustomerPricingSection({
               data={data}
               retails={retails}
               setRetail={setRetail}
+              note={
+                group.heading === "Certified"
+                  ? "Certified mail requires Lob Startup plan ($260/mo). Your account is on Developer; certified sends will fail until you upgrade. Wholesale shows the Startup rate."
+                  : undefined
+              }
             />
           ))}
         </PriceTable>
@@ -202,7 +201,7 @@ export function CustomerPricingSection({
       </PriceCard>
 
       {/* Checks card ---------------------------------------------------- */}
-      <PriceCard title="Checks" subtitle="Lob check products. Attachment page applies when the check is mailed with an enclosed letter.">
+      <PriceCard title="Checks" subtitle="Lob check products. Printed B&W on standard MICR stock; no color variant. Attachment page applies when the check is mailed with an enclosed letter.">
         <PriceTable>
           <PriceGroupRows
             rows={CHECK_ROWS}
@@ -212,45 +211,6 @@ export function CustomerPricingSection({
           />
         </PriceTable>
       </PriceCard>
-
-      {/* Quick math footer --------------------------------------------- */}
-      <div
-        className="mt-6 rounded-lg px-5 py-4 text-[12.5px]"
-        style={{
-          border: "1px solid #ebedf0",
-          background: "#f6f7f9",
-          color: "#1a1d24",
-        }}
-      >
-        <div className="mb-2 text-[13px] font-semibold">Quick math</div>
-        <div className="text-[12.5px] text-gray-700">
-          B&amp;W First Class letter: you pay Lob{" "}
-          <span className="font-mono">{fmtMoney(bwFcLobCents)}</span>, customer
-          pays you{" "}
-          <span className="font-mono">
-            {fmtMoney(bwFcCustomerCents, 2)}
-          </span>
-          , your margin is{" "}
-          <span
-            className="font-mono"
-            style={{ color: bwFcMarginCents < 0 ? "#b42318" : "#067647" }}
-          >
-            {fmtMoney(bwFcMarginCents)}
-          </span>{" "}
-          per piece.
-        </div>
-        <div className="mt-1 text-[12.5px] text-gray-700">
-          At 50 letters per customer per month:{" "}
-          <span className="font-mono">
-            {fmtMoney(bwFcMarginCents * 50, 2)}
-          </span>{" "}
-          margin per customer. At 5 customers, that's{" "}
-          <span className="font-mono">
-            {fmtMoney(bwFcMarginCents * 50 * 5, 2)}
-          </span>{" "}
-          / month from B&amp;W First Class letters alone.
-        </div>
-      </div>
     </div>
   );
 }
@@ -308,12 +268,14 @@ function PriceGroupRows({
   data,
   retails,
   setRetail,
+  note,
 }: {
   groupLabel?: string;
   rows: RowSpec[];
   data: CustomerPricingData;
   retails: Record<string, string>;
   setRetail: (key: string, value: string) => void;
+  note?: string;
 }) {
   return (
     <>
@@ -325,6 +287,22 @@ function PriceGroupRows({
             style={{ color: "#5b606a", fontWeight: 600 }}
           >
             {groupLabel}
+          </td>
+        </tr>
+      )}
+      {note && (
+        <tr>
+          <td colSpan={4} className="px-5 pb-2">
+            <div
+              className="rounded-md px-3 py-2 text-[11.5px]"
+              style={{
+                background: "#fef2f2",
+                color: "#b42318",
+                border: "1px solid rgba(180, 35, 24, 0.20)",
+              }}
+            >
+              {note}
+            </div>
           </td>
         </tr>
       )}

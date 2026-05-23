@@ -82,10 +82,16 @@ export async function fetchPublishedLobPricing(): Promise<LobPricingFetchResult>
       error: `Could not parse Lob rates for: ${missing.join(", ")}. The published page format may have changed.`,
     };
   }
-  // Certified isn't priced separately in the published table; fall
-  // back to first-class rates. This matches the migration default.
-  partial.letter_certified_bw = partial.letter_first_class_bw!;
-  partial.letter_certified_color = partial.letter_first_class_color!;
+  // Certified mail is NOT available on Lob's Developer tier (the published
+  // table shows a dash for Developer and $6.70 for Startup/Growth). The
+  // earlier fallback "treat certified as first-class" was wrong — it
+  // wrote $1.029 into wholesale and made certified look way cheaper than
+  // it actually is. Use $6.70 (Startup tier published rate) as the
+  // certified cost since that's what we'd pay the moment we upgrade. No
+  // color premium on certified (Lob doesn't differentiate).
+  const STARTUP_CERTIFIED_CENTS = 670;
+  partial.letter_certified_bw = STARTUP_CERTIFIED_CENTS;
+  partial.letter_certified_color = STARTUP_CERTIFIED_CENTS;
 
   return {
     ok: true,
