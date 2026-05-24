@@ -714,7 +714,7 @@ function CostEstimate({
         {includeCheck ? ` · Lob check ${fmt(1.16)} each` : ""}
       </div>
       <div className="mt-[2px] text-[10px] italic text-gray-400">
-        Starting price per Click2Mail's letter listing — final charge
+        Starting price per Click2Mail&apos;s letter listing, final charge
         depends on rendered page count + paper / class options, and
         comes back from C2M when the job is accepted.
       </div>
