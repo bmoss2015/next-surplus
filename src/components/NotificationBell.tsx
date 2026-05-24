@@ -97,6 +97,9 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
+    // Polling kickoff: initial fetch on mount, then every POLL_MS. refresh()
+    // calls setState internally to update the bell's unread count.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const t = setInterval(refresh, POLL_MS);
     return () => clearInterval(t);

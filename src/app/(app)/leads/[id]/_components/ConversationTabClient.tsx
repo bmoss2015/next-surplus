@@ -248,8 +248,12 @@ export function ConversationTabClient({
   useEffect(() => {
     const target = searchParams.get("compose_to");
     if (!target) return;
+    // One-shot mount sync from the URL — opens the compose drawer pre-filled
+    // for the address the Contacts tab handed off.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setComposeTo(target);
     setComposing(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
     // Clear the param so re-renders don't keep re-opening the drawer.
     const next = new URLSearchParams(searchParams.toString());
     next.delete("compose_to");
@@ -351,6 +355,10 @@ export function ConversationTabClient({
   // Auto-pick the most recent thread when nothing is selected or when the
   // current selection got filtered out.
   useEffect(() => {
+    // Auto-pick the most recent thread when nothing is selected or the
+    // current selection got filtered out. Real Effect — selection follows
+    // the data set, not a user action.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (threadGroups.length === 0) {
       if (selectedThreadId !== null) setSelectedThreadId(null);
       return;
@@ -359,6 +367,7 @@ export function ConversationTabClient({
       setSelectedThreadId(threadGroups[0].id);
       markRead(threadGroups[0].id);
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadGroups.map((t) => t.id).join(",")]);
 
@@ -1198,6 +1207,8 @@ function EmailButton({
     if (!open) return;
     const toCheck = emails.filter((e) => !statuses[e]);
     if (toCheck.length === 0) return;
+    // Mark addresses as "checking" then kick off parallel verify-mx fetches.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatuses((prev) => {
       const next = { ...prev };
       for (const e of toCheck) next[e] = "checking";

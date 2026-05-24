@@ -20,20 +20,6 @@ const eslintConfig = defineConfig([
     // under the Next.js tsconfig is noise.
     "supabase/functions/**",
   ]),
-  {
-    rules: {
-      // The React 19 / Next 16 upgrade introduced these as errors. There are
-      // 30+ existing call sites where setState lives inside a useEffect (reset
-      // on dep change, polling kickoff, sync local state to incoming props).
-      // Each one needs a per-site decision (useEffectEvent, derived state,
-      // event-handler hoist), so they're tracked as warnings here pending a
-      // dedicated hooks refactor PR.
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/immutability": "warn",
-      "react-hooks/purity": "warn",
-      "react-hooks/refs": "warn",
-    },
-  },
 ]);
 
 export default eslintConfig;

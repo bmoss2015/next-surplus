@@ -584,6 +584,9 @@ function NotesEditor({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   useEffect(() => {
+    // Re-sync the textarea draft when the parent's saved notes value changes
+    // (e.g. another panel saved and the server returned a fresh row).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(value);
   }, [value]);
 
@@ -653,10 +656,12 @@ function PhoneSlot({
   const [val, setVal] = useState(stored);
   useEffect(() => {
     const next = ((relative[slot.value] as string | null) ?? "").trim();
-    setVal(next);
     // Drop out of edit mode whenever the server returns a saved value — keeps
     // the committed display fresh after onPatch round-trips.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setVal(next);
     if (next.length > 0) setEditing(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [relative, slot.value]);
 
   const type = relative[slot.type] as string | null;
@@ -844,6 +849,8 @@ function EmailSlot({
   const stored = ((relative[field] as string | null) ?? "").trim();
   const [val, setVal] = useState(stored);
   useEffect(() => {
+    // Re-sync the email input when the relative row is refreshed from server.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVal(((relative[field] as string | null) ?? "").trim());
   }, [relative, field]);
 

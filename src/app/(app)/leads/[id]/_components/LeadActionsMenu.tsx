@@ -43,6 +43,9 @@ export function LeadActionsMenu({
 
   useEffect(() => {
     if (!open) {
+      // Reset the inline archive confirmation when the menu closes so it
+      // doesn't reopen with the destructive state still primed.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setArchiveConfirm(false);
       return;
     }

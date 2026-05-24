@@ -75,10 +75,13 @@ export function GlobalSearch() {
   useEffect(() => {
     const q = query.trim();
     if (q.length < 2) {
+      // Reset to empty results when the query is too short to fetch.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([]);
       return;
     }
     const ctrl = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const t = setTimeout(async () => {
       try {

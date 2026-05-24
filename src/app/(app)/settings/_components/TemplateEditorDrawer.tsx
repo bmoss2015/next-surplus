@@ -91,12 +91,15 @@ function TextEditor({
 
   useEffect(() => {
     if (open) {
+      // Re-seed the editor fields each time the drawer opens for a new row.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setName(row?.name ?? "");
       setStateCode(row?.state ?? "");
       setSubject(row?.subject ?? "");
       setBody(row?.body ?? "");
       setErrMsg(null);
       setConfirmDelete(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open, row]);
 
@@ -317,6 +320,8 @@ function ResearchEditor({
 
   useEffect(() => {
     if (open) {
+      // Re-seed the step editor fields each time the drawer opens for a new row.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setName(row?.name ?? "");
       setStateCode(row?.state ?? "");
       setSaleType(row?.sale_type ?? "");
@@ -327,6 +332,7 @@ function ResearchEditor({
       );
       setErrMsg(null);
       setConfirmDelete(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open, row]);
 

@@ -81,6 +81,8 @@ export function SettingsPreviewJsx({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const h = window.location.hash.replace(/^#/, "");
+    // Initial-mount sync from the URL hash. One-shot only.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (h) setActive(h);
   }, []);
 

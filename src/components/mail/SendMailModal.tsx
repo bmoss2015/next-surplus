@@ -174,6 +174,8 @@ export function SendMailModal({
   );
   useEffect(() => {
     if (!isFileTemplate || !selectedTemplate) {
+      // Reset to unknown when there's no file template to count.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAttachmentPdfPages(null);
       return;
     }
@@ -911,13 +913,17 @@ function PreviewPane({
   const [docxErr, setDocxErr] = useState<string | null>(null);
   useEffect(() => {
     if (!fileTemplate || !recipient || !templateId) {
+      // Clear preview when there's no valid combo to render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPreviewBlob(null);
       return;
     }
     let cancelled = false;
+    /* eslint-disable react-hooks/set-state-in-effect */
     setDocxLoading(true);
     setDocxErr(null);
     setPreviewBlob(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
     (async () => {
       const res = await previewMailMergeDocx({
         template_id: templateId,
