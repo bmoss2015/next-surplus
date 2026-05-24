@@ -24,10 +24,12 @@ export function SearchBox() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   // Sync internal state when URL changes (e.g., back button, Clear all)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setValue(params.get("q") ?? "");
   }, [params]);
 

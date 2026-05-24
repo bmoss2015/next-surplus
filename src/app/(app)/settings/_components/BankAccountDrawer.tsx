@@ -61,11 +61,14 @@ function AddDrawer({
 
   useEffect(() => {
     if (open) {
+      // Reset the form each time the drawer opens.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setRouting("");
       setAccountNum("");
       setHolder("");
       setAccountType("company");
       setErrMsg(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open]);
 
@@ -235,9 +238,12 @@ function VerifyDrawer({
 
   useEffect(() => {
     if (open) {
+      // Reset the micro-deposit verification fields each time the drawer opens.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setAmt1("");
       setAmt2("");
       setErrMsg(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open]);
 

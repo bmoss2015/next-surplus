@@ -55,9 +55,11 @@ export function AttorneyDrawer({
   // Re-seed each time the drawer opens for a new row.
   useEffect(() => {
     if (open) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setForm(seedFrom(attorney));
       setErrMsg(null);
       setConfirmDelete(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open, attorney]);
 

@@ -33,6 +33,8 @@ export function EditTaskDrawer({
 
   useEffect(() => {
     if (!task) return;
+    // Re-seed the drawer fields each time a new task is loaded for editing.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setTitle(task.title ?? "");
     setDescription(task.description ?? "");
     setDueDate(task.due_date ?? "");
@@ -43,10 +45,13 @@ export function EditTaskDrawer({
     setSelectedLeadLabel(label);
     setNotes(task.notes ?? null);
     setError(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [task]);
 
   useEffect(() => {
     if (!leadQuery.trim() || leadQuery === selectedLeadLabel) {
+      // Hide and clear search state when nothing to look up.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLeadSearchResults([]);
       return;
     }

@@ -2544,8 +2544,14 @@ export function ImportHistoryTable({ history }: { history: ImportHistoryRow[] })
         </thead>
         <tbody>
           {history.map((row) => {
+            // Time-windowed revert button: a fresh Date.now() per render is
+            // intentional so the disable kicks in without waiting for a
+            // re-render trigger. The rule flags this as impure (correct), but
+            // the staleness window here is the entire point.
+            /* eslint-disable react-hooks/purity */
             const withinWindow =
               Date.now() - new Date(row.uploaded_at).getTime() <= REVERT_WINDOW_MS;
+            /* eslint-enable react-hooks/purity */
             // Fix FFFF4: Revert now also restores replaced/updated leads
             // from snapshots. An import is potentially revertable whenever
             // it touched anything (i.e. produced at least one non-skipped

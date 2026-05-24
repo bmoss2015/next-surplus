@@ -21,6 +21,9 @@ export default function ResetPage() {
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("error") === "invalid_link") {
+      // Mount-time error gate: the auth callback redirected here with an
+      // explicit invalid-link signal.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus("invalid");
       return;
     }

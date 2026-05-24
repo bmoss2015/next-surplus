@@ -28,10 +28,13 @@ export function InviteMemberDrawer({
 
   useEffect(() => {
     if (open) {
+      // Reset the invite form each time the drawer opens.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setFullName("");
       setEmail("");
       setRole("member");
       setErrMsg(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open]);
 

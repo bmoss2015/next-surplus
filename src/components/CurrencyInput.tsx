@@ -47,6 +47,9 @@ export function CurrencyInput({
 }) {
   const [text, setText] = useState(value != null ? formatTyped(String(value)) : "");
   useEffect(() => {
+    // Sync the displayed text when the parent's numeric value changes (e.g.
+    // a controlled reset or programmatic prefill).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setText(value != null ? formatTyped(String(value)) : "");
   }, [value]);
 

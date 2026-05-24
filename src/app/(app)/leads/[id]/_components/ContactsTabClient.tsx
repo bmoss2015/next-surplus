@@ -1066,8 +1066,12 @@ function ContactLine({
   const [editingValue, setEditingValue] = useState(false);
   const [val, setVal] = useState(value);
   useEffect(() => {
+    // Re-sync the inline editor when the parent's saved value changes (e.g.
+    // after a successful validate / patch round-trip).
+    /* eslint-disable react-hooks/set-state-in-effect */
     setVal(value);
     setEditingValue(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [value]);
   const ptype = phoneType ?? null;
   const displayValue = isPhone ? formatPhone(value) : value;

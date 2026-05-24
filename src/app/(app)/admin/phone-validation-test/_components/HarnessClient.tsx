@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   testValidatePhone,
   refreshBalance,
@@ -27,11 +27,11 @@ export function HarnessClient({
   const [log, setLog] = useState<RunLog[]>([]);
   const [preview, setPreview] = useState<PreviewBackfillResult | null>(null);
   const [pending, startTransition] = useTransition();
-  const runIdRef = useState(() => ({ n: 0 }))[0];
+  const runIdRef = useRef({ n: 0 });
 
   function appendLog(entry: { label: string } & (Omit<Extract<RunLog, { ok: true }>, "runId" | "label"> | Omit<Extract<RunLog, { ok: false }>, "runId" | "label">)) {
-    runIdRef.n += 1;
-    setLog((prev) => [{ ...entry, runId: runIdRef.n } as RunLog, ...prev]);
+    runIdRef.current.n += 1;
+    setLog((prev) => [{ ...entry, runId: runIdRef.current.n } as RunLog, ...prev]);
   }
 
   function runOnce(label: string, p: string) {

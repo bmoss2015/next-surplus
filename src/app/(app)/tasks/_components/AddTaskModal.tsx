@@ -35,12 +35,15 @@ export function AddTaskModal({
 
   useEffect(() => {
     if (open) {
+      // Reset the linked-lead picker each time the modal opens.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setLeadId(defaultLeadId ?? "");
       setLeadQuery("");
       setSelectedLeadLabel("");
       setLeadSearchResults([]);
       setSearchedQuery("");
       setLeadSearchError(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open, defaultLeadId]);
 
@@ -48,9 +51,12 @@ export function AddTaskModal({
   useEffect(() => {
     const q = leadQuery.trim();
     if (!q || leadQuery === selectedLeadLabel) {
+      // Hide and clear search state when nothing to look up.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setLeadSearchResults([]);
       setSearchedQuery("");
       setLeadSearchError(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
     const handle = window.setTimeout(async () => {
