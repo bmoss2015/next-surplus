@@ -247,6 +247,15 @@ function PreflightToggle({ initialEnabled }: { initialEnabled: boolean }) {
           retail rates above bake this cost in, so leaving it on doesn't
           eat your margin.
         </div>
+        <div className="mt-1 text-[11px] text-gray-500">
+          <span className="font-medium">Included:</span> CASS-certified
+          deliverability check + ZIP+4 normalization.{" "}
+          <span className="font-medium">Not yet enabled:</span> NCOA
+          forwarding (auto-update to recipient&apos;s new address if they
+          moved). NCOA needs to be turned on at the Lob account level and
+          typically requires Lob Startup tier or higher. Enable when you
+          upgrade Lob; pricing copy will be updated accordingly.
+        </div>
       </header>
       <div className="flex items-center justify-between px-5 py-4">
         <div className="text-[13px] text-ink">
