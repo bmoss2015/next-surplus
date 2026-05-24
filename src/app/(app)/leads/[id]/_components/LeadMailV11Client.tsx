@@ -103,6 +103,7 @@ export function LeadMailV11Client({
   mailReady,
   fromAddress,
   pricing,
+  preflightVerifyEnabled,
 }: {
   rows: MailJobListRow[];
   totalSent: number;
@@ -127,6 +128,7 @@ export function LeadMailV11Client({
     letter_extra_page_color: number;
     check_base: number;
   } | null;
+  preflightVerifyEnabled: boolean;
 }) {
   void leadId;
   const router = useRouter();
@@ -327,6 +329,7 @@ export function LeadMailV11Client({
           mailReady={mailReady}
           fromAddress={fromAddress}
           pricing={pricing}
+          preflightVerifyEnabled={preflightVerifyEnabled}
           defaultSelectedKeys={resendDefaultKeys}
           notice={resendNotice}
         />

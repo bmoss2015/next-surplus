@@ -98,6 +98,7 @@ export async function MailTab({ leadId }: { leadId: string }) {
       mailReady={mailReady}
       fromAddress={fromAddress}
       pricing={customerPricing?.customer_mail_pricing_cents ?? null}
+      preflightVerifyEnabled={customerPricing?.preflight_verify_enabled ?? true}
     />
   );
 }

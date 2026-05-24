@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { fetchCustomerPricing } from "@/lib/owner/fetch";
+import { fetchMailReport } from "@/lib/mail/reports";
 import { OwnerView } from "./_components/OwnerView";
 
 // Owner area entry point. Owner-only — admins and members hit redirect.
@@ -13,7 +14,10 @@ export default async function OwnerPage() {
   if (!profile) redirect("/login");
   if (!profile.isOwner) redirect("/");
 
-  const customerPricing = await fetchCustomerPricing();
+  const [customerPricing, report] = await Promise.all([
+    fetchCustomerPricing(),
+    fetchMailReport({ range: "30d" }),
+  ]);
 
-  return <OwnerView data={{ customerPricing }} />;
+  return <OwnerView data={{ customerPricing, report }} />;
 }

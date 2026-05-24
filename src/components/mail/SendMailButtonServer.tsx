@@ -56,6 +56,7 @@ export async function SendMailButtonServer(props: Props) {
       mailReady={mailReady}
       fromAddress={fromAddress}
       pricing={customerPricing?.customer_mail_pricing_cents ?? null}
+      preflightVerifyEnabled={customerPricing?.preflight_verify_enabled ?? true}
     />
   );
 }

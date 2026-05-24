@@ -197,6 +197,7 @@ function coerceLobPricing(raw: unknown): LobPricingCents {
 export type CustomerPricingViewData = {
   subscription_monthly_cents: number;
   customer_mail_pricing_cents: LobPricing;
+  preflight_verify_enabled: boolean;
 };
 
 // Customer-facing pricing read. Available to any authenticated user via
@@ -207,7 +208,9 @@ export async function fetchMyCustomerPricing(): Promise<CustomerPricingViewData 
   const sb = await createClient();
   const { data } = await sb
     .from("app_pricing_config")
-    .select("subscription_monthly_cents, customer_mail_pricing_cents")
+    .select(
+      "subscription_monthly_cents, customer_mail_pricing_cents, preflight_verify_enabled"
+    )
     .eq("id", 1)
     .maybeSingle();
   if (!data) return null;
@@ -217,6 +220,8 @@ export async function fetchMyCustomerPricing(): Promise<CustomerPricingViewData 
     customer_mail_pricing_cents: coerceLobPricing(
       data.customer_mail_pricing_cents
     ),
+    preflight_verify_enabled:
+      (data.preflight_verify_enabled as boolean | null) ?? true,
   };
 }
 

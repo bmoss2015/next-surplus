@@ -10,11 +10,14 @@
 //
 // No subscription card. No Quick Math footer. Just price grids.
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerPricingData } from "@/lib/owner/fetch";
 import type { LobPricing } from "@/lib/mail/types";
-import { updateCustomerPricing } from "@/lib/owner/actions";
+import {
+  updateCustomerPricing,
+  setPreflightVerifyEnabled,
+} from "@/lib/owner/actions";
 import { useSaveBarSection } from "@/components/SettingsSaveBar";
 
 type PriceKey = keyof Omit<LobPricing, "tier_label">;
@@ -198,7 +201,100 @@ export function CustomerPricingSection({
           setRetail={setRetail}
         />
       </PriceCard>
+
+      {/* Address Verification toggle ------------------------------------ */}
+      <PreflightToggle initialEnabled={data.preflight_verify_enabled} />
     </div>
+  );
+}
+
+function PreflightToggle({ initialEnabled }: { initialEnabled: boolean }) {
+  const router = useRouter();
+  const [enabled, setEnabled] = useState(initialEnabled);
+  const [pending, startTransition] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+
+  function toggle() {
+    const next = !enabled;
+    setEnabled(next);
+    setErr(null);
+    startTransition(async () => {
+      const res = await setPreflightVerifyEnabled({ enabled: next });
+      if (!res.ok) {
+        setErr(res.error);
+        setEnabled(!next);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <section
+      className="mb-5 rounded-lg bg-white"
+      style={{ border: "1px solid #ebedf0" }}
+    >
+      <header
+        className="px-5 py-3.5"
+        style={{ borderBottom: "1px solid #ebedf0" }}
+      >
+        <div className="text-[14px] font-semibold text-ink">
+          Address Verification
+        </div>
+        <div className="text-[11.5px] text-gray-500">
+          Pre-flight verification calls Lob to check the recipient address
+          before send. Each call costs ~$0.05 on Lob Developer tier. The
+          retail rates above bake this cost in, so leaving it on doesn't
+          eat your margin.
+        </div>
+      </header>
+      <div className="flex items-center justify-between px-5 py-4">
+        <div className="text-[13px] text-ink">
+          {enabled ? (
+            <>
+              <span className="font-medium">On.</span> Bad addresses surface
+              as inline pills before the customer clicks Send.
+            </>
+          ) : (
+            <>
+              <span className="font-medium">Off.</span> Verification runs at
+              Lob send time only; bad addresses show as a friendly error
+              after click.
+            </>
+          )}
+          {err && (
+            <div
+              className="mt-1 text-[11.5px]"
+              style={{ color: "#b42318" }}
+            >
+              {err}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={pending}
+          className="cursor-pointer rounded-full transition-colors disabled:opacity-60"
+          style={{
+            width: 44,
+            height: 24,
+            background: enabled ? "#0d4b3a" : "#cbd5d1",
+            position: "relative",
+          }}
+          aria-label="Toggle pre-flight verification"
+        >
+          <span
+            className="absolute top-[3px] rounded-full bg-white transition-all"
+            style={{
+              left: enabled ? 23 : 3,
+              width: 18,
+              height: 18,
+            }}
+          />
+        </button>
+      </div>
+    </section>
   );
 }
 
