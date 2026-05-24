@@ -147,10 +147,6 @@ export function SendMailModal({
   );
   const [previewIdx, setPreviewIdx] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
-  // Track whether the user has previewed the CURRENT body+recipient combo.
-  // Reset whenever body or selected recipients change so any edit forces a
-  // fresh preview before we let them send physical mail.
-  const [previewedSignature, setPreviewedSignature] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [bodyRef, setBodyRef] = useState<HTMLTextAreaElement | null>(null);
@@ -177,15 +173,6 @@ export function SendMailModal({
     () => candidates.filter((c) => selectedKeys.has(c.key)),
     [candidates, selectedKeys]
   );
-
-  // A signature string that changes whenever anything the recipient will see
-  // changes. Compared against previewedSignature to require a fresh preview
-  // before sending physical mail.
-  const currentSignature = useMemo(
-    () => `${body}|${selectedRecipients.map((r) => r.key).sort().join(",")}`,
-    [body, selectedRecipients]
-  );
-  const hasPreviewed = previewedSignature === currentSignature;
 
   const checkAmountCents = useMemo(() => {
     const n = parseFloat(checkAmount);
@@ -472,6 +459,18 @@ export function SendMailModal({
           }
           fromAddress={fromAddress}
           onBack={() => setShowPreview(false)}
+          onSend={send}
+          sendDisabled={pending || verifying}
+          sendLabel={
+            pending
+              ? "Sending..."
+              : verifying
+                ? "Verifying addresses..."
+                : selectedRecipients.length <= 1
+                  ? "Send Letter"
+                  : `Send ${selectedRecipients.length} Letters`
+          }
+          sendErr={err}
         />
       ) : (
         <div className="space-y-5">
@@ -654,13 +653,8 @@ export function SendMailModal({
           {/* Color toggle */}
           <div className={sectionClass}>
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-gray-200 bg-surface px-3 py-[10px] hover:border-gray-300">
-              <div>
-                <div className="text-[13px] font-medium text-ink">
-                  Print in Color
-                </div>
-                <div className="text-[11px] text-gray-500">
-                  Adds about $0.10&ndash;$0.20 per piece. Off = black and white.
-                </div>
+              <div className="text-[13px] font-medium text-ink">
+                Print in Color
               </div>
               <input
                 type="checkbox"
@@ -769,45 +763,22 @@ export function SendMailModal({
               onClick={() => {
                 setPreviewIdx(0);
                 setShowPreview(true);
-                setPreviewedSignature(currentSignature);
               }}
               disabled={
                 pending ||
-                selectedRecipients.length === 0 ||
-                (!isFileTemplate && !body.trim())
-              }
-              className="cursor-pointer rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500 disabled:opacity-50"
-            >
-              Preview
-            </button>
-            <button
-              type="button"
-              onClick={send}
-              disabled={
-                pending ||
-                verifying ||
                 !mailReady ||
                 selectedRecipients.length === 0 ||
                 (!isFileTemplate && !body.trim()) ||
-                !hasPreviewed ||
                 (includeCheck && !hasVerifiedBank)
               }
               title={
                 !mailReady
                   ? "Add a Company Address in Settings before sending mail"
-                  : !hasPreviewed && selectedRecipients.length > 0
-                    ? "Preview the letter before sending, printed mail can't be unsent"
-                    : undefined
+                  : undefined
               }
               className="cursor-pointer rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white disabled:opacity-50"
             >
-              {pending
-                ? "Sending..."
-                : verifying
-                  ? "Verifying addresses..."
-                  : selectedRecipients.length <= 1
-                    ? "Send Letter"
-                    : `Send ${selectedRecipients.length} Letters`}
+              Preview &amp; Send
             </button>
           </div>
         </div>
@@ -910,8 +881,7 @@ function CostEstimate({
       </div>
       <div className="mt-[2px] text-[10px] text-gray-600">
         {recipients} {recipients === 1 ? "piece" : "pieces"} · {pagesPerPiece}{" "}
-        per piece · letter {fmt(letterDollars)} each
-        {includeCheck ? ` · check ${fmt(checkDollars)} each` : ""}
+        per piece
       </div>
     </div>
   );
@@ -1157,6 +1127,10 @@ function PreviewPane({
   templateId,
   fromAddress,
   onBack,
+  onSend,
+  sendDisabled,
+  sendLabel,
+  sendErr,
 }: {
   recipients: SendMailModalRecipient[];
   body: string;
@@ -1170,6 +1144,10 @@ function PreviewPane({
   templateId: string | null;
   fromAddress: SendMailFromAddress;
   onBack: () => void;
+  onSend: () => void;
+  sendDisabled: boolean;
+  sendLabel: string;
+  sendErr: string | null;
 }) {
   const recipient = recipients[idx];
   const rendered =
@@ -1370,6 +1348,22 @@ function PreviewPane({
             </pre>
           </div>
         )}
+      </div>
+
+      {/* Send footer — anchored at the bottom of the preview so the
+          user reviews then commits without leaving this screen. */}
+      <div className="sticky bottom-0 -mx-1 flex items-center justify-between gap-3 border-t border-gray-200 bg-white px-1 pt-3">
+        <div className="text-[11.5px]" style={{ color: "var(--danger)" }}>
+          {sendErr ?? ""}
+        </div>
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={sendDisabled}
+          className="cursor-pointer rounded-md btn-primary px-4 py-[7px] text-[12.5px] font-semibold text-white disabled:opacity-50"
+        >
+          {sendLabel}
+        </button>
       </div>
     </div>
   );
