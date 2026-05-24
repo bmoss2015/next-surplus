@@ -199,8 +199,11 @@ export function SuperDocEditor({
       <SuperDocEditorInner
         document={source as File | Blob | string}
         documentMode={documentMode}
-        onReady={(event: { superdoc: SDInstance }) => {
-          superdocRef.current = event.superdoc;
+        onReady={(event) => {
+          // Library type is stricter than the local SDInstance shape we
+          // actually use (only triggerDownload is called). At runtime it's
+          // the same object — narrow the type via cast.
+          superdocRef.current = event.superdoc as unknown as SDInstance;
           emitControlsIfReady();
         }}
         onEditorCreate={(event: { editor: Editor }) => {

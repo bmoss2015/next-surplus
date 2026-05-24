@@ -22,9 +22,5 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Typecheck is wired but kept off the required path until
-      # next.config.ts:typescript.ignoreBuildErrors is removed and the
-      # 4 known type errors are fixed (see tech-lead audit). Flip the
-      # comment block once that follow-up PR lands.
-      # - name: Typecheck
-      #   run: npm run typecheck
+      - name: Typecheck
+        run: npm run typecheck
