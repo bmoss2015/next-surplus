@@ -13,8 +13,14 @@ import {
   setNeedsActionThreshold,
   addLostReason,
   setLostReasonArchived,
+  countLeadsUsingLostReason,
+  reassignAndArchiveLostReason,
 } from "@/app/(app)/settings/_actions";
 import type { LostReasonAdminRow } from "@/lib/settings/fetch";
+import {
+  ReassignAndRemoveDialog,
+  type ReassignOption,
+} from "./ReassignAndRemoveDialog";
 
 export function PipelineSection({
   initialNeedsActionThreshold,
@@ -64,23 +70,47 @@ export function PipelineSection({
   }
 
   const [confirmingArchive, setConfirmingArchive] = useState<string | null>(null);
+  const [reassignTarget, setReassignTarget] = useState<{
+    id: string;
+    label: string;
+    count: number;
+  } | null>(null);
 
   function archive(id: string) {
-    // Click 1: arm the confirm state. Click 2: actually archive. The
-    // armed state expires when the user clicks a different row or
-    // archives this one.
-    if (confirmingArchive !== id) {
-      setConfirmingArchive(id);
+    setErrMsg(null);
+    // Click 1: ask the server how many leads use this reason. If zero,
+    // arm the regular confirm flow (two-click trash). If non-zero, open
+    // the Reassign dialog instead.
+    if (confirmingArchive !== id && reassignTarget?.id !== id) {
+      startTransition(async () => {
+        const usage = await countLeadsUsingLostReason(id);
+        if (!usage.ok) {
+          setErrMsg(usage.error);
+          return;
+        }
+        if (usage.count === 0) {
+          setConfirmingArchive(id);
+        } else {
+          setReassignTarget({
+            id,
+            label: usage.label,
+            count: usage.count,
+          });
+        }
+      });
       return;
     }
-    startTransition(async () => {
-      const res = await setLostReasonArchived(id, true);
-      if (!res.ok) setErrMsg(res.error);
-      else {
-        setConfirmingArchive(null);
-        router.refresh();
-      }
-    });
+    // Click 2 on a zero-usage reason: actually archive.
+    if (confirmingArchive === id) {
+      startTransition(async () => {
+        const res = await setLostReasonArchived(id, true);
+        if (!res.ok) setErrMsg(res.error);
+        else {
+          setConfirmingArchive(null);
+          router.refresh();
+        }
+      });
+    }
   }
 
   const liveReasons = initialLostReasons.filter((r) => !r.archived);
@@ -220,6 +250,32 @@ export function PipelineSection({
           {errMsg}
         </div>
       )}
+
+      <ReassignAndRemoveDialog
+        open={Boolean(reassignTarget)}
+        onClose={() => setReassignTarget(null)}
+        itemLabel={reassignTarget?.label ?? ""}
+        itemKind="lost reason"
+        dependentNoun="leads"
+        dependentCount={reassignTarget?.count ?? 0}
+        options={
+          (liveReasons
+            .filter((r) => r.id !== reassignTarget?.id)
+            .map((r) => ({ id: r.id, label: r.label })) as ReassignOption[]) ?? []
+        }
+        onCommit={async (replacementId) => {
+          if (!reassignTarget) {
+            return { ok: false as const, error: "No target" };
+          }
+          const res = await reassignAndArchiveLostReason(
+            reassignTarget.id,
+            replacementId
+          );
+          if (!res.ok) return { ok: false as const, error: res.error };
+          router.refresh();
+          return { ok: true as const };
+        }}
+      />
     </section>
   );
 }

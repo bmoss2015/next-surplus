@@ -409,7 +409,7 @@ function PieceRow({
     <Link
       href={href}
       className={cn(
-        "group relative grid grid-cols-[1fr_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50",
+        "group relative grid grid-cols-[1fr_auto_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50",
         // Batch-child rows: subtle gray background + a 3px dark brand
         // bar on the left edge. Absolute-positioned so it doesn't shift
         // the content grid.
@@ -423,23 +423,13 @@ function PieceRow({
           style={{ width: 3, background: "#0d4b3a" }}
         />
       )}
-      {/* Left column — name + pill on row 1. Name column is fixed 280px
-          so the pill always lands at the same X across rows regardless
-          of name length (short names don't pull it left, long names
-          truncate). */}
+      {/* Left content column — name, address, meta. Pill is no longer
+          inside this column; it's its own grid column to the right so
+          the meta line below (with Check $X.XX) can't collide with the
+          pill horizontally. */}
       <div className="min-w-0">
-        <div className="grid grid-cols-[280px_auto] items-center gap-3">
-          <span className="truncate text-[15px] font-semibold text-ink">
-            {displayRecipientName(piece.recipient_name)}
-          </span>
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] whitespace-nowrap justify-self-start",
-              pillClass
-            )}
-          >
-            {pillLabel}
-          </span>
+        <div className="truncate text-[15px] font-semibold text-ink">
+          {displayRecipientName(piece.recipient_name)}
         </div>
 
         <div className="mt-1 text-[12.5px] text-gray-600">
@@ -492,6 +482,20 @@ function PieceRow({
             </>
           )}
         </div>
+      </div>
+
+      {/* Middle column — status pill in its own column, tight against
+          actions (auto-sized). Top-aligned with a small nudge so it
+          sits on the name's baseline. */}
+      <div className="flex shrink-0 items-start pt-[2px]">
+        <span
+          className={cn(
+            "inline-flex items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] whitespace-nowrap",
+            pillClass
+          )}
+        >
+          {pillLabel}
+        </span>
       </div>
 
       {/* Right column — actions. Solid buttons (clickable affordance);
@@ -567,12 +571,13 @@ function BatchRow({
   return (
     <details className="group">
       <summary
-        className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-start gap-5 px-6 py-4 transition-colors hover:bg-gray-50"
+        className="grid cursor-pointer list-none grid-cols-[1fr_auto_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50"
       >
         <div className="min-w-0">
-          {/* Batch header: name only, no status pill. Pills live on the
-              individual recipient rows below so the pill column is
-              consistent across the whole list. */}
+          {/* Batch header: name only, no status pill (pills live on the
+              individual recipient rows below). The empty middle column
+              of the grid keeps the actions aligned with PieceRow's
+              action column. */}
           <div className="truncate text-[15px] font-semibold text-ink">
             Batch of {batch.length}
           </div>
@@ -586,6 +591,9 @@ function BatchRow({
             <span>Sent {fmtDateLong(first.sent_at)}</span>
           </div>
         </div>
+        {/* Empty middle column so the Expand Batch button aligns with
+            the PieceRow action column below. */}
+        <div />
         {/* Batch affordance spans View Letter + gap + Track exactly:
             110 + 8 + 110 = 228px. Solid petrol fill, same h-[30px]. */}
         <div className="flex shrink-0 items-center">

@@ -11,7 +11,13 @@ import { IconX } from "@tabler/icons-react";
 import {
   addOrgCustomRole,
   deleteOrgCustomRole,
+  countContactsUsingCustomRole,
+  reassignAndDeleteOrgCustomRole,
 } from "@/app/(app)/settings/_actions";
+import {
+  ReassignAndRemoveDialog,
+  type ReassignOption,
+} from "./ReassignAndRemoveDialog";
 
 export function ContactRolesSection({
   initial,
@@ -45,23 +51,43 @@ export function ContactRolesSection({
     });
   }
 
+  const [reassignTarget, setReassignTarget] = useState<{
+    label: string;
+    count: number;
+  } | null>(null);
+
   function onDelete(label: string) {
-    if (confirmingDelete !== label) {
-      setConfirmingDelete(label);
-      setErrMsg(null);
+    setErrMsg(null);
+    // Click 1: check usage. Zero in use → arm two-click confirm.
+    // Non-zero → open Reassign dialog with the other roles as options.
+    if (confirmingDelete !== label && reassignTarget?.label !== label) {
+      startTransition(async () => {
+        const usage = await countContactsUsingCustomRole(label);
+        if (!usage.ok) {
+          setErrMsg(usage.error);
+          return;
+        }
+        if (usage.count === 0) {
+          setConfirmingDelete(label);
+        } else {
+          setReassignTarget({ label, count: usage.count });
+        }
+      });
       return;
     }
-    startTransition(async () => {
-      const res = await deleteOrgCustomRole(label);
-      if (!res.ok) {
-        setErrMsg(res.error);
+    if (confirmingDelete === label) {
+      startTransition(async () => {
+        const res = await deleteOrgCustomRole(label);
+        if (!res.ok) {
+          setErrMsg(res.error);
+          setConfirmingDelete(null);
+          return;
+        }
+        setLabels((prev) => prev.filter((l) => l !== label));
         setConfirmingDelete(null);
-        return;
-      }
-      setLabels((prev) => prev.filter((l) => l !== label));
-      setConfirmingDelete(null);
-      router.refresh();
-    });
+        router.refresh();
+      });
+    }
   }
 
   return (
@@ -168,6 +194,31 @@ export function ContactRolesSection({
           {errMsg}
         </div>
       )}
+
+      <ReassignAndRemoveDialog
+        open={Boolean(reassignTarget)}
+        onClose={() => setReassignTarget(null)}
+        itemLabel={reassignTarget?.label ?? ""}
+        itemKind="contact role"
+        dependentNoun="contacts"
+        dependentCount={reassignTarget?.count ?? 0}
+        options={
+          labels
+            .filter((l) => l !== reassignTarget?.label)
+            .map((l) => ({ id: l, label: l })) as ReassignOption[]
+        }
+        onCommit={async (replacementLabel) => {
+          if (!reassignTarget) return { ok: false as const, error: "No target" };
+          const res = await reassignAndDeleteOrgCustomRole(
+            reassignTarget.label,
+            replacementLabel
+          );
+          if (!res.ok) return { ok: false as const, error: res.error };
+          setLabels((prev) => prev.filter((l) => l !== reassignTarget.label));
+          router.refresh();
+          return { ok: true as const };
+        }}
+      />
     </section>
   );
 }

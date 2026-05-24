@@ -1161,6 +1161,95 @@ export async function setLostReasonArchived(
   return { ok: true };
 }
 
+// Look up how many leads currently use a given lost reason. Used by the
+// settings UI to decide whether to show a reassign-to picker before
+// archive/delete commits.
+export async function countLeadsUsingLostReason(
+  reasonId: string
+): Promise<{ ok: true; count: number; label: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { data: reason } = await sb
+    .from("lost_reasons")
+    .select("label")
+    .eq("id", reasonId)
+    .maybeSingle();
+  if (!reason) return { ok: false, error: "Reason not found" };
+  const { count, error } = await sb
+    .from("leads")
+    .select("id", { count: "exact", head: true })
+    .eq("lost_reason", reason.label as string);
+  if (error) return { ok: false, error: error.message };
+  return {
+    ok: true,
+    count: count ?? 0,
+    label: (reason.label as string | null) ?? "",
+  };
+}
+
+// Reassign all leads currently using `fromReasonId`'s label to the
+// label belonging to `toReasonId` (or null = unset), then archive the
+// "from" reason. Used by the Lost Reasons settings UI when the user
+// tries to archive a reason that's still in use on existing leads.
+//
+// The replacement label must come from another lost_reason row in the
+// same org (or the literal null sentinel for "clear the lost_reason
+// field"). RLS scopes everything to the caller's org.
+export async function reassignAndArchiveLostReason(
+  fromId: string,
+  toId: string | null
+): Promise<{ ok: true; reassigned: number } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+
+  const { data: fromRow } = await sb
+    .from("lost_reasons")
+    .select("label")
+    .eq("id", fromId)
+    .maybeSingle();
+  if (!fromRow) return { ok: false, error: "Reason not found" };
+  const fromLabel = (fromRow.label as string | null) ?? "";
+
+  let toLabel: string | null = null;
+  if (toId) {
+    const { data: toRow } = await sb
+      .from("lost_reasons")
+      .select("label, archived")
+      .eq("id", toId)
+      .maybeSingle();
+    if (!toRow) return { ok: false, error: "Replacement reason not found" };
+    if (toRow.archived) {
+      return {
+        ok: false,
+        error: "Pick a non-archived reason as the replacement.",
+      };
+    }
+    toLabel = (toRow.label as string | null) ?? null;
+  }
+
+  // Reassign affected leads first. If this fails we don't archive, so
+  // the operator sees the error and can retry. If reassign succeeds and
+  // archive fails (unlikely), the reason ends up unarchived but with no
+  // leads referencing it — also safe.
+  const { count: reassignCount, error: reassignErr } = await sb
+    .from("leads")
+    .update({ lost_reason: toLabel }, { count: "exact" })
+    .eq("lost_reason", fromLabel);
+  if (reassignErr) return { ok: false, error: reassignErr.message };
+
+  const { error: archErr } = await sb
+    .from("lost_reasons")
+    .update({ archived: true })
+    .eq("id", fromId);
+  if (archErr) return { ok: false, error: archErr.message };
+
+  revalidatePath("/settings");
+  revalidatePath("/leads");
+  return { ok: true, reassigned: reassignCount ?? 0 };
+}
+
 export async function addLostReason(
   label: string
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -1455,8 +1544,6 @@ export async function deleteOrgCustomRole(
   const clean = label.trim();
   if (!clean) return { ok: false, error: "Role label is required" };
   const sb = await createClient();
-  // Block delete if any lead_parties row still uses this label. Matches
-  // the Salesforce / Attio "can't delete in use" pattern.
   const { count, error: countErr } = await sb
     .from("lead_parties")
     .select("id", { count: "exact", head: true })
@@ -1475,6 +1562,54 @@ export async function deleteOrgCustomRole(
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
   return { ok: true };
+}
+
+// Count contacts currently using a custom-role label. Mirror of the
+// Lost Reasons "count in use" helper.
+export async function countContactsUsingCustomRole(
+  label: string
+): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const clean = label.trim();
+  if (!clean) return { ok: false, error: "Role label is required" };
+  const sb = await createClient();
+  const { count, error } = await sb
+    .from("lead_parties")
+    .select("id", { count: "exact", head: true })
+    .eq("custom_role_label", clean);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, count: count ?? 0 };
+}
+
+// Reassign contacts on lead_parties using `fromLabel` to `toLabel`
+// (or null = clear the custom label, role falls back to "other" with
+// no specifier), then delete the org_custom_roles row for `fromLabel`.
+export async function reassignAndDeleteOrgCustomRole(
+  fromLabel: string,
+  toLabel: string | null
+): Promise<{ ok: true; reassigned: number } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const cleanFrom = fromLabel.trim();
+  const cleanTo = toLabel?.trim() || null;
+  if (!cleanFrom) return { ok: false, error: "Role label is required" };
+  const sb = await createClient();
+
+  const { count: reassignCount, error: reassignErr } = await sb
+    .from("lead_parties")
+    .update({ custom_role_label: cleanTo }, { count: "exact" })
+    .eq("custom_role_label", cleanFrom);
+  if (reassignErr) return { ok: false, error: reassignErr.message };
+
+  const { error: delErr } = await sb
+    .from("org_custom_roles")
+    .delete()
+    .eq("label", cleanFrom);
+  if (delErr) return { ok: false, error: delErr.message };
+
+  revalidatePath("/settings");
+  return { ok: true, reassigned: reassignCount ?? 0 };
 }
 
 export async function deleteResearchTemplate(
