@@ -1624,8 +1624,9 @@ function PreviewPane({
           </div>
         </div>
 
-        {/* Recipient — visually centered */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-[11px] leading-snug text-ink">
+        {/* Recipient — block is centered on the envelope, but address
+            LINES are left-aligned like a real mailing label. */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-left text-[11px] leading-snug text-ink">
           <div className="font-medium">{recipient?.contact.full_name}</div>
           <div>{recipient?.contact.line1}</div>
           {recipient?.contact.line2 && (
@@ -1701,12 +1702,15 @@ function PreviewPane({
           </div>
         ) : (
           <div
-            className="bg-white shadow-card"
+            className="bg-white"
             style={{
               // Scaled 8.5x11 — 0.6 scale so a single page fits inside
               // the modal without horizontal scroll. Real margins (1in)
               // are preserved at the scaled rate (~58px) so the body
-              // sits where it would on actual paper.
+              // sits where it would on actual paper. Visible border +
+              // drop shadow so the white paper reads as a physical
+              // page against the also-white modal background (the
+              // earlier shadow-card alone was too subtle).
               width: "510px",
               minHeight: "660px",
               padding: "58px",
@@ -1714,6 +1718,8 @@ function PreviewPane({
               fontSize: "10pt",
               lineHeight: 1.5,
               color: "#0f1729",
+              border: "1px solid #d4d8dd",
+              boxShadow: "0 4px 16px rgba(15, 23, 41, 0.08)",
             }}
           >
             <pre
