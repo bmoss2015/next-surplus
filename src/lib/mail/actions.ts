@@ -1205,7 +1205,20 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
 // drop <style> blocks. We do not include the signer signature image yet
 // (storage upload deferred to v1.1).
 function wrapBodyHtml(inner: string): string {
-  const safeInner = inner.replace(/\n/g, "<br/>");
+  // Convert paragraph breaks (double newlines) to <p> blocks and single
+  // newlines to <br/> so the textarea-typed body renders with the same
+  // whitespace the user typed. Handles both \n (Unix) and \r\n (Windows)
+  // line endings. If the input already has <p> or <br> tags (template
+  // HTML), we pass it through verbatim — the regex below only touches
+  // plain-text segments.
+  const norm = inner.replace(/\r\n/g, "\n");
+  const hasHtmlBlocks = /<(p|div|br)\b/i.test(norm);
+  const safeInner = hasHtmlBlocks
+    ? norm.replace(/\n/g, "<br/>")
+    : norm
+        .split(/\n{2,}/)
+        .map((para) => `<p>${para.replace(/\n/g, "<br/>")}</p>`)
+        .join("");
   return `<!doctype html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family: Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0.75in;">

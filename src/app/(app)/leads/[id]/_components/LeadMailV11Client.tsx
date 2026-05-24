@@ -501,11 +501,9 @@ function DetailPane({
               </Meta>
             )}
           {piece.status === "processing" || piece.status === "queued" ? (
-            <Meta icon={IconClock}>
-              At Lob, being printed. Expect mailed in 1 business day.
-            </Meta>
+            <Meta icon={IconClock}>Printing</Meta>
           ) : piece.status === "in_transit" ? (
-            <Meta icon={IconClock}>USPS · 2 to 4 business days</Meta>
+            <Meta icon={IconClock}>2 to 4 business days</Meta>
           ) : null}
         </div>
 
