@@ -159,6 +159,22 @@ export function SendMailModal({
   const [previewIdx, setPreviewIdx] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Refs for the form + preview error banners so we can scroll them
+  // into view when an error fires. Without scrollIntoView, the user
+  // can be scrolled to the bottom of the modal (e.g. at the Send
+  // Letter button) and never see a top-of-modal error. sticky top-0
+  // on both banners pins them once visible.
+  const formErrBannerRef = useRef<HTMLDivElement | null>(null);
+  const previewErrBannerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!err) return;
+    const target = showPreview
+      ? previewErrBannerRef.current
+      : formErrBannerRef.current;
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [err, showPreview]);
   const [pending, startTransition] = useTransition();
   const [bodyRef, setBodyRef] = useState<HTMLTextAreaElement | null>(null);
 
@@ -534,15 +550,19 @@ export function SendMailModal({
               Address in Settings before sending mail.
             </div>
           )}
-          {/* Top-of-modal error banner — anchored on Linear / Attio /
-              Pipedrive's pattern: red callout with alert icon at the
-              top of the form, NOT buried inline near the Send button.
-              Bree feedback: "this error is way too hidden". */}
+          {/* Top-of-modal error banner. STICKY-positioned so it stays
+              visible even when the user has scrolled the form to the
+              bottom (e.g. clicked Send Letter at the footer with the
+              recipients list scrolled past). Also auto-scrolls the
+              banner into view via the useEffect below. Anchored on
+              Linear / Mailchimp / Stripe pattern: error must be in
+              the user's viewport at the moment they need to see it. */}
           {err && (
             <div
+              ref={formErrBannerRef}
               role="alert"
-              className="flex items-start gap-2.5 rounded-md border-2 border-danger/40 bg-red-50 px-3.5 py-2.5"
-              style={{ boxShadow: "0 1px 3px rgba(180, 35, 24, 0.10)" }}
+              className="sticky top-0 z-20 flex items-start gap-2.5 rounded-md border-2 border-danger/40 bg-red-50 px-3.5 py-2.5"
+              style={{ boxShadow: "0 4px 12px rgba(180, 35, 24, 0.18)" }}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -1173,19 +1193,10 @@ function CheckSample({
           </div>
         </div>
 
-        {/* MICR-style stub at the bottom — visual placeholder for the
-            routing / account / check-number line. Real numbers are
-            pulled from the verified bank account at print time and
-            never exposed to the customer in the preview. */}
-        <div
-          aria-hidden
-          className="absolute bottom-1 left-4 right-4 flex items-center justify-between text-[9px] tabular-nums tracking-widest text-gray-400"
-          style={{ fontFamily: "Courier, monospace" }}
-        >
-          <span>•••••••••</span>
-          <span>••••••••••••</span>
-          <span>••••</span>
-        </div>
+        {/* MICR stub removed — the dotted placeholder overlapped the
+            memo/signature row and read as visual noise. Real routing
+            and account numbers are printed by the provider; the
+            preview doesn't need a placeholder visualization. */}
       </div>
       <div className="mt-1 text-[10px] text-gray-500">
         Routing and account numbers are pulled from your verified bank
@@ -1585,15 +1596,16 @@ function PreviewPane({
   }, [fileTemplate?.name, recipient?.key, templateId]);
   return (
     <div className="space-y-3">
-      {/* Prominent error banner at the TOP of the preview pane (same
-          style as the form view's banner). Bree feedback: error was
-          buried as tiny text near the Send button in the bottom-left
-          and easy to miss. */}
+      {/* Prominent STICKY error banner at the TOP of the preview pane
+          (same style as the form view's banner). Pins to the top of
+          the scroll container while the user scrolls through the
+          letter render, so the error is always visible regardless of
+          where they were when they clicked Send. */}
       {sendErr && (
         <div
           role="alert"
-          className="flex items-start gap-2.5 rounded-md border-2 border-danger/40 bg-red-50 px-3.5 py-2.5"
-          style={{ boxShadow: "0 1px 3px rgba(180, 35, 24, 0.10)" }}
+          className="sticky top-0 z-20 flex items-start gap-2.5 rounded-md border-2 border-danger/40 bg-red-50 px-3.5 py-2.5"
+          style={{ boxShadow: "0 4px 12px rgba(180, 35, 24, 0.18)" }}
         >
           <svg
             viewBox="0 0 24 24"
