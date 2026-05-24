@@ -403,7 +403,7 @@ export function MailingAddresses({
                       title={row.mailed ? "Mark Not Mailed" : "Mark Mailed"}
                     >
                       {row.mailed && <IconCheck size={11} stroke={2.5} />}
-                      {row.mailed && row.mail_count > 1 && row.mailed_at
+                      {row.mailed && (row.mail_count ?? 0) > 1 && row.mailed_at
                         ? `Mailed ${row.mail_count}x · last ${fmtMailedAt(row.mailed_at)}`
                         : row.mailed && row.mailed_at
                           ? `Mailed ${fmtMailedAt(row.mailed_at)}`

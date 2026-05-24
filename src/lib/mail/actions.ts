@@ -297,20 +297,37 @@ export async function previewMailJob(input: {
   if (!profile) return { ok: false, error: "Not signed in" };
   const sb = await createClient();
 
-  const { data: job } = await sb
+  // Try the select with rendered_pdf_path first (migration 0131
+  // applied). Fall back to the legacy select if the column isn't
+  // there yet — keeps the page working during the brief window
+  // between code deploy and migration apply.
+  let job:
+    | (Record<string, unknown> & { rendered_pdf_path?: string | null })
+    | null = null;
+  const withCache = await sb
     .from("mail_jobs")
     .select(
       "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html, rendered_pdf_path"
     )
     .eq("id", input.mail_job_id)
     .maybeSingle();
+  if (withCache.error) {
+    const fallback = await sb
+      .from("mail_jobs")
+      .select(
+        "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html"
+      )
+      .eq("id", input.mail_job_id)
+      .maybeSingle();
+    job = fallback.data;
+  } else {
+    job = withCache.data;
+  }
   if (!job) return { ok: false, error: "Mail job not found" };
 
   // Cache hit: rendered PDF already sits in storage from send time.
-  // Stream it back as base64 — instant compared to a fresh Gotenberg
-  // render. Cache is populated by sendMail right after a successful
-  // docx send. HTML-body sends don't cache (no render needed).
-  const cachedPath = (job.rendered_pdf_path as string | null) ?? null;
+  // Skipped when the column isn't there yet (migration 0131 pending).
+  const cachedPath = (job.rendered_pdf_path as string | null | undefined) ?? null;
   if (cachedPath) {
     const admin = createServiceClient();
     const dl = await admin.storage.from("mail-renders").download(cachedPath);
@@ -323,8 +340,6 @@ export async function previewMailJob(input: {
         recipient_name: (job.recipient_name as string | null) ?? "",
       };
     }
-    // Storage download failed — fall through to the live re-render
-    // path below so the preview still works, just slower.
   }
 
   // HTML-body path: we stored the merged HTML at send time. Just hand
@@ -1174,51 +1189,63 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
 
     // Cache the rendered PDF (docx path only) in Supabase storage so
     // View Letter / View Check open instantly without re-rendering
-    // through Gotenberg. Saves ~5s per repeat preview. The mail_jobs
-    // row already exists at this point so we can key by its id.
+    // through Gotenberg. Saves ~5s per repeat preview. Both the
+    // bucket and the rendered_pdf_path column come from migration
+    // 0131; this entire block is best-effort so the send still
+    // succeeds if migration hasn't been applied yet.
     if (renderedPdfBuffer) {
-      const admin = createServiceClient();
-      const storagePath = `${profile.orgId}/${mailJobId}.pdf`;
-      const up = await admin.storage
-        .from("mail-renders")
-        .upload(storagePath, renderedPdfBuffer, {
-          contentType: "application/pdf",
-          upsert: false,
-        });
-      if (!up.error) {
-        await admin
-          .from("mail_jobs")
-          .update({ rendered_pdf_path: storagePath })
-          .eq("id", mailJobId);
+      try {
+        const admin = createServiceClient();
+        const storagePath = `${profile.orgId}/${mailJobId}.pdf`;
+        const up = await admin.storage
+          .from("mail-renders")
+          .upload(storagePath, renderedPdfBuffer, {
+            contentType: "application/pdf",
+            upsert: false,
+          });
+        if (!up.error) {
+          await admin
+            .from("mail_jobs")
+            .update({ rendered_pdf_path: storagePath })
+            .eq("id", mailJobId);
+        }
+      } catch {
+        // Pre-migration: bucket or column missing. Preview falls
+        // back to live re-render on demand.
       }
-      // If the upload fails, the send already succeeded — preview
-      // falls back to re-rendering on demand. Don't surface the
-      // upload error to the caller.
     }
 
-    // Flip the contact's mailed flag + bump the mail count so the
-    // Mailing Addresses chip on the lead Overview tab reflects
-    // reality. Match on lead_id + channel + line1; for a single
-    // lead, line1 is unique enough to identify the address row.
+    // Flip the contact's mailed flag so the Mailing Addresses chip
+    // on the lead Overview tab reflects reality. Match on lead_id +
+    // channel + line1; for a single lead, line1 is unique enough to
+    // identify the address row. The two updates run separately so a
+    // missing mail_count column (pre-migration 0132) doesn't bring
+    // down the mailed/mailed_at flip.
     if (recipient.lead_id && recipient.line1) {
-      // Count includes the row we just inserted, so it's the post-
-      // send total. Match against the same recipient_address_line1
-      // field that's on the new mail_job.
-      const { count: priorCount } = await sb
-        .from("mail_jobs")
-        .select("id", { count: "exact", head: true })
-        .eq("lead_id", recipient.lead_id)
-        .eq("recipient_address_line1", recipient.line1);
-      await sb
+      const baseFilter = sb
         .from("contacts")
-        .update({
-          mailed: true,
-          mailed_at: new Date().toISOString(),
-          mail_count: priorCount ?? 1,
-        })
+        .update({ mailed: true, mailed_at: new Date().toISOString() })
         .eq("lead_id", recipient.lead_id)
         .eq("channel", "mailing_address")
         .ilike("value", `%${recipient.line1}%`);
+      await baseFilter;
+      // Best-effort count bump. Silently no-ops if the column hasn't
+      // been migrated yet.
+      try {
+        const { count: priorCount } = await sb
+          .from("mail_jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("lead_id", recipient.lead_id)
+          .eq("recipient_address_line1", recipient.line1);
+        await sb
+          .from("contacts")
+          .update({ mail_count: priorCount ?? 1 })
+          .eq("lead_id", recipient.lead_id)
+          .eq("channel", "mailing_address")
+          .ilike("value", `%${recipient.line1}%`);
+      } catch {
+        // mail_count column not yet present; the bump silently skipped.
+      }
     }
 
     // No bell notification at send time — the activity row is the
