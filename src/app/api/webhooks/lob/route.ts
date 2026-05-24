@@ -121,6 +121,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, noop: true });
   }
 
+  // Test-mode gate: when the Lob API key starts with "test_", Lob
+  // fires .mailed / .in_transit / .delivered events almost immediately
+  // after create. That's useful for end-to-end testing of terminal
+  // states, but it makes fresh sends LOOK already-mailed in the UI
+  // because the webhook fires before the user has even seen the
+  // Printing pill. Ignore the in-flight events in test mode so rows
+  // stay at "processing" until a real, time-accurate event arrives.
+  // Terminal events (delivered / returned / failed) still go through
+  // so we can validate those code paths.
+  const isTestMode = (process.env.LOB_API_KEY ?? "").startsWith("test_");
+  const isInflight =
+    mappedStatus === "in_transit" ||
+    eventType === "letter.mailed" ||
+    eventType === "check.mailed" ||
+    eventType === "letter.in_transit" ||
+    eventType === "check.in_transit" ||
+    eventType === "letter.in_local_area" ||
+    eventType === "check.in_local_area" ||
+    eventType === "letter.processed_for_delivery" ||
+    eventType === "check.processed_for_delivery" ||
+    eventType === "letter.re-routed" ||
+    eventType === "check.re-routed";
+  if (isTestMode && isInflight) {
+    return NextResponse.json({ ok: true, noop: true, reason: "test_mode_inflight_skipped" });
+  }
+
   const sb = createServiceClient();
   const { data: job } = await sb
     .from("mail_jobs")
