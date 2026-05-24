@@ -41,7 +41,10 @@ export function filtersAreActive(f: MailFilterState): boolean {
 type Option = { value: string; label: string };
 
 const STATUS_OPTIONS: Option[] = [
-  { value: "processing", label: "Processing" },
+  // Bucket value stays "processing" (URL param + matchesFilters key);
+  // the customer-visible label is "Printing" per the anchored
+  // convention (Lob dashboard / Postalytics / PostGrid).
+  { value: "processing", label: "Printing" },
   { value: "in_transit", label: "In Transit" },
   { value: "delivered", label: "Delivered" },
   { value: "returned", label: "Returned" },

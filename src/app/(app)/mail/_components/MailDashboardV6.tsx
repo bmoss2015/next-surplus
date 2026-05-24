@@ -257,11 +257,12 @@ export function MailDashboardV6({
       />
       <MailToolbar filters={filters} onChange={setFilters} />
 
-      {/* KPI strip — five operational counts now that Processing is
-          a first-class status. Processing pieces are at Lob being
-          printed; In Transit have a tracking_number and are with USPS. */}
+      {/* KPI strip — five operational counts. Printing pieces are at
+          Lob being printed; In Transit have a tracking_number and are
+          with USPS. Both use the underlying status='processing' value
+          in mail_jobs — "Printing" is the user-facing label. */}
       <div className="grid grid-cols-5 gap-4">
-        <Kpi label="Processing" value={displayStats.processing} />
+        <Kpi label="Printing" value={displayStats.processing} />
         <Kpi label="In Transit" value={displayStats.in_flight} />
         <Kpi label="Sent Today" value={sentToday} />
         <Kpi label="Delivered This Week" value={deliveredThisWeek} />
@@ -283,7 +284,7 @@ export function MailDashboardV6({
           empty state row. */}
       {(processingGrouped.length > 0 ||
         (!hasActiveFilters && processingRows.length > 0)) && (
-        <ListSection eyebrow="Processing" count={processingRows.length}>
+        <ListSection eyebrow="Printing" count={processingRows.length}>
           {processingGrouped.map((item) =>
             item.kind === "batch" ? (
               <BatchRow batch={item.pieces} batchId={item.batchId} key={item.batchId} />
@@ -470,7 +471,7 @@ function PieceRow({
       : section === "returned"
         ? "Returned"
         : section === "processing"
-          ? "Processing"
+          ? "Printing"
           : "In Transit";
 
   const href = piece.lead_id ? `/leads/${piece.lead_id}?tab=mail` : "#";

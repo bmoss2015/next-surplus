@@ -271,7 +271,7 @@ export function LeadMailV11Client({
         </div>
         <dl className="mt-5 grid grid-cols-5 gap-x-6 gap-y-2">
           <StatPair label="Total Sent" value={totalSent} />
-          <StatPair label="Processing" value={processingCount} />
+          <StatPair label="Printing" value={processingCount} />
           <StatPair label="In Transit" value={inTransitCount} />
           <StatPair label="Delivered" value={deliveredCount} />
           <StatPair
