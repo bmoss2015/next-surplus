@@ -478,31 +478,37 @@ export async function previewCheckJob(input: {
   try {
     // Provider's check URL is signed and short-lived; proxy through
     // the server so the browser never hits a provider-branded host.
-    const res = await fetch(checkUrl, { method: "GET" });
+    // Send the API key as a Bearer token in case the URL requires
+    // it (some providers gate even signed URLs behind auth).
+    const apiKey = process.env.LOB_API_KEY ?? "";
+    const headers: Record<string, string> = {};
+    if (apiKey) {
+      const encoded = Buffer.from(`${apiKey}:`).toString("base64");
+      headers.Authorization = `Basic ${encoded}`;
+    }
+    const res = await fetch(checkUrl, { method: "GET", headers });
     if (!res.ok) {
+      console.error(
+        "previewCheckJob fetch failed",
+        res.status,
+        await res.text().catch(() => "")
+      );
       return {
         ok: false,
         error: "Couldn't load the check preview right now. Try again.",
       };
     }
-    // Sanity-check the content type — if the URL is wrong (e.g. it
-    // points to a tracking HTML page instead of a check PDF), the
-    // fetch will succeed but return HTML. Surface a clear message
-    // rather than try to render HTML as PDF.
-    const ct = res.headers.get("content-type") ?? "";
-    if (!ct.includes("pdf")) {
-      return {
-        ok: false,
-        error: "Check preview isn't available for this piece.",
-      };
-    }
     const buf = Buffer.from(await res.arrayBuffer());
+    // Pass the bytes through regardless of content-type — the iframe
+    // on the client handles PDF, PNG, JPG. An over-strict content-
+    // type check was previously rejecting valid responses.
     return {
       ok: true,
       base64: buf.toString("base64"),
       recipient_name: (job.recipient_name as string | null) ?? "",
     };
-  } catch {
+  } catch (err) {
+    console.error("previewCheckJob threw", err);
     return {
       ok: false,
       error: "Couldn't load the check preview right now. Try again.",
