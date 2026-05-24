@@ -722,12 +722,10 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   if (!isFileTemplate && !body) {
     return { ok: false, error: "Body is required" };
   }
-  if (isFileTemplate && input.include_check) {
-    return {
-      ok: false,
-      error: "Word document templates cannot be combined with check sending yet",
-    };
-  }
+  // Docx + check is supported now that the docx → Gotenberg → PDF
+  // pipeline produces a clean PDF that Lob's /v1/checks endpoint
+  // accepts as the check_bottom (letter side of the check). Before
+  // the migration off Click2Mail this combination wasn't possible.
 
   if (input.include_check) {
     if (!input.bank_account_id) {
@@ -1010,8 +1008,8 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       //      ...attachments] into one PDF (LibreOffice converts docx
       //      and merges with the PDF attachments in a single round
       //      trip via `merge=true`).
-      //   3. The merged PDF is uploaded to Lob /v1/letters via
-      //      multipart, which prints + mails it.
+      //   3. The merged PDF is uploaded to Lob (either /v1/letters
+      //      OR /v1/checks if include_check) via multipart.
       const docxBuffer = await fillDocxTemplate(docxTemplate.buffer, ctx);
       if (!docxBuffer.ok) {
         send = { ok: false as const, error: docxBuffer.error };
@@ -1022,6 +1020,17 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         );
         if (!merged.ok) {
           send = { ok: false as const, error: merged.error };
+        } else if (input.include_check && lobBankAccountId) {
+          // Docx + check: same PDF goes as the check_bottom on
+          // Lob /v1/checks.
+          send = await sendCheck({
+            ...sendInput,
+            body_html: "",
+            file_pdf: merged.value,
+            amount_cents: input.check_amount_cents as number,
+            memo: input.check_memo ?? null,
+            bank_account_id: lobBankAccountId,
+          });
         } else {
           send = await sendLetter({
             ...sendInput,

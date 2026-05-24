@@ -215,42 +215,87 @@ export async function lobSendCheck(
   }
 
   try {
-    const body = {
-      bank_account: input.bank_account_id,
-      amount: (input.amount_cents / 100).toFixed(2),
-      memo: input.memo ?? "",
-      to: {
-        name: input.to.name,
-        address_line1: input.to.line1,
-        address_line2: input.to.line2 ?? "",
-        address_city: input.to.city,
-        address_state: input.to.state,
-        address_zip: input.to.postal_code,
-        address_country: input.to.country ?? "US",
-      },
-      from: {
-        name: input.from.name,
-        address_line1: input.from.line1,
-        address_line2: input.from.line2 ?? "",
-        address_city: input.from.city,
-        address_state: input.from.state,
-        address_zip: input.from.postal_code,
-        address_country: input.from.country ?? "US",
-      },
-      // The letter content is rendered above the check stub.
-      check_bottom: input.body_html,
-      mail_type: lobMailType(input.mail_class),
-      metadata: { correlation_id: input.correlation_id },
-    };
-    const res = await lobFetch(`${LOB_BASE_URL}/checks`, {
-      method: "POST",
-      headers: {
-        Authorization: authHeader(),
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    // Two send shapes, mirroring lobSendLetter:
+    //   * file_pdf set -> multipart/form-data with the PDF as the
+    //     `check_bottom` field. Used by the Word-template + check
+    //     path after Gotenberg renders the docx into a PDF.
+    //   * otherwise -> JSON body with HTML in `check_bottom`.
+    const hasPdf = !!input.file_pdf;
+    let res: Response;
+    if (hasPdf) {
+      const fd = new FormData();
+      fd.append("bank_account", input.bank_account_id);
+      fd.append("amount", (input.amount_cents / 100).toFixed(2));
+      fd.append("memo", input.memo ?? "");
+      fd.append("to[name]", input.to.name);
+      fd.append("to[address_line1]", input.to.line1);
+      fd.append("to[address_line2]", input.to.line2 ?? "");
+      fd.append("to[address_city]", input.to.city);
+      fd.append("to[address_state]", input.to.state);
+      fd.append("to[address_zip]", input.to.postal_code);
+      fd.append("to[address_country]", input.to.country ?? "US");
+      fd.append("from[name]", input.from.name);
+      fd.append("from[address_line1]", input.from.line1);
+      fd.append("from[address_line2]", input.from.line2 ?? "");
+      fd.append("from[address_city]", input.from.city);
+      fd.append("from[address_state]", input.from.state);
+      fd.append("from[address_zip]", input.from.postal_code);
+      fd.append("from[address_country]", input.from.country ?? "US");
+      fd.append(
+        "check_bottom",
+        new Blob([new Uint8Array(input.file_pdf!)], {
+          type: "application/pdf",
+        }),
+        "letter.pdf"
+      );
+      fd.append("mail_type", lobMailType(input.mail_class));
+      fd.append("metadata[correlation_id]", input.correlation_id);
+      res = await lobFetch(`${LOB_BASE_URL}/checks`, {
+        method: "POST",
+        headers: {
+          Authorization: authHeader(),
+          Accept: "application/json",
+        },
+        body: fd,
+      });
+    } else {
+      const body = {
+        bank_account: input.bank_account_id,
+        amount: (input.amount_cents / 100).toFixed(2),
+        memo: input.memo ?? "",
+        to: {
+          name: input.to.name,
+          address_line1: input.to.line1,
+          address_line2: input.to.line2 ?? "",
+          address_city: input.to.city,
+          address_state: input.to.state,
+          address_zip: input.to.postal_code,
+          address_country: input.to.country ?? "US",
+        },
+        from: {
+          name: input.from.name,
+          address_line1: input.from.line1,
+          address_line2: input.from.line2 ?? "",
+          address_city: input.from.city,
+          address_state: input.from.state,
+          address_zip: input.from.postal_code,
+          address_country: input.from.country ?? "US",
+        },
+        // The letter content is rendered above the check stub.
+        check_bottom: input.body_html,
+        mail_type: lobMailType(input.mail_class),
+        metadata: { correlation_id: input.correlation_id },
+      };
+      res = await lobFetch(`${LOB_BASE_URL}/checks`, {
+        method: "POST",
+        headers: {
+          Authorization: authHeader(),
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    }
     if (!res.ok) {
       const raw = await res.text();
       console.error("Lob check create failed", res.status, raw);

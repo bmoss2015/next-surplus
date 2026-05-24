@@ -1582,6 +1582,42 @@ function PreviewPane({
   }, [fileTemplate?.name, recipient?.key, templateId]);
   return (
     <div className="space-y-3">
+      {/* Prominent error banner at the TOP of the preview pane (same
+          style as the form view's banner). Bree feedback: error was
+          buried as tiny text near the Send button in the bottom-left
+          and easy to miss. */}
+      {sendErr && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border-2 border-danger/40 bg-red-50 px-3.5 py-2.5"
+          style={{ boxShadow: "0 1px 3px rgba(180, 35, 24, 0.10)" }}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.25"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0 text-danger"
+            style={{ marginTop: 1 }}
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="13" />
+            <circle cx="12" cy="16.5" r="0.8" fill="currentColor" />
+          </svg>
+          <div className="flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-danger">
+              Can&apos;t send yet
+            </div>
+            <div className="mt-0.5 text-[12.5px] font-medium text-danger">
+              {sendErr}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -1760,12 +1796,9 @@ function PreviewPane({
         )}
       </div>
 
-      {/* Send footer — anchored at the bottom of the preview so the
-          user reviews then commits without leaving this screen. */}
-      <div className="sticky bottom-0 -mx-1 flex items-center justify-between gap-3 border-t border-gray-200 bg-white px-1 pt-3">
-        <div className="text-[11.5px]" style={{ color: "var(--danger)" }}>
-          {sendErr ?? ""}
-        </div>
+      {/* Send footer — error is rendered at the TOP of the pane (banner
+          above) so it can't be missed. Footer is just the action. */}
+      <div className="sticky bottom-0 -mx-1 flex items-center justify-end gap-3 border-t border-gray-200 bg-white px-1 pt-3">
         <button
           type="button"
           onClick={onSend}
