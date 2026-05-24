@@ -22,19 +22,50 @@ type LobEvent = {
   };
 };
 
+// Maps every Lob letter / check event we care about to one of our
+// MailStatus buckets. Lob's pipeline goes:
+//   created -> rendered_pdf -> printing -> mailed -> in_transit ->
+//   in_local_area -> processed_for_delivery -> delivered
+// (with returned_to_sender or re-routed as alt branches).
+//
+// We map:
+//   * created / rendered_pdf / printing -> stay at "queued" (no
+//     status change, but webhook still updates tracking_number when
+//     one is attached). The dashboard labels queued pieces "Processing"
+//     until tracking_number lands.
+//   * mailed -> "in_transit" (USPS now has the piece; this is the
+//     point where Lob attaches a USPS tracking_number).
+//   * in_transit / in_local_area / processed_for_delivery / re-routed
+//     -> "in_transit" (in-flight states).
+//   * delivered -> "delivered".
+//   * returned_to_sender -> "returned".
+//   * failed -> "failed" (print or render failure).
+const QUEUED_EVENTS = new Set([
+  "letter.created",
+  "letter.rendered_pdf",
+  "letter.printing",
+  "check.created",
+  "check.rendered_pdf",
+  "check.printing",
+]);
+
 const STATUS_BY_EVENT: Record<string, "in_transit" | "delivered" | "returned" | "failed"> = {
+  "letter.mailed": "in_transit",
   "letter.in_transit": "in_transit",
   "letter.in_local_area": "in_transit",
   "letter.processed_for_delivery": "in_transit",
   "letter.delivered": "delivered",
   "letter.re-routed": "in_transit",
   "letter.returned_to_sender": "returned",
+  "letter.failed": "failed",
+  "check.mailed": "in_transit",
   "check.in_transit": "in_transit",
   "check.in_local_area": "in_transit",
   "check.processed_for_delivery": "in_transit",
   "check.delivered": "delivered",
   "check.re-routed": "in_transit",
   "check.returned_to_sender": "returned",
+  "check.failed": "failed",
 };
 
 function verifySignature(rawBody: string, signature: string | null): boolean {
@@ -83,9 +114,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Letter / check status changes update mail_jobs.
-  const mappedStatus = STATUS_BY_EVENT[eventType] ?? null;
   const providerId = event.body?.id;
-  if (!mappedStatus || !providerId) {
+  const isQueuedEvent = QUEUED_EVENTS.has(eventType);
+  const mappedStatus = STATUS_BY_EVENT[eventType] ?? null;
+  if ((!mappedStatus && !isQueuedEvent) || !providerId) {
     return NextResponse.json({ ok: true, noop: true });
   }
 
@@ -103,12 +135,17 @@ export async function POST(req: NextRequest) {
   }
 
   const update: Record<string, unknown> = {};
-  if (mappedStatus !== job.status) {
+  if (mappedStatus && mappedStatus !== job.status) {
     update.status = mappedStatus;
     if (mappedStatus === "delivered") update.delivered_at = new Date().toISOString();
     if (mappedStatus === "returned") update.returned_at = new Date().toISOString();
   }
   if (event.body?.tracking_number) {
+    // The presence of a tracking_number is what flips the dashboard
+    // pill from "Processing" to "In Transit" for queued rows. Lob
+    // typically attaches it on the .mailed event but some plans
+    // attach earlier on .printing / .rendered_pdf — write whenever
+    // we see it.
     update.tracking_number = event.body.tracking_number;
   }
   if (Object.keys(update).length === 0) {

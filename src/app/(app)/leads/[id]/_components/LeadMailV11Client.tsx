@@ -9,10 +9,11 @@ import {
   IconCircleCheck,
   IconArrowBackUp,
   IconBarcode,
-  IconX,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { displayRecipientName } from "@/components/mail/displayName";
+import { LetterPreviewModal } from "@/components/mail/LetterPreviewModal";
+import { CheckPreviewModal } from "@/components/mail/CheckPreviewModal";
 import type { MailJobListRow, MailJobDetailRow } from "@/lib/mail/fetch";
 import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
 import {
@@ -138,6 +139,7 @@ export function LeadMailV11Client({
   );
   const [detail, setDetail] = useState<MailJobDetailRow | null>(null);
   const [letterModalOpen, setLetterModalOpen] = useState(false);
+  const [checkModalOpen, setCheckModalOpen] = useState(false);
 
   // Send Mail modal state. resendingFor carries the failed piece when
   // opened via Fix & Resend; null when the user clicks the header
@@ -294,21 +296,43 @@ export function LeadMailV11Client({
               piece={selected}
               detail={detail}
               onOpenLetter={() => setLetterModalOpen(true)}
+              onOpenCheck={() => setCheckModalOpen(true)}
               onFixAndResend={() => openResend(selected)}
             />
           )}
         </div>
       )}
 
-      {/* Letter preview modal — opens when user clicks the thumbnail
-          or the View Letter button. */}
-      {letterModalOpen && selected && (
-        <LetterModal
-          recipient={displayRecipientName(selected.recipient_name)}
-          bodyHtml={detail?.body_html ?? null}
-          onClose={() => setLetterModalOpen(false)}
-        />
-      )}
+      {/* Letter preview modal — calls previewMailJob on the server so
+          docx-template sends (no stored body_html) render correctly via
+          Gotenberg fallback. */}
+      <LetterPreviewModal
+        data={
+          letterModalOpen && selected
+            ? {
+                jobId: selected.id,
+                recipientName: displayRecipientName(selected.recipient_name),
+                bodyHtml: detail?.body_html ?? null,
+                trackingUrl: selected.tracking_url ?? null,
+              }
+            : null
+        }
+        onClose={() => setLetterModalOpen(false)}
+      />
+
+      {/* Check preview modal — fetches the rendered check PDF from Lob
+          on demand. Only shown for pieces sent with include_check=true. */}
+      <CheckPreviewModal
+        data={
+          checkModalOpen && selected && selected.include_check
+            ? {
+                jobId: selected.id,
+                recipientName: displayRecipientName(selected.recipient_name),
+              }
+            : null
+        }
+        onClose={() => setCheckModalOpen(false)}
+      />
 
       {/* Send Mail modal — handles both regular compose and Fix &
           Resend. Re-mounts with a fresh key when resendingFor changes
@@ -365,11 +389,13 @@ function DetailPane({
   piece,
   detail,
   onOpenLetter,
+  onOpenCheck,
   onFixAndResend,
 }: {
   piece: MailJobListRow | MailJobDetailRow;
   detail: MailJobDetailRow | null;
   onOpenLetter: () => void;
+  onOpenCheck: () => void;
   onFixAndResend: () => void;
 }) {
   const bodyHtml = detail?.body_html ?? null;
@@ -472,6 +498,15 @@ function DetailPane({
           >
             View Letter
           </button>
+          {piece.include_check && (
+            <button
+              type="button"
+              onClick={onOpenCheck}
+              className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md border border-petrol-500/25 bg-white px-3 text-petrol-700 hover:bg-petrol-50"
+            >
+              View Check
+            </button>
+          )}
           {trackingUrl ? (
             <a
               href={trackingUrl}
@@ -541,63 +576,3 @@ function Meta({
   );
 }
 
-function LetterModal({
-  recipient,
-  bodyHtml,
-  onClose,
-}: {
-  recipient: string;
-  bodyHtml: string | null;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-      <div className="absolute inset-0" aria-hidden onClick={onClose} />
-      <div className="relative z-10 flex max-h-[90vh] flex-col items-center gap-3">
-        <header className="flex w-[560px] max-w-[90vw] items-center justify-between rounded-lg border border-gray-200 bg-surface px-4 py-2.5 shadow-card">
-          <div className="min-w-0">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
-              Letter Sent To
-            </div>
-            <div className="truncate text-[13px] font-medium text-ink">
-              {recipient}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="cursor-pointer rounded-md p-1 text-gray-500 hover:bg-gray-100"
-            aria-label="Close"
-          >
-            <IconX size={15} stroke={1.75} />
-          </button>
-        </header>
-        <div
-          className="overflow-hidden rounded-sm border border-gray-300 bg-white shadow-xl"
-          style={{ width: "560px", maxWidth: "90vw", aspectRatio: "8.5 / 11" }}
-        >
-          {bodyHtml ? (
-            <iframe
-              title="Letter preview"
-              sandbox=""
-              srcDoc={bodyHtml}
-              className="h-full w-full"
-            />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center px-8 text-center text-[12.5px] text-gray-500">
-              Letter content not stored for this piece.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -397,8 +397,13 @@ export function SendMailModal({
     startTransition(async () => {
       const res = await sendMail(payload);
       if (res.ok) {
-        router.refresh();
+        // Close FIRST so the modal disappears the instant the send
+        // succeeds (matches Mailchimp / Lob dashboard / Postalytics
+        // pattern). The refresh runs in the background while the
+        // underlying lead page picks up the new mail_job row on its
+        // next render — no visible mid-send button label flip.
         onClose();
+        router.refresh();
       } else {
         setErr(res.error);
         // Rotate the idempotency key so a retry after fixing the error

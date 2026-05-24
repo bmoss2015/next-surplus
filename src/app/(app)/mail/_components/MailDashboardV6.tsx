@@ -384,24 +384,34 @@ function PieceRow({
   section: Section;
   isBatchChild?: boolean;
 }) {
-  // Three distinct pill styles, anchored on the Settings Members role-tab
-  // family: ink (solid black-filled) for In Transit since it's the
-  // neutral/default state; outlined petrol for Delivered; outlined red
-  // for Returned. The black option is used because In Transit doesn't
-  // share a color with any action button, so no informational vs
-  // clickable conflict.
+  // Fresh sends sit in status="queued" (the in_transit bucket) until
+  // Lob's first delivery-status event fires. During that window the
+  // piece is at the print plant, not in the mail stream — we label
+  // it "Processing" to match Lob's own dashboard ("Processed" /
+  // "Printing") and USPS's "Pre-Shipment". Once tracking_number is
+  // populated by the webhook, label flips to "In Transit".
+  const isProcessing =
+    section === "in_transit" && !piece.tracking_number;
+  // Four pill styles. Ink (solid black) for In Transit (default state,
+  // no action-button hue conflict). Outlined neutral for Processing
+  // (softer than In Transit since it's a pre-flight state). Outlined
+  // petrol for Delivered. Outlined red for Returned.
   const pillClass =
     section === "delivered"
       ? "border-petrol-500/40 bg-white text-petrol-700"
       : section === "returned"
         ? "border-danger/40 bg-white text-danger"
-        : "border-ink bg-ink text-white";
+        : isProcessing
+          ? "border-gray-300 bg-white text-gray-600"
+          : "border-ink bg-ink text-white";
   const pillLabel =
     section === "delivered"
       ? "Delivered"
       : section === "returned"
         ? "Returned"
-        : "In Transit";
+        : isProcessing
+          ? "Processing"
+          : "In Transit";
 
   const href = piece.lead_id ? `/leads/${piece.lead_id}?tab=mail` : "#";
 
@@ -409,7 +419,13 @@ function PieceRow({
     <Link
       href={href}
       className={cn(
-        "group relative grid grid-cols-[1fr_auto_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50",
+        // 3-track grid: recipient content (flex), FIXED 140px pill
+        // column, auto actions. The fixed middle track is the only
+        // way to anchor the pill at a consistent x-position across
+        // rows (auto columns collapse flush against each other, so
+        // adjacent auto tracks always ended up jammed right).
+        // Pattern matches Attio / Linear / Pipedrive data tables.
+        "group relative grid grid-cols-[1fr_140px_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50",
         // Batch-child rows: subtle gray background + a 3px dark brand
         // bar on the left edge. Absolute-positioned so it doesn't shift
         // the content grid.
@@ -484,10 +500,10 @@ function PieceRow({
         </div>
       </div>
 
-      {/* Middle column — status pill in its own column, tight against
-          actions (auto-sized). Top-aligned with a small nudge so it
-          sits on the name's baseline. */}
-      <div className="flex shrink-0 items-start pt-[2px]">
+      {/* Middle column — status pill anchored to the START of its
+          fixed 140px track. Same x-position on every row regardless
+          of recipient name length or pill text width. */}
+      <div className="flex items-start justify-start pt-[2px]">
         <span
           className={cn(
             "inline-flex items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] whitespace-nowrap",
@@ -571,7 +587,7 @@ function BatchRow({
   return (
     <details className="group">
       <summary
-        className="grid cursor-pointer list-none grid-cols-[1fr_auto_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50"
+        className="grid cursor-pointer list-none grid-cols-[1fr_140px_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50"
       >
         <div className="min-w-0">
           {/* Batch header: name only, no status pill (pills live on the

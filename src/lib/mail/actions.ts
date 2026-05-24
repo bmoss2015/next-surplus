@@ -385,6 +385,72 @@ export async function previewMailJob(input: {
     | { ok: true; kind: "pdf"; base64: string; recipient_name: string };
 }
 
+// Fetches the rendered check PDF for a mail_job from Lob and returns
+// it as base64 so the client can display it in an iframe without
+// exposing the Lob URL or our API key. Only valid for mail_jobs where
+// include_check=true and provider="lob" — older click2mail rows or
+// non-check pieces return an error.
+export async function previewCheckJob(input: {
+  mail_job_id: string;
+}): Promise<
+  | { ok: true; base64: string; recipient_name: string }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+  const { data: job } = await sb
+    .from("mail_jobs")
+    .select(
+      "id, provider, provider_id, include_check, tracking_url, recipient_name"
+    )
+    .eq("id", input.mail_job_id)
+    .maybeSingle();
+  if (!job) return { ok: false, error: "Mail job not found" };
+  if (!job.include_check) {
+    return { ok: false, error: "This piece doesn't have a check attached" };
+  }
+  if (job.provider !== "lob") {
+    return {
+      ok: false,
+      error: "Check preview only available for Lob-sent pieces",
+    };
+  }
+  const checkUrl = (job.tracking_url as string | null) ?? null;
+  if (!checkUrl) {
+    return {
+      ok: false,
+      error: "Check PDF URL isn't available yet, try again in a minute",
+    };
+  }
+  try {
+    // Lob's check `url` is a signed URL that doesn't require the API
+    // key, but proxy through the server so the customer never sees
+    // a Lob-branded URL directly.
+    const res = await fetch(checkUrl, { method: "GET" });
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `Could not fetch check PDF (${res.status})`,
+      };
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    return {
+      ok: true,
+      base64: buf.toString("base64"),
+      recipient_name: (job.recipient_name as string | null) ?? "",
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? `Check PDF fetch failed: ${err.message}`
+          : "Check PDF fetch failed",
+    };
+  }
+}
+
 // Renders HTML through Gotenberg's Chromium engine and counts pages.
 // Used to detect the > 6-sheet USPS surcharge for HTML-body letters
 // (without this, the cost would silently miss multi-page sends and
