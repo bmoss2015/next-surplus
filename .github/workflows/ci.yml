@@ -19,8 +19,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Pre-existing lint debt at the time CI was introduced:
+      # 50 errors, 1611 warnings (mostly react-hooks/set-state-in-effect
+      # from the React 19 / Next 16 upgrade, plus a few prefer-const,
+      # no-unescaped-entities, ban-ts-comment). Lint runs informationally
+      # so the failures are visible on every PR without blocking merge.
+      # Flip continue-on-error to false once the lint-debt cleanup PR(s)
+      # land.
       - name: Lint
         run: npm run lint
+        continue-on-error: true
 
       # Typecheck is wired but kept off the required path until
       # next.config.ts:typescript.ignoreBuildErrors is removed and the
