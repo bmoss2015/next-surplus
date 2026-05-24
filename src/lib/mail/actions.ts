@@ -300,11 +300,32 @@ export async function previewMailJob(input: {
   const { data: job } = await sb
     .from("mail_jobs")
     .select(
-      "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html"
+      "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html, rendered_pdf_path"
     )
     .eq("id", input.mail_job_id)
     .maybeSingle();
   if (!job) return { ok: false, error: "Mail job not found" };
+
+  // Cache hit: rendered PDF already sits in storage from send time.
+  // Stream it back as base64 — instant compared to a fresh Gotenberg
+  // render. Cache is populated by sendMail right after a successful
+  // docx send. HTML-body sends don't cache (no render needed).
+  const cachedPath = (job.rendered_pdf_path as string | null) ?? null;
+  if (cachedPath) {
+    const admin = createServiceClient();
+    const dl = await admin.storage.from("mail-renders").download(cachedPath);
+    if (!dl.error && dl.data) {
+      const buf = Buffer.from(await dl.data.arrayBuffer());
+      return {
+        ok: true,
+        kind: "pdf",
+        base64: buf.toString("base64"),
+        recipient_name: (job.recipient_name as string | null) ?? "",
+      };
+    }
+    // Storage download failed — fall through to the live re-render
+    // path below so the preview still works, just slower.
+  }
 
   // HTML-body path: we stored the merged HTML at send time. Just hand
   // it back. The modal renders it in a sandboxed iframe.
@@ -318,7 +339,7 @@ export async function previewMailJob(input: {
     };
   }
 
-  // Word-template path: no stored HTML. Re-render through the same
+  // Word-template path with no cached PDF: re-render through the same
   // docxtemplater + Gotenberg/mammoth pipeline previewMailMergeDocx
   // uses. Reconstruct the merge context as best we can.
   const templateId = job.template_id as string | null;
@@ -1000,6 +1021,10 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     };
 
     let send;
+    // PDF buffer captured here when the docx path runs, so we can
+    // cache the rendered file in storage AFTER the mail_jobs row
+    // exists (we need the row id to key the storage path).
+    let renderedPdfBuffer: Buffer | null = null;
     if (isFileTemplate && docxTemplate) {
       // File-template path:
       //   1. docxtemplater fills the Word doc with this recipient's
@@ -1010,6 +1035,8 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       //      trip via `merge=true`).
       //   3. The merged PDF is uploaded to Lob (either /v1/letters
       //      OR /v1/checks if include_check) via multipart.
+      //   4. The same PDF is cached in Supabase storage so View
+      //      Letter / View Check open instantly without re-rendering.
       const docxBuffer = await fillDocxTemplate(docxTemplate.buffer, ctx);
       if (!docxBuffer.ok) {
         send = { ok: false as const, error: docxBuffer.error };
@@ -1020,26 +1047,29 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         );
         if (!merged.ok) {
           send = { ok: false as const, error: merged.error };
-        } else if (input.include_check && lobBankAccountId) {
-          // Docx + check: same PDF goes as the check_bottom on
-          // Lob /v1/checks.
-          send = await sendCheck({
-            ...sendInput,
-            body_html: "",
-            file_pdf: merged.value,
-            amount_cents: input.check_amount_cents as number,
-            memo: input.check_memo ?? null,
-            bank_account_id: lobBankAccountId,
-          });
         } else {
-          send = await sendLetter({
-            ...sendInput,
-            // Provider receives the rendered PDF; HTML body is ignored
-            // when file_pdf is set. Keep body_html as empty so we don't
-            // pay the cost of wrapping merged tokens we won't use.
-            body_html: "",
-            file_pdf: merged.value,
-          });
+          renderedPdfBuffer = merged.value;
+          if (input.include_check && lobBankAccountId) {
+            // Docx + check: same PDF goes as the check_bottom on
+            // Lob /v1/checks.
+            send = await sendCheck({
+              ...sendInput,
+              body_html: "",
+              file_pdf: merged.value,
+              amount_cents: input.check_amount_cents as number,
+              memo: input.check_memo ?? null,
+              bank_account_id: lobBankAccountId,
+            });
+          } else {
+            send = await sendLetter({
+              ...sendInput,
+              // Provider receives the rendered PDF; HTML body is ignored
+              // when file_pdf is set. Keep body_html as empty so we don't
+              // pay the cost of wrapping merged tokens we won't use.
+              body_html: "",
+              file_pdf: merged.value,
+            });
+          }
         }
       }
     } else if (input.include_check && lobBankAccountId) {
@@ -1140,16 +1170,52 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       };
     }
     jobIds.push(inserted.id as string);
+    const mailJobId = inserted.id as string;
 
-    // Flip the contact's mailed flag so the Mailing Addresses chip on
-    // the lead Overview tab reflects reality (used to require a manual
-    // toggle). Match on lead_id + channel + line1; for a single lead,
-    // line1 is unique enough to identify the address row. ilike is
-    // case-insensitive so "123 main st" vs "123 Main St" both match.
+    // Cache the rendered PDF (docx path only) in Supabase storage so
+    // View Letter / View Check open instantly without re-rendering
+    // through Gotenberg. Saves ~5s per repeat preview. The mail_jobs
+    // row already exists at this point so we can key by its id.
+    if (renderedPdfBuffer) {
+      const admin = createServiceClient();
+      const storagePath = `${profile.orgId}/${mailJobId}.pdf`;
+      const up = await admin.storage
+        .from("mail-renders")
+        .upload(storagePath, renderedPdfBuffer, {
+          contentType: "application/pdf",
+          upsert: false,
+        });
+      if (!up.error) {
+        await admin
+          .from("mail_jobs")
+          .update({ rendered_pdf_path: storagePath })
+          .eq("id", mailJobId);
+      }
+      // If the upload fails, the send already succeeded — preview
+      // falls back to re-rendering on demand. Don't surface the
+      // upload error to the caller.
+    }
+
+    // Flip the contact's mailed flag + bump the mail count so the
+    // Mailing Addresses chip on the lead Overview tab reflects
+    // reality. Match on lead_id + channel + line1; for a single
+    // lead, line1 is unique enough to identify the address row.
     if (recipient.lead_id && recipient.line1) {
+      // Count includes the row we just inserted, so it's the post-
+      // send total. Match against the same recipient_address_line1
+      // field that's on the new mail_job.
+      const { count: priorCount } = await sb
+        .from("mail_jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("lead_id", recipient.lead_id)
+        .eq("recipient_address_line1", recipient.line1);
       await sb
         .from("contacts")
-        .update({ mailed: true, mailed_at: new Date().toISOString() })
+        .update({
+          mailed: true,
+          mailed_at: new Date().toISOString(),
+          mail_count: priorCount ?? 1,
+        })
         .eq("lead_id", recipient.lead_id)
         .eq("channel", "mailing_address")
         .ilike("value", `%${recipient.line1}%`);
