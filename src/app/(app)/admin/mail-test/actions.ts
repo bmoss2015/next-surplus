@@ -636,7 +636,7 @@ export async function seedSampleMailData(): Promise<
     city: string;
     state: string;
     zip: string;
-    status: "in_transit" | "delivered" | "returned" | "queued";
+    status: "processing" | "in_transit" | "delivered" | "returned" | "queued";
     sent_days_ago: number;
     delivered_days_ago?: number;
     returned_days_ago?: number;
@@ -700,15 +700,18 @@ export async function seedSampleMailData(): Promise<
       lead_idx: 2,
     },
     {
+      // Sent 1 day ago — realistic lifecycle puts this still at the
+      // print plant (processing), since Lob typically takes ~24h to
+      // hand off to USPS. No tracking_number yet (that lands on the
+      // .mailed webhook event when the piece actually leaves).
       name: `Linda Foster (batch)`,
       line1: "5511 Westbrook Way",
       city: "Fort Worth",
       state: "TX",
       zip: "76107",
-      status: "in_transit",
+      status: "processing",
       sent_days_ago: 1,
       mail_class: "first_class",
-      tracking_number: "9400111899223344556742",
       batch_with: "robert-batch",
       lead_idx: 3,
     },
@@ -718,10 +721,9 @@ export async function seedSampleMailData(): Promise<
       city: "Fort Worth",
       state: "TX",
       zip: "76107",
-      status: "in_transit",
+      status: "processing",
       sent_days_ago: 1,
       mail_class: "first_class",
-      tracking_number: "9400111899223344556759",
       batch_with: "robert-batch",
       lead_idx: 3,
     },

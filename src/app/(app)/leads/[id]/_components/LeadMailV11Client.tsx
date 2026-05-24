@@ -251,9 +251,6 @@ export function LeadMailV11Client({
         >
           <IconCircleCheck size={18} stroke={2} className="text-petrol-600" />
           <span className="font-semibold">{sentBanner.msg}</span>
-          <span className="text-petrol-500/80">
-            · Will print today and mail tomorrow
-          </span>
           <button
             type="button"
             onClick={() => setSentBanner(null)}

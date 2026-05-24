@@ -1,7 +1,18 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
-export type MailStatus = "queued" | "in_transit" | "delivered" | "returned" | "failed";
+// Mirror of MailStatus in types.ts — has to live here too because
+// fetch.ts is "server-only" while types.ts is imported by client
+// components, and TypeScript widens the type if the two definitions
+// diverge. Keep both in sync; adding a new status means editing both
+// files.
+export type MailStatus =
+  | "processing"
+  | "queued"
+  | "in_transit"
+  | "delivered"
+  | "returned"
+  | "failed";
 
 export type MailJobListRow = {
   id: string;
