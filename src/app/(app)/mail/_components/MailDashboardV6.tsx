@@ -7,7 +7,7 @@ import {
   IconMail,
   IconChevronDown,
   IconCalendarTime,
-  IconChecks,
+  IconCheck,
   IconArrowBack,
   IconCash,
   IconMailbox,
@@ -33,7 +33,7 @@ import {
 // when it's actually filter-state). With no filters, empty groups show
 // the friendly empty row so the page never looks broken.
 
-type Section = "in_transit" | "delivered" | "returned";
+type Section = "processing" | "in_transit" | "delivered" | "returned";
 
 type BatchOrPiece =
   | { kind: "piece"; piece: MailJobListRow }
@@ -90,15 +90,18 @@ function matchesFilters(
   f: MailFilterState,
   qNorm: string
 ): boolean {
-  // Status — UI groups status into 3 buckets (in_transit, delivered,
-  // returned). Map row statuses to those buckets for the match.
+  // Status — four UI buckets (processing, in_transit, delivered,
+  // returned). 'queued' is the legacy pre-migration status that maps
+  // to 'processing'; 'failed' rolls into 'returned' (terminal bad).
   if (f.status.length > 0) {
     const bucket =
-      r.status === "queued" || r.status === "in_transit"
-        ? "in_transit"
-        : r.status === "delivered"
-          ? "delivered"
-          : "returned";
+      r.status === "processing" || r.status === "queued"
+        ? "processing"
+        : r.status === "in_transit"
+          ? "in_transit"
+          : r.status === "delivered"
+            ? "delivered"
+            : "returned";
     if (!f.status.includes(bucket)) return false;
   }
   if (f.mailClass.length > 0 && !f.mailClass.includes(r.mail_class)) {
@@ -181,35 +184,44 @@ export function MailDashboardV6({
     [filteredRows]
   );
 
-  const inTransitRows = filteredRows.filter(
-    (r) => r.status === "queued" || r.status === "in_transit"
+  // Status buckets. 'queued' is legacy (pre-migration 0130) and rolls
+  // into 'processing'. 'failed' rolls into 'returned' for display.
+  const processingRows = filteredRows.filter(
+    (r) => r.status === "processing" || r.status === "queued"
   );
+  const inTransitRows = filteredRows.filter((r) => r.status === "in_transit");
   const deliveredRows = filteredRows.filter((r) => r.status === "delivered");
   const returnedRows = filteredRows.filter(
     (r) => r.status === "returned" || r.status === "failed"
   );
 
+  const processingGrouped = groupByBatch(processingRows);
   const inTransitGrouped = groupByBatch(inTransitRows);
 
   // Stats source — when filters are active, recompute from filtered
   // rows so KPIs reflect what's visible. With no filters, use the
   // server-side stats (which are accurate even past the 200-row fetch
-  // cap).
+  // cap). Processing + In Transit are reported separately; the
+  // "in_flight" stat from the server covers both (pre-delivered).
   const displayStats = hasActiveFilters
     ? {
+        processing: processingRows.length,
         in_flight: inTransitRows.length,
         delivered: deliveredRows.length,
         returned: returnedRows.length,
         spent_cents: 0,
       }
-    : stats;
+    : { ...stats, processing: processingRows.length };
 
   return (
     <div>
       <MailToolbar filters={filters} onChange={setFilters} />
 
-      {/* KPI strip — no subtext, four operational counts */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* KPI strip — five operational counts now that Processing is
+          a first-class status. Processing pieces are at Lob being
+          printed; In Transit have a tracking_number and are with USPS. */}
+      <div className="grid grid-cols-5 gap-4">
+        <Kpi label="Processing" value={displayStats.processing} />
         <Kpi label="In Transit" value={displayStats.in_flight} />
         <Kpi label="Sent Today" value={sentToday} />
         <Kpi label="Delivered This Week" value={deliveredThisWeek} />
@@ -224,10 +236,24 @@ export function MailDashboardV6({
           surfaces in-transit / delivered / returned counts. The bar
           added visual noise without decision-relevant signal. */}
 
-      {/* Three status sections. With filters active, empty sections hide
-          (so the page doesn't claim "no deliveries" when it really means
-          "none match"). With no filters, empty sections show the empty
-          state row. */}
+      {/* Four status sections (Processing, In Transit, Delivered,
+          Returned). With filters active, empty sections hide so the
+          page doesn't claim "no deliveries" when it really means
+          "none match". With no filters, empty sections show the
+          empty state row. */}
+      {(processingGrouped.length > 0 ||
+        (!hasActiveFilters && processingRows.length > 0)) && (
+        <ListSection eyebrow="Processing" count={processingRows.length}>
+          {processingGrouped.map((item) =>
+            item.kind === "batch" ? (
+              <BatchRow batch={item.pieces} batchId={item.batchId} key={item.batchId} />
+            ) : (
+              <PieceRow piece={item.piece} section="processing" key={item.piece.id} />
+            )
+          )}
+        </ListSection>
+      )}
+
       {(inTransitGrouped.length > 0 || !hasActiveFilters) && (
         <ListSection eyebrow="In Transit" count={inTransitRows.length}>
           {inTransitGrouped.length === 0 ? (
@@ -384,24 +410,16 @@ function PieceRow({
   section: Section;
   isBatchChild?: boolean;
 }) {
-  // Fresh sends sit in status="queued" (the in_transit bucket) until
-  // Lob's first delivery-status event fires. During that window the
-  // piece is at the print plant, not in the mail stream — we label
-  // it "Processing" to match Lob's own dashboard ("Processed" /
-  // "Printing") and USPS's "Pre-Shipment". Once tracking_number is
-  // populated by the webhook, label flips to "In Transit".
-  const isProcessing =
-    section === "in_transit" && !piece.tracking_number;
-  // Four pill styles. Ink (solid black) for In Transit (default state,
-  // no action-button hue conflict). Outlined neutral for Processing
-  // (softer than In Transit since it's a pre-flight state). Outlined
-  // petrol for Delivered. Outlined red for Returned.
+  // Section is sourced from the real mail_jobs.status (post-migration
+  // 0130). Four pill styles: solid ink for In Transit (default with
+  // USPS), neutral gray outline for Processing (still at Lob), petrol
+  // outline for Delivered, red outline for Returned.
   const pillClass =
     section === "delivered"
       ? "border-petrol-500/40 bg-white text-petrol-700"
       : section === "returned"
         ? "border-danger/40 bg-white text-danger"
-        : isProcessing
+        : section === "processing"
           ? "border-gray-300 bg-white text-gray-600"
           : "border-ink bg-ink text-white";
   const pillLabel =
@@ -409,7 +427,7 @@ function PieceRow({
       ? "Delivered"
       : section === "returned"
         ? "Returned"
-        : isProcessing
+        : section === "processing"
           ? "Processing"
           : "In Transit";
 
@@ -419,16 +437,13 @@ function PieceRow({
     <Link
       href={href}
       className={cn(
-        // 3-track grid: recipient content (flex), FIXED 140px pill
-        // column, auto actions. The fixed middle track is the only
-        // way to anchor the pill at a consistent x-position across
-        // rows (auto columns collapse flush against each other, so
-        // adjacent auto tracks always ended up jammed right).
-        // Pattern matches Attio / Linear / Pipedrive data tables.
-        "group relative grid grid-cols-[1fr_140px_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50",
-        // Batch-child rows: subtle gray background + a 3px dark brand
-        // bar on the left edge. Absolute-positioned so it doesn't shift
-        // the content grid.
+        // Flex row, NOT grid. Recipient is capped at max-w-[440px] so
+        // it doesn't expand on wide screens and push the pill to the
+        // right edge. Pill sits immediately after recipient. Actions
+        // are pushed to the right with ml-auto. This is the only way
+        // to anchor the pill at a consistent x-position; with grid
+        // 1fr the pill always slides with the viewport width.
+        "group relative flex items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50",
         isBatchChild && "bg-gray-50/60"
       )}
     >
@@ -439,11 +454,10 @@ function PieceRow({
           style={{ width: 3, background: "#0d4b3a" }}
         />
       )}
-      {/* Left content column — name, address, meta. Pill is no longer
-          inside this column; it's its own grid column to the right so
-          the meta line below (with Check $X.XX) can't collide with the
-          pill horizontally. */}
-      <div className="min-w-0">
+      {/* Left content column — name, address, meta. Capped at 440px
+          so the pill doesn't drift right on wide screens. flex-1 so
+          short-content rows still fill toward the cap. */}
+      <div className="min-w-0 flex-1" style={{ maxWidth: 440 }}>
         <div className="truncate text-[15px] font-semibold text-ink">
           {displayRecipientName(piece.recipient_name)}
         </div>
@@ -469,9 +483,11 @@ function PieceRow({
           {section === "delivered" && piece.delivered_at && (
             <>
               <span className="text-gray-300">·</span>
-              {/* Delivered — petrol with double-check icon, slightly bolder */}
+              {/* Delivered — petrol with single-check icon. The previous
+                  double-check (IconChecks) read as visually busy/blurry
+                  at 12px. Single check reads cleaner at this scale. */}
               <span className="inline-flex items-center gap-1 font-medium text-petrol-700">
-                <IconChecks size={12} stroke={2} />
+                <IconCheck size={12} stroke={2} />
                 Delivered {fmtDateLong(piece.delivered_at)}
               </span>
             </>
@@ -500,10 +516,11 @@ function PieceRow({
         </div>
       </div>
 
-      {/* Middle column — status pill anchored to the START of its
-          fixed 140px track. Same x-position on every row regardless
-          of recipient name length or pill text width. */}
-      <div className="flex items-start justify-start pt-[2px]">
+      {/* Pill — sits immediately to the right of the recipient block. */}
+      <div
+        className="flex shrink-0 items-start pt-[2px]"
+        style={{ width: 140 }}
+      >
         <span
           className={cn(
             "inline-flex items-center justify-center rounded-[4px] border bg-white px-[10px] py-[5px] text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] whitespace-nowrap",
@@ -514,9 +531,9 @@ function PieceRow({
         </span>
       </div>
 
-      {/* Right column — actions. Solid buttons (clickable affordance);
-          same hue as the status pill but different weight. */}
-      <div className="flex shrink-0 items-center gap-2">
+      {/* Actions — pushed to the right edge with ml-auto. Same hue
+          family as the status pill, different weight. */}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         {section === "returned" ? (
           piece.lead_id ? (
             <Link
@@ -587,13 +604,9 @@ function BatchRow({
   return (
     <details className="group">
       <summary
-        className="grid cursor-pointer list-none grid-cols-[1fr_140px_auto] items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50"
+        className="flex cursor-pointer list-none items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50"
       >
-        <div className="min-w-0">
-          {/* Batch header: name only, no status pill (pills live on the
-              individual recipient rows below). The empty middle column
-              of the grid keeps the actions aligned with PieceRow's
-              action column. */}
+        <div className="min-w-0 flex-1" style={{ maxWidth: 440 }}>
           <div className="truncate text-[15px] font-semibold text-ink">
             Batch of {batch.length}
           </div>
@@ -607,12 +620,13 @@ function BatchRow({
             <span>Sent {fmtDateLong(first.sent_at)}</span>
           </div>
         </div>
-        {/* Empty middle column so the Expand Batch button aligns with
-            the PieceRow action column below. */}
-        <div />
-        {/* Batch affordance spans View Letter + gap + Track exactly:
-            110 + 8 + 110 = 228px. Solid petrol fill, same h-[30px]. */}
-        <div className="flex shrink-0 items-center">
+        {/* Same 140px placeholder slot as PieceRow's pill column so
+            the batch row's Expand button vertically aligns with the
+            child rows' action column. */}
+        <div className="shrink-0" style={{ width: 140 }} />
+        {/* Expand affordance pushed to the right edge. Width matches
+            View Letter + gap + Track on the child rows (228px). */}
+        <div className="ml-auto flex shrink-0 items-center">
           <span
             className="inline-flex h-[30px] cursor-pointer items-center justify-center gap-2 rounded-md bg-petrol-500 px-3 text-[11.5px] font-medium text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-petrol-600"
             style={{ minWidth: "228px" }}

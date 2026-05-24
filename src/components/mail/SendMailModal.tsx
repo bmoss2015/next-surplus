@@ -55,6 +55,10 @@ export type SendMailModalRecipient = {
 export type SendMailModalProps = {
   open: boolean;
   onClose: () => void;
+  // Optional callback fired AFTER a successful send (before onClose
+  // runs). Used by the lead Mail tab to flash a "Letter sent" banner.
+  // Receives the list of recipient names that were sent to.
+  onSuccess?: (recipientNames: string[]) => void;
   templates: MailTemplateRow[];
   candidates: SendMailModalRecipient[];
   bankAccounts: { id: string; label: string; verified: boolean }[];
@@ -92,6 +96,7 @@ export type SendMailModalProps = {
 export function SendMailModal({
   open,
   onClose,
+  onSuccess,
   templates,
   candidates,
   bankAccounts,
@@ -296,6 +301,26 @@ export function SendMailModal({
       }
     }
 
+    // Cheap structural sanity check before paying for Lob verification:
+    // any real US street address has at least one digit somewhere in
+    // line1 (the street number). Lob's test mode is permissive and
+    // sometimes accepts addresses like "Fake Street" — this catches
+    // the obvious cases pre-click without an API call.
+    const missingDigits = selectedRecipients.filter(
+      (r) => !/\d/.test(r.contact.line1.trim())
+    );
+    if (missingDigits.length > 0) {
+      const names = missingDigits
+        .map((r) => r.contact.full_name || "recipient")
+        .join(", ");
+      setErr(
+        missingDigits.length === 1
+          ? `Address for ${names} has no street number. Fix it before sending.`
+          : `Addresses for ${names} have no street numbers. Fix them before sending.`
+      );
+      return;
+    }
+
     // Pre-send address verification (Lob /us_verifications). Always
     // runs — pre-flight is the contract that keeps bad addresses from
     // surfacing as post-click errors. The $0.05/send cost is baked
@@ -397,11 +422,12 @@ export function SendMailModal({
     startTransition(async () => {
       const res = await sendMail(payload);
       if (res.ok) {
+        // Notify parent BEFORE closing so it can flash a confirmation
+        // banner that survives the modal unmount.
+        onSuccess?.(selectedRecipients.map((r) => r.contact.full_name));
         // Close FIRST so the modal disappears the instant the send
         // succeeds (matches Mailchimp / Lob dashboard / Postalytics
-        // pattern). The refresh runs in the background while the
-        // underlying lead page picks up the new mail_job row on its
-        // next render — no visible mid-send button label flip.
+        // pattern). The refresh runs in the background.
         onClose();
         router.refresh();
       } else {
@@ -697,16 +723,32 @@ export function SendMailModal({
               )}
             </label>
             {includeCheck && (
-              <div className="grid grid-cols-[140px_1fr] gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={checkAmount}
-                  onChange={(e) => setCheckAmount(e.target.value)}
-                  placeholder="Amount ($)"
-                  className={inputClass}
-                />
+              <div className="grid grid-cols-[160px_1fr] gap-2">
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[13px] font-medium text-gray-500">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0.01"
+                    value={checkAmount}
+                    onChange={(e) => setCheckAmount(e.target.value)}
+                    onBlur={(e) => {
+                      // Auto-format on blur: parse to a number then pin
+                      // to 2 decimal places ("1000" -> "1000.00",
+                      // "12.5" -> "12.50"). Leave blank values alone.
+                      const v = e.target.value.trim();
+                      if (!v) return;
+                      const n = Number(v);
+                      if (!Number.isFinite(n) || n <= 0) return;
+                      setCheckAmount(n.toFixed(2));
+                    }}
+                    placeholder="0.00"
+                    className={cn(inputClass, "pl-6 text-right tabular-nums")}
+                  />
+                </div>
                 <input
                   type="text"
                   value={checkMemo}

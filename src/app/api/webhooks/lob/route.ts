@@ -135,17 +135,27 @@ export async function POST(req: NextRequest) {
   }
 
   const update: Record<string, unknown> = {};
+  // Status transition rules: processing rows advance whenever an
+  // in-flight or terminal event arrives; everything else just respects
+  // the mapping. Don't bump in_transit back to processing.
   if (mappedStatus && mappedStatus !== job.status) {
-    update.status = mappedStatus;
-    if (mappedStatus === "delivered") update.delivered_at = new Date().toISOString();
-    if (mappedStatus === "returned") update.returned_at = new Date().toISOString();
+    const canAdvance =
+      job.status === "processing" ||
+      job.status === "queued" ||
+      (job.status === "in_transit" &&
+        (mappedStatus === "delivered" ||
+          mappedStatus === "returned" ||
+          mappedStatus === "failed")) ||
+      mappedStatus === "delivered" ||
+      mappedStatus === "returned" ||
+      mappedStatus === "failed";
+    if (canAdvance) {
+      update.status = mappedStatus;
+      if (mappedStatus === "delivered") update.delivered_at = new Date().toISOString();
+      if (mappedStatus === "returned") update.returned_at = new Date().toISOString();
+    }
   }
   if (event.body?.tracking_number) {
-    // The presence of a tracking_number is what flips the dashboard
-    // pill from "Processing" to "In Transit" for queued rows. Lob
-    // typically attaches it on the .mailed event but some plans
-    // attach earlier on .printing / .rendered_pdf — write whenever
-    // we see it.
     update.tracking_number = event.body.tracking_number;
   }
   if (Object.keys(update).length === 0) {

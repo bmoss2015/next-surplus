@@ -46,9 +46,10 @@ export type MailJobDetailRow = MailJobListRow & {
 };
 
 export type MailStats = {
-  // queued + in_transit collapse to "in_flight"; returned + failed
-  // collapse to "returned" (the UI shows one bucket — to the user both
-  // mean "didn't reach the recipient, fix something").
+  // processing = at Lob being printed (status='processing' or legacy
+  // 'queued' rows). in_flight = USPS-side (status='in_transit'). The
+  // /mail dashboard surfaces both as separate KPIs.
+  processing: number;
   in_flight: number;
   delivered: number;
   returned: number;
@@ -75,7 +76,7 @@ export type MailDashboardData = {
 
 const STATUS_FILTERS: Record<MailStatusFilter, MailStatus[] | null> = {
   all: null,
-  in_flight: ["queued", "in_transit"],
+  in_flight: ["processing", "queued", "in_transit"],
   delivered: ["delivered"],
   returned: ["returned", "failed"],
 };
@@ -103,8 +104,9 @@ export async function fetchMailDashboard(
       .gte("created_at", since);
   const statsLeadEq = (q: ReturnType<typeof baseStat>) =>
     opts.leadId ? q.eq("lead_id", opts.leadId) : q;
-  const [inFlightRes, deliveredRes, returnedRes, costRes] = await Promise.all([
-    statsLeadEq(baseStat()).in("status", ["queued", "in_transit"]),
+  const [processingRes, inFlightRes, deliveredRes, returnedRes, costRes] = await Promise.all([
+    statsLeadEq(baseStat()).in("status", ["processing", "queued"]),
+    statsLeadEq(baseStat()).eq("status", "in_transit"),
     statsLeadEq(baseStat()).eq("status", "delivered"),
     statsLeadEq(baseStat()).in("status", ["returned", "failed"]),
     (opts.leadId
@@ -205,6 +207,7 @@ export async function fetchMailDashboard(
 
   return {
     stats: {
+      processing: processingRes.count ?? 0,
       in_flight: inFlightRes.count ?? 0,
       delivered: deliveredRes.count ?? 0,
       returned: returnedRes.count ?? 0,

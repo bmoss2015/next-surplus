@@ -36,8 +36,12 @@ import type { MailTemplateRow } from "@/lib/settings/fetch";
 // in the URL (used by /mail's Fix & Resend button to deep-link in).
 
 const STATUS_DOT: Record<string, string> = {
-  queued: "bg-gray-400",
-  in_transit: "bg-gray-400",
+  // Processing (still at Lob) = lighter neutral; In Transit (with
+  // USPS) = stronger ink. Visually distinguishes the two pre-delivery
+  // states at the left-rail glance level.
+  processing: "bg-gray-300",
+  queued: "bg-gray-300",
+  in_transit: "bg-gray-500",
   delivered: "bg-petrol-500",
   returned: "bg-danger",
   failed: "bg-danger",
@@ -93,6 +97,7 @@ function findCandidateKeyForPiece(
 export function LeadMailV11Client({
   rows,
   totalSent,
+  processingCount,
   inTransitCount,
   deliveredCount,
   returnedCount,
@@ -107,6 +112,7 @@ export function LeadMailV11Client({
 }: {
   rows: MailJobListRow[];
   totalSent: number;
+  processingCount: number;
   inTransitCount: number;
   deliveredCount: number;
   returnedCount: number;
@@ -140,6 +146,18 @@ export function LeadMailV11Client({
   const [detail, setDetail] = useState<MailJobDetailRow | null>(null);
   const [letterModalOpen, setLetterModalOpen] = useState(false);
   const [checkModalOpen, setCheckModalOpen] = useState(false);
+  const [sentBanner, setSentBanner] = useState<{
+    msg: string;
+    key: number;
+  } | null>(null);
+
+  // Auto-dismiss the "Letter sent" banner after 4.5 seconds. Re-keyed
+  // on each new send so back-to-back sends each get their own timer.
+  useEffect(() => {
+    if (!sentBanner) return;
+    const t = setTimeout(() => setSentBanner(null), 4500);
+    return () => clearTimeout(t);
+  }, [sentBanner]);
 
   // Send Mail modal state. resendingFor carries the failed piece when
   // opened via Fix & Resend; null when the user clicks the header
@@ -215,6 +233,23 @@ export function LeadMailV11Client({
 
   return (
     <div className="space-y-5">
+      {/* Send confirmation banner — flashes for ~4.5s after a successful
+          send so the user gets a visible "yes, it went out" cue instead
+          of having to read the new row in the list. */}
+      {sentBanner && (
+        <div
+          key={sentBanner.key}
+          className="flex items-center gap-2 rounded-lg border border-petrol-500/30 bg-petrol-50 px-4 py-3 text-[13px] text-petrol-700"
+          role="status"
+        >
+          <IconCircleCheck size={16} stroke={2} />
+          <span className="font-medium">{sentBanner.msg}</span>
+          <span className="text-petrol-500/70">
+            · Will print today and mail tomorrow
+          </span>
+        </div>
+      )}
+
       {/* Header row — stats + Send Mail. */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
         <div className="flex items-end justify-between gap-4">
@@ -231,8 +266,9 @@ export function LeadMailV11Client({
             Send Mail
           </button>
         </div>
-        <dl className="mt-5 grid grid-cols-4 gap-x-6 gap-y-2">
+        <dl className="mt-5 grid grid-cols-5 gap-x-6 gap-y-2">
           <StatPair label="Total Sent" value={totalSent} />
+          <StatPair label="Processing" value={processingCount} />
           <StatPair label="In Transit" value={inTransitCount} />
           <StatPair label="Delivered" value={deliveredCount} />
           <StatPair
@@ -344,6 +380,13 @@ export function LeadMailV11Client({
           onClose={() => {
             setSendMailOpen(false);
             setResendingFor(null);
+          }}
+          onSuccess={(names) => {
+            const msg =
+              names.length === 1
+                ? `Letter sent to ${displayRecipientName(names[0])}`
+                : `Letters sent to ${names.length} recipients`;
+            setSentBanner({ msg, key: Date.now() });
           }}
           templates={templates}
           candidates={candidates}
@@ -461,9 +504,13 @@ function DetailPane({
                 {piece.error_message ? ` (${piece.error_message})` : ""}
               </Meta>
             )}
-          {(piece.status === "queued" || piece.status === "in_transit") && (
-            <Meta icon={IconClock}>2 to 4 business days</Meta>
-          )}
+          {piece.status === "processing" || piece.status === "queued" ? (
+            <Meta icon={IconClock}>
+              At Lob, being printed. Expect mailed in 1 business day.
+            </Meta>
+          ) : piece.status === "in_transit" ? (
+            <Meta icon={IconClock}>USPS · 2 to 4 business days</Meta>
+          ) : null}
         </div>
 
         {piece.tracking_number && (

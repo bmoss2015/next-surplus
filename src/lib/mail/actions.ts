@@ -1077,7 +1077,12 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         from_state: org.region as string,
         from_postal_code: org.postal_code as string,
         from_country: (org.country as string | null) ?? "US",
-        body_html: rendered,
+        // Store the FULLY-WRAPPED HTML (margins, fonts) so View Letter
+        // iframes render the same thing the printer mailed. Pre-wrap
+        // rendering would otherwise show as an unstyled blob of merged
+        // text in the thumbnail. For file-template sends, body_html
+        // stays empty; previewMailJob re-renders via Gotenberg on demand.
+        body_html: isFileTemplate ? "" : wrapBodyHtml(rendered),
         mail_class: input.mail_class,
         include_check: input.include_check ?? false,
         check_amount_cents: input.check_amount_cents ?? null,
@@ -1089,7 +1094,11 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         tracking_url: send.tracking_url,
         cost_cents: send.cost_cents,
         provider_cost_cents: send.provider_cost_cents,
-        status: "queued",
+        // Lifecycle: processing (at Lob, being printed) -> in_transit
+        // (Lob attached a tracking_number via .mailed event) -> delivered.
+        // Skip 'processing' when Lob already returned a tracking_number
+        // on the create response (some plans do).
+        status: send.tracking_number ? "in_transit" : "processing",
         sent_at: new Date().toISOString(),
         created_by: profile.id,
       })
@@ -1122,6 +1131,20 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       };
     }
     jobIds.push(inserted.id as string);
+
+    // Flip the contact's mailed flag so the Mailing Addresses chip on
+    // the lead Overview tab reflects reality (used to require a manual
+    // toggle). Match on lead_id + channel + line1; for a single lead,
+    // line1 is unique enough to identify the address row. ilike is
+    // case-insensitive so "123 main st" vs "123 Main St" both match.
+    if (recipient.lead_id && recipient.line1) {
+      await sb
+        .from("contacts")
+        .update({ mailed: true, mailed_at: new Date().toISOString() })
+        .eq("lead_id", recipient.lead_id)
+        .eq("channel", "mailing_address")
+        .ilike("value", `%${recipient.line1}%`);
+    }
 
     // No bell notification at send time — the activity row is the
     // sender-side record. Bell only fires on the terminal webhook

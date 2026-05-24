@@ -41,6 +41,7 @@ export function filtersAreActive(f: MailFilterState): boolean {
 type Option = { value: string; label: string };
 
 const STATUS_OPTIONS: Option[] = [
+  { value: "processing", label: "Processing" },
   { value: "in_transit", label: "In Transit" },
   { value: "delivered", label: "Delivered" },
   { value: "returned", label: "Returned" },
@@ -218,11 +219,8 @@ function ChipMulti({
   function toggle(v: string) {
     if (values.includes(v)) onChange(values.filter((x) => x !== v));
     else onChange([...values, v]);
-    // Close the dropdown on each selection per Bree's UX preference —
-    // reopen if you want to add another value. The trade-off vs leaving
-    // it open: simpler "click, done" flow, more clicks for true multi-
-    // select. Re-evaluate if multi-select gets used often.
-    setOpen(false);
+    // Multi-select stays open across clicks. Outside click via
+    // ChipBase's document mousedown listener closes the dropdown.
   }
 
   return (

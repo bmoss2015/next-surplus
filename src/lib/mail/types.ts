@@ -5,6 +5,11 @@
 export type MailClass = "standard" | "first_class" | "certified";
 
 export type MailStatus =
+  // Lifecycle: processing (at Lob, being printed) -> in_transit
+  // (Lob attached USPS tracking_number) -> delivered/returned/failed.
+  // 'queued' is the pre-migration-0130 legacy status that we treat as
+  // an alias for processing throughout the UI and filters.
+  | "processing"
   | "queued"
   | "in_transit"
   | "delivered"

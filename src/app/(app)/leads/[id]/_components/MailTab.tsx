@@ -47,9 +47,10 @@ export async function MailTab({ leadId }: { leadId: string }) {
 
   const mailingAddressCount = addressCountRes.count ?? 0;
 
-  const inTransitCount = rows.filter(
-    (r) => r.status === "queued" || r.status === "in_transit"
+  const processingCount = rows.filter(
+    (r) => r.status === "processing" || r.status === "queued"
   ).length;
+  const inTransitCount = rows.filter((r) => r.status === "in_transit").length;
   const deliveredCount = rows.filter((r) => r.status === "delivered").length;
   const returnedCount = rows.filter(
     (r) => r.status === "returned" || r.status === "failed"
@@ -87,6 +88,7 @@ export async function MailTab({ leadId }: { leadId: string }) {
     <LeadMailV11Client
       rows={rows}
       totalSent={rows.length}
+      processingCount={processingCount}
       inTransitCount={inTransitCount}
       deliveredCount={deliveredCount}
       returnedCount={returnedCount}
