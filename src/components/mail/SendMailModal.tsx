@@ -779,7 +779,7 @@ export function SendMailModal({
                       setCheckAmount(n.toFixed(2));
                     }}
                     placeholder="0.00"
-                    className={cn(inputClass, "pl-6 text-right tabular-nums")}
+                    className={`${inputClass} pl-6 text-right tabular-nums`}
                   />
                 </div>
                 <input
