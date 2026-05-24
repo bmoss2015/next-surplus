@@ -39,6 +39,9 @@ function formatWhen(iso: string | null): string {
 function mailClassLabel(c: string): string {
   if (c === "first_class") return "First Class";
   if (c === "standard") return "Standard Class";
+  // 'certified' kept in the type union for backwards compat with old
+  // rows, but the UI no longer surfaces it (no Lob plan supports it
+  // yet — feature gated until Startup tier).
   if (c === "certified") return "Certified";
   return c;
 }
@@ -85,8 +88,6 @@ export function ProviderCostsSection({ data }: { data: ProviderCostsData }) {
                 ["Color Letter, First Class", lob.letter_first_class_color],
                 ["B&W Letter, Standard Class", lob.letter_standard_bw],
                 ["Color Letter, Standard Class", lob.letter_standard_color],
-                ["B&W Letter, Certified", lob.letter_certified_bw],
-                ["Color Letter, Certified", lob.letter_certified_color],
                 ["B&W Additional Page", lob.letter_extra_page_bw],
                 ["Color Additional Page", lob.letter_extra_page_color],
                 ["Check", lob.check_base],

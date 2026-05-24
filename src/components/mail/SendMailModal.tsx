@@ -715,15 +715,16 @@ export function SendMailModal({
             </div>
           )}
 
-          {/* Mail class */}
+          {/* Mail class — Certified is hidden until the Lob plan
+              supports it (Startup tier+). Only Standard + First Class
+              for now. */}
           <div className={sectionClass}>
             <div className={labelClass}>Mail Class</div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {(
                 [
                   ["standard", "Standard", "3-10 days"],
                   ["first_class", "First Class", "1-5 days"],
-                  ["certified", "Certified", "Proof of receipt"],
                 ] as const
               ).map(([value, label, sub]) => (
                 <label
@@ -818,7 +819,7 @@ export function SendMailModal({
                       setCheckAmount(n.toFixed(2));
                     }}
                     placeholder="0.00"
-                    className={`${inputClass} pl-6 text-right tabular-nums`}
+                    className={`${inputClass} w-full pl-6 text-right tabular-nums`}
                   />
                 </div>
                 <input
@@ -826,7 +827,7 @@ export function SendMailModal({
                   value={checkMemo}
                   onChange={(e) => setCheckMemo(e.target.value)}
                   placeholder="Memo"
-                  className={inputClass}
+                  className={`${inputClass} w-full`}
                 />
                 <select
                   value={bankAccountId}
@@ -845,30 +846,10 @@ export function SendMailModal({
             )}
           </div>
 
-          {/* Error renders as a banner at the top of the modal (above
-              the recipients list). No second inline copy near the Send
-              footer — Bree feedback was that error showed twice. */}
-
-          {selectedRecipients.length > 0 && (
-            <CostEstimate
-              recipients={selectedRecipients.length}
-              mailClass={mailClass}
-              isColor={colorPrint}
-              attachmentPdfPages={
-                isFileTemplate && attachmentPdfPages != null
-                  ? attachmentPdfPages
-                  : null
-              }
-              attachmentFileCount={
-                isFileTemplate && selectedTemplate
-                  ? selectedTemplate.attachment_paths.length
-                  : 0
-              }
-              isFileTemplate={isFileTemplate}
-              includeCheck={includeCheck}
-              pricing={pricing ?? null}
-            />
-          )}
+          {/* CostEstimate removed per Bree feedback — CRM convention
+              is to hide per-action pricing inside the modal. Pricing
+              lives in /owner > Customer Pricing where the operator
+              can set rates; not surfaced at send time. */}
 
           <div className="flex items-center justify-end gap-2 border-t border-gray-200 pt-3">
             <button
@@ -1189,22 +1170,23 @@ function CheckSample({
           </div>
         </div>
 
-        {/* MICR-style stub at the bottom — not real numbers, just the
-            visual presence of a routing/account line that signals
-            "this is a real check, not a coupon". */}
+        {/* MICR-style stub at the bottom — visual placeholder for the
+            routing / account / check-number line. Real numbers are
+            pulled from the verified bank account at print time and
+            never exposed to the customer in the preview. */}
         <div
           aria-hidden
-          className="absolute bottom-1 left-4 right-4 flex justify-between text-[8.5px] tabular-nums text-gray-400"
+          className="absolute bottom-1 left-4 right-4 flex items-center justify-between text-[9px] tabular-nums tracking-widest text-gray-400"
           style={{ fontFamily: "Courier, monospace" }}
         >
-          <span>⑆ ROUTING ⑆</span>
-          <span>ACCOUNT ⑈</span>
-          <span>CHECK</span>
+          <span>•••••••••</span>
+          <span>••••••••••••</span>
+          <span>••••</span>
         </div>
       </div>
       <div className="mt-1 text-[10px] text-gray-500">
-        Lob prints the actual routing + account numbers from your bank
-        account record. This preview shows the layout only.
+        Routing and account numbers are pulled from your verified bank
+        account at print time. This preview shows the layout only.
       </div>
     </div>
   );
