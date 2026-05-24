@@ -121,43 +121,56 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, noop: true });
   }
 
-  // Test-mode gate: when the Lob API key starts with "test_", Lob
-  // fires .mailed / .in_transit / .delivered events almost immediately
-  // after create. That's useful for end-to-end testing of terminal
-  // states, but it makes fresh sends LOOK already-mailed in the UI
-  // because the webhook fires before the user has even seen the
-  // Printing pill. Ignore the in-flight events in test mode so rows
-  // stay at "processing" until a real, time-accurate event arrives.
-  // Terminal events (delivered / returned / failed) still go through
-  // so we can validate those code paths.
-  const isTestMode = (process.env.LOB_API_KEY ?? "").startsWith("test_");
-  const isInflight =
-    mappedStatus === "in_transit" ||
-    eventType === "letter.mailed" ||
-    eventType === "check.mailed" ||
-    eventType === "letter.in_transit" ||
-    eventType === "check.in_transit" ||
-    eventType === "letter.in_local_area" ||
-    eventType === "check.in_local_area" ||
-    eventType === "letter.processed_for_delivery" ||
-    eventType === "check.processed_for_delivery" ||
-    eventType === "letter.re-routed" ||
-    eventType === "check.re-routed";
-  if (isTestMode && isInflight) {
-    return NextResponse.json({ ok: true, noop: true, reason: "test_mode_inflight_skipped" });
-  }
+  // (Time-based gate applied AFTER we look up the row — see below.)
 
   const sb = createServiceClient();
   const { data: job } = await sb
     .from("mail_jobs")
     .select(
-      "id, lead_id, recipient_name, recipient_city, recipient_state, status, org_id, created_by, include_check"
+      "id, lead_id, recipient_name, recipient_city, recipient_state, status, org_id, created_by, include_check, sent_at, created_at"
     )
     .eq("provider", "lob")
     .eq("provider_id", providerId)
     .maybeSingle();
   if (!job) {
     return NextResponse.json({ ok: true, noop: true });
+  }
+
+  // Time-based realism gate: Lob's test mode fires .mailed /
+  // .in_transit events within seconds of letter create, which is
+  // useful for testing terminal-state code paths but makes fresh
+  // sends look already-mailed in the UI before the user has even
+  // seen the Printing pill. Real-world Lob fires these events
+  // 12-24 hours after create when USPS actually picks up the
+  // mail. Anything in-flight arriving within 5 minutes of sent_at
+  // is treated as a test-mode artifact and ignored. Terminal
+  // events (delivered/returned/failed) always go through — those
+  // are real signals regardless of timing.
+  const inflightEventTypes = new Set([
+    "letter.mailed",
+    "check.mailed",
+    "letter.in_transit",
+    "check.in_transit",
+    "letter.in_local_area",
+    "check.in_local_area",
+    "letter.processed_for_delivery",
+    "check.processed_for_delivery",
+    "letter.re-routed",
+    "check.re-routed",
+  ]);
+  if (inflightEventTypes.has(eventType)) {
+    const referenceTs =
+      (job.sent_at as string | null) ?? (job.created_at as string | null);
+    if (referenceTs) {
+      const ageMs = Date.now() - new Date(referenceTs).getTime();
+      if (ageMs < 5 * 60 * 1000) {
+        return NextResponse.json({
+          ok: true,
+          noop: true,
+          reason: "inflight_event_too_soon",
+        });
+      }
+    }
   }
 
   const update: Record<string, unknown> = {};
