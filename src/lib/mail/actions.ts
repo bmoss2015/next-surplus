@@ -446,14 +446,28 @@ export async function previewCheckJob(input: {
   if (!job.include_check) {
     return { ok: false, error: "This piece doesn't have a check attached" };
   }
-  if (job.provider !== "lob") {
-    // Legacy sample-data rows have provider != "lob". Surface a
-    // friendly message that doesn't expose the underlying provider.
+
+  // Sample seeded rows have provider_id starting with "sample_" and
+  // a fake USPS tracking URL stored on tracking_url (not a real
+  // check PDF URL). Detect them and surface a specific message
+  // instead of failing the proxy fetch.
+  const providerId = (job.provider_id as string | null) ?? "";
+  if (providerId.startsWith("sample_")) {
+    return {
+      ok: false,
+      error: "Sample data, no check preview is available.",
+    };
+  }
+
+  // Stub provider (sent without a real provider configured) won't
+  // have a real check PDF either.
+  if (job.provider === "stub") {
     return {
       ok: false,
       error: "Check preview isn't available for this piece.",
     };
   }
+
   const checkUrl = (job.tracking_url as string | null) ?? null;
   if (!checkUrl) {
     return {
@@ -462,14 +476,24 @@ export async function previewCheckJob(input: {
     };
   }
   try {
-    // Provider's check URL is signed and short-lived, but we proxy it
-    // through the server so the browser never hits a provider-branded
-    // host directly.
+    // Provider's check URL is signed and short-lived; proxy through
+    // the server so the browser never hits a provider-branded host.
     const res = await fetch(checkUrl, { method: "GET" });
     if (!res.ok) {
       return {
         ok: false,
         error: "Couldn't load the check preview right now. Try again.",
+      };
+    }
+    // Sanity-check the content type — if the URL is wrong (e.g. it
+    // points to a tracking HTML page instead of a check PDF), the
+    // fetch will succeed but return HTML. Surface a clear message
+    // rather than try to render HTML as PDF.
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.includes("pdf")) {
+      return {
+        ok: false,
+        error: "Check preview isn't available for this piece.",
       };
     }
     const buf = Buffer.from(await res.arrayBuffer());
@@ -647,6 +671,11 @@ export type RecipientInput = {
   relative_id?: string | null;
   lead_party_id?: string | null;
   lead_id?: string | null;
+  // The contacts.id of the mailing-address contact row this recipient
+  // was picked from. Lets sendMail flip the mailed flag + bump
+  // mail_count by direct primary-key match instead of fuzzy line1
+  // matching. Optional for backwards compat.
+  contact_id?: string | null;
   name: string;
   line1: string;
   line2?: string | null;
@@ -1218,13 +1247,31 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       }
     }
 
-    // Flip the contact's mailed flag so the Mailing Addresses chip
-    // on the lead Overview tab reflects reality. Match on lead_id +
-    // channel + line1; for a single lead, line1 is unique enough to
-    // identify the address row. The two updates run separately so a
-    // missing mail_count column (pre-migration 0132) doesn't bring
-    // down the mailed/mailed_at flip.
-    if (recipient.lead_id && recipient.line1) {
+    // Flip the contact's mailed flag + bump mail_count so the
+    // Mailing Addresses chip on the lead Overview tab reflects
+    // reality. Match by contact_id (primary key) when the modal
+    // passed it through; fall back to fuzzy line1 ilike for old
+    // call sites that didn't.
+    if (recipient.contact_id) {
+      const now = new Date().toISOString();
+      await sb
+        .from("contacts")
+        .update({ mailed: true, mailed_at: now })
+        .eq("id", recipient.contact_id);
+      try {
+        const { count: priorCount } = await sb
+          .from("mail_jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("lead_id", recipient.lead_id ?? "")
+          .eq("recipient_address_line1", recipient.line1);
+        await sb
+          .from("contacts")
+          .update({ mail_count: priorCount ?? 1 })
+          .eq("id", recipient.contact_id);
+      } catch {
+        // mail_count column not yet present; the bump silently skipped.
+      }
+    } else if (recipient.lead_id && recipient.line1) {
       const baseFilter = sb
         .from("contacts")
         .update({ mailed: true, mailed_at: new Date().toISOString() })
@@ -1232,8 +1279,6 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         .eq("channel", "mailing_address")
         .ilike("value", `%${recipient.line1}%`);
       await baseFilter;
-      // Best-effort count bump. Silently no-ops if the column hasn't
-      // been migrated yet.
       try {
         const { count: priorCount } = await sb
           .from("mail_jobs")

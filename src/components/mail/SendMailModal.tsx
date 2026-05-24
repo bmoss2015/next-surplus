@@ -416,10 +416,19 @@ export function SendMailModal({
     const payload = {
       recipients: selectedRecipients.map<RecipientInput>((r) => {
         const addr = normalizedFor(r);
+        // Candidate keys are formed as `contact:${contacts.id}`.
+        // Parse to extract the contact_id so sendMail can flip the
+        // mailed flag + bump mail_count via primary-key match
+        // instead of fuzzy line1 ilike.
+        const contactId =
+          typeof r.key === "string" && r.key.startsWith("contact:")
+            ? r.key.slice("contact:".length)
+            : null;
         return {
           relative_id: r.relative_id ?? null,
           lead_party_id: r.lead_party_id ?? null,
           lead_id: r.lead_id ?? null,
+          contact_id: contactId,
           name: r.contact.full_name,
           line1: addr.line1,
           line2: addr.line2,
