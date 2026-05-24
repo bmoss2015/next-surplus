@@ -1380,6 +1380,7 @@ function cleanResearchSteps(steps: ResearchStepInput[]): ResearchStepInput[] {
 export async function upsertResearchTemplate(input: {
   id?: string | null;
   name: string;
+  description: string | null;
   state: string | null;
   sale_type: "TAX" | "MTG" | null;
   steps: ResearchStepInput[];
@@ -1391,11 +1392,13 @@ export async function upsertResearchTemplate(input: {
     input.sale_type === "TAX" || input.sale_type === "MTG" ? input.sale_type : null;
   const steps = cleanResearchSteps(input.steps);
   const sb = await createClient();
+  const description = input.description?.trim() || null;
   if (input.id) {
     const { error } = await sb
       .from("research_templates")
       .update({
         name: input.name.trim(),
+        description,
         state: input.state,
         sale_type: saleType,
         steps,
@@ -1409,6 +1412,7 @@ export async function upsertResearchTemplate(input: {
     .from("research_templates")
     .insert({
       name: input.name.trim(),
+      description,
       state: input.state,
       sale_type: saleType,
       steps,
@@ -1418,6 +1422,59 @@ export async function upsertResearchTemplate(input: {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
   return { ok: true, id: data.id as string };
+}
+
+// Org-wide custom role labels surfaced in Settings > Leads > Contact
+// Roles. Stored in org_custom_roles (separate from lead_parties to
+// allow adding labels without first creating a contact). Fetcher
+// (lib/leads/lead-parties.ts) unions this table with distinct labels
+// already in lead_parties so historic custom labels keep showing.
+export async function addOrgCustomRole(
+  label: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const clean = label.trim();
+  if (!clean) return { ok: false, error: "Role label is required" };
+  if (clean.length > 60)
+    return { ok: false, error: "Role label is too long (max 60 chars)" };
+  const sb = await createClient();
+  const { error } = await sb
+    .from("org_custom_roles")
+    .upsert({ label: clean }, { onConflict: "org_id,label" });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function deleteOrgCustomRole(
+  label: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const clean = label.trim();
+  if (!clean) return { ok: false, error: "Role label is required" };
+  const sb = await createClient();
+  // Block delete if any lead_parties row still uses this label. Matches
+  // the Salesforce / Attio "can't delete in use" pattern.
+  const { count, error: countErr } = await sb
+    .from("lead_parties")
+    .select("id", { count: "exact", head: true })
+    .eq("custom_role_label", clean);
+  if (countErr) return { ok: false, error: countErr.message };
+  if ((count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `This role is used by ${count} contact${count === 1 ? "" : "s"}. Reassign those contacts before deleting.`,
+    };
+  }
+  const { error } = await sb
+    .from("org_custom_roles")
+    .delete()
+    .eq("label", clean);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
 }
 
 export async function deleteResearchTemplate(

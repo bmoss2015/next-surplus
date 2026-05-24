@@ -1,18 +1,19 @@
 "use client";
 
-// Settings clone · Phase C.7 — Notifications wired to real data.
-//
-// Six per-event email toggles backed by user_notification_prefs (migration
-// 0117). Each toggle flips local state immediately for a snappy feel, then
-// upserts via setMyNotificationPref. If the server returns an error we
-// roll local state back so the UI never lies about what's saved.
+// Notifications panel — six per-event email toggles backed by
+// user_notification_prefs. Wired into the global SettingsSaveBar so the
+// flip-and-commit feels consistent with every other Settings panel.
+// State is kept locally and dirty against the initial snapshot; Save
+// upserts each changed pref in parallel; Discard reverts to the
+// snapshot.
 
-import { useState, useTransition } from "react";
+import { useCallback, useState } from "react";
 import {
   NOTIFICATION_PREFS,
   type NotificationPrefKey,
 } from "@/app/(app)/settings/_notification-prefs";
 import { setMyNotificationPref } from "@/app/(app)/settings/_notification-actions";
+import { useSaveBarSection } from "@/components/SettingsSaveBar";
 
 export function NotificationsSection({
   initial,
@@ -23,17 +24,37 @@ export function NotificationsSection({
   for (const p of NOTIFICATION_PREFS) {
     seed[p.key] = p.key in initial ? initial[p.key] : p.defaultOn;
   }
-  const [state, setState] = useState(seed);
-  const [, startTransition] = useTransition();
+  const [state, setState] = useState<Record<string, boolean>>(seed);
+
+  // Dirty if any toggle no longer matches the initial seed.
+  const dirty = NOTIFICATION_PREFS.some(
+    (p) => Boolean(state[p.key]) !== Boolean(seed[p.key])
+  );
+
+  const save = useCallback(async () => {
+    const changed = NOTIFICATION_PREFS.filter(
+      (p) => Boolean(state[p.key]) !== Boolean(seed[p.key])
+    );
+    const results = await Promise.all(
+      changed.map((p) => setMyNotificationPref(p.key, state[p.key]))
+    );
+    const firstErr = results.find((r) => !r.ok);
+    if (firstErr && !firstErr.ok) {
+      return { ok: false as const, error: firstErr.error };
+    }
+    return { ok: true as const };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  const discard = useCallback(() => {
+    setState(seed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial]);
+
+  useSaveBarSection("settings-notifications", { isDirty: dirty, save, discard });
 
   function toggle(key: NotificationPrefKey, next: boolean) {
     setState((prev) => ({ ...prev, [key]: next }));
-    startTransition(async () => {
-      const res = await setMyNotificationPref(key, next);
-      if (!res.ok) {
-        setState((prev) => ({ ...prev, [key]: !next }));
-      }
-    });
   }
 
   const activity = NOTIFICATION_PREFS.filter((p) => p.group === "activity");

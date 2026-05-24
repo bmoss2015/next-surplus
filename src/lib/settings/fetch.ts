@@ -534,6 +534,7 @@ export type ResearchStep = {
 export type ResearchTemplateRow = {
   id: string;
   name: string;
+  description: string | null;
   state: string | null;
   sale_type: "TAX" | "MTG" | null;
   steps: ResearchStep[];
@@ -558,12 +559,13 @@ export async function fetchResearchTemplates(): Promise<ResearchTemplateRow[]> {
   const sb = await createClient();
   const { data, error } = await sb
     .from("research_templates")
-    .select("id, name, state, sale_type, steps")
+    .select("id, name, description, state, sale_type, steps")
     .order("name", { ascending: true });
   if (error) throw error;
   return (data ?? []).map((r) => ({
     id: r.id as string,
     name: (r.name as string | null) ?? "",
+    description: (r.description as string | null) || null,
     state: (r.state as string | null) || null,
     sale_type:
       (r.sale_type as string) === "TAX"

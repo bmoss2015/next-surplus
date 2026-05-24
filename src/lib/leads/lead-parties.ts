@@ -15,19 +15,28 @@ export async function fetchLeadParties(leadId: string): Promise<LeadPartyRow[]> 
   return (data ?? []) as LeadPartyRow[];
 }
 
-// Distinct custom role labels previously used across this org's lead_parties.
-// RLS scopes to the caller's org automatically. Returned sorted, deduped.
+// Custom role labels available to this org. Combines two sources so
+// labels can be added from Settings (explicit org_custom_roles row)
+// without first creating a contact, AND any label historically used on
+// lead_parties.custom_role_label still appears so we don't strand old
+// data. Returned sorted + deduped.
 export async function fetchOrgCustomRoles(): Promise<string[]> {
   const sb = await createClient();
-  const { data, error } = await sb
-    .from("lead_parties")
-    .select("custom_role_label")
-    .eq("role", "other")
-    .not("custom_role_label", "is", null);
-  if (error) throw error;
+  const [partyRes, orgRes] = await Promise.all([
+    sb
+      .from("lead_parties")
+      .select("custom_role_label")
+      .eq("role", "other")
+      .not("custom_role_label", "is", null),
+    sb.from("org_custom_roles").select("label"),
+  ]);
   const set = new Set<string>();
-  for (const r of data ?? []) {
+  for (const r of partyRes.data ?? []) {
     const v = (r as { custom_role_label: string | null }).custom_role_label;
+    if (v && v.trim()) set.add(v.trim());
+  }
+  for (const r of orgRes.data ?? []) {
+    const v = (r as { label: string | null }).label;
     if (v && v.trim()) set.add(v.trim());
   }
   return Array.from(set).sort();
