@@ -18,7 +18,7 @@ export function InboxEmptyState({
               Your Inbox Is Empty
             </h2>
             <p className="mt-2 text-[12px] text-gray-500">
-              Once new messages arrive, you'll see them here. The portal syncs
+              Once new messages arrive, you&apos;ll see them here. The portal syncs
               your connected account every couple minutes.
             </p>
           </>
@@ -29,7 +29,7 @@ export function InboxEmptyState({
             </h2>
             <p className="mt-2 text-[12px] text-gray-500">
               Connect your Gmail to send and receive messages without leaving
-              the portal. Each lead's conversations are pinned to its detail
+              the portal. Each lead&apos;s conversations are pinned to its detail
               page automatically.
             </p>
             <Link

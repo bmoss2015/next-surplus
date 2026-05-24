@@ -485,7 +485,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   // docxtemplater); attachments are passed through unchanged so we can
   // reuse the same buffers across the batch.
   let docxTemplate: { name: string; buffer: Buffer } | null = null;
-  let attachmentFiles: Array<{
+  const attachmentFiles: Array<{
     name: string;
     buffer: Buffer;
     contentType: string;
