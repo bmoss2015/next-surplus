@@ -39,7 +39,6 @@ export type SendMailButtonProps = {
     letter_extra_page_color: number;
     check_base: number;
   } | null;
-  preflightVerifyEnabled?: boolean;
 };
 
 export function SendMailButton({
@@ -53,7 +52,6 @@ export function SendMailButton({
   mailReady,
   fromAddress,
   pricing,
-  preflightVerifyEnabled,
 }: SendMailButtonProps) {
   const [open, setOpen] = useState(false);
   // Always render the button as clickable — the modal carries the
@@ -87,7 +85,6 @@ export function SendMailButton({
           mailReady={mailReady}
           fromAddress={fromAddress}
           pricing={pricing}
-          preflightVerifyEnabled={preflightVerifyEnabled}
         />
       )}
     </>

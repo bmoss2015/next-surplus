@@ -13,7 +13,6 @@ export type CustomerPricingData = {
   customer_mail_pricing_cents: LobPricing;
   wholesale_pricing_cents: LobPricing | null;
   wholesale_last_checked_at: string | null;
-  preflight_verify_enabled: boolean;
 };
 
 const DEFAULT_CUSTOMER_PRICING: LobPricing = {
@@ -38,14 +37,13 @@ export async function fetchCustomerPricing(): Promise<CustomerPricingData> {
       customer_mail_pricing_cents: DEFAULT_CUSTOMER_PRICING,
       wholesale_pricing_cents: null,
       wholesale_last_checked_at: null,
-      preflight_verify_enabled: true,
     };
   }
   const admin = createServiceClient();
   const { data } = await admin
     .from("app_pricing_config")
     .select(
-      "subscription_monthly_cents, customer_mail_pricing_cents, wholesale_pricing_cents, wholesale_last_checked_at, preflight_verify_enabled"
+      "subscription_monthly_cents, customer_mail_pricing_cents, wholesale_pricing_cents, wholesale_last_checked_at"
     )
     .eq("id", 1)
     .maybeSingle();
@@ -59,8 +57,6 @@ export async function fetchCustomerPricing(): Promise<CustomerPricingData> {
       (data?.wholesale_pricing_cents as LobPricing | null) ?? null,
     wholesale_last_checked_at:
       (data?.wholesale_last_checked_at as string | null) ?? null,
-    preflight_verify_enabled:
-      (data?.preflight_verify_enabled as boolean | null) ?? true,
   };
 }
 

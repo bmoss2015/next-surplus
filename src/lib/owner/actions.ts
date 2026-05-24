@@ -125,19 +125,3 @@ export async function updateCustomerPricing(input: {
   revalidatePath("/settings");
   return { ok: true };
 }
-
-export async function setPreflightVerifyEnabled(input: {
-  enabled: boolean;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const gate = await requireOwner();
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const admin = createServiceClient();
-  const { error } = await admin
-    .from("app_pricing_config")
-    .update({ preflight_verify_enabled: Boolean(input.enabled) })
-    .eq("id", 1);
-  if (error) return { ok: false, error: error.message };
-  revalidatePath("/owner");
-  revalidatePath("/settings");
-  return { ok: true };
-}

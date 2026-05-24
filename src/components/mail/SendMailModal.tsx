@@ -72,10 +72,6 @@ export type SendMailModalProps = {
   // Optional banner shown at the top of the modal — typically the
   // "resending to <name> after <reason>" callout for Fix & Resend.
   notice?: string | null;
-  // Owner-controlled toggle (app_pricing_config.preflight_verify_enabled).
-  // When false the Send button skips the Lob /us_verifications call to
-  // save $0.05 per recipient. Defaults to true if not provided.
-  preflightVerifyEnabled?: boolean;
   // Customer-facing rate schedule from app_pricing_config. Drives the
   // CostEstimate "Estimated total" line. Optional so any existing caller
   // that doesn't pass it gets a "pricing not configured" placeholder.
@@ -104,7 +100,6 @@ export function SendMailModal({
   fromAddress,
   defaultSelectedKeys,
   notice,
-  preflightVerifyEnabled,
   pricing,
 }: SendMailModalProps) {
   const hasVerifiedBank = bankAccounts.some((b) => b.verified);
@@ -314,34 +309,28 @@ export function SendMailModal({
       }
     }
 
-    // Pre-send address verification (Lob /us_verifications). Skipped
-    // entirely when the owner has flipped preflight_verify_enabled off
-    // in /owner > Customer Pricing — they're choosing to absorb the
-    // $0.05/send cost via the higher retail rate (Option D) rather than
-    // pay for inline verification. Without pre-flight, Lob still
-    // validates addresses at create-letter time, so bad addresses
-    // surface as friendly errors after click instead of pills before.
-    const verifyEntries: Array<readonly [string, AddressVerifyResult]> = [];
-    if (preflightVerifyEnabled !== false) {
-      setVerifying(true);
-      const results = await Promise.all(
-        selectedRecipients.map(async (r) => {
-          const res = await verifyAddressAction({
-            line1: r.contact.line1,
-            line2: r.contact.line2 ?? null,
-            city: r.contact.city,
-            state: r.contact.state,
-            postal_code: r.contact.postal_code,
-          });
-          return [r.key, res] as const;
-        })
-      );
-      verifyEntries.push(...results);
-      const nextResults: Record<string, AddressVerifyResult> = {};
-      for (const [key, res] of results) nextResults[key] = res;
-      setVerifyResults(nextResults);
-      setVerifying(false);
-    }
+    // Pre-send address verification (Lob /us_verifications). Always
+    // runs — pre-flight is the contract that keeps bad addresses from
+    // surfacing as post-click errors. The $0.05/send cost is baked
+    // into retail rates (migration 0127).
+    setVerifying(true);
+    const results = await Promise.all(
+      selectedRecipients.map(async (r) => {
+        const res = await verifyAddressAction({
+          line1: r.contact.line1,
+          line2: r.contact.line2 ?? null,
+          city: r.contact.city,
+          state: r.contact.state,
+          postal_code: r.contact.postal_code,
+        });
+        return [r.key, res] as const;
+      })
+    );
+    const verifyEntries = results;
+    const nextResults: Record<string, AddressVerifyResult> = {};
+    for (const [key, res] of results) nextResults[key] = res;
+    setVerifyResults(nextResults);
+    setVerifying(false);
 
     const undeliverable = verifyEntries.filter(
       ([, res]) => res.ok && res.deliverability === "undeliverable"
@@ -443,12 +432,20 @@ export function SendMailModal({
   return (
     <Modal
       open={open}
-      onClose={pending ? () => {} : onClose}
-      title="Send Mail"
+      onClose={
+        pending
+          ? () => {}
+          : showPreview
+            ? () => setShowPreview(false)
+            : onClose
+      }
+      title={showPreview ? "Letter Preview" : "Send Mail"}
       description={
-        selectedRecipients.length > 1
-          ? `Batch of ${selectedRecipients.length}`
-          : undefined
+        showPreview
+          ? "Close to return to the send form"
+          : selectedRecipients.length > 1
+            ? `Batch of ${selectedRecipients.length}`
+            : undefined
       }
       width={showPreview ? 920 : 680}
     >
@@ -868,13 +865,7 @@ function CostEstimate({
     return `Word cover + ${attachmentPdfPages} PDF page${attachmentPdfPages === 1 ? "" : "s"}`;
   })();
 
-  if (!pricing) {
-    return (
-      <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] text-gray-600">
-        Pricing not configured. Contact your administrator.
-      </div>
-    );
-  }
+  if (!pricing) return null;
 
   // Per-letter rate from the customer pricing schedule.
   const letterCents = (() => {
