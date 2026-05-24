@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState, createContext, useContext } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
@@ -14,6 +14,8 @@ import {
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { displayRecipientName } from "@/components/mail/displayName";
+import { LetterPreviewModal } from "@/components/mail/LetterPreviewModal";
+import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
 import type { MailJobListRow, MailStats } from "@/lib/mail/fetch";
 import {
   MailToolbar,
@@ -23,6 +25,11 @@ import {
   readFiltersFromParams,
   writeFiltersToParams,
 } from "./MailToolbar";
+
+// Context lets nested PieceRow components trigger the dashboard-level
+// LetterPreviewModal without prop-drilling through ListSection / BatchRow.
+type LetterOpener = (piece: MailJobListRow) => void;
+const ViewLetterContext = createContext<LetterOpener>(() => {});
 
 // V6 main /mail tab. Filter toolbar + KPI strip + pipeline bar + three
 // status sections (In Transit with batch grouping, Delivered, Returned).
@@ -213,8 +220,41 @@ export function MailDashboardV6({
       }
     : { ...stats, processing: processingRows.length };
 
+  // Dashboard-level letter preview modal — opened inline when the user
+  // clicks View Letter on any row. Avoids round-tripping to the lead
+  // page just to see the letter. body_html is lazy-fetched on open
+  // (the list row only carries enough fields for the row itself).
+  const [openLetter, setOpenLetter] = useState<{
+    jobId: string;
+    recipientName: string;
+    bodyHtml: string | null;
+    trackingUrl: string | null;
+  } | null>(null);
+  const onViewLetter = useCallback<LetterOpener>(async (piece) => {
+    // Optimistic open with the row's data (body_html isn't on the row).
+    setOpenLetter({
+      jobId: piece.id,
+      recipientName: displayRecipientName(piece.recipient_name),
+      bodyHtml: null,
+      trackingUrl: piece.tracking_url ?? null,
+    });
+    // Fetch the full body and merge it in so LetterPreviewModal's
+    // bodyHtml short-circuit fires for HTML-body sends.
+    const detail = await fetchMailJobAction(piece.id);
+    setOpenLetter((cur) =>
+      cur && cur.jobId === piece.id
+        ? { ...cur, bodyHtml: detail?.body_html ?? null }
+        : cur
+    );
+  }, []);
+
   return (
+    <ViewLetterContext.Provider value={onViewLetter}>
     <div>
+      <LetterPreviewModal
+        data={openLetter}
+        onClose={() => setOpenLetter(null)}
+      />
       <MailToolbar filters={filters} onChange={setFilters} />
 
       {/* KPI strip — five operational counts now that Processing is
@@ -304,6 +344,7 @@ export function MailDashboardV6({
         </div>
       )}
     </div>
+    </ViewLetterContext.Provider>
   );
 }
 
@@ -410,6 +451,7 @@ function PieceRow({
   section: Section;
   isBatchChild?: boolean;
 }) {
+  const onViewLetter = useContext(ViewLetterContext);
   // Section is sourced from the real mail_jobs.status (post-migration
   // 0130). Four pill styles: solid ink for In Transit (default with
   // USPS), neutral gray outline for Processing (still at Lob), petrol
@@ -555,19 +597,28 @@ function PieceRow({
           )
         ) : (
           <>
-            {/* All three action buttons (View Letter, Track, Fix &
-                Resend) share min-w-[110px] so they read as a consistent
-                button family regardless of label length. Width set to
-                fit the longest phrase ("Fix & Resend"). */}
+            {/* View Letter opens the dashboard-level LetterPreviewModal
+                via context. preventDefault stops the row Link from
+                hijacking the click (the row navigates to the lead). */}
             <button
               type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onViewLetter(piece);
+              }}
               className="inline-flex h-[30px] min-w-[110px] cursor-pointer items-center justify-center rounded-md bg-petrol-500 px-3 text-[11.5px] font-medium text-white shadow-[0_1px_2px_rgba(13,75,58,0.25)] hover:bg-petrol-600"
             >
               View Letter
             </button>
-            {piece.tracking_url ? (
+            {/* Track button hits USPS using the tracking_number that
+                Lob attaches once the piece is .mailed. Used to gate on
+                piece.tracking_url, but that's actually Lob's rendered
+                PDF URL — wrong link, also nullable until .mailed
+                fires. Tracking_number presence is the right signal. */}
+            {piece.tracking_number ? (
               <a
-                href={piece.tracking_url}
+                href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${piece.tracking_number}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
@@ -579,6 +630,7 @@ function PieceRow({
               <button
                 type="button"
                 disabled
+                title="USPS tracking number isn't assigned yet, check back once the piece is mailed."
                 className="inline-flex h-[30px] min-w-[110px] cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-[11.5px] font-medium text-gray-400"
               >
                 Track

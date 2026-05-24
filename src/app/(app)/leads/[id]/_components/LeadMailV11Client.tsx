@@ -14,6 +14,7 @@ import { cn } from "@/lib/cn";
 import { displayRecipientName } from "@/components/mail/displayName";
 import { LetterPreviewModal } from "@/components/mail/LetterPreviewModal";
 import { CheckPreviewModal } from "@/components/mail/CheckPreviewModal";
+import { LetterThumbnail } from "@/components/mail/LetterThumbnail";
 import type { MailJobListRow, MailJobDetailRow } from "@/lib/mail/fetch";
 import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
 import {
@@ -109,6 +110,7 @@ export function LeadMailV11Client({
   mailReady,
   fromAddress,
   pricing,
+  lobTestMode,
 }: {
   rows: MailJobListRow[];
   totalSent: number;
@@ -116,6 +118,7 @@ export function LeadMailV11Client({
   inTransitCount: number;
   deliveredCount: number;
   returnedCount: number;
+  lobTestMode?: boolean;
   leadId: string;
   mailingAddressCount: number;
   candidates: SendMailModalRecipient[];
@@ -394,6 +397,7 @@ export function LeadMailV11Client({
           mailReady={mailReady}
           fromAddress={fromAddress}
           pricing={pricing}
+          lobTestMode={lobTestMode}
           defaultSelectedKeys={resendDefaultKeys}
           notice={resendNotice}
         />
@@ -445,7 +449,10 @@ function DetailPane({
   const trackingUrl = piece.tracking_url;
   return (
     <div className="grid grid-cols-[200px_1fr] gap-5 bg-white p-6">
-      {/* Letter thumbnail — 8.5x11 portrait */}
+      {/* Letter thumbnail — 8.5x11 portrait. Uses LetterThumbnail which
+          lazy-fetches the rendered preview via previewMailJob for
+          docx-template sends (empty body_html), so Word doc sends
+          don't render as "No preview". */}
       <button
         type="button"
         onClick={onOpenLetter}
@@ -453,18 +460,7 @@ function DetailPane({
         style={{ width: "200px", aspectRatio: "8.5 / 11" }}
         title="Click to view full letter"
       >
-        {bodyHtml ? (
-          <iframe
-            title="Letter preview"
-            sandbox=""
-            srcDoc={bodyHtml}
-            className="absolute left-0 top-0 origin-top-left h-[792px] w-[612px] scale-[0.327] bg-white"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-[11px] text-gray-400">
-            No preview
-          </div>
-        )}
+        <LetterThumbnail jobId={piece.id} bodyHtml={bodyHtml} />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/0 to-transparent group-hover:from-black/5" />
         <div className="absolute inset-x-0 bottom-0 border-t border-gray-200 bg-white px-2 py-1 text-center text-[10px] text-gray-500 group-hover:text-petrol-700">
           Click to view

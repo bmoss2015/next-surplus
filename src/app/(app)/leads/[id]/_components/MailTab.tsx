@@ -84,6 +84,12 @@ export async function MailTab({ leadId }: { leadId: string }) {
     postal_code: org.postal_code ?? "",
   };
 
+  // Lob mode flag — when the API key starts with `test_`, Lob's
+  // /us_verifications endpoint is permissive (returns "deliverable"
+  // for plausible-looking junk). The modal shows an inline banner so
+  // the operator knows real CASS isn't running.
+  const lobTestMode = (process.env.LOB_API_KEY ?? "").startsWith("test_");
+
   return (
     <LeadMailV11Client
       rows={rows}
@@ -100,6 +106,7 @@ export async function MailTab({ leadId }: { leadId: string }) {
       mailReady={mailReady}
       fromAddress={fromAddress}
       pricing={customerPricing?.customer_mail_pricing_cents ?? null}
+      lobTestMode={lobTestMode}
     />
   );
 }

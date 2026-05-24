@@ -76,6 +76,11 @@ export type SendMailModalProps = {
   // Optional banner shown at the top of the modal — typically the
   // "resending to <name> after <reason>" callout for Fix & Resend.
   notice?: string | null;
+  // True when LOB_API_KEY starts with `test_`. Lob test mode is
+  // permissive — it returns "deliverable" for plausibly-formatted
+  // junk addresses without running real CASS. The modal shows a
+  // sticky banner so the operator knows verification isn't strict.
+  lobTestMode?: boolean;
   // Customer-facing rate schedule from app_pricing_config. Drives the
   // CostEstimate "Estimated total" line. Optional so any existing caller
   // that doesn't pass it gets a "pricing not configured" placeholder.
@@ -105,6 +110,7 @@ export function SendMailModal({
   fromAddress,
   defaultSelectedKeys,
   notice,
+  lobTestMode,
   pricing,
 }: SendMailModalProps) {
   const hasVerifiedBank = bankAccounts.some((b) => b.verified);
@@ -301,23 +307,23 @@ export function SendMailModal({
       }
     }
 
-    // Cheap structural sanity check before paying for Lob verification:
-    // any real US street address has at least one digit somewhere in
-    // line1 (the street number). Lob's test mode is permissive and
-    // sometimes accepts addresses like "Fake Street" — this catches
-    // the obvious cases pre-click without an API call.
-    const missingDigits = selectedRecipients.filter(
-      (r) => !/\d/.test(r.contact.line1.trim())
-    );
-    if (missingDigits.length > 0) {
-      const names = missingDigits
-        .map((r) => r.contact.full_name || "recipient")
-        .join(", ");
-      setErr(
-        missingDigits.length === 1
-          ? `Address for ${names} has no street number. Fix it before sending.`
-          : `Addresses for ${names} have no street numbers. Fix them before sending.`
-      );
+    // Structural pre-flight checks. Lob's test API is permissive and
+    // returns "deliverable" for plausible-looking junk; these client-
+    // side guards reject the obvious fakes before paying for Lob and
+    // before the customer sees a post-click failure on prod.
+    //
+    // What we check:
+    //   1. Valid US state code (2-letter, in the canonical list).
+    //   2. 5-digit ZIP (with optional ZIP+4 extension).
+    //   3. Line1 quality: >= 5 chars AND contains both digits AND
+    //      letters. Catches "Fake Street" (no digits) and "12345" (no
+    //      letters).
+    //   4. City non-empty, contains letters (not pure numbers).
+    //   5. Recipient name / line1 / city don't start with junk
+    //      placeholders (test, fake, asdf, null, none, n/a).
+    const issue = firstAddressIssue(selectedRecipients);
+    if (issue) {
+      setErr(issue);
       return;
     }
 
@@ -475,6 +481,20 @@ export function SendMailModal({
           idx={previewIdx}
           setIdx={setPreviewIdx}
           color={colorPrint}
+          checkInfo={
+            includeCheck
+              ? {
+                  amountDollars: checkAmount.trim(),
+                  memo: checkMemo.trim(),
+                  bankLabel:
+                    bankAccounts.find((b) => b.id === bankAccountId)?.label ??
+                    "Selected bank account",
+                  fromName: fromAddress.name,
+                  fromLine1: fromAddress.line1,
+                  fromCityStateZip: `${fromAddress.city}, ${fromAddress.region} ${fromAddress.postal_code}`,
+                }
+              : null
+          }
           fileTemplate={
             isFileTemplate && selectedTemplate
               ? {
@@ -514,6 +534,19 @@ export function SendMailModal({
           {notice && (
             <div className="rounded-md border border-petrol-200 bg-petrol-50 px-3 py-2 text-[12px] text-petrol-700">
               {notice}
+            </div>
+          )}
+          {lobTestMode && (
+            <div className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-[11.5px] text-gray-700">
+              <span className="font-semibold uppercase tracking-wide text-[10.5px]">
+                Test mode
+              </span>
+              <span className="ml-2">
+                Lob test API is permissive — it accepts plausibly
+                formatted junk without running real CASS. Use a live
+                key on production to verify real deliverability. Local
+                structural checks still block fake addresses pre-click.
+              </span>
             </div>
           )}
 
@@ -934,6 +967,276 @@ function CostEstimate({
   );
 }
 
+// Canonical US state / DC / territory codes accepted by USPS. Used by
+// the address pre-flight to reject typos like "TX1" or "California"
+// before they reach Lob.
+const US_STATE_CODES = new Set([
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN",
+  "IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV",
+  "NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN",
+  "TX","UT","VT","VA","WA","WV","WI","WY","DC","PR","VI","GU","AS","MP",
+]);
+
+const JUNK_PREFIX = /^(test|fake|asdf|null|none|n\/a)\b/i;
+
+// Returns the first user-readable problem found across the selected
+// recipients, or null if every address passes the structural sanity
+// checks. Order: state -> ZIP -> line1 -> city -> junk patterns.
+function firstAddressIssue(
+  recipients: SendMailModalRecipient[]
+): string | null {
+  for (const r of recipients) {
+    const name = r.contact.full_name || "recipient";
+    const line1 = r.contact.line1.trim();
+    const city = r.contact.city.trim();
+    const state = r.contact.state.trim().toUpperCase();
+    const zip = r.contact.postal_code.trim();
+
+    if (!US_STATE_CODES.has(state)) {
+      return `${name}'s address has an unknown state code "${r.contact.state}". Use a 2-letter code like TX or CA.`;
+    }
+    if (!/^\d{5}(-\d{4})?$/.test(zip)) {
+      return `${name}'s ZIP "${r.contact.postal_code}" doesn't look right. Use 5 digits like 78701.`;
+    }
+    if (line1.length < 5) {
+      return `${name}'s street address is too short. Add the full street.`;
+    }
+    if (!/\d/.test(line1)) {
+      return `Address for ${name} has no street number. Fix it before sending.`;
+    }
+    if (!/[a-z]/i.test(line1)) {
+      return `${name}'s street address has no street name, only numbers.`;
+    }
+    if (city.length === 0) {
+      return `${name}'s city is blank.`;
+    }
+    if (!/[a-z]/i.test(city)) {
+      return `${name}'s city doesn't contain any letters.`;
+    }
+    if (
+      JUNK_PREFIX.test(line1) ||
+      JUNK_PREFIX.test(city) ||
+      JUNK_PREFIX.test(r.contact.full_name)
+    ) {
+      return `${name}'s address looks like a placeholder ("${line1}, ${city}"). Replace with a real address.`;
+    }
+  }
+  return null;
+}
+
+// Visual mock-up of the check Lob will print. Standard business check
+// layout: payee + date on top, amount box on the right, amount in words
+// below, memo + signature line at bottom. NOT a real check image — just
+// a faithful preview so the user verifies what they're about to mail.
+function CheckSample({
+  recipientName,
+  amountDollars,
+  memo,
+  bankLabel,
+  fromName,
+  fromLine1,
+  fromCityStateZip,
+  dateLabel,
+}: {
+  recipientName: string;
+  amountDollars: string;
+  memo: string;
+  bankLabel: string;
+  fromName: string;
+  fromLine1: string;
+  fromCityStateZip: string;
+  dateLabel: string;
+}) {
+  const amountNum = Number(amountDollars.replace(/[,$\s]/g, ""));
+  const amountValid = Number.isFinite(amountNum) && amountNum > 0;
+  const amountFmt = amountValid
+    ? amountNum.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : "0.00";
+  const amountWords = amountValid ? dollarsToWords(amountNum) : "";
+
+  return (
+    <div className="mx-auto mb-3 max-w-[640px]">
+      <div className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">
+        Check Preview
+      </div>
+      <div
+        className="relative w-full overflow-hidden rounded-sm border border-gray-300 bg-white"
+        style={{ aspectRatio: "6 / 2.75" }}
+      >
+        {/* Background watermark stripe — subtle, just adds texture */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(135deg, #fafbfc 0%, #fff 50%, #fafbfc 100%)",
+          }}
+        />
+
+        <div className="relative grid h-full grid-cols-[1fr_auto] gap-3 p-4 text-[11px] text-ink">
+          {/* Top-left: drawer / from address */}
+          <div className="flex flex-col justify-between">
+            <div className="text-[10.5px] leading-tight">
+              <div className="font-semibold">{fromName}</div>
+              <div className="text-gray-600">{fromLine1}</div>
+              <div className="text-gray-600">{fromCityStateZip}</div>
+            </div>
+
+            {/* Payee line */}
+            <div className="mt-2">
+              <div className="flex items-end gap-2">
+                <span className="text-[9px] uppercase tracking-wider text-gray-500">
+                  Pay to the order of
+                </span>
+                <span className="flex-1 border-b border-gray-400 pb-[1px] text-[12px] font-medium text-ink">
+                  {recipientName || "—"}
+                </span>
+              </div>
+              {/* Amount in words */}
+              <div className="mt-2 flex items-end gap-2">
+                <span className="flex-1 border-b border-gray-400 pb-[1px] text-[10px] italic text-gray-700">
+                  {amountWords || "—"}
+                </span>
+                <span className="text-[9px] uppercase tracking-wider text-gray-500">
+                  Dollars
+                </span>
+              </div>
+            </div>
+
+            {/* Memo + signature line */}
+            <div className="mt-2 flex items-end gap-3 text-[10px] text-gray-600">
+              <div className="flex flex-1 items-end gap-1">
+                <span className="text-[9px] uppercase tracking-wider text-gray-500">
+                  Memo
+                </span>
+                <span className="flex-1 border-b border-gray-400 pb-[1px] text-ink">
+                  {memo || ""}
+                </span>
+              </div>
+              <div className="flex flex-1 items-end gap-1">
+                <span className="flex-1 border-b border-gray-400 pb-[1px]" />
+                <span className="text-[9px] uppercase tracking-wider text-gray-500">
+                  Signature
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Top-right: date + amount box */}
+          <div className="flex flex-col justify-between text-right">
+            <div className="text-[10px] text-gray-600">
+              <div className="text-[9px] uppercase tracking-wider text-gray-500">
+                Date
+              </div>
+              <div className="border-b border-gray-400 px-2 pb-[1px] text-ink">
+                {dateLabel}
+              </div>
+            </div>
+            <div
+              className="self-end rounded-sm border border-gray-400 px-2 py-1 text-right tabular-nums"
+              style={{ minWidth: 110 }}
+            >
+              <span className="text-[10px] text-gray-500">$</span>{" "}
+              <span className="text-[14px] font-semibold text-ink">
+                {amountFmt}
+              </span>
+            </div>
+            <div className="text-[9px] text-gray-500">{bankLabel}</div>
+          </div>
+        </div>
+
+        {/* MICR-style stub at the bottom — not real numbers, just the
+            visual presence of a routing/account line that signals
+            "this is a real check, not a coupon". */}
+        <div
+          aria-hidden
+          className="absolute bottom-1 left-4 right-4 flex justify-between text-[8.5px] tabular-nums text-gray-400"
+          style={{ fontFamily: "Courier, monospace" }}
+        >
+          <span>⑆ ROUTING ⑆</span>
+          <span>ACCOUNT ⑈</span>
+          <span>CHECK</span>
+        </div>
+      </div>
+      <div className="mt-1 text-[10px] text-gray-500">
+        Lob prints the actual routing + account numbers from your bank
+        account record. This preview shows the layout only.
+      </div>
+    </div>
+  );
+}
+
+// Convert a dollar amount to USA-style words for check writing. Handles
+// up to 999,999.99. Not internationalized — checks are US-only. Output
+// shape: "Twenty Three and 50/100" (the "Dollars" word is rendered
+// separately by the caller).
+function dollarsToWords(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "";
+  const dollars = Math.floor(n);
+  const cents = Math.round((n - dollars) * 100);
+  const ones = [
+    "Zero",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const tens = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+  function chunk(n: number): string {
+    if (n === 0) return "";
+    if (n < 20) return ones[n];
+    if (n < 100) {
+      const t = Math.floor(n / 10);
+      const r = n % 10;
+      return r === 0 ? tens[t] : `${tens[t]}-${ones[r]}`;
+    }
+    const h = Math.floor(n / 100);
+    const r = n % 100;
+    return r === 0
+      ? `${ones[h]} Hundred`
+      : `${ones[h]} Hundred ${chunk(r)}`;
+  }
+  let words = "";
+  const thousands = Math.floor(dollars / 1000);
+  const rest = dollars % 1000;
+  if (thousands > 0) {
+    words = `${chunk(thousands)} Thousand`;
+    if (rest > 0) words += ` ${chunk(rest)}`;
+  } else {
+    words = chunk(dollars);
+  }
+  return `${words} and ${String(cents).padStart(2, "0")}/100`;
+}
+
 // Renders every page of a PDF Blob to a stack of canvases via pdfjs-dist.
 // Used by the Send Mail preview pane to show the merged-and-PDF-rendered
 // letter exactly as Click2Mail will print it. pdfjs is already a project
@@ -1170,6 +1473,7 @@ function PreviewPane({
   idx,
   setIdx,
   color,
+  checkInfo,
   fileTemplate,
   templateId,
   fromAddress,
@@ -1187,6 +1491,14 @@ function PreviewPane({
   idx: number;
   setIdx: (n: number) => void;
   color: boolean;
+  checkInfo: {
+    amountDollars: string;
+    memo: string;
+    bankLabel: string;
+    fromName: string;
+    fromLine1: string;
+    fromCityStateZip: string;
+  } | null;
   fileTemplate: { name: string; attachmentNames: string[] } | null;
   templateId: string | null;
   fromAddress: SendMailFromAddress;
@@ -1336,6 +1648,28 @@ function PreviewPane({
             </span>
           ))}
         </div>
+      )}
+
+      {/* Check sample — only when the user has toggled "Include a check
+          with this letter". Visual mock-up of what Lob will physically
+          print, so the user verifies payee + amount + memo before send.
+          Lob's actual check layout is similar (top half = check, bottom
+          half = letter); we show the check above the letter pane. */}
+      {checkInfo && recipient && (
+        <CheckSample
+          recipientName={recipient.contact.full_name}
+          amountDollars={checkInfo.amountDollars}
+          memo={checkInfo.memo}
+          bankLabel={checkInfo.bankLabel}
+          fromName={checkInfo.fromName}
+          fromLine1={checkInfo.fromLine1}
+          fromCityStateZip={checkInfo.fromCityStateZip}
+          dateLabel={new Date().toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })}
+        />
       )}
 
       {/* Paper preview. SuperDoc renders the merged docx in viewing mode
