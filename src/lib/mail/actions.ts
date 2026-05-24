@@ -10,8 +10,6 @@ import {
   sendCheck,
   activeLetterProvider,
   activeCheckProvider,
-  click2mailCreateMergedDocument,
-  click2mailSendFromDocumentId,
 } from ".";
 import { renderMerge, type MergeContext } from "./merge";
 
@@ -421,6 +419,71 @@ async function countHtmlPagesViaGotenberg(
     return doc.numPages ?? null;
   } catch {
     return null;
+  }
+}
+
+// Renders [filled docx, ...attachments] into a single merged PDF using
+// Gotenberg's libreoffice/convert endpoint with `merge=true`. The
+// attachments may be PDFs (pass-through) or docx files (LibreOffice
+// converts them). Returned PDF is the exact file Lob will print.
+//
+// Requires GOTENBERG_URL — without it, file-template sends can't run
+// (we have no other docx → PDF pipeline). Surface a clear server-config
+// error so the operator sees what's missing.
+async function renderDocxAndAttachmentsToPdf(
+  cover: { name: string; buffer: Buffer },
+  attachments: Array<{ name: string; buffer: Buffer; contentType: string }>
+): Promise<{ ok: true; value: Buffer } | { ok: false; error: string }> {
+  const gotenbergUrl = process.env.GOTENBERG_URL;
+  if (!gotenbergUrl) {
+    return {
+      ok: false,
+      error:
+        "Server is missing GOTENBERG_URL — required to send Word document templates. Contact support.",
+    };
+  }
+  try {
+    const fd = new FormData();
+    fd.append(
+      "files",
+      new Blob([new Uint8Array(cover.buffer)], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+      // Gotenberg uses the filename's lexical order to determine merge
+      // order, so prefix with a zero-padded index to guarantee the cover
+      // page comes first and each attachment follows in array order.
+      `00_${cover.name}`
+    );
+    attachments.forEach((a, i) => {
+      fd.append(
+        "files",
+        new Blob([new Uint8Array(a.buffer)], { type: a.contentType }),
+        `${String(i + 1).padStart(2, "0")}_${a.name}`
+      );
+    });
+    fd.append("merge", "true");
+    const res = await fetch(`${gotenbergUrl}/forms/libreoffice/convert`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) {
+      const raw = await res.text();
+      console.error("Gotenberg merge failed", res.status, raw);
+      return {
+        ok: false,
+        error: `Document render failed (Gotenberg ${res.status}). Try again or simplify the template.`,
+      };
+    }
+    const pdfBytes = Buffer.from(await res.arrayBuffer());
+    return { ok: true, value: pdfBytes };
+  } catch (err) {
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? `Document render failed: ${err.message}`
+          : "Document render failed",
+    };
   }
 }
 
@@ -874,31 +937,33 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
 
     let send;
     if (isFileTemplate && docxTemplate) {
-      // File-template path: fill the Word doc per recipient with
-      // docxtemplater, then upload [Word, ...PDFs] to C2M's create2
-      // endpoint to get one merged documentId, then submit the job.
+      // File-template path:
+      //   1. docxtemplater fills the Word doc with this recipient's
+      //      merge context.
+      //   2. Gotenberg's libreoffice/convert merges [filled docx,
+      //      ...attachments] into one PDF (LibreOffice converts docx
+      //      and merges with the PDF attachments in a single round
+      //      trip via `merge=true`).
+      //   3. The merged PDF is uploaded to Lob /v1/letters via
+      //      multipart, which prints + mails it.
       const docxBuffer = await fillDocxTemplate(docxTemplate.buffer, ctx);
       if (!docxBuffer.ok) {
         send = { ok: false as const, error: docxBuffer.error };
       } else {
-        const create = await click2mailCreateMergedDocument(correlationId, [
-          {
-            name: docxTemplate.name,
-            buffer: docxBuffer.value,
-            contentType:
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          },
-          ...attachmentFiles,
-        ]);
-        if (!create.ok) {
-          send = { ok: false as const, error: create.error };
+        const merged = await renderDocxAndAttachmentsToPdf(
+          { name: docxTemplate.name, buffer: docxBuffer.value },
+          attachmentFiles
+        );
+        if (!merged.ok) {
+          send = { ok: false as const, error: merged.error };
         } else {
-          send = await click2mailSendFromDocumentId(create.documentId, {
-            to: sendInput.to,
-            mail_class: sendInput.mail_class,
-            color: sendInput.color,
-            correlation_id: sendInput.correlation_id,
-            customer_pricing: sendInput.customer_pricing,
+          send = await sendLetter({
+            ...sendInput,
+            // Provider receives the rendered PDF; HTML body is ignored
+            // when file_pdf is set. Keep body_html as empty so we don't
+            // pay the cost of wrapping merged tokens we won't use.
+            body_html: "",
+            file_pdf: merged.value,
           });
         }
       }

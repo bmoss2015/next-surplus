@@ -298,40 +298,86 @@ export async function lobSendLetter(
     return { ok: false, error: "Lob is not configured (missing LOB_API_KEY)" };
   }
   try {
-    const body = {
-      to: {
-        name: input.to.name,
-        address_line1: input.to.line1,
-        address_line2: input.to.line2 ?? "",
-        address_city: input.to.city,
-        address_state: input.to.state,
-        address_zip: input.to.postal_code,
-        address_country: input.to.country ?? "US",
-      },
-      from: {
-        name: input.from.name,
-        address_line1: input.from.line1,
-        address_line2: input.from.line2 ?? "",
-        address_city: input.from.city,
-        address_state: input.from.state,
-        address_zip: input.from.postal_code,
-        address_country: input.from.country ?? "US",
-      },
-      file: input.body_html,
-      color: input.color === true,
-      mail_type: lobMailType(input.mail_class),
-      use_type: "marketing",
-      metadata: { correlation_id: input.correlation_id },
-    };
-    const res = await lobFetch(`${LOB_BASE_URL}/letters`, {
-      method: "POST",
-      headers: {
-        Authorization: authHeader(),
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    // Two send shapes:
+    //   * file_pdf set → multipart/form-data with the PDF as the `file`
+    //     field (used by the Word-template path after Gotenberg renders
+    //     the merged docx + attachments into a single PDF).
+    //   * otherwise → JSON body with HTML in the `file` field (the
+    //     Blank Letter / HTML-template path). Lob renders the HTML to
+    //     PDF at print time.
+    const hasPdf = !!input.file_pdf;
+    let res: Response;
+    if (hasPdf) {
+      const fd = new FormData();
+      fd.append("to[name]", input.to.name);
+      fd.append("to[address_line1]", input.to.line1);
+      fd.append("to[address_line2]", input.to.line2 ?? "");
+      fd.append("to[address_city]", input.to.city);
+      fd.append("to[address_state]", input.to.state);
+      fd.append("to[address_zip]", input.to.postal_code);
+      fd.append("to[address_country]", input.to.country ?? "US");
+      fd.append("from[name]", input.from.name);
+      fd.append("from[address_line1]", input.from.line1);
+      fd.append("from[address_line2]", input.from.line2 ?? "");
+      fd.append("from[address_city]", input.from.city);
+      fd.append("from[address_state]", input.from.state);
+      fd.append("from[address_zip]", input.from.postal_code);
+      fd.append("from[address_country]", input.from.country ?? "US");
+      fd.append(
+        "file",
+        new Blob([new Uint8Array(input.file_pdf!)], {
+          type: "application/pdf",
+        }),
+        "letter.pdf"
+      );
+      fd.append("color", String(input.color === true));
+      fd.append("mail_type", lobMailType(input.mail_class));
+      fd.append("use_type", "marketing");
+      fd.append("metadata[correlation_id]", input.correlation_id);
+      res = await lobFetch(`${LOB_BASE_URL}/letters`, {
+        method: "POST",
+        headers: {
+          Authorization: authHeader(),
+          Accept: "application/json",
+        },
+        body: fd,
+      });
+    } else {
+      const body = {
+        to: {
+          name: input.to.name,
+          address_line1: input.to.line1,
+          address_line2: input.to.line2 ?? "",
+          address_city: input.to.city,
+          address_state: input.to.state,
+          address_zip: input.to.postal_code,
+          address_country: input.to.country ?? "US",
+        },
+        from: {
+          name: input.from.name,
+          address_line1: input.from.line1,
+          address_line2: input.from.line2 ?? "",
+          address_city: input.from.city,
+          address_state: input.from.state,
+          address_zip: input.from.postal_code,
+          address_country: input.from.country ?? "US",
+        },
+        file: input.body_html,
+        color: input.color === true,
+        mail_type: lobMailType(input.mail_class),
+        use_type: "marketing",
+        metadata: { correlation_id: input.correlation_id },
+      };
+      res = await lobFetch(`${LOB_BASE_URL}/letters`, {
+        method: "POST",
+        headers: {
+          Authorization: authHeader(),
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    }
     if (!res.ok) {
       const raw = await res.text();
       console.error("Lob letter create failed", res.status, raw);

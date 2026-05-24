@@ -530,12 +530,14 @@ function buildRecipients(count: 0 | 1 | 3): RecipientInput[] {
 }
 
 function describeCostSource(provider: string, isCheck: boolean): string {
-  if (provider === "click2mail") return "C2M totalCost (live)";
   if (provider === "lob" && isCheck) {
-    return "hardcoded 116c (Lob Dev tier base — verify against invoice)";
+    return "Lob check rate from app_pricing_config.wholesale_pricing_cents";
   }
-  if (provider === "lob") return "hardcoded 81c (Lob letter base)";
-  if (provider === "stub") return "stub fixture (Lob/C2M not configured)";
+  if (provider === "lob") {
+    return "Lob letter rate from app_pricing_config.wholesale_pricing_cents";
+  }
+  if (provider === "stub") return "stub fixture (Lob not configured)";
+  if (provider === "click2mail") return "legacy C2M row (provider deprecated)";
   return provider;
 }
 
@@ -772,7 +774,7 @@ export async function seedSampleMailData(): Promise<
       include_check: s.include_check ?? false,
       check_amount_cents: s.check_amount_cents ?? null,
       check_memo: s.include_check ? "Surplus Recovery" : null,
-      provider: "click2mail",
+      provider: "lob",
       provider_id: `sample_${randomUUID().slice(0, 8)}`,
       tracking_number: s.tracking_number ?? null,
       tracking_url: s.tracking_number

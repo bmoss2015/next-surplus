@@ -50,7 +50,14 @@ export type LobPricing = {
 export type SendLetterInput = {
   to: Address;
   from: Address;
+  // HTML letter body. Used when file_pdf is not provided. Lob renders
+  // HTML to PDF at print time.
   body_html: string;
+  // PDF buffer for file-template letters (Word doc merged + attachments
+  // converted/concatenated into a single PDF by Gotenberg). When set,
+  // overrides body_html — Lob receives the PDF via multipart upload
+  // instead of HTML.
+  file_pdf?: Buffer;
   mail_class: MailClass;
   // True = print in full color (~$0.10-0.20/piece extra on both providers).
   // False / undefined = black and white. Default is B&W to match the default
