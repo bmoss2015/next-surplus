@@ -15,7 +15,7 @@ import {
   deleteAttorney,
 } from "@/app/(app)/settings/_actions";
 import type { AttorneyRow } from "@/lib/settings/fetch";
-import { StatesPicker } from "@/components/StatesPicker";
+import { StatesPickerCombobox } from "@/components/StatesPickerCombobox";
 
 type Form = {
   name: string;
@@ -200,7 +200,7 @@ export function AttorneyDrawer({
           Click each state this attorney handles, or toggle All States for
           national coverage.
         </div>
-        <StatesPicker
+        <StatesPickerCombobox
           value={form.states}
           onChange={(next) => set("states", next)}
         />

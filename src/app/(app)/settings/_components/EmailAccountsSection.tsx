@@ -61,14 +61,9 @@ export function EmailAccountsSection({
         ))
       )}
 
-      <button
-        type="button"
-        className="inbox-add"
-        disabled
-        title="Connect flow ships in Phase D"
-      >
-        + Connect another inbox
-      </button>
+      {/* "+ Connect another inbox" intentionally removed — only one
+          connected Gmail per user is supported right now. Re-enable when
+          multi-inbox + OAuth-connect flow lands. */}
     </section>
   );
 }
