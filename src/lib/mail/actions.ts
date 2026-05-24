@@ -447,27 +447,29 @@ export async function previewCheckJob(input: {
     return { ok: false, error: "This piece doesn't have a check attached" };
   }
   if (job.provider !== "lob") {
+    // Legacy sample-data rows have provider != "lob". Surface a
+    // friendly message that doesn't expose the underlying provider.
     return {
       ok: false,
-      error: "Check preview only available for Lob-sent pieces",
+      error: "Check preview isn't available for this piece.",
     };
   }
   const checkUrl = (job.tracking_url as string | null) ?? null;
   if (!checkUrl) {
     return {
       ok: false,
-      error: "Check PDF URL isn't available yet, try again in a minute",
+      error: "Check preview isn't ready yet. Try again in a minute.",
     };
   }
   try {
-    // Lob's check `url` is a signed URL that doesn't require the API
-    // key, but proxy through the server so the customer never sees
-    // a Lob-branded URL directly.
+    // Provider's check URL is signed and short-lived, but we proxy it
+    // through the server so the browser never hits a provider-branded
+    // host directly.
     const res = await fetch(checkUrl, { method: "GET" });
     if (!res.ok) {
       return {
         ok: false,
-        error: `Could not fetch check PDF (${res.status})`,
+        error: "Couldn't load the check preview right now. Try again.",
       };
     }
     const buf = Buffer.from(await res.arrayBuffer());
@@ -476,13 +478,10 @@ export async function previewCheckJob(input: {
       base64: buf.toString("base64"),
       recipient_name: (job.recipient_name as string | null) ?? "",
     };
-  } catch (err) {
+  } catch {
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? `Check PDF fetch failed: ${err.message}`
-          : "Check PDF fetch failed",
+      error: "Couldn't load the check preview right now. Try again.",
     };
   }
 }
@@ -1148,11 +1147,15 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         tracking_url: send.tracking_url,
         cost_cents: send.cost_cents,
         provider_cost_cents: send.provider_cost_cents,
-        // Lifecycle: processing (at Lob, being printed) -> in_transit
-        // (Lob attached a tracking_number via .mailed event) -> delivered.
-        // Skip 'processing' when Lob already returned a tracking_number
-        // on the create response (some plans do).
-        status: send.tracking_number ? "in_transit" : "processing",
+        // Every fresh send starts as 'processing' (piece is at the
+        // provider's print plant). The webhook flips status to
+        // 'in_transit' on the provider's .mailed event. Earlier code
+        // checked send.tracking_number on the create response and
+        // upgraded to 'in_transit' immediately — but provider test
+        // environments return a tracking_number eagerly which made
+        // batch sends look mailed before they were. Consistent start
+        // state = consistent UI labels across single and batch sends.
+        status: "processing",
         sent_at: new Date().toISOString(),
         created_by: profile.id,
       })

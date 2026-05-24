@@ -154,11 +154,13 @@ export function LeadMailV11Client({
     key: number;
   } | null>(null);
 
-  // Auto-dismiss the "Letter sent" banner after 4.5 seconds. Re-keyed
-  // on each new send so back-to-back sends each get their own timer.
+  // Auto-dismiss the "Letter sent" banner after 10 seconds, OR when
+  // the user clicks the dismiss X. Earlier 4.5s window was too brief
+  // to be reliably noticed. Re-keyed on each send so back-to-back
+  // sends each get their own timer.
   useEffect(() => {
     if (!sentBanner) return;
-    const t = setTimeout(() => setSentBanner(null), 4500);
+    const t = setTimeout(() => setSentBanner(null), 10000);
     return () => clearTimeout(t);
   }, [sentBanner]);
 
@@ -236,20 +238,42 @@ export function LeadMailV11Client({
 
   return (
     <div className="space-y-5">
-      {/* Send confirmation banner — flashes for ~4.5s after a successful
-          send so the user gets a visible "yes, it went out" cue instead
-          of having to read the new row in the list. */}
+      {/* Send confirmation banner — visible for 10s after a successful
+          send, or until dismissed. Sticky-positioned so it stays in
+          view if the user scrolled. The dismiss X gives a deliberate
+          acknowledgement path. */}
       {sentBanner && (
         <div
           key={sentBanner.key}
-          className="flex items-center gap-2 rounded-lg border border-petrol-500/30 bg-petrol-50 px-4 py-3 text-[13px] text-petrol-700"
+          className="sticky top-0 z-30 flex items-center gap-2 rounded-lg border-2 border-petrol-500/40 bg-petrol-50 px-4 py-3 text-[13px] text-petrol-700"
           role="status"
+          style={{ boxShadow: "0 4px 12px rgba(13, 75, 58, 0.15)" }}
         >
-          <IconCircleCheck size={16} stroke={2} />
-          <span className="font-medium">{sentBanner.msg}</span>
-          <span className="text-petrol-500/70">
+          <IconCircleCheck size={18} stroke={2} className="text-petrol-600" />
+          <span className="font-semibold">{sentBanner.msg}</span>
+          <span className="text-petrol-500/80">
             · Will print today and mail tomorrow
           </span>
+          <button
+            type="button"
+            onClick={() => setSentBanner(null)}
+            className="ml-auto cursor-pointer rounded p-1 text-petrol-700/70 hover:bg-petrol-100 hover:text-petrol-900"
+            aria-label="Dismiss"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
       )}
 

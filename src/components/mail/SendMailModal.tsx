@@ -1108,7 +1108,7 @@ function CheckSample({
         className="relative w-full overflow-hidden rounded-sm border border-gray-300 bg-white"
         style={{ aspectRatio: "6 / 2.75" }}
       >
-        {/* Background watermark stripe — subtle, just adds texture */}
+        {/* Watermark texture so the check reads as paper. */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -1118,85 +1118,86 @@ function CheckSample({
           }}
         />
 
-        <div className="relative grid h-full grid-cols-[1fr_auto] gap-3 p-4 text-[11px] text-ink">
-          {/* Top-left: drawer / from address */}
-          <div className="flex flex-col justify-between">
+        {/* Three-row layout: header (drawer + date + amount), middle
+            (payee + amount-in-words spans full width), footer
+            (memo bottom-left + signature bottom-right spans full
+            width). The earlier version nested memo + signature
+            inside the left column so they only spanned half the
+            check — fix is to lift them to a full-width footer row. */}
+        <div className="relative flex h-full flex-col p-4 text-[11px] text-ink">
+          {/* Header row */}
+          <div className="grid grid-cols-[1fr_auto] gap-4">
             <div className="text-[10.5px] leading-tight">
               <div className="font-semibold">{fromName}</div>
               <div className="text-gray-600">{fromLine1}</div>
               <div className="text-gray-600">{fromCityStateZip}</div>
             </div>
-
-            {/* Payee line */}
-            <div className="mt-2">
-              <div className="flex items-end gap-2">
+            <div className="flex flex-col items-end gap-1 text-right">
+              <div className="flex items-center gap-2">
                 <span className="text-[9px] uppercase tracking-wider text-gray-500">
-                  Pay to the order of
+                  Date
                 </span>
-                <span className="flex-1 border-b border-gray-400 pb-[1px] text-[12px] font-medium text-ink">
-                  {recipientName || "—"}
-                </span>
-              </div>
-              {/* Amount in words */}
-              <div className="mt-2 flex items-end gap-2">
-                <span className="flex-1 border-b border-gray-400 pb-[1px] text-[10px] italic text-gray-700">
-                  {amountWords || "—"}
-                </span>
-                <span className="text-[9px] uppercase tracking-wider text-gray-500">
-                  Dollars
+                <span className="border-b border-gray-400 pb-[1px] px-2 text-[10px] text-ink">
+                  {dateLabel}
                 </span>
               </div>
-            </div>
-
-            {/* Memo + signature — labels BELOW their lines so the
-                check reads like a real business check (Memo on the
-                left, Signature on the right, both with the label
-                anchored under the line). */}
-            <div className="mt-3 grid grid-cols-2 gap-4">
-              <div className="flex flex-col">
-                <div className="border-b border-gray-400 pb-[2px] text-[10px] text-ink min-h-[14px]">
-                  {memo || ""}
-                </div>
-                <div className="mt-0.5 text-[9px] uppercase tracking-wider text-gray-500">
-                  Memo
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <div className="border-b border-gray-400 pb-[2px] min-h-[14px]" />
-                <div className="mt-0.5 text-right text-[9px] uppercase tracking-wider text-gray-500">
-                  Authorized Signature
-                </div>
+              <div
+                className="rounded-sm border border-gray-400 px-2 py-1 text-right tabular-nums"
+                style={{ minWidth: 110 }}
+              >
+                <span className="text-[10px] text-gray-500">$</span>{" "}
+                <span className="text-[14px] font-semibold text-ink">
+                  {amountFmt}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Top-right: date + amount box */}
-          <div className="flex flex-col justify-between text-right">
-            <div className="text-[10px] text-gray-600">
-              <div className="text-[9px] uppercase tracking-wider text-gray-500">
-                Date
-              </div>
-              <div className="border-b border-gray-400 px-2 pb-[1px] text-ink">
-                {dateLabel}
-              </div>
-            </div>
-            <div
-              className="self-end rounded-sm border border-gray-400 px-2 py-1 text-right tabular-nums"
-              style={{ minWidth: 110 }}
-            >
-              <span className="text-[10px] text-gray-500">$</span>{" "}
-              <span className="text-[14px] font-semibold text-ink">
-                {amountFmt}
+          {/* Middle: payee + amount-in-words. Spans full check width. */}
+          <div className="mt-3">
+            <div className="flex items-end gap-2">
+              <span className="text-[9px] uppercase tracking-wider text-gray-500">
+                Pay to the order of
+              </span>
+              <span className="flex-1 border-b border-gray-400 pb-[1px] text-[12px] font-medium text-ink">
+                {recipientName || "—"}
               </span>
             </div>
-            <div className="text-[9px] text-gray-500">{bankLabel}</div>
+            <div className="mt-2 flex items-end gap-2">
+              <span className="flex-1 border-b border-gray-400 pb-[1px] text-[10px] italic text-gray-700">
+                {amountWords || "—"}
+              </span>
+              <span className="text-[9px] uppercase tracking-wider text-gray-500">
+                Dollars
+              </span>
+            </div>
+          </div>
+
+          {/* Spacer pushes the footer to the bottom of the check */}
+          <div className="flex-1" />
+
+          {/* Footer row: memo bottom-left, signature bottom-right.
+              Each block is line-on-top + label-below. The grid
+              spans the full width of the check so memo sits at the
+              left edge and signature at the right edge — same as
+              a real business check. */}
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <div className="border-b border-gray-400 pb-[2px] text-[10px] text-ink" style={{ minHeight: 16 }}>
+                {memo || ""}
+              </div>
+              <div className="mt-0.5 text-[9px] uppercase tracking-wider text-gray-500">
+                Memo
+              </div>
+            </div>
+            <div>
+              <div className="border-b border-gray-400 pb-[2px]" style={{ minHeight: 16 }} />
+              <div className="mt-0.5 text-right text-[9px] uppercase tracking-wider text-gray-500">
+                Authorized Signature
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* MICR stub removed — the dotted placeholder overlapped the
-            memo/signature row and read as visual noise. Real routing
-            and account numbers are printed by the provider; the
-            preview doesn't need a placeholder visualization. */}
       </div>
       <div className="mt-1 text-[10px] text-gray-500">
         Routing and account numbers are pulled from your verified bank
