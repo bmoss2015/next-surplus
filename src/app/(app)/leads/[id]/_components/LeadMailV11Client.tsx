@@ -289,10 +289,20 @@ export function LeadMailV11Client({
         </div>
       ) : (
         <div className="grid grid-cols-[260px_1fr] gap-0 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card">
-          {/* Left rail */}
+          {/* Left rail — newest send at the top. The shared fetcher
+              sorts by terminal-state-first then created_at desc for
+              the /mail dashboard ("needs attention" goes first there);
+              on a single lead's Mail tab the user just wants a strict
+              chronological feed so the most recent send is at the top. */}
           <div className="border-r border-gray-200 bg-gray-50/60">
             <ul className="divide-y divide-gray-150">
-              {rows.map((p) => {
+              {[...rows]
+                .sort((a, b) => {
+                  const ta = a.sent_at ?? a.created_at;
+                  const tb = b.sent_at ?? b.created_at;
+                  return tb.localeCompare(ta);
+                })
+                .map((p) => {
                 const isSelected = p.id === selectedId;
                 return (
                   <li key={p.id}>

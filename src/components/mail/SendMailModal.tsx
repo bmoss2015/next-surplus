@@ -1128,21 +1128,24 @@ function CheckSample({
               </div>
             </div>
 
-            {/* Memo + signature line */}
-            <div className="mt-2 flex items-end gap-3 text-[10px] text-gray-600">
-              <div className="flex flex-1 items-end gap-1">
-                <span className="text-[9px] uppercase tracking-wider text-gray-500">
-                  Memo
-                </span>
-                <span className="flex-1 border-b border-gray-400 pb-[1px] text-ink">
+            {/* Memo + signature — labels BELOW their lines so the
+                check reads like a real business check (Memo on the
+                left, Signature on the right, both with the label
+                anchored under the line). */}
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <div className="border-b border-gray-400 pb-[2px] text-[10px] text-ink min-h-[14px]">
                   {memo || ""}
-                </span>
+                </div>
+                <div className="mt-0.5 text-[9px] uppercase tracking-wider text-gray-500">
+                  Memo
+                </div>
               </div>
-              <div className="flex flex-1 items-end gap-1">
-                <span className="flex-1 border-b border-gray-400 pb-[1px]" />
-                <span className="text-[9px] uppercase tracking-wider text-gray-500">
-                  Signature
-                </span>
+              <div className="flex flex-col">
+                <div className="border-b border-gray-400 pb-[2px] min-h-[14px]" />
+                <div className="mt-0.5 text-right text-[9px] uppercase tracking-wider text-gray-500">
+                  Authorized Signature
+                </div>
               </div>
             </div>
           </div>
