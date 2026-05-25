@@ -1,7 +1,7 @@
 :root {
         --bg: #ffffff;
         --surface: #ffffff;
-        --rail: #fafbfc;
+        --rail: #ffffff;
         --canvas: #fafbfc;
         --ink: #0a0d14;
         --ink-2: #1a1d24;
@@ -101,7 +101,7 @@
       }
       .rail-section {
         font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
-        text-transform: uppercase; color: var(--text-3);
+        text-transform: uppercase; color: var(--text-2);
         padding: 16px 18px 8px 18px;
       }
       .rail-section:first-child { padding-top: 8px; }

@@ -5,9 +5,10 @@ export type CurrentProfile = {
   id: string;
   email: string | null;
   fullName: string;
-  role: "admin" | "member";
+  role: "admin" | "member" | "owner";
   orgId: string;
   isAdmin: boolean;
+  isOwner: boolean;
   avatarUrl: string | null;
   timeZone: string | null;
 };
@@ -28,14 +29,20 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
     .maybeSingle();
   if (error || !data) return null;
 
-  const role = data.role === "admin" ? "admin" : "member";
+  // Owner inherits admin (every existing admin gate must pass for the owner).
+  const raw = data.role as string;
+  const role: CurrentProfile["role"] =
+    raw === "owner" ? "owner" : raw === "admin" ? "admin" : "member";
+  const isOwner = role === "owner";
+  const isAdmin = role === "admin" || isOwner;
   return {
     id: data.id as string,
     email: (data.email as string | null) ?? user.email ?? null,
     fullName: (data.full_name as string | null) ?? user.email ?? "User",
     role,
     orgId: data.org_id as string,
-    isAdmin: role === "admin",
+    isAdmin,
+    isOwner,
     avatarUrl: (data.avatar_url as string | null) ?? null,
     timeZone: (data.time_zone as string | null) ?? null,
   };
@@ -50,6 +57,20 @@ export async function requireAdmin(): Promise<
   if (!profile) return { ok: false, error: "Not signed in" };
   if (!profile.isAdmin) {
     return { ok: false, error: "Only admins can do that" };
+  }
+  return { ok: true };
+}
+
+// Owner-only gate. Used by server actions that read or mutate cross-customer
+// data (provider costs, margin, etc.) where even an org admin should not have
+// access.
+export async function requireOwner(): Promise<
+  { ok: true } | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  if (!profile.isOwner) {
+    return { ok: false, error: "Owner only" };
   }
   return { ok: true };
 }

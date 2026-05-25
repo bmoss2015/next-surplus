@@ -887,8 +887,8 @@ export async function upsertRelative(
     .maybeSingle();
 
   revalidatePath(`/leads/${leadId}`);
-  // Bust Settings cache so the Billing credit meter reflects any new
-  // validation on relative phone slots.
+  // Bust the Settings page cache so the Billing meter refreshes if a
+  // relative phone slot triggered a validation.
   revalidatePath("/settings");
   return {
     ok: true,

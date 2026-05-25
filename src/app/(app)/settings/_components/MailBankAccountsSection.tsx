@@ -49,7 +49,7 @@ export function MailBankAccountsSection({
           <h1 className="section-h1">Bank Accounts</h1>
           <p className="section-desc">
             Bank accounts used to fund outgoing checks and certified mail
-            through Lob. ACH only — credit and debit cards aren&apos;t
+            through Lob. ACH only, credit and debit cards aren&apos;t
             eligible since the network won&apos;t draw checks against a
             credit line. Your monthly Moss Equity subscription is billed
             separately in <a href="#billing">Billing</a>.

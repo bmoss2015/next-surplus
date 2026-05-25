@@ -23,6 +23,7 @@ import { NotesTab } from "./_components/NotesTab";
 import { LeadTasksTab } from "./_components/LeadTasksTab";
 import { ActivityTab } from "./_components/ActivityTab";
 import { ConversationTab } from "./_components/ConversationTab";
+import { MailTab } from "./_components/MailTab";
 import { RecoveryFeeField } from "./_components/RecoveryFeeField";
 import { ConfirmedSurplusProvider } from "./_components/ConfirmedSurplusContext";
 
@@ -34,6 +35,7 @@ const VALID_TABS: TabKey[] = [
   "contacts",
   "research",
   "documents",
+  "mail",
   "notes",
   "tasks",
   "conversation",
@@ -112,6 +114,7 @@ export default async function LeadDetailPage({
             {activeTab === "contacts" && <ContactsTab leadId={lead.id} />}
             {activeTab === "research" && <ResearchTab lead={lead} />}
             {activeTab === "documents" && <DocumentsTab leadId={lead.id} />}
+            {activeTab === "mail" && <MailTab leadId={lead.id} />}
             {activeTab === "notes" && <NotesTab leadId={lead.id} />}
             {activeTab === "tasks" && <LeadTasksTab leadId={lead.id} />}
             {activeTab === "conversation" && <ConversationTab leadId={lead.id} />}

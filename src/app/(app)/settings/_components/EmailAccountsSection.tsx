@@ -1,12 +1,14 @@
-// Settings clone · Phase C.3 — Email Accounts wired to real data (display).
-//
-// Lists the currently-signed-in user's connected channel accounts. The
-// per-account toggles (sync read, send default, auto-archive, daily digest)
-// are visual-only here — only sync_read_to_provider has a column today; the
-// other three are surfaced for parity with the mockup. Disconnect / Connect
-// another inbox link to the existing OAuth flow (out of scope for Phase C;
-// Phase D wires them).
+"use client";
 
+// Email Accounts panel. Lists the connected Gmail accounts and provides
+// a Disconnect button (server action wired) with a confirmation prompt.
+// Per-account preference toggles (sync read, send default, auto-archive,
+// daily digest) are still display-only since the underlying columns
+// don't all exist; Disconnect is the action that actually fires now.
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { disconnectEmailAccount } from "@/app/(app)/settings/_email-actions";
 import type { EmailAccountRow } from "@/lib/email/types";
 
 function formatSyncedAt(ts: string | null): string {
@@ -48,7 +50,7 @@ export function EmailAccountsSection({
       {initial.length === 0 ? (
         <div
           className="inbox-head"
-          style={{ color: "var(--text-3)", fontSize: 13 }}
+          style={{ color: "var(--text-2)", fontSize: 13 }}
         >
           No email accounts connected. Use the button below to start the
           Gmail OAuth flow.
@@ -59,25 +61,42 @@ export function EmailAccountsSection({
         ))
       )}
 
-      <button
-        type="button"
-        className="inbox-add"
-        disabled
-        title="Connect flow ships in Phase D"
-      >
-        + Connect another inbox
-      </button>
+      {/* "+ Connect another inbox" intentionally removed — only one
+          connected Gmail per user is supported right now. Re-enable when
+          multi-inbox + OAuth-connect flow lands. */}
     </section>
   );
 }
 
 function AccountBlock({ acct }: { acct: EmailAccountRow }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
   const statusText =
     acct.status === "active"
       ? `Active · ${formatSyncedAt(acct.last_synced_at).toLowerCase()}`
       : acct.status === "reauth_required"
         ? "Re-authentication required"
         : "Disabled";
+
+  function onClickDisconnect() {
+    if (!confirming) {
+      setConfirming(true);
+      setErr(null);
+      return;
+    }
+    startTransition(async () => {
+      const res = await disconnectEmailAccount(acct.id);
+      if (!res.ok) {
+        setErr(res.error);
+        setConfirming(false);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   return (
     <>
@@ -103,14 +122,31 @@ function AccountBlock({ acct }: { acct: EmailAccountRow }) {
             <span className="inbox-status-pulse" />
             {statusText}
           </div>
+          {err && (
+            <div
+              className="mt-1 text-[11.5px]"
+              style={{ color: "var(--danger)" }}
+            >
+              {err}
+            </div>
+          )}
         </div>
         <button
           type="button"
           className="btn btn-ghost btn-sm inbox-disconnect"
-          disabled
-          title="Disconnect ships in Phase D"
+          onClick={onClickDisconnect}
+          disabled={pending}
+          style={
+            confirming
+              ? { color: "var(--danger)", borderColor: "var(--danger)" }
+              : undefined
+          }
         >
-          Disconnect
+          {pending
+            ? "Disconnecting…"
+            : confirming
+              ? "Click again to confirm"
+              : "Disconnect"}
         </button>
       </div>
 

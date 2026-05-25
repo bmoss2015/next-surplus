@@ -18,6 +18,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Drawer } from "./Drawer";
 import { MergeFieldPicker } from "./MergeFieldPicker";
+import { US_STATES as US_STATE_OPTIONS } from "@/components/StatesPicker";
 import {
   upsertTemplate,
   deleteTemplate,
@@ -305,6 +306,7 @@ function ResearchEditor({
 }) {
   const router = useRouter();
   const [name, setName] = useState(row?.name ?? "");
+  const [description, setDescription] = useState(row?.description ?? "");
   const [stateCode, setStateCode] = useState(row?.state ?? "");
   const [saleType, setSaleType] = useState<"TAX" | "MTG" | "">(
     row?.sale_type ?? ""
@@ -323,6 +325,7 @@ function ResearchEditor({
       // Re-seed the step editor fields each time the drawer opens for a new row.
       /* eslint-disable react-hooks/set-state-in-effect */
       setName(row?.name ?? "");
+      setDescription(row?.description ?? "");
       setStateCode(row?.state ?? "");
       setSaleType(row?.sale_type ?? "");
       setSteps(
@@ -358,6 +361,7 @@ function ResearchEditor({
       const res = await upsertResearchTemplate({
         id: row?.id ?? null,
         name: name.trim(),
+        description: description.trim() || null,
         state: stateCode.trim() || null,
         sale_type: saleType || null,
         steps: steps.map((s) => ({
@@ -447,15 +451,37 @@ function ResearchEditor({
         />
       </div>
       <div className="drawer-field">
-        <label className="drawer-label">State</label>
-        <input
-          className="input"
-          style={{ width: 120 }}
-          value={stateCode}
-          onChange={(e) => setStateCode(e.target.value.toUpperCase())}
-          placeholder="TX"
-          maxLength={2}
+        <label className="drawer-label">Description</label>
+        <div className="drawer-hint">
+          Optional context shown on the research checklist on each lead.
+        </div>
+        <textarea
+          className="input drawer-textarea"
+          style={{ width: "100%" }}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Outlines the steps to pull SOS filings and tax-sale notices for Texas leads."
         />
+      </div>
+      <div className="drawer-field">
+        <label className="drawer-label">State</label>
+        <div className="drawer-hint">
+          Which state does this checklist apply to. Pick All States for a
+          template that runs on every lead regardless of state.
+        </div>
+        <select
+          className="input"
+          style={{ width: 220 }}
+          value={stateCode}
+          onChange={(e) => setStateCode(e.target.value)}
+        >
+          <option value="">All States</option>
+          {US_STATE_OPTIONS.map((s) => (
+            <option key={s.code} value={s.code}>
+              {s.code} — {s.label}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="drawer-field">
         <label className="drawer-label">Sale Type</label>

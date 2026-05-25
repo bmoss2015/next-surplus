@@ -22,19 +22,50 @@ type LobEvent = {
   };
 };
 
+// Maps every Lob letter / check event we care about to one of our
+// MailStatus buckets. Lob's pipeline goes:
+//   created -> rendered_pdf -> printing -> mailed -> in_transit ->
+//   in_local_area -> processed_for_delivery -> delivered
+// (with returned_to_sender or re-routed as alt branches).
+//
+// We map:
+//   * created / rendered_pdf / printing -> stay at "queued" (no
+//     status change, but webhook still updates tracking_number when
+//     one is attached). The dashboard labels queued pieces "Processing"
+//     until tracking_number lands.
+//   * mailed -> "in_transit" (USPS now has the piece; this is the
+//     point where Lob attaches a USPS tracking_number).
+//   * in_transit / in_local_area / processed_for_delivery / re-routed
+//     -> "in_transit" (in-flight states).
+//   * delivered -> "delivered".
+//   * returned_to_sender -> "returned".
+//   * failed -> "failed" (print or render failure).
+const QUEUED_EVENTS = new Set([
+  "letter.created",
+  "letter.rendered_pdf",
+  "letter.printing",
+  "check.created",
+  "check.rendered_pdf",
+  "check.printing",
+]);
+
 const STATUS_BY_EVENT: Record<string, "in_transit" | "delivered" | "returned" | "failed"> = {
+  "letter.mailed": "in_transit",
   "letter.in_transit": "in_transit",
   "letter.in_local_area": "in_transit",
   "letter.processed_for_delivery": "in_transit",
   "letter.delivered": "delivered",
   "letter.re-routed": "in_transit",
   "letter.returned_to_sender": "returned",
+  "letter.failed": "failed",
+  "check.mailed": "in_transit",
   "check.in_transit": "in_transit",
   "check.in_local_area": "in_transit",
   "check.processed_for_delivery": "in_transit",
   "check.delivered": "delivered",
   "check.re-routed": "in_transit",
   "check.returned_to_sender": "returned",
+  "check.failed": "failed",
 };
 
 function verifySignature(rawBody: string, signature: string | null): boolean {
@@ -83,16 +114,21 @@ export async function POST(req: NextRequest) {
   }
 
   // Letter / check status changes update mail_jobs.
-  const mappedStatus = STATUS_BY_EVENT[eventType] ?? null;
   const providerId = event.body?.id;
-  if (!mappedStatus || !providerId) {
+  const isQueuedEvent = QUEUED_EVENTS.has(eventType);
+  const mappedStatus = STATUS_BY_EVENT[eventType] ?? null;
+  if ((!mappedStatus && !isQueuedEvent) || !providerId) {
     return NextResponse.json({ ok: true, noop: true });
   }
+
+  // (Time-based gate applied AFTER we look up the row — see below.)
 
   const sb = createServiceClient();
   const { data: job } = await sb
     .from("mail_jobs")
-    .select("id, lead_id, recipient_name, status")
+    .select(
+      "id, lead_id, recipient_name, recipient_city, recipient_state, status, org_id, created_by, include_check, sent_at, created_at"
+    )
     .eq("provider", "lob")
     .eq("provider_id", providerId)
     .maybeSingle();
@@ -100,11 +136,63 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, noop: true });
   }
 
+  // Time-based realism gate: Lob's test mode fires .mailed /
+  // .in_transit events within seconds of letter create, which is
+  // useful for testing terminal-state code paths but makes fresh
+  // sends look already-mailed in the UI before the user has even
+  // seen the Printing pill. Real-world Lob fires these events
+  // 12-24 hours after create when USPS actually picks up the
+  // mail. Anything in-flight arriving within 5 minutes of sent_at
+  // is treated as a test-mode artifact and ignored. Terminal
+  // events (delivered/returned/failed) always go through — those
+  // are real signals regardless of timing.
+  const inflightEventTypes = new Set([
+    "letter.mailed",
+    "check.mailed",
+    "letter.in_transit",
+    "check.in_transit",
+    "letter.in_local_area",
+    "check.in_local_area",
+    "letter.processed_for_delivery",
+    "check.processed_for_delivery",
+    "letter.re-routed",
+    "check.re-routed",
+  ]);
+  if (inflightEventTypes.has(eventType)) {
+    const referenceTs =
+      (job.sent_at as string | null) ?? (job.created_at as string | null);
+    if (referenceTs) {
+      const ageMs = Date.now() - new Date(referenceTs).getTime();
+      if (ageMs < 5 * 60 * 1000) {
+        return NextResponse.json({
+          ok: true,
+          noop: true,
+          reason: "inflight_event_too_soon",
+        });
+      }
+    }
+  }
+
   const update: Record<string, unknown> = {};
-  if (mappedStatus !== job.status) {
-    update.status = mappedStatus;
-    if (mappedStatus === "delivered") update.delivered_at = new Date().toISOString();
-    if (mappedStatus === "returned") update.returned_at = new Date().toISOString();
+  // Status transition rules: processing rows advance whenever an
+  // in-flight or terminal event arrives; everything else just respects
+  // the mapping. Don't bump in_transit back to processing.
+  if (mappedStatus && mappedStatus !== job.status) {
+    const canAdvance =
+      job.status === "processing" ||
+      job.status === "queued" ||
+      (job.status === "in_transit" &&
+        (mappedStatus === "delivered" ||
+          mappedStatus === "returned" ||
+          mappedStatus === "failed")) ||
+      mappedStatus === "delivered" ||
+      mappedStatus === "returned" ||
+      mappedStatus === "failed";
+    if (canAdvance) {
+      update.status = mappedStatus;
+      if (mappedStatus === "delivered") update.delivered_at = new Date().toISOString();
+      if (mappedStatus === "returned") update.returned_at = new Date().toISOString();
+    }
   }
   if (event.body?.tracking_number) {
     update.tracking_number = event.body.tracking_number;
@@ -127,6 +215,25 @@ export async function POST(req: NextRequest) {
         recipient_name: job.recipient_name,
         tracking_number: event.body?.tracking_number ?? null,
       },
+    });
+  }
+
+  // Bell notification on terminal states only — in_transit is noise.
+  if (
+    job.created_by &&
+    (mappedStatus === "delivered" || mappedStatus === "returned")
+  ) {
+    const kindLabel = job.include_check ? "Check" : "Letter";
+    const cityState = `${job.recipient_city}, ${job.recipient_state}`;
+    const statusLabel =
+      mappedStatus === "delivered" ? "delivered" : "returned to sender";
+    await sb.from("notifications").insert({
+      org_id: job.org_id,
+      recipient_id: job.created_by,
+      actor_id: null,
+      type: `mail_${mappedStatus}`,
+      lead_id: job.lead_id ?? null,
+      body_preview: `${kindLabel} to ${job.recipient_name} in ${cityState} ${statusLabel}`,
     });
   }
 

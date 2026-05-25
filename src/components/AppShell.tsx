@@ -12,19 +12,22 @@ export function AppShell({
   userName,
   userEmail,
   isAdmin,
+  isOwner,
 }: {
   children: React.ReactNode;
   userName: string;
   userEmail: string | null;
   isAdmin: boolean;
+  isOwner: boolean;
 }) {
   return (
-    <RoleProvider isAdmin={isAdmin}>
+    <RoleProvider isAdmin={isAdmin} isOwner={isOwner}>
       <div className="flex h-screen w-screen overflow-hidden bg-canvas">
         <IconSidebar
           userName={userName}
           userEmail={userEmail}
           isAdmin={isAdmin}
+          isOwner={isOwner}
         />
         <div className="flex flex-1 flex-col overflow-hidden bg-surface-muted">
           <Topbar />

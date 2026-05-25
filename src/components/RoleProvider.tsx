@@ -2,17 +2,24 @@
 
 import { createContext, useContext } from "react";
 
-const RoleContext = createContext<{ isAdmin: boolean }>({ isAdmin: false });
+const RoleContext = createContext<{ isAdmin: boolean; isOwner: boolean }>({
+  isAdmin: false,
+  isOwner: false,
+});
 
 export function RoleProvider({
   isAdmin,
+  isOwner,
   children,
 }: {
   isAdmin: boolean;
+  isOwner: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <RoleContext.Provider value={{ isAdmin }}>{children}</RoleContext.Provider>
+    <RoleContext.Provider value={{ isAdmin, isOwner }}>
+      {children}
+    </RoleContext.Provider>
   );
 }
 

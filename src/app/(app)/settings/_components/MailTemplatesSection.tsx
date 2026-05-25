@@ -777,7 +777,7 @@ function MailTemplateForm({
             installed and will substitute with a different one, which can
             shift the layout (tables and paragraphs may overlap). To fix:
             open the .docx in Word, change to one of these supported
-            fonts, save and re-upload —{" "}
+            fonts, save and re-upload:{" "}
             <span className="font-mono">
               Arial, Calibri, Times New Roman, Roboto, Inter, Open Sans,
               Lato, Montserrat, Poppins, Merriweather, Lora, Source Serif
@@ -915,7 +915,7 @@ function MailTemplateForm({
           >
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
               <div className="text-[13px] font-semibold text-ink">
-                {name || "Template"} — Full Screen Edit
+                {name || "Template"}, Full Screen Edit
               </div>
               <button
                 type="button"

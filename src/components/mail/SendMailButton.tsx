@@ -26,6 +26,19 @@ export type SendMailButtonProps = {
   // out the button without the user needing to open the modal first.
   mailReady: boolean;
   fromAddress: SendMailFromAddress;
+  // Customer-facing rate schedule. Passed to the modal so the cost
+  // estimate reflects "what you'll pay" not the underlying provider cost.
+  pricing?: {
+    letter_first_class_bw: number;
+    letter_first_class_color: number;
+    letter_standard_bw: number;
+    letter_standard_color: number;
+    letter_certified_bw: number;
+    letter_certified_color: number;
+    letter_extra_page_bw: number;
+    letter_extra_page_color: number;
+    check_base: number;
+  } | null;
 };
 
 export function SendMailButton({
@@ -38,6 +51,7 @@ export function SendMailButton({
   className,
   mailReady,
   fromAddress,
+  pricing,
 }: SendMailButtonProps) {
   const [open, setOpen] = useState(false);
   // Always render the button as clickable — the modal carries the
@@ -70,6 +84,7 @@ export function SendMailButton({
           defaultMailClass={defaultMailClass}
           mailReady={mailReady}
           fromAddress={fromAddress}
+          pricing={pricing}
         />
       )}
     </>

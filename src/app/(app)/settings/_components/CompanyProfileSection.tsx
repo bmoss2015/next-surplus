@@ -10,6 +10,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateOrgInfo } from "@/app/(app)/settings/_actions";
+import { useSaveBarSection } from "@/components/SettingsSaveBar";
 import {
   uploadOrgLogo,
   removeOrgLogo,
@@ -59,10 +60,30 @@ export function CompanyProfileSection({ initial }: { initial: OrgInfo }) {
     setSaving(false);
     if (!res.ok) {
       setErrMsg(res.error);
-      return;
+      return { ok: false as const, error: res.error };
     }
     router.refresh();
+    return { ok: true as const };
   }
+
+  // Register with the global Settings save bar so users don't have to
+  // scroll to find an inline Save Changes button. ready blocks save when
+  // org name is empty (required field). Discard reverts the form to the
+  // last fetched snapshot.
+  useSaveBarSection("settings-company-profile", {
+    isDirty: dirty,
+    save: async () => {
+      if (!ready) {
+        return { ok: false, error: "Company Name is required" };
+      }
+      const r = await onSave();
+      return r;
+    },
+    discard: () => {
+      setForm(initial);
+      setErrMsg(null);
+    },
+  });
 
   const initials = (form.name || form.legal_name || "Org")
     .trim()
@@ -268,27 +289,12 @@ export function CompanyProfileSection({ initial }: { initial: OrgInfo }) {
         />
       </PrefRow>
 
-      {(dirty || errMsg) && (
+      {/* Inline Save/Discard removed — commits flow through the global
+          bottom-right SettingsSaveBar so the controls are reachable
+          without scrolling. errMsg still rendered here for in-context
+          feedback when a save fails. */}
+      {errMsg && (
         <div className="mt-6 flex items-center gap-3">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={!ready || saving}
-            onClick={onSave}
-          >
-            {saving ? "Saving…" : "Save Changes"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={saving}
-            onClick={() => {
-              setForm(initial);
-              setErrMsg(null);
-            }}
-          >
-            Discard
-          </button>
           {errMsg && (
             <span style={{ color: "var(--danger)", fontSize: 12.5 }}>
               {errMsg}

@@ -31,6 +31,12 @@ export type ContactRow = {
   is_litigator: boolean;
   mailed: boolean;
   mailed_at: string | null;
+  // Number of physical mailings sent to this address (migration 0132).
+  // Pairs with mailed_at for the "Mailed 2x . last May 24" chip.
+  // Optional: stays 0 / undefined until migration 0132 has been
+  // applied. The chip falls back to "Mailed [date]" when count is
+  // not > 1.
+  mail_count?: number;
   // Only meaningful for channel='mailing_address' rows. Stores the recipient
   // label shown in the picker (e.g. "John Doe (Owner)"). Phone/email rows
   // write null. Renamed from `notes` in migration 0107.

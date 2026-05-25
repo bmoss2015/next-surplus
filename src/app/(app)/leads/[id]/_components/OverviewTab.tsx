@@ -21,6 +21,7 @@ import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
 import { formatPhone } from "@/lib/format/phone";
 import { SurplusBreakdown } from "./Overview/SurplusBreakdown";
 import { SectionSubheader } from "./SectionSubheader";
+import { MailCard } from "./MailCard";
 import { cn } from "@/lib/cn";
 
 // Fix XXXX2: Overview is a read-only deal snapshot. Order, top to bottom:
@@ -191,6 +192,9 @@ export async function OverviewTab({ lead }: { lead: LeadDetailWithCounts }) {
           )}
           <CardLink href={`/leads/${leadId}?tab=documents`}>Open Documents</CardLink>
         </div>
+
+        {/* Mail — last 5 pieces sent to this lead */}
+        <MailCard leadId={leadId} />
       </div>
 
       {/* Recent Activity — full width */}

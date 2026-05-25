@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { SubRail, GROUPS } from "./SubRail";
 import { Placeholder } from "./Placeholder";
+import { SettingsSaveProvider } from "@/components/SettingsSaveBar";
 
 import { ProfileSection } from "./ProfileSection";
 import { SecuritySection } from "./SecuritySection";
@@ -23,11 +24,15 @@ import { AttorneysSection } from "./AttorneysSection";
 import { ContactRolesSection } from "./ContactRolesSection";
 import { MailSettingsSection } from "./MailSettingsSection";
 import { MailBankAccountsSection } from "./MailBankAccountsSection";
+import { LobPricingSection } from "./LobPricingSection";
+import { CustomerPricingViewSection } from "./CustomerPricingViewSection";
 import { TemplatesSection } from "./TemplatesSection";
 
 import type {
   AppSettings,
   AttorneyRow,
+  CustomerPricingViewData,
+  LobPricingSettings,
   LostReasonAdminRow,
   MailBankAccountRow,
   MailSettings,
@@ -60,6 +65,8 @@ export type SettingsData = {
   emailAccounts: EmailAccountRow[];
   mailSettings: MailSettings | null;
   mailBank: MailBankAccountRow[];
+  lobPricing: LobPricingSettings | null;
+  customerPricing: CustomerPricingViewData | null;
   templates: TemplateRow[];
   research: ResearchTemplateRow[];
   phoneUsage: PhoneValidationUsage | null;
@@ -112,17 +119,21 @@ export function SettingsPreviewJsx({
   // and Topbar handle the global chrome. This component only renders the
   // settings-internal sub-rail + active panel.
   return (
-    <div className="flex h-full">
-      <SubRail
-        active={railActive}
-        onSelect={pick}
-        isAdmin={currentUser.isAdmin}
-        counts={counts}
-      />
-      <main className="flex-1 overflow-y-auto scroll-area">
-        <div className="content">{renderPanel(active, currentUser, data)}</div>
-      </main>
-    </div>
+    <SettingsSaveProvider>
+      <div className="flex h-full">
+        <SubRail
+          active={railActive}
+          onSelect={pick}
+          isAdmin={currentUser.isAdmin}
+          counts={counts}
+        />
+        <main className="flex-1 overflow-y-auto scroll-area">
+          <div className="content">
+            {renderPanel(active, currentUser, data)}
+          </div>
+        </main>
+      </div>
+    </SettingsSaveProvider>
   );
 }
 
@@ -198,6 +209,12 @@ function renderPanel(
       );
     case "mail-bank":
       return <MailBankAccountsSection initial={data.mailBank} />;
+    case "mail-customer-pricing":
+      return <CustomerPricingViewSection data={data.customerPricing} />;
+    case "mail-pricing":
+      // Legacy key kept for back-compat with any saved hash URLs.
+      // Renders the same customer-facing view as the new key above.
+      return <CustomerPricingViewSection data={data.customerPricing} />;
     case "templates":
       return (
         <TemplatesSection

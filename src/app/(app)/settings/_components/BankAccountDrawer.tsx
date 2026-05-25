@@ -133,7 +133,7 @@ function AddDrawer({
         <div className="drawer-hint">
           Numbers are forwarded to Lob and stored there. The portal only
           keeps the last four digits for display. Lob will deposit two
-          small amounts (under $1 each) in 1-2 business days — enter them
+          small amounts (under $1 each) in 1 to 2 business days. Enter them
           here from this drawer to verify.
         </div>
       </div>

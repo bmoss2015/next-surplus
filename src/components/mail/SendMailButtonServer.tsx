@@ -3,6 +3,7 @@ import {
   fetchMailTemplates,
   fetchMailBankAccounts,
   fetchOrgInfo,
+  fetchMyCustomerPricing,
 } from "@/lib/settings/fetch";
 import { SendMailButton, type SendMailButtonProps } from "./SendMailButton";
 
@@ -12,13 +13,14 @@ type Props = Omit<
 >;
 
 // Server wrapper that fetches the org's templates + verified bank accounts
-// and forwards them to the client component. Saves every caller from
-// touching the settings fetchers directly.
+// + customer pricing schedule and forwards them to the client component.
+// Saves every caller from touching the settings fetchers directly.
 export async function SendMailButtonServer(props: Props) {
-  const [templates, bankAccounts, org] = await Promise.all([
+  const [templates, bankAccounts, org, customerPricing] = await Promise.all([
     fetchMailTemplates(),
     fetchMailBankAccounts(),
     fetchOrgInfo(),
+    fetchMyCustomerPricing(),
   ]);
   const banks = bankAccounts.map((b) => ({
     id: b.id,
@@ -53,6 +55,7 @@ export async function SendMailButtonServer(props: Props) {
       bankAccounts={banks}
       mailReady={mailReady}
       fromAddress={fromAddress}
+      pricing={customerPricing?.customer_mail_pricing_cents ?? null}
     />
   );
 }

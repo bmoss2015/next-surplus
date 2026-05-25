@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
   const sb = createServiceClient();
   const { data: job, error: findErr } = await sb
     .from("mail_jobs")
-    .select("id, lead_id, recipient_name, status")
+    .select(
+      "id, lead_id, recipient_name, recipient_city, recipient_state, status, org_id, created_by"
+    )
     .eq("provider", "click2mail")
     .eq("provider_id", providerId)
     .maybeSingle();
@@ -92,6 +94,33 @@ export async function POST(req: NextRequest) {
         recipient_name: job.recipient_name,
         tracking_number: body.trackingNumber ?? null,
       },
+    });
+  }
+
+  // Bell notification on terminal states only. in_transit fires multiple
+  // times per piece (printed → mailed → out_for_delivery), which would
+  // turn the bell into noise. Webhook runs without auth, so we set
+  // org_id explicitly (service client bypasses the table default).
+  if (
+    job.created_by &&
+    (mappedStatus === "delivered" ||
+      mappedStatus === "returned" ||
+      mappedStatus === "failed")
+  ) {
+    const cityState = `${job.recipient_city}, ${job.recipient_state}`;
+    const statusLabel =
+      mappedStatus === "delivered"
+        ? "delivered"
+        : mappedStatus === "returned"
+          ? "returned to sender"
+          : "failed";
+    await sb.from("notifications").insert({
+      org_id: job.org_id,
+      recipient_id: job.created_by,
+      actor_id: null,
+      type: `mail_${mappedStatus}`,
+      lead_id: job.lead_id ?? null,
+      body_preview: `Mail to ${job.recipient_name} in ${cityState} ${statusLabel}`,
     });
   }
 

@@ -8,10 +8,19 @@ import {
   IconClock,
   IconFile,
   IconCircleDot,
+  IconMail,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import type { ActivityFullRow, DocumentRow } from "@/lib/leads/fetch-tab-data";
 import { formatActivity, relativeTime, activityActorName } from "@/lib/leads/activity-format";
 import { DocumentViewerModal, type ViewerDoc } from "./DocumentViewerModal";
+import { MailStatusPill } from "@/components/mail/MailStatusPill";
+import {
+  LetterPreviewModal,
+  type LetterPreviewData,
+} from "@/components/mail/LetterPreviewModal";
+import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
+import type { MailStatus } from "@/lib/mail/fetch";
 
 const ICONS = {
   create: IconSparkles,
@@ -27,6 +36,12 @@ function docLabel(doc: DocumentRow): string {
   return doc.filename;
 }
 
+const MAIL_ACTIVITY_TO_STATUS: Record<string, MailStatus> = {
+  mail_sent: "in_transit",
+  mail_delivered: "delivered",
+  mail_returned: "returned",
+};
+
 export function ActivityTabClient({
   rows,
   leadSource,
@@ -37,6 +52,9 @@ export function ActivityTabClient({
   documents: DocumentRow[];
 }) {
   const [viewer, setViewer] = useState<ViewerDoc | null>(null);
+  const [letterPreview, setLetterPreview] = useState<LetterPreviewData | null>(
+    null
+  );
 
   // Match a document_uploaded activity to a real document row by filename so we
   // can open the viewer from the timeline.
@@ -47,6 +65,20 @@ export function ActivityTabClient({
     return (
       documents.find((d) => d.filename === filename && d.storage_path) ?? null
     );
+  }
+
+  function isMailRow(row: ActivityFullRow): boolean {
+    return Boolean(MAIL_ACTIVITY_TO_STATUS[row.activity_type]);
+  }
+
+  async function openLetter(mailJobId: string, recipientName: string, trackingUrl: string | null) {
+    const detail = await fetchMailJobAction(mailJobId);
+    setLetterPreview({
+      jobId: mailJobId,
+      recipientName,
+      bodyHtml: detail?.body_html ?? null,
+      trackingUrl: detail?.tracking_url ?? trackingUrl,
+    });
   }
 
   return (
@@ -76,13 +108,24 @@ export function ActivityTabClient({
               const Icon = ICONS[icon];
               const actor = activityActorName(row);
               const doc = docForActivity(row);
+              const mailStatus = MAIL_ACTIVITY_TO_STATUS[row.activity_type];
+              const mailJobId =
+                (row.payload?.mail_job_id as string | undefined) ?? null;
+              const trackingUrl =
+                (row.payload?.tracking_url as string | undefined) ?? null;
+              const mailRecipient =
+                (row.payload?.recipient_name as string | undefined) ?? "";
               return (
                 <div key={row.id} className="relative flex items-start gap-3 pl-0">
                   <div className="relative z-10 flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-gray-200 bg-surface">
-                    <Icon size={13} stroke={1.75} className="text-gray-500" />
+                    {isMailRow(row) ? (
+                      <IconMail size={13} stroke={1.75} className="text-gray-500" />
+                    ) : (
+                      <Icon size={13} stroke={1.75} className="text-gray-500" />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1 pt-1">
-                    <div className="text-[13px] text-ink">
+                    <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink">
                       {doc ? (
                         <>
                           Document Uploaded —{" "}
@@ -100,8 +143,39 @@ export function ActivityTabClient({
                             {docLabel(doc)}
                           </button>
                         </>
+                      ) : mailStatus ? (
+                        <>
+                          <span>{text}</span>
+                          <MailStatusPill status={mailStatus} />
+                          {mailJobId && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void openLetter(
+                                  mailJobId,
+                                  mailRecipient,
+                                  trackingUrl
+                                )
+                              }
+                              className="cursor-pointer text-[11.5px] font-medium text-petrol-500 underline hover:text-petrol-700"
+                            >
+                              View Letter
+                            </button>
+                          )}
+                          {trackingUrl && (
+                            <a
+                              href={trackingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex cursor-pointer items-center gap-1 text-[11.5px] font-medium text-petrol-500 hover:text-petrol-700"
+                            >
+                              Track
+                              <IconExternalLink size={11} stroke={1.75} />
+                            </a>
+                          )}
+                        </>
                       ) : (
-                        text
+                        <span>{text}</span>
                       )}
                     </div>
                     <div className="mt-[2px] text-[11px] text-gray-500">
@@ -122,6 +196,10 @@ export function ActivityTabClient({
       )}
 
       <DocumentViewerModal doc={viewer} onClose={() => setViewer(null)} />
+      <LetterPreviewModal
+        data={letterPreview}
+        onClose={() => setLetterPreview(null)}
+      />
     </div>
   );
 }

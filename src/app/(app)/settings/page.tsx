@@ -21,6 +21,8 @@ import {
   fetchOrgInfo,
   fetchMailSettings,
   fetchMailBankAccounts,
+  fetchLobPricingSettings,
+  fetchMyCustomerPricing,
   fetchTemplates,
   fetchResearchTemplates,
   fetchMyNotificationPrefs,
@@ -47,6 +49,7 @@ export default async function SettingsPreviewJsxPage() {
     templates,
     research,
     notificationPrefs,
+    customerPricing,
   ] = await Promise.all([
     fetchAttorneys(),
     fetchOrgCustomRoles(),
@@ -54,6 +57,7 @@ export default async function SettingsPreviewJsxPage() {
     fetchTemplates(),
     fetchResearchTemplates(),
     fetchMyNotificationPrefs(),
+    fetchMyCustomerPricing(),
   ]);
 
   // Admin-only data.
@@ -65,6 +69,7 @@ export default async function SettingsPreviewJsxPage() {
     orgInfo,
     mailSettings,
     mailBank,
+    lobPricing,
     phoneUsage,
   ] = isAdmin
     ? await Promise.all([
@@ -75,9 +80,10 @@ export default async function SettingsPreviewJsxPage() {
         fetchOrgInfo(),
         fetchMailSettings(),
         fetchMailBankAccounts(),
+        fetchLobPricingSettings(),
         getValidationUsage(profile.orgId),
       ])
-    : [null, null, [], [], null, null, [], null];
+    : [null, null, [], [], null, null, [], null, null];
 
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "(app)", "settings", "preview.css"),
@@ -143,11 +149,13 @@ export default async function SettingsPreviewJsxPage() {
           emailAccounts,
           mailSettings,
           mailBank,
+          lobPricing,
           templates,
           research,
           phoneUsage,
           phoneValidationEnabled: isPhoneValidationEnabled(),
           notificationPrefs,
+          customerPricing,
         }}
       />
     </>

@@ -17,6 +17,7 @@ export default async function AppGroupLayout({
       userName={profile.fullName}
       userEmail={profile.email}
       isAdmin={profile.isAdmin}
+      isOwner={profile.isOwner}
     >
       {children}
     </AppShell>
