@@ -1,4 +1,6 @@
 import "server-only";
+import { createHash } from "node:crypto";
+import { createServiceClient } from "@/lib/supabase/service";
 
 // Pre-send US address verification via Lob's /v1/us_verifications endpoint.
 // Costs ~$0.20 per verification on Developer tier and catches the
@@ -296,4 +298,83 @@ export async function verifyAddress(
       error: err instanceof Error ? err.message : "Address verification failed. Try again.",
     };
   }
+}
+
+// How long a cached verification result is considered "fresh".
+// 90 days matches USPS's published change rate for the address
+// database; longer than that risks missing updates.
+const CACHE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+// Normalized hash of the address fields the verifier cares about.
+// Case-insensitive, whitespace-collapsed so trivial format changes
+// ("123 Main St" vs "123 main st") don't invalidate the cache.
+function hashAddress(input: AddressVerifyInput): string {
+  const norm = (s: string | null | undefined) =>
+    (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  const parts = [
+    norm(input.line1),
+    norm(input.line2),
+    norm(input.city),
+    norm(input.state),
+    norm(input.postal_code),
+  ].join("|");
+  return createHash("sha256").update(parts).digest("hex").slice(0, 32);
+}
+
+// Cached-or-fresh verify. When a contact_id is provided, looks at
+// the contacts.address_verify_* fields first. If the cached hash
+// matches the input address AND the result was verified within the
+// last 90 days, returns the cached result without calling the
+// provider (saves ~$0.05/call). Otherwise calls the provider and
+// writes the new result back to the contact row.
+//
+// `force: true` bypasses the cache entirely; useful when the user
+// has explicitly edited an address and wants to re-verify.
+export async function verifyAddressCached(
+  input: AddressVerifyInput,
+  opts: { contactId?: string | null; force?: boolean } = {}
+): Promise<AddressVerifyResult> {
+  const contactId = opts.contactId ?? null;
+  if (!contactId) {
+    // No anchor to cache against; do a one-shot call.
+    return verifyAddress(input);
+  }
+
+  const sb = createServiceClient();
+  const hash = hashAddress(input);
+
+  if (!opts.force) {
+    const { data: cached } = await sb
+      .from("contacts")
+      .select("address_verified_at, address_verify_result, address_verify_hash")
+      .eq("id", contactId)
+      .maybeSingle();
+    if (
+      cached &&
+      cached.address_verified_at &&
+      cached.address_verify_hash === hash &&
+      cached.address_verify_result
+    ) {
+      const age = Date.now() - new Date(cached.address_verified_at).getTime();
+      if (age < CACHE_TTL_MS) {
+        return cached.address_verify_result as AddressVerifyResult;
+      }
+    }
+  }
+
+  const result = await verifyAddress(input);
+  // Only cache successful verifications so a transient provider 5xx
+  // doesn't poison the cache. The cache TTL gate ensures stale
+  // success results eventually re-verify.
+  if (result.ok) {
+    await sb
+      .from("contacts")
+      .update({
+        address_verified_at: new Date().toISOString(),
+        address_verify_result: result,
+        address_verify_hash: hash,
+      })
+      .eq("id", contactId);
+  }
+  return result;
 }

@@ -235,6 +235,10 @@ export function SendMailModal({
   ) {
     setReVerifyingKey(c.key);
     setAddressOverrides((prev) => ({ ...prev, [c.key]: suggested }));
+    // Skip the per-contact cache when re-verifying an override —
+    // the corrected address isn't the contact's stored value, so
+    // we shouldn't write it to the contact's cache row. Cache
+    // only kicks in for the contact's own original address.
     const res = await verifyAddressAction(suggested);
     setVerifyResults((prev) => ({ ...prev, [c.key]: res }));
     setReVerifyingKey(null);
@@ -258,10 +262,24 @@ export function SendMailModal({
   >({});
   const [verifying, setVerifying] = useState(false);
 
+  // Helper: extract the contacts.id from a candidate's key.
+  // Candidate keys are formed as `contact:${contacts.id}` in
+  // buildLeadSendMailCandidates; parsing it here lets us pass
+  // contact_id to verifyAddressAction so it can use the per-contact
+  // address cache. Without contact_id, every modal open pays the
+  // ~$0.05 per-call verifier charge for the same address — with
+  // contact_id, repeats hit the cache (fresh up to 90 days).
+  function contactIdOf(c: SendMailModalRecipient): string | null {
+    return c.key.startsWith("contact:")
+      ? c.key.slice("contact:".length)
+      : null;
+  }
+
   // Background-verify every candidate's address when the modal opens
   // so the per-row "Undeliverable" / "Unit Warning" pills appear
-  // before the user even clicks Send. Only verifies addresses we
-  // haven't already checked (or overridden). Runs in parallel.
+  // before the user even clicks Send. Passes contact_id so the
+  // server-side cache returns the stored result without hitting
+  // the provider when the address hasn't changed.
   useEffect(() => {
     if (!open) return;
     if (candidates.length === 0) return;
@@ -279,6 +297,7 @@ export function SendMailModal({
             city: c.contact.city,
             state: c.contact.state,
             postal_code: c.contact.postal_code,
+            contact_id: contactIdOf(c),
           });
           return [c.key, res] as const;
         })
@@ -461,7 +480,14 @@ export function SendMailModal({
     const results = await Promise.all(
       selectedRecipients.map(async (r) => {
         const addr = effectiveAddress(r);
-        const res = await verifyAddressAction(addr);
+        // Pass contact_id ONLY when sending the original address;
+        // for accepted corrections (override), we skip the contact
+        // cache because the corrected address isn't the contact's
+        // stored value.
+        const res = await verifyAddressAction({
+          ...addr,
+          contact_id: addressOverrides[r.key] ? null : contactIdOf(r),
+        });
         return [r.key, res] as const;
       })
     );
@@ -471,16 +497,15 @@ export function SendMailModal({
     setVerifyResults(nextResults);
     setVerifying(false);
 
-    // Skip the undeliverable block for recipients the user has
-    // explicitly accepted via the fix panel (either by applying the
-    // corrected version OR by clicking "Send anyway" on the original).
-    // Their choice on record. Lets edge cases ship without forcing a
-    // contacts-tab edit they may not want.
+    // Skip the undeliverable block ONLY for recipients whose address
+    // has been replaced with a Lob-confirmed corrected version. The
+    // override map holds the user's accepted address; if that
+    // accepted address itself passed verification (deliverability !==
+    // "undeliverable") on the re-verify, this filter is moot. If the
+    // accepted version is STILL undeliverable, block. No escape hatch
+    // — Bree's call: real USPS validation is the contract.
     const undeliverable = verifyEntries.filter(
-      ([key, res]) =>
-        res.ok &&
-        res.deliverability === "undeliverable" &&
-        !addressOverrides[key]
+      ([, res]) => res.ok && res.deliverability === "undeliverable"
     );
     if (undeliverable.length > 0) {
       // Bounce the user BACK to the form view so they can see the
@@ -1695,7 +1720,6 @@ function AddressFixPanel({
   original,
   result,
   onApply,
-  onAcceptOriginal,
   onClose,
   testMode,
 }: {
@@ -1714,7 +1738,6 @@ function AddressFixPanel({
     state: string;
     postal_code: string;
   }) => void;
-  onAcceptOriginal: () => void;
   onClose: () => void;
   testMode?: boolean;
 }) {
@@ -1754,14 +1777,13 @@ function AddressFixPanel({
         )}
       </div>
 
-      {/* Three action options:
+      {/* Two action options:
           1. Use corrected version (only when a real correction exists)
-          2. Send anyway (always — user confirms the original address)
-          3. Close (don't decide right now)
-          "Send anyway" exists because (a) on staging the verifier is
-          unreliable and (b) on prod even real CASS can flag valid
-          addresses (new construction, PO boxes, etc.). Power user
-          escape hatch. */}
+          2. Close
+          No "Send anyway" escape hatch — undeliverable means USPS
+          says the piece won't deliver. If there's no auto-correction,
+          the user has to edit the address in the Contacts tab. The
+          contract is real USPS validation, no exceptions. */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {result.has_suggestion && (
           <button
@@ -1781,22 +1803,6 @@ function AddressFixPanel({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onAcceptOriginal();
-          }}
-          className={`cursor-pointer rounded-md px-3 py-[5px] text-[11.5px] font-medium ${
-            result.has_suggestion
-              ? "border border-gray-200 bg-white text-ink hover:border-gray-300"
-              : "bg-petrol-500 text-white font-semibold hover:bg-petrol-600"
-          }`}
-          title="Send to the address as I entered it. USPS may return the piece if the address is wrong."
-        >
-          Send anyway
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
             onClose();
           }}
           className="cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-[5px] text-[11.5px] font-medium text-ink hover:border-gray-300"
@@ -1806,8 +1812,8 @@ function AddressFixPanel({
         {!result.has_suggestion && (
           <div className="basis-full text-[11px] text-gray-600">
             {testMode
-              ? "Staging verification is limited. On production, real USPS verification runs."
-              : "USPS has no corrected version. Send anyway accepts the risk that the piece may return."}
+              ? "Staging can't verify this address. To test the full send flow, use a USPS test address (185 Berry St, San Francisco, CA 94107) in the Contacts tab. Real verification runs on production."
+              : "USPS has no corrected version for this address. Edit it in the Contacts tab, then re-open Send Mail."}
           </div>
         )}
       </div>
