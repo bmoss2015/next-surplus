@@ -577,6 +577,31 @@ export function SendMailModal({
       setExpandedFixRecipient(firstFailing);
       return;
     }
+    // USPS auto-corrected one or more addresses (deliverable but
+    // primary_line / city / state / zip changed). The "Verified"
+    // framing is too soft on its own — average user won't click
+    // the Review pill — so we hard-block send and bounce them to
+    // the fix panel. They either accept the corrected version
+    // (one click) or edit the address. Catches the Lantna ->
+    // Lantana fuzzy-match case where the typed and verified
+    // addresses are two different streets.
+    const corrected = verifyEntries.filter(
+      ([, res]) =>
+        res.ok &&
+        res.deliverability === "deliverable" &&
+        res.has_suggestion
+    );
+    if (corrected.length > 0) {
+      setShowPreview(false);
+      setErr(
+        corrected.length === 1
+          ? "USPS corrected 1 address. Confirm the corrected version before sending."
+          : `USPS corrected ${corrected.length} addresses. Confirm each correction before sending.`
+      );
+      const firstCorrected = corrected[0][0];
+      setExpandedFixRecipient(firstCorrected);
+      return;
+    }
     const verifyErrors = verifyEntries.filter(([, res]) => !res.ok);
     if (verifyErrors.length > 0) {
       // Lob itself errored. Don't block the send — surface the issue
@@ -1758,17 +1783,23 @@ function AddressBadge({
   }
   // Deliverable BUT USPS auto-corrected something (e.g. fixed a
   // typo in the street name, normalized ST -> Street, added ZIP+4).
-  // We show this as Verified + Review so the user can confirm
-  // the suggested address matches what they meant. Important when
-  // USPS fuzzy-matched a typo: the user typed "Lantna" and CASS
-  // matched "Lantana" — we want them to see + accept that fix.
+  // Visually distinct from plain "Verified" — has to read as an
+  // action the user MUST take, not an info pill. Lantna -> Lantana
+  // type fuzzy-matches happen here and the user needs to confirm
+  // USPS matched what they meant. Send is also blocked until they
+  // either accept the correction or edit the address.
   if (result.ok && result.has_suggestion) {
     return (
       <Wrapper
-        className={`rounded-full border border-petrol-500/30 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700 ${onClick ? "cursor-pointer hover:bg-petrol-100" : "cursor-default"}`}
-        title={onClick ? "USPS auto-corrected this address. Click to review." : undefined}
+        className={`rounded-full border border-rose-500/40 bg-rose-50 px-2 py-[1px] text-[10px] font-semibold text-rose-700 ${onClick ? "cursor-pointer hover:bg-rose-100" : "cursor-default"}`}
+        title={
+          onClick
+            ? "USPS auto-corrected this address. Review before sending."
+            : undefined
+        }
       >
-        Verified {onClick ? "·" : ""} {onClick && <span className="underline">Review</span>}
+        Auto-corrected{onClick ? " · " : ""}
+        {onClick && <span className="underline">Review</span>}
       </Wrapper>
     );
   }
@@ -1829,13 +1860,20 @@ function AddressFixPanel({
   const suggested = result.normalized;
   const fmt = (a: typeof original) =>
     `${a.line1}${a.line2 ? ", " + a.line2 : ""}, ${a.city}, ${a.state} ${a.postal_code}`;
+  const isAutoCorrected =
+    result.ok && result.deliverability === "deliverable" && result.has_suggestion;
 
   return (
     <div className="border-t border-gray-150 bg-gray-50/60 px-3 py-3">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-        What USPS sees
+        {isAutoCorrected ? "USPS auto-corrected this address" : "What USPS sees"}
       </div>
-      {result.issues.length > 0 ? (
+      {isAutoCorrected ? (
+        <div className="mb-3 text-[12px] text-ink">
+          USPS matched what you entered to a different address. Confirm the
+          corrected version is what you meant before sending.
+        </div>
+      ) : result.issues.length > 0 ? (
         <ul className="mb-3 list-disc pl-5 text-[12px] text-ink">
           {result.issues.map((issue, i) => (
             <li key={i}>{issue}</li>
