@@ -167,9 +167,32 @@ export async function verifyAddress(
     const zip = json.components?.zip_code_plus_4
       ? `${json.components.zip_code}-${json.components.zip_code_plus_4}`
       : (json.components?.zip_code ?? input.postal_code);
-    const normalizedLine1 = json.primary_line ?? input.line1;
-    const normalizedLine2 =
-      (json.secondary_line as string | undefined) ?? input.line2 ?? null;
+    // In test mode, the provider sometimes returns documentation /
+    // tutorial text in primary_line (e.g. "SET primary_line TO
+    // 'deliverable' AND zip_code to '11111' to simulate..."). That
+    // text is for developers reading provider docs, NOT for end
+    // users. Detect it and fall back to the original input so the
+    // customer never sees provider-internal hint copy.
+    const looksLikeProviderHint = (s: string | undefined) => {
+      if (!s) return false;
+      const lower = s.toLowerCase();
+      return (
+        lower.includes("set primary_line") ||
+        lower.includes("simulate an address") ||
+        lower.includes("us-verification-test-environment") ||
+        lower.includes("lob.com") ||
+        lower.includes("see https://")
+      );
+    };
+    const safePrimary = looksLikeProviderHint(json.primary_line)
+      ? input.line1
+      : (json.primary_line ?? input.line1);
+    const safeSecondary = looksLikeProviderHint(json.secondary_line)
+      ? (input.line2 ?? null)
+      : ((json.secondary_line as string | undefined) ?? input.line2 ?? null);
+
+    const normalizedLine1 = safePrimary;
+    const normalizedLine2 = safeSecondary;
     const normalizedCity = json.components?.city ?? input.city;
     const normalizedState = json.components?.state ?? input.state;
     const normalizedZip = zip;
@@ -226,7 +249,7 @@ export async function verifyAddress(
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Lob verify unknown error",
+      error: err instanceof Error ? err.message : "Address verification failed. Try again.",
     };
   }
 }

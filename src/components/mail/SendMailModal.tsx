@@ -242,7 +242,12 @@ export function SendMailModal({
     setErr(null);
   }
 
-  // Pre-send address verification (Lob /us_verifications) results,
+  // Background-verify EVERY candidate's address as soon as the
+  // modal opens. The user gets per-row pills before they even pick
+  // recipients, so they're not surprised at Send time by an
+  // undeliverable error they could have known about earlier. Skips
+  // anything already in verifyResults to avoid re-verifying on
+  // re-renders. Pre-send address verification (Lob /us_verifications) results,
   // keyed by recipient.key. Populated when the user clicks Send;
   // an "undeliverable" result blocks the actual send and shows an
   // inline error on the offending recipient. Normalized addresses
@@ -252,6 +257,44 @@ export function SendMailModal({
     Record<string, AddressVerifyResult>
   >({});
   const [verifying, setVerifying] = useState(false);
+
+  // Background-verify every candidate's address when the modal opens
+  // so the per-row "Undeliverable" / "Unit Warning" pills appear
+  // before the user even clicks Send. Only verifies addresses we
+  // haven't already checked (or overridden). Runs in parallel.
+  useEffect(() => {
+    if (!open) return;
+    if (candidates.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const toVerify = candidates.filter(
+        (c) => !verifyResults[c.key] && !addressOverrides[c.key]
+      );
+      if (toVerify.length === 0) return;
+      const results = await Promise.all(
+        toVerify.map(async (c) => {
+          const res = await verifyAddressAction({
+            line1: c.contact.line1,
+            line2: c.contact.line2 ?? null,
+            city: c.contact.city,
+            state: c.contact.state,
+            postal_code: c.contact.postal_code,
+          });
+          return [c.key, res] as const;
+        })
+      );
+      if (cancelled) return;
+      setVerifyResults((prev) => {
+        const next = { ...prev };
+        for (const [key, res] of results) next[key] = res;
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, candidates]);
 
   // Templates show in alphabetical order. Folder-aware grouping in the
   // picker UI happens at render time below.
@@ -440,8 +483,8 @@ export function SendMailModal({
       setShowPreview(false);
       setErr(
         undeliverable.length === 1
-          ? "1 recipient has an undeliverable address. Click the red Fix pill on that recipient to see Lob's suggested correction."
-          : `${undeliverable.length} recipients have undeliverable addresses. Click the red Fix pill on each to see Lob's suggested corrections.`
+          ? "1 recipient has an undeliverable address. Click the red Fix pill on that recipient to see the USPS-verified version."
+          : `${undeliverable.length} recipients have undeliverable addresses. Click the red Fix pill on each to see the USPS-verified version.`
       );
       // Auto-open the first failing recipient's fix panel so the
       // resolution path is one click away, not buried in the list.
@@ -683,10 +726,9 @@ export function SendMailModal({
                 Test mode
               </span>
               <span className="ml-2">
-                Lob test API is permissive — it accepts plausibly
-                formatted junk without running real CASS. Use a live
-                key on production to verify real deliverability. Local
-                structural checks still block fake addresses pre-click.
+                You&apos;re on the staging environment. Sends here
+                don&apos;t actually print or mail; they just exercise
+                the flow.
               </span>
             </div>
           )}
@@ -747,8 +789,13 @@ export function SendMailModal({
                                 Not Mailed
                               </span>
                             )}
-                            {/* Status badge — clickable when there's
-                                something to fix. */}
+                            {/* Status badge — only shown when there's
+                                a problem. Verified addresses get no
+                                pill (the address itself below already
+                                reads as accepted). The override case
+                                also implicitly reads as accepted since
+                                the displayed address IS the corrected
+                                one. */}
                             <AddressBadge
                               result={verifyResult}
                               loading={reVerifyingKey === c.key}
@@ -764,14 +811,6 @@ export function SendMailModal({
                                   : undefined
                               }
                             />
-                            {override && (
-                              <span
-                                className="rounded-full border border-petrol-200 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700"
-                                title="Address was corrected using Lob's suggestion"
-                              >
-                                Corrected
-                              </span>
-                            )}
                           </div>
                           <div className="mt-[2px] text-[11.5px] text-gray-500">
                             {addr.line1}
@@ -788,6 +827,7 @@ export function SendMailModal({
                             applyAddressSuggestion(c, suggested)
                           }
                           onClose={() => setExpandedFixRecipient(null)}
+                          testMode={lobTestMode === true}
                         />
                       )}
                     </div>
@@ -1554,6 +1594,19 @@ function AddressBadge({
   }
   if (!result) return null;
 
+  // Only render the pill when the address has a real problem. Fully
+  // deliverable addresses (and "unnecessary unit" — Lob's nitpick
+  // that USPS still delivers fine) get NO pill. Cleaner row, less
+  // visual noise. The displayed address itself is the implicit
+  // confirmation that it's accepted.
+  if (
+    result.ok &&
+    (result.deliverability === "deliverable" ||
+      result.deliverability === "deliverable_unnecessary_unit")
+  ) {
+    return null;
+  }
+
   const Wrapper = onClick
     ? ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
         <button type="button" onClick={onClick} {...rest}>
@@ -1586,8 +1639,7 @@ function AddressBadge({
   }
   if (
     result.deliverability === "deliverable_incorrect_unit" ||
-    result.deliverability === "deliverable_missing_unit" ||
-    result.deliverability === "deliverable_unnecessary_unit"
+    result.deliverability === "deliverable_missing_unit"
   ) {
     return (
       <Wrapper
@@ -1598,18 +1650,7 @@ function AddressBadge({
       </Wrapper>
     );
   }
-  return (
-    <span
-      className="rounded-full border border-petrol-500/30 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700"
-      title={
-        result.test_mode
-          ? "Lob test mode, verification is non-functional in dev"
-          : "Address verified deliverable by Lob"
-      }
-    >
-      {result.test_mode ? "Test Verified" : "Verified"}
-    </span>
-  );
+  return null;
 }
 
 // Inline panel that appears below a recipient row when the user
@@ -1622,6 +1663,7 @@ function AddressFixPanel({
   result,
   onApply,
   onClose,
+  testMode,
 }: {
   original: {
     line1: string;
@@ -1639,6 +1681,7 @@ function AddressFixPanel({
     postal_code: string;
   }) => void;
   onClose: () => void;
+  testMode?: boolean;
 }) {
   const suggested = result.normalized;
   const fmt = (a: typeof original) =>
@@ -1661,7 +1704,7 @@ function AddressFixPanel({
         </div>
       )}
 
-      <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1 text-[12px]">
+      <div className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 text-[12px]">
         <div className="text-[10.5px] uppercase tracking-wider text-gray-500">
           You entered
         </div>
@@ -1669,7 +1712,7 @@ function AddressFixPanel({
         {result.has_suggestion && (
           <>
             <div className="text-[10.5px] uppercase tracking-wider text-gray-500">
-              Lob suggests
+              USPS-verified
             </div>
             <div className="font-medium text-petrol-700">{fmt(suggested)}</div>
           </>
@@ -1687,13 +1730,14 @@ function AddressFixPanel({
             }}
             className="cursor-pointer rounded-md bg-petrol-500 px-3 py-[5px] text-[11.5px] font-semibold text-white hover:bg-petrol-600"
           >
-            Use Lob&apos;s version
+            Use corrected version
           </button>
         )}
         {!result.has_suggestion && (
           <div className="text-[11.5px] text-gray-600">
-            Lob doesn&apos;t have a suggested correction for this address.
-            Edit the address from the Contacts tab, then re-open Send Mail.
+            {testMode
+              ? "Staging address checks are limited. Edit the address from the Contacts tab if needed."
+              : "USPS has no corrected version for this address. Edit it from the Contacts tab, then re-open Send Mail."}
           </div>
         )}
         <button

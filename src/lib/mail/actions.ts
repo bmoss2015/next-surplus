@@ -1212,9 +1212,9 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
           provider_id: send.provider_id,
         });
         if (!cancel.ok) {
-          cancelNote = ` Cancel attempt failed: ${cancel.error}. Check Lob dashboard.`;
+          cancelNote = ` Cancel attempt failed: ${cancel.error}. Contact support.`;
         } else {
-          cancelNote = " Lob send was cancelled to avoid double-billing.";
+          cancelNote = " Send was cancelled to avoid double-billing.";
         }
       }
       return {

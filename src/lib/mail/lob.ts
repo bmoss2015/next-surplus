@@ -211,7 +211,7 @@ export async function lobSendCheck(
   input: SendCheckInput
 ): Promise<SendResult> {
   if (!isLobConfigured()) {
-    return { ok: false, error: "Lob is not configured (missing LOB_API_KEY)" };
+    return { ok: false, error: "Mail service is not configured. Contact support." };
   }
 
   try {
@@ -308,7 +308,7 @@ export async function lobSendCheck(
       thumbnails?: unknown;
     };
     if (!json.id) {
-      return { ok: false, error: "Lob check create returned no id" };
+      return { ok: false, error: "Couldn't create the check. Try again or contact support." };
     }
     const { cost_cents, provider_cost_cents } = lobCheckCostPair(
       input.customer_pricing,
@@ -329,7 +329,7 @@ export async function lobSendCheck(
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Lob unknown error",
+      error: err instanceof Error ? err.message : "Mail service hit an unknown error. Try again.",
     };
   }
 }
@@ -340,7 +340,7 @@ export async function lobSendLetter(
   input: SendLetterInput
 ): Promise<SendResult> {
   if (!isLobConfigured()) {
-    return { ok: false, error: "Lob is not configured (missing LOB_API_KEY)" };
+    return { ok: false, error: "Mail service is not configured. Contact support." };
   }
   try {
     // Two send shapes:
@@ -434,7 +434,7 @@ export async function lobSendLetter(
       url?: string;
     };
     if (!json.id) {
-      return { ok: false, error: "Lob letter create returned no id" };
+      return { ok: false, error: "Couldn't create the letter. Try again or contact support." };
     }
     const { cost_cents, provider_cost_cents } = lobLetterCostPair(
       input.mail_class,
@@ -455,7 +455,7 @@ export async function lobSendLetter(
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Lob unknown error",
+      error: err instanceof Error ? err.message : "Mail service hit an unknown error. Try again.",
     };
   }
 }
@@ -472,7 +472,7 @@ export async function lobGetPiece(opts: {
   kind: "letter" | "check";
   provider_id: string;
 }): Promise<LobPieceStatus> {
-  if (!isLobConfigured()) return { ok: false, error: "Lob not configured" };
+  if (!isLobConfigured()) return { ok: false, error: "Mail service is not configured." };
   try {
     const path = opts.kind === "check" ? "checks" : "letters";
     const res = await fetch(
@@ -519,7 +519,7 @@ export async function lobGetPiece(opts: {
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Lob get-piece unknown error",
+      error: err instanceof Error ? err.message : "Mail lookup failed. Try again.",
     };
   }
 }
@@ -534,7 +534,7 @@ export async function lobCancelPiece(opts: {
   kind: "letter" | "check";
   provider_id: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!isLobConfigured()) return { ok: false, error: "Lob not configured" };
+  if (!isLobConfigured()) return { ok: false, error: "Mail service is not configured." };
   try {
     const path = opts.kind === "check" ? "checks" : "letters";
     const res = await fetch(
@@ -554,7 +554,7 @@ export async function lobCancelPiece(opts: {
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Lob cancel unknown error",
+      error: err instanceof Error ? err.message : "Mail cancel failed. Try again.",
     };
   }
 }
@@ -582,7 +582,7 @@ export async function lobCreateBankAccount(
   input: LobBankAccountInput
 ): Promise<LobBankAccountResult> {
   if (!isLobConfigured()) {
-    return { ok: false, error: "Lob is not configured (missing LOB_API_KEY)" };
+    return { ok: false, error: "Mail service is not configured. Contact support." };
   }
   try {
     const res = await lobFetch(`${LOB_BASE_URL}/bank_accounts`, {
@@ -612,7 +612,7 @@ export async function lobCreateBankAccount(
       account_number?: string;
     };
     if (!json.id) {
-      return { ok: false, error: "Lob bank account create returned no id" };
+      return { ok: false, error: "Couldn't add bank account. Try again or contact support." };
     }
     return {
       ok: true,
@@ -624,7 +624,7 @@ export async function lobCreateBankAccount(
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Lob unknown error",
+      error: err instanceof Error ? err.message : "Mail service hit an unknown error. Try again.",
     };
   }
 }
@@ -634,7 +634,7 @@ export async function lobVerifyBankAccount(
   amounts: [number, number]
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isLobConfigured()) {
-    return { ok: false, error: "Lob is not configured (missing LOB_API_KEY)" };
+    return { ok: false, error: "Mail service is not configured. Contact support." };
   }
   try {
     const res = await lobFetch(`${LOB_BASE_URL}/bank_accounts/${bnkId}/verify`, {
@@ -656,7 +656,7 @@ export async function lobVerifyBankAccount(
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Lob unknown error",
+      error: err instanceof Error ? err.message : "Mail service hit an unknown error. Try again.",
     };
   }
 }
