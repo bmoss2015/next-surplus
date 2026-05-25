@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Moss Equity Operations Portal
 
-## Getting Started
+Multi-tenant Next.js portal for surplus funds recovery operations. Built for Moss Equity Partners, designed for public SaaS release.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Next.js 16 (App Router) on Vercel
+- Supabase Postgres (multi-org RLS) for data, auth, and storage
+- React 19, Tailwind 4
+- Resend (transactional email)
+- Gmail OAuth + Cloudflare Worker poller (inbound mailbox sync)
+- Lob (check sending), Click2Mail (letter sending)
+- HLR Lookup (phone validation, currently paused)
+- OpenPhone / QUO (SMS, via separate Cloudflare Worker)
+- SuperDoc + Tiptap (in-app document editing)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Prerequisites
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Node 22+
+- npm
+- Supabase CLI (already a devDependency, invoked via `npx supabase`)
+- A Supabase account with two projects: staging + production
+- A Vercel account, project linked to this repo
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Local setup
 
-## Learn More
+1. Clone and install:
+   ```
+   git clone https://github.com/bmoss2015/MossEquityPartners.git
+   cd MossEquityPartners
+   npm install
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. Copy the env template and fill in values from the staging Supabase project:
+   ```
+   cp .env.example .env.local
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Verify the Supabase CLI is linked to staging, not production:
+   ```
+   cat supabase/.temp/project-ref
+   ```
+   Output should be `sghfmudgnddybsayfqbd`. If not:
+   ```
+   npx supabase link --project-ref sghfmudgnddybsayfqbd
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Start the dev server:
+   ```
+   npm run dev
+   ```
+   Open http://localhost:3000.
 
-## Deploy on Vercel
+Login credentials for the staging tenant live in `CLAUDE.md`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` — local dev server
+- `npm run build` — production build (note: type errors currently suppressed in next.config.ts pending cleanup)
+- `npm run start` — start the built app
+- `npm run lint` — ESLint
+- `npm run typecheck` — `tsc --noEmit`
+
+## Branch and deploy flow
+
+See `CLAUDE.md` for the full branch → PR → preview → merge → auto-deploy workflow. Short version:
+
+1. Branch off main: `git checkout -b <type>/<short-name>` (never commit to main directly)
+2. Push the branch, Vercel auto-builds a preview URL
+3. Open the PR with `gh pr create`
+4. Confirm the change on the preview URL
+5. Merge with `gh pr merge <n> --merge --delete-branch`
+6. Vercel auto-deploys main to production within seconds
+
+## Documentation
+
+- `CLAUDE.md` — standing instructions, env map, deploy flow, design system, business rules
+- `ARCHITECTURE.md` — one-page topology and data model reference
+- `RUNBOOKS.md` — what to do when X breaks
+- `docs/` — original product spec and reference material
+
+## Environments
+
+| | Staging | Production |
+|---|---|---|
+| Supabase project | sghfmudgnddybsayfqbd | qvyhdexoicoppgrvvtov |
+| Dev URL | http://localhost:3000 (or Vercel preview) | https://portal.mossequitypartners.com |
+| Vendor mode | Test / sandbox keys | Live keys |
+
+## Related repos
+
+- `workflow-minds-quo-poller` — Cloudflare Worker, polls OpenPhone for inbound SMS verification codes
+- `moss-equity-email-poller` — Cloudflare Worker, drives Gmail mailbox sync every 2 minutes

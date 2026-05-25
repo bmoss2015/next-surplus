@@ -118,6 +118,7 @@ export function MailingAddresses({
   // Re-sync local rows when the server component re-fetches (e.g. after
   // adding an address elsewhere on the page).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRows(initialAddresses.filter((c) => c.channel === "mailing_address"));
   }, [initialAddresses]);
 

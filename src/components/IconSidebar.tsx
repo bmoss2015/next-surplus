@@ -85,6 +85,8 @@ export function IconSidebar({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(STORAGE_KEY);
+    // Hydrate the collapsed/expanded preference from localStorage on mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored === "true") setExpanded(true);
   }, []);
 
@@ -242,6 +244,8 @@ function AccountMenu({
   const popRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    // Mark mounted so the popout (portaled to <body>) only renders client-side.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

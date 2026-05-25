@@ -11,7 +11,7 @@ import {
   IconSettings,
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
-import { formatPhoneUS, formatPhoneInput } from "@/lib/phone";
+import { formatPhoneUS, formatPhoneInput, toE164 } from "@/lib/phone";
 import {
   LEAD_PARTY_ROLE_LABELS,
   type LeadPartyRole,
@@ -235,16 +235,26 @@ export function OtherContactsSection({
                 </div>
                 <div className="mt-[6px] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-gray-600">
                   {row.email && (
-                    <span className="inline-flex items-center gap-1">
+                    <a
+                      href={`mailto:${row.email}`}
+                      aria-label="Email this contact"
+                      title="Email"
+                      className="inline-flex cursor-pointer items-center gap-1 text-gray-600 hover:text-petrol-700"
+                    >
                       <IconMail size={11} stroke={1.75} className="text-gray-400" />
                       {row.email}
-                    </span>
+                    </a>
                   )}
                   {row.phone && (
-                    <span className="inline-flex items-center gap-1">
+                    <a
+                      href={`tel:${toE164(row.phone) ?? row.phone}`}
+                      aria-label="Call this number"
+                      title="Call"
+                      className="inline-flex cursor-pointer items-center gap-1 text-gray-600 hover:text-petrol-700"
+                    >
                       <IconPhone size={11} stroke={1.75} className="text-gray-400" />
                       {formatPhoneUS(row.phone)}
-                    </span>
+                    </a>
                   )}
                   {!row.email && !row.phone && (
                     <span className="text-gray-400">No contact info</span>

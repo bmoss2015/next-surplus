@@ -268,7 +268,7 @@ export function ContactsTabClient({
   const [isPending, startTransition] = useTransition();
   // IDs of phone contacts currently being validated server-side. Drives the
   // small "Verifying…" spinner shown on the row while the action awaits
-  // Veriphone. Cleared the moment the action returns with the real row.
+  // Clearout. Cleared the moment the action returns with the real row.
   const [verifyingIds, setVerifyingIds] = useState<Set<string>>(() => new Set());
 
   function resetOwnerForm() {
@@ -313,6 +313,12 @@ export function ContactsTabClient({
           is_litigator: newOwnerPhoneLitigator,
         });
         if (r.ok) {
+          // upsertContact awaits the validator and returns r.row populated
+          // with the post-validation status / phone_type / checkedAt /
+          // provider. Use that instead of hardcoding "untested" so the
+          // newly-added owner phone shows Verified the same way every
+          // other phone-add does.
+          const fresh = (r.row ?? null) as Partial<ContactRow> | null;
           newContacts.push({
             id: r.id,
             owner_id: ownerId,
@@ -321,19 +327,19 @@ export function ContactsTabClient({
             lead_id: leadId,
             channel: "phone",
             value: phone,
-            status: "untested",
+            status: (fresh?.status as ContactRow["status"]) ?? "untested",
             connection_status: null,
             source: null,
             last_attempted: null,
             is_primary: true,
-            phone_type: null,
+            phone_type: (fresh?.phone_type as string | null) ?? null,
             is_dnc: newOwnerPhoneDnc,
             is_litigator: newOwnerPhoneLitigator,
             mailed: false,
             mailed_at: null,
             recipient_label: null,
-            validation_checked_at: null,
-            validation_provider: null,
+            validation_checked_at: (fresh?.validation_checked_at as string | null) ?? null,
+            validation_provider: (fresh?.validation_provider as string | null) ?? null,
           });
         }
       }
@@ -447,7 +453,7 @@ export function ContactsTabClient({
     const trimmed = value.trim();
     if (!trimmed) return;
     // Optimistic placeholder so the user sees "Verifying…" on the new phone
-    // row while the action awaits the Veriphone call (~500ms-1s). Real row
+    // row while the action awaits the Clearout call (~500ms-1s). Real row
     // replaces it when the action returns.
     const placeholderId = `pending-${crypto.randomUUID()}`;
     const placeholder: ContactRow = {
@@ -1060,8 +1066,12 @@ function ContactLine({
   const [editingValue, setEditingValue] = useState(false);
   const [val, setVal] = useState(value);
   useEffect(() => {
+    // Re-sync the inline editor when the parent's saved value changes (e.g.
+    // after a successful validate / patch round-trip).
+    /* eslint-disable react-hooks/set-state-in-effect */
     setVal(value);
     setEditingValue(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [value]);
   const ptype = phoneType ?? null;
   const displayValue = isPhone ? formatPhone(value) : value;

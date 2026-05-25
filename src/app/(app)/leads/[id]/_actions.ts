@@ -14,7 +14,7 @@ const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5
 
 // Synchronous targeted validation for manual saves — validates ONLY the rows
 // passed in and AWAITS the result so the action response carries the final
-// status back to the client. ~500ms-1s per phone for Veriphone, fast enough
+// status back to the client. ~500ms-1s per phone for Clearout, fast enough
 // to feel like part of the save instead of needing a background sweep.
 // (Bulk imports stay async via after() since they can't block on N×500ms.)
 async function runValidationFor(
@@ -644,6 +644,11 @@ export async function upsertContact(
       }
     : {};
 
+  // Note: we deliberately do NOT reject duplicate same-lead phones here.
+  // The validator's 90-day cache picks up the prior result and stamps the
+  // new row as Verified instantly without billing a credit. Two rows can
+  // carry the same number with the same status, no flag, no confirmation.
+
   let resolvedId: string;
   if (contactId) {
     const { error } = await sb
@@ -693,6 +698,13 @@ export async function upsertContact(
     .maybeSingle();
 
   revalidatePath(`/leads/${leadId}`);
+  // Bust the Settings cache so the Billing credit meter reflects any new
+  // validation on the next navigation. The validator updates the live
+  // balance via Clearout's getcredits endpoint and the meter is otherwise
+  // server-rendered and would serve stale data.
+  if (patch.channel === "phone" || (contactId && valueChanged)) {
+    revalidatePath("/settings");
+  }
   return { ok: true, id: resolvedId, row: refreshed ?? null };
 }
 

@@ -469,6 +469,8 @@ function MailTemplateForm({
   const [unsupportedFonts, setUnsupportedFonts] = useState<string[]>([]);
   useEffect(() => {
     if (!docxPath || fileType !== "docx") {
+      // Clear the unsupported-fonts warning when no .docx is loaded.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUnsupportedFonts([]);
       return;
     }
@@ -524,6 +526,8 @@ function MailTemplateForm({
 
   useEffect(() => {
     if (!previewOpen) {
+      // Drop cached signed URLs when the preview panel closes.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPreviewUrls([]);
       return;
     }

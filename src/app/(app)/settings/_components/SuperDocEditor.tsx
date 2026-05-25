@@ -71,6 +71,10 @@ export function SuperDocEditor({
   const superdocRef = useRef<SDInstance | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const onReadyRef = useRef(onReady);
+  // Keep the ref in sync with the latest onReady so emitControlsIfReady (an
+  // imperative SuperDoc lifecycle callback) always invokes the freshest
+  // closure. Doing this in useEffect would be one paint stale.
+  // eslint-disable-next-line react-hooks/refs
   onReadyRef.current = onReady;
 
   // Build and emit the controls once we have BOTH the superdoc instance

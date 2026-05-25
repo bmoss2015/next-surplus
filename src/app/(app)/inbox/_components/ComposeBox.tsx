@@ -522,8 +522,12 @@ function RecipientField({
 
   useEffect(() => {
     if (!userTyped || current.length < 1) {
+      // Hide and clear suggestions when the user hasn't typed yet or has
+      // erased the current token.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setSuggestions([]);
       setOpen(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
     const myReq = ++reqIdRef.current;

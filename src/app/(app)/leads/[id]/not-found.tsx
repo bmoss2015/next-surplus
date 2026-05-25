@@ -14,7 +14,7 @@ export default function LeadNotFound() {
           Lead not found
         </div>
         <div className="mt-2 text-[15px] text-ink">
-          This lead either doesn't exist or has been deleted.
+          This lead either doesn&apos;t exist or has been deleted.
         </div>
         <Link
           href="/leads"

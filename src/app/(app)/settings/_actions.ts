@@ -7,7 +7,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
-import { validateAllUntestedForOrg } from "@/lib/phone-validate";
+import { validateAllUntestedForOrg, previewBackfillCount, DEFAULT_CREDIT_COST_USD } from "@/lib/phone-validate";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
@@ -1629,9 +1629,9 @@ export async function deleteResearchTemplate(
 // Admin-only one-shot: validates every phone in the org with status='untested'
 // on leads that aren't marked lost. Runs in after() so the UI returns
 // immediately; progress shows up in the Billing meter as validations complete.
-// Whatever VERIPHONE_API_KEY is set in the runtime env at trigger time is what
-// gets charged — swap it in Vercel before clicking if you want a different
-// account to absorb the cost.
+// Whatever CLEAROUT_PHONE_API_KEY is set in the runtime env at trigger time
+// is what gets charged — swap it in Vercel before clicking if you want a
+// different Clearout account to absorb the cost.
 export async function runPhoneValidationBackfill(): Promise<
   { ok: true } | { ok: false; error: string }
 > {
@@ -1652,5 +1652,33 @@ export async function runPhoneValidationBackfill(): Promise<
     }
   });
   return { ok: true };
+}
+
+// Pre-count helper for the Run Backfill confirmation modal. Returns the
+// exact number of unique phones that would be sent to the validator + the
+// estimated USD cost, so admins see the real spend before committing.
+export async function previewPhoneValidationBackfill(): Promise<
+  | { ok: true; uniquePhones: number; totalRows: number; estimatedCostUsd: number; costPerCreditUsd: number }
+  | { ok: false; error: string }
+> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const profile = await getCurrentProfile();
+  if (!profile?.orgId) return { ok: false, error: "No org" };
+  try {
+    const { uniquePhones, totalRows } = await previewBackfillCount(profile.orgId, {
+      excludeLostLeads: true,
+    });
+    return {
+      ok: true,
+      uniquePhones,
+      totalRows,
+      estimatedCostUsd: uniquePhones * DEFAULT_CREDIT_COST_USD,
+      costPerCreditUsd: DEFAULT_CREDIT_COST_USD,
+    };
+  } catch (e) {
+    console.error("[phone-validate] preview backfill failed:", e);
+    return { ok: false, error: "Couldn't read the validation queue. Try again." };
+  }
 }
 

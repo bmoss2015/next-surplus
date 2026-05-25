@@ -125,7 +125,7 @@ export function RelativesSection({
   const [adding, setAdding] = useState(false);
   // Keys of phone slots currently being validated server-side, formatted as
   // "<relativeId>:<base>" (e.g. "abc-123:phone_2"). Drives the "Verifying…"
-  // pill on the slot while the action awaits Veriphone.
+  // pill on the slot while the action awaits Clearout.
   const [verifyingSlots, setVerifyingSlots] = useState<Set<string>>(() => new Set());
   const [draftName, setDraftName] = useState("");
   const [draftRelationship, setDraftRelationship] = useState("");
@@ -175,12 +175,20 @@ export function RelativesSection({
         notes,
       });
       if (res.ok) {
-        const row = makeRelativeRow(res.id, leadId, name, relationship, phone);
-        row.age = age;
-        row.phone_is_dnc = phone ? draftPhoneDnc : false;
-        row.phone_is_litigator = phone ? draftPhoneLitigator : false;
-        row.email = email;
-        row.notes = notes;
+        // upsertRelative awaits the validator and returns res.row populated
+        // with post-validation phone_status / phone_type / checkedAt /
+        // provider on every populated slot. Use that directly so the new
+        // relative renders Verified the moment it lands, instead of stale
+        // "Not Verified" until refresh.
+        const row = (res.row as RelativeRow | null) ?? (() => {
+          const stub = makeRelativeRow(res.id, leadId, name, relationship, phone);
+          stub.age = age;
+          stub.phone_is_dnc = phone ? draftPhoneDnc : false;
+          stub.phone_is_litigator = phone ? draftPhoneLitigator : false;
+          stub.email = email;
+          stub.notes = notes;
+          return stub;
+        })();
         setRelatives((prev) => [...prev, row]);
         resetDrafts();
         setAdding(false);
@@ -576,6 +584,9 @@ function NotesEditor({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   useEffect(() => {
+    // Re-sync the textarea draft when the parent's saved notes value changes
+    // (e.g. another panel saved and the server returned a fresh row).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(value);
   }, [value]);
 
@@ -645,10 +656,12 @@ function PhoneSlot({
   const [val, setVal] = useState(stored);
   useEffect(() => {
     const next = ((relative[slot.value] as string | null) ?? "").trim();
-    setVal(next);
     // Drop out of edit mode whenever the server returns a saved value — keeps
     // the committed display fresh after onPatch round-trips.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setVal(next);
     if (next.length > 0) setEditing(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [relative, slot.value]);
 
   const type = relative[slot.type] as string | null;
@@ -836,6 +849,8 @@ function EmailSlot({
   const stored = ((relative[field] as string | null) ?? "").trim();
   const [val, setVal] = useState(stored);
   useEffect(() => {
+    // Re-sync the email input when the relative row is refreshed from server.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVal(((relative[field] as string | null) ?? "").trim());
   }, [relative, field]);
 
