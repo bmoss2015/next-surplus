@@ -471,8 +471,16 @@ export function SendMailModal({
     setVerifyResults(nextResults);
     setVerifying(false);
 
+    // Skip the undeliverable block for recipients the user has
+    // explicitly accepted via the fix panel (either by applying the
+    // corrected version OR by clicking "Send anyway" on the original).
+    // Their choice on record. Lets edge cases ship without forcing a
+    // contacts-tab edit they may not want.
     const undeliverable = verifyEntries.filter(
-      ([, res]) => res.ok && res.deliverability === "undeliverable"
+      ([key, res]) =>
+        res.ok &&
+        res.deliverability === "undeliverable" &&
+        !addressOverrides[key]
     );
     if (undeliverable.length > 0) {
       // Bounce the user BACK to the form view so they can see the
@@ -789,28 +797,50 @@ export function SendMailModal({
                                 Not Mailed
                               </span>
                             )}
-                            {/* Status badge — only shown when there's
-                                a problem. Verified addresses get no
-                                pill (the address itself below already
-                                reads as accepted). The override case
-                                also implicitly reads as accepted since
-                                the displayed address IS the corrected
-                                one. */}
-                            <AddressBadge
-                              result={verifyResult}
-                              loading={reVerifyingKey === c.key}
-                              onClick={
-                                canFix
-                                  ? (e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setExpandedFixRecipient((prev) =>
-                                        prev === c.key ? null : c.key
-                                      );
-                                    }
-                                  : undefined
-                              }
-                            />
+                            {/* Status badge logic:
+                                - If user has applied an override
+                                  (corrected OR "send anyway"), show a
+                                  neutral "Address confirmed" pill so
+                                  the row stops nagging.
+                                - Else: show AddressBadge which renders
+                                  only when there's a real problem to
+                                  fix (Verified / OK = no pill).
+                                Clicking the bad pill opens the fix
+                                panel; clicking the confirmed pill
+                                re-opens the fix panel so the user
+                                can change their mind. */}
+                            {override ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setExpandedFixRecipient((prev) =>
+                                    prev === c.key ? null : c.key
+                                  );
+                                }}
+                                className="cursor-pointer rounded-full border border-petrol-500/30 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700 hover:bg-petrol-100"
+                                title="You confirmed this address. Click to revisit."
+                              >
+                                Address confirmed
+                              </button>
+                            ) : (
+                              <AddressBadge
+                                result={verifyResult}
+                                loading={reVerifyingKey === c.key}
+                                onClick={
+                                  canFix
+                                    ? (e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setExpandedFixRecipient((prev) =>
+                                          prev === c.key ? null : c.key
+                                        );
+                                      }
+                                    : undefined
+                                }
+                              />
+                            )}
                           </div>
                           <div className="mt-[2px] text-[11.5px] text-gray-500">
                             {addr.line1}
@@ -825,6 +855,9 @@ export function SendMailModal({
                           result={verifyResult}
                           onApply={(suggested) =>
                             applyAddressSuggestion(c, suggested)
+                          }
+                          onAcceptOriginal={() =>
+                            applyAddressSuggestion(c, addr)
                           }
                           onClose={() => setExpandedFixRecipient(null)}
                           testMode={lobTestMode === true}
@@ -1662,6 +1695,7 @@ function AddressFixPanel({
   original,
   result,
   onApply,
+  onAcceptOriginal,
   onClose,
   testMode,
 }: {
@@ -1680,6 +1714,7 @@ function AddressFixPanel({
     state: string;
     postal_code: string;
   }) => void;
+  onAcceptOriginal: () => void;
   onClose: () => void;
   testMode?: boolean;
 }) {
@@ -1719,7 +1754,15 @@ function AddressFixPanel({
         )}
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
+      {/* Three action options:
+          1. Use corrected version (only when a real correction exists)
+          2. Send anyway (always — user confirms the original address)
+          3. Close (don't decide right now)
+          "Send anyway" exists because (a) on staging the verifier is
+          unreliable and (b) on prod even real CASS can flag valid
+          addresses (new construction, PO boxes, etc.). Power user
+          escape hatch. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {result.has_suggestion && (
           <button
             type="button"
@@ -1733,13 +1776,22 @@ function AddressFixPanel({
             Use corrected version
           </button>
         )}
-        {!result.has_suggestion && (
-          <div className="text-[11.5px] text-gray-600">
-            {testMode
-              ? "Staging address checks are limited. Edit the address from the Contacts tab if needed."
-              : "USPS has no corrected version for this address. Edit it from the Contacts tab, then re-open Send Mail."}
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onAcceptOriginal();
+          }}
+          className={`cursor-pointer rounded-md px-3 py-[5px] text-[11.5px] font-medium ${
+            result.has_suggestion
+              ? "border border-gray-200 bg-white text-ink hover:border-gray-300"
+              : "bg-petrol-500 text-white font-semibold hover:bg-petrol-600"
+          }`}
+          title="Send to the address as I entered it. USPS may return the piece if the address is wrong."
+        >
+          Send anyway
+        </button>
         <button
           type="button"
           onClick={(e) => {
@@ -1751,6 +1803,13 @@ function AddressFixPanel({
         >
           Close
         </button>
+        {!result.has_suggestion && (
+          <div className="basis-full text-[11px] text-gray-600">
+            {testMode
+              ? "Staging verification is limited. On production, real USPS verification runs."
+              : "USPS has no corrected version. Send anyway accepts the risk that the piece may return."}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -240,21 +240,34 @@ export async function verifyAddress(
       norm(normalizedZip) !== norm(input.postal_code);
     const hasSuggestion = correctedIsComplete && correctedDiffersFromInput;
 
-    // Map Lob's footnote codes to plain English, plus tack on a
-    // catch-all deliverability message so the popover always says
-    // something even when Lob doesn't return footnotes.
-    const issues = explainFootnotes(
-      json.deliverability_analysis?.dpv_footnotes ?? []
-    );
-    if (issues.length === 0) {
-      if (deliverability === "undeliverable") {
-        issues.push("USPS has no record of this address as deliverable.");
-      } else if (deliverability === "deliverable_missing_unit") {
-        issues.push("Apartment or suite number is missing.");
-      } else if (deliverability === "deliverable_incorrect_unit") {
-        issues.push("Apartment or suite number doesn't match USPS records.");
-      } else if (deliverability === "deliverable_unnecessary_unit") {
-        issues.push("The unit number provided isn't necessary for this address.");
+    // Real CASS footnotes are unreliable in test mode — the
+    // provider returns canned responses for non-fixture addresses,
+    // often flagging real well-formed addresses as "Street number
+    // missing" etc. when they clearly have one. Suppress the
+    // specific reasons in test mode and surface a single honest
+    // message so we don't mislead the customer with fake errors.
+    let issues: string[];
+    if (isTest) {
+      issues =
+        deliverability === "undeliverable"
+          ? [
+              "Staging verification couldn't confirm this address. Real USPS verification runs on production sends.",
+            ]
+          : [];
+    } else {
+      issues = explainFootnotes(
+        json.deliverability_analysis?.dpv_footnotes ?? []
+      );
+      if (issues.length === 0) {
+        if (deliverability === "undeliverable") {
+          issues.push("USPS has no record of this address as deliverable.");
+        } else if (deliverability === "deliverable_missing_unit") {
+          issues.push("Apartment or suite number is missing.");
+        } else if (deliverability === "deliverable_incorrect_unit") {
+          issues.push("Apartment or suite number doesn't match USPS records.");
+        } else if (deliverability === "deliverable_unnecessary_unit") {
+          issues.push("The unit number provided isn't necessary for this address.");
+        }
       }
     }
 
