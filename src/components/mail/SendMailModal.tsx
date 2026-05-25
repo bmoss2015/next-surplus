@@ -377,6 +377,30 @@ export function SendMailModal({
     [candidates, selectedKeys]
   );
 
+  // Block Preview & Send while any selected recipient has an
+  // unresolved address issue. Includes:
+  //   - undeliverable (USPS won't deliver)
+  //   - deliverable + has_suggestion (USPS auto-corrected; user
+  //     must confirm the corrected version is what they meant)
+  // Without this gate the button opens the preview pane, the user
+  // assumes the issue cleared, and only finds out at the Send click
+  // inside preview. Gating at the button keeps pill warning + button
+  // state in lockstep.
+  const unresolvedAddressCount = useMemo(() => {
+    let count = 0;
+    for (const r of selectedRecipients) {
+      const v = verifyResults[r.key];
+      if (!v || !v.ok) continue;
+      if (
+        v.deliverability === "undeliverable" ||
+        (v.deliverability === "deliverable" && v.has_suggestion)
+      ) {
+        count++;
+      }
+    }
+    return count;
+  }, [selectedRecipients, verifyResults]);
+
   const checkAmountCents = useMemo(() => {
     const n = parseFloat(checkAmount);
     if (!Number.isFinite(n) || n <= 0) return 0;
@@ -1197,12 +1221,17 @@ export function SendMailModal({
                 !mailReady ||
                 selectedRecipients.length === 0 ||
                 (!isFileTemplate && !body.trim()) ||
-                (includeCheck && !hasVerifiedBank)
+                (includeCheck && !hasVerifiedBank) ||
+                unresolvedAddressCount > 0
               }
               title={
                 !mailReady
                   ? "Add a Company Address in Settings before sending mail"
-                  : undefined
+                  : unresolvedAddressCount > 0
+                    ? unresolvedAddressCount === 1
+                      ? "1 recipient has an address issue. Resolve it before sending."
+                      : `${unresolvedAddressCount} recipients have address issues. Resolve them before sending.`
+                    : undefined
               }
               className="cursor-pointer rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white disabled:opacity-50"
             >
