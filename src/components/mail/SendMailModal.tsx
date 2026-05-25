@@ -9,7 +9,10 @@ import {
   getMailTemplateAttachmentPageCount,
   type RecipientInput,
 } from "@/lib/mail/actions";
-import { verifyAddressAction } from "@/app/(app)/mail/_verify-action";
+import {
+  verifyAddressAction,
+  fetchCachedVerifyResults,
+} from "@/app/(app)/mail/_verify-action";
 import type { AddressVerifyResult } from "@/lib/mail/verify-address";
 import { renderMerge, MERGE_FIELDS, MERGE_GROUP_LABELS } from "@/lib/mail/merge";
 import type { MailTemplateRow } from "@/lib/settings/fetch";
@@ -275,39 +278,37 @@ export function SendMailModal({
       : null;
   }
 
-  // Background-verify every candidate's address when the modal opens
-  // so the per-row "Undeliverable" / "Unit Warning" pills appear
-  // before the user even clicks Send. Passes contact_id so the
-  // server-side cache returns the stored result without hitting
-  // the provider when the address hasn't changed.
+  // On modal open, pull the CACHED verification result for each
+  // candidate (no fresh provider calls). The cache lives on the
+  // contact row (migration 0133). If a contact has a cached
+  // result, it shows up as a pill immediately. Contacts that have
+  // never been verified show no pill until they're selected and
+  // Send is clicked — that's when the actual verification fires
+  // (cost only at the moment we're about to commit). Address
+  // verification happens at contact add/edit time as the primary
+  // path; this load is a "read what's already cached" cheap call.
   useEffect(() => {
     if (!open) return;
     if (candidates.length === 0) return;
     let cancelled = false;
     (async () => {
-      const toVerify = candidates.filter(
-        (c) => !verifyResults[c.key] && !addressOverrides[c.key]
-      );
-      if (toVerify.length === 0) return;
-      const results = await Promise.all(
-        toVerify.map(async (c) => {
-          const res = await verifyAddressAction({
-            line1: c.contact.line1,
-            line2: c.contact.line2 ?? null,
-            city: c.contact.city,
-            state: c.contact.state,
-            postal_code: c.contact.postal_code,
-            contact_id: contactIdOf(c),
-          });
-          return [c.key, res] as const;
-        })
-      );
-      if (cancelled) return;
-      setVerifyResults((prev) => {
-        const next = { ...prev };
-        for (const [key, res] of results) next[key] = res;
-        return next;
-      });
+      const contactIds = candidates
+        .map((c) => contactIdOf(c))
+        .filter((id): id is string => Boolean(id));
+      if (contactIds.length === 0) return;
+      const res = await fetchCachedVerifyResults(contactIds);
+      if (cancelled || !res.ok) return;
+      // Map by contact_id back to candidate keys for verifyResults.
+      const byKey: Record<string, AddressVerifyResult> = {};
+      for (const c of candidates) {
+        const id = contactIdOf(c);
+        if (id && res.results[id]) {
+          byKey[c.key] = res.results[id];
+        }
+      }
+      if (Object.keys(byKey).length > 0) {
+        setVerifyResults((prev) => ({ ...prev, ...byKey }));
+      }
     })();
     return () => {
       cancelled = true;
