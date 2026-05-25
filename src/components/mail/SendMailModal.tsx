@@ -432,11 +432,21 @@ export function SendMailModal({
       ([, res]) => res.ok && res.deliverability === "undeliverable"
     );
     if (undeliverable.length > 0) {
+      // Bounce the user BACK to the form view so they can see the
+      // per-recipient pills + the click-to-fix panels. The pills
+      // live on the form recipient picker, not on the preview pane.
+      // Without this jump, the error reads as a dead end on the
+      // preview pane with no obvious way to act on it.
+      setShowPreview(false);
       setErr(
         undeliverable.length === 1
-          ? "1 recipient has an undeliverable address. Fix it or remove them, then send again."
-          : `${undeliverable.length} recipients have undeliverable addresses. Fix or remove them, then send again.`
+          ? "1 recipient has an undeliverable address. Click the red Fix pill on that recipient to see Lob's suggested correction."
+          : `${undeliverable.length} recipients have undeliverable addresses. Click the red Fix pill on each to see Lob's suggested corrections.`
       );
+      // Auto-open the first failing recipient's fix panel so the
+      // resolution path is one click away, not buried in the list.
+      const firstFailing = undeliverable[0][0];
+      setExpandedFixRecipient(firstFailing);
       return;
     }
     const verifyErrors = verifyEntries.filter(([, res]) => !res.ok);
