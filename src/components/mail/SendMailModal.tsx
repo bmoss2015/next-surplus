@@ -838,10 +838,16 @@ export function SendMailModal({
                   const addr = effectiveAddress(c);
                   const verifyResult = verifyResults[c.key] ?? null;
                   const isExpanded = expandedFixRecipient === c.key;
+                  // Click opens the panel when there's something to act
+                  // on: undeliverable, unit warning, OR a USPS-auto-
+                  // corrected address the user should review (typo fix
+                  // case — Lantna -> Lantana). Plain deliverable with
+                  // no suggestion = nothing to click.
                   const canFix =
                     verifyResult &&
                     verifyResult.ok &&
-                    verifyResult.deliverability !== "deliverable";
+                    (verifyResult.deliverability !== "deliverable" ||
+                      verifyResult.has_suggestion);
                   return (
                     <div
                       key={c.key}
@@ -1704,18 +1710,8 @@ function AddressBadge({
   }
   if (!result) return null;
 
-  // Only render the pill when the address has a real problem. Fully
-  // deliverable addresses (and "unnecessary unit" — Lob's nitpick
-  // that USPS still delivers fine) get NO pill. Cleaner row, less
-  // visual noise. The displayed address itself is the implicit
-  // confirmation that it's accepted.
-  if (
-    result.ok &&
-    (result.deliverability === "deliverable" ||
-      result.deliverability === "deliverable_unnecessary_unit")
-  ) {
-    return null;
-  }
+  // (verified-no-correction case rendered at the end as a small
+  // green check — see the return at bottom of this function)
 
   const Wrapper = onClick
     ? ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
@@ -1760,7 +1756,44 @@ function AddressBadge({
       </Wrapper>
     );
   }
-  return null;
+  // Deliverable BUT USPS auto-corrected something (e.g. fixed a
+  // typo in the street name, normalized ST -> Street, added ZIP+4).
+  // We show this as Verified + Review so the user can confirm
+  // the suggested address matches what they meant. Important when
+  // USPS fuzzy-matched a typo: the user typed "Lantna" and CASS
+  // matched "Lantana" — we want them to see + accept that fix.
+  if (result.ok && result.has_suggestion) {
+    return (
+      <Wrapper
+        className={`rounded-full border border-petrol-500/30 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700 ${onClick ? "cursor-pointer hover:bg-petrol-100" : "cursor-default"}`}
+        title={onClick ? "USPS auto-corrected this address. Click to review." : undefined}
+      >
+        Verified {onClick ? "·" : ""} {onClick && <span className="underline">Review</span>}
+      </Wrapper>
+    );
+  }
+  // Verified, no correction needed — small confirmation pill so the
+  // customer can see at-a-glance that the address has been checked.
+  return (
+    <span
+      className="inline-flex items-center gap-[3px] rounded-full border border-petrol-500/30 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700"
+      title="Address verified by USPS"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width="9"
+        height="9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <polyline points="4 12 10 18 20 6" />
+      </svg>
+      Verified
+    </span>
+  );
 }
 
 // Inline panel that appears below a recipient row when the user
