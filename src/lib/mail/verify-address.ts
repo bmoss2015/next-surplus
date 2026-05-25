@@ -50,11 +50,55 @@ export type AddressVerifyResult =
       // a placeholder response per Lob policy). UI should hint that
       // verification is non-functional in dev.
       test_mode: boolean;
+      // Plain-English reason(s) the address was flagged. Empty array
+      // when the address is fully deliverable. Sourced from Lob's
+      // deliverability_analysis.dpv_footnotes + heuristics on the
+      // deliverability bucket. Surfaced in the click-to-fix popover.
+      issues: string[];
+      // True when Lob suggested an address that differs from the
+      // input (different street name, ZIP, abbreviation, etc.).
+      // Drives the "Use Lob's version" button in the popover.
+      has_suggestion: boolean;
     }
   | {
       ok: false;
       error: string;
     };
+
+// Map Lob's dpv_footnote codes to plain-English issues the customer
+// can understand. Footnote codes are documented at:
+// https://docs.lob.com/#tag/US-Verifications
+function explainFootnotes(codes: string[]): string[] {
+  const map: Record<string, string> = {
+    AA: "ZIP+4 matched a primary record.",
+    A1: "USPS has no exact record of this address.",
+    BB: "Address fully matched USPS records.",
+    CC: "Apartment/unit number doesn't match USPS records.",
+    F1: "Address matched to a military / diplomatic post.",
+    G1: "Address matched to a general delivery.",
+    IA: "Address has an informational error.",
+    M1: "Street number is missing.",
+    M3: "Street number is invalid for this street.",
+    N1: "High-rise address is missing an apartment or suite.",
+    P1: "PO Box / Rural Route / HC Box info is missing or invalid.",
+    P3: "Private mailbox (PMB) designator is missing or invalid.",
+    R1: "Building exists but no apartment number matched.",
+    R7: "Carrier route is rural / unknown.",
+    RR: "Address is a Commercial Mail Receiving Agency (CMRA).",
+    TA: "Primary number matched after dropping trailing letter.",
+    U1: "Single-ZIP address — no further matching possible.",
+  };
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of codes) {
+    const msg = map[c];
+    if (msg && !seen.has(msg)) {
+      seen.add(msg);
+      out.push(msg);
+    }
+  }
+  return out;
+}
 
 export async function verifyAddress(
   input: AddressVerifyInput
@@ -73,6 +117,8 @@ export async function verifyAddress(
         postal_code: input.postal_code,
       },
       test_mode: true,
+      issues: [],
+      has_suggestion: false,
     };
   }
   const isTest = LOB_API_KEY.startsWith("test_");
@@ -108,6 +154,12 @@ export async function verifyAddress(
         zip_code?: string;
         zip_code_plus_4?: string;
       };
+      deliverability_analysis?: {
+        dpv_confirmation?: string;
+        dpv_footnotes?: string[];
+        ews_match?: boolean;
+        lacs_indicator?: string;
+      };
     };
     const deliverability =
       (json.deliverability as AddressVerifyResult["deliverability" & "ok"]["deliverability"]) ??
@@ -115,6 +167,43 @@ export async function verifyAddress(
     const zip = json.components?.zip_code_plus_4
       ? `${json.components.zip_code}-${json.components.zip_code_plus_4}`
       : (json.components?.zip_code ?? input.postal_code);
+    const normalizedLine1 = json.primary_line ?? input.line1;
+    const normalizedLine2 =
+      (json.secondary_line as string | undefined) ?? input.line2 ?? null;
+    const normalizedCity = json.components?.city ?? input.city;
+    const normalizedState = json.components?.state ?? input.state;
+    const normalizedZip = zip;
+
+    // Surface a meaningful "we changed something" signal so the popover
+    // can show a "Use Lob's version" button only when there's actually
+    // something to apply. Case-insensitive compare on each part.
+    const norm = (s: string | null | undefined) =>
+      (s ?? "").trim().toLowerCase();
+    const hasSuggestion =
+      norm(normalizedLine1) !== norm(input.line1) ||
+      norm(normalizedLine2) !== norm(input.line2) ||
+      norm(normalizedCity) !== norm(input.city) ||
+      norm(normalizedState) !== norm(input.state) ||
+      norm(normalizedZip) !== norm(input.postal_code);
+
+    // Map Lob's footnote codes to plain English, plus tack on a
+    // catch-all deliverability message so the popover always says
+    // something even when Lob doesn't return footnotes.
+    const issues = explainFootnotes(
+      json.deliverability_analysis?.dpv_footnotes ?? []
+    );
+    if (issues.length === 0) {
+      if (deliverability === "undeliverable") {
+        issues.push("USPS has no record of this address as deliverable.");
+      } else if (deliverability === "deliverable_missing_unit") {
+        issues.push("Apartment or suite number is missing.");
+      } else if (deliverability === "deliverable_incorrect_unit") {
+        issues.push("Apartment or suite number doesn't match USPS records.");
+      } else if (deliverability === "deliverable_unnecessary_unit") {
+        issues.push("The unit number provided isn't necessary for this address.");
+      }
+    }
+
     return {
       ok: true,
       deliverability: deliverability as
@@ -124,13 +213,15 @@ export async function verifyAddress(
         | "deliverable_missing_unit"
         | "undeliverable",
       normalized: {
-        line1: json.primary_line ?? input.line1,
-        line2: (json.secondary_line as string | undefined) ?? input.line2 ?? null,
-        city: json.components?.city ?? input.city,
-        state: json.components?.state ?? input.state,
-        postal_code: zip,
+        line1: normalizedLine1,
+        line2: normalizedLine2,
+        city: normalizedCity,
+        state: normalizedState,
+        postal_code: normalizedZip,
       },
       test_mode: isTest,
+      issues,
+      has_suggestion: hasSuggestion,
     };
   } catch (err) {
     return {

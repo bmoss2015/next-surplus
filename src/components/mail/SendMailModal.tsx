@@ -178,6 +178,70 @@ export function SendMailModal({
   const [pending, startTransition] = useTransition();
   const [bodyRef, setBodyRef] = useState<HTMLTextAreaElement | null>(null);
 
+  // Per-recipient address overrides. Set when the user accepts
+  // Lob's suggested correction for an undeliverable / unit-warning
+  // address. The override wins over the candidate's original address
+  // in both the displayed value and the send payload.
+  const [addressOverrides, setAddressOverrides] = useState<
+    Record<
+      string,
+      {
+        line1: string;
+        line2: string | null;
+        city: string;
+        state: string;
+        postal_code: string;
+      }
+    >
+  >({});
+  // Which recipient's "fix it" panel is open (null = none open).
+  // Clicking the address-status pill toggles this. Only one open at
+  // a time to keep the picker scannable.
+  const [expandedFixRecipient, setExpandedFixRecipient] = useState<
+    string | null
+  >(null);
+  // Which recipient is currently re-verifying after a correction is
+  // applied. UI shows a small spinner on that row's pill.
+  const [reVerifyingKey, setReVerifyingKey] = useState<string | null>(null);
+
+  // Resolve the address a recipient should be sent to. Priority:
+  //   1. User-accepted override (from the "Use Lob's version" button)
+  //   2. Original candidate address
+  // Used for the row display + as the input to the verifyAddress call.
+  function effectiveAddress(c: SendMailModalRecipient) {
+    const override = addressOverrides[c.key];
+    if (override) return override;
+    return {
+      line1: c.contact.line1,
+      line2: c.contact.line2 ?? null,
+      city: c.contact.city,
+      state: c.contact.state,
+      postal_code: c.contact.postal_code,
+    };
+  }
+
+  // Apply a Lob-suggested correction for this recipient. Stores it as
+  // an override + re-runs verify on the new address. The pill flips
+  // to Verified once Lob confirms the corrected version.
+  async function applyAddressSuggestion(
+    c: SendMailModalRecipient,
+    suggested: {
+      line1: string;
+      line2: string | null;
+      city: string;
+      state: string;
+      postal_code: string;
+    }
+  ) {
+    setReVerifyingKey(c.key);
+    setAddressOverrides((prev) => ({ ...prev, [c.key]: suggested }));
+    const res = await verifyAddressAction(suggested);
+    setVerifyResults((prev) => ({ ...prev, [c.key]: res }));
+    setReVerifyingKey(null);
+    setExpandedFixRecipient(null);
+    setErr(null);
+  }
+
   // Pre-send address verification (Lob /us_verifications) results,
   // keyed by recipient.key. Populated when the user clicks Send;
   // an "undeliverable" result blocks the actual send and shows an
@@ -353,13 +417,8 @@ export function SendMailModal({
     setVerifying(true);
     const results = await Promise.all(
       selectedRecipients.map(async (r) => {
-        const res = await verifyAddressAction({
-          line1: r.contact.line1,
-          line2: r.contact.line2 ?? null,
-          city: r.contact.city,
-          state: r.contact.state,
-          postal_code: r.contact.postal_code,
-        });
+        const addr = effectiveAddress(r);
+        const res = await verifyAddressAction(addr);
         return [r.key, res] as const;
       })
     );
@@ -390,10 +449,14 @@ export function SendMailModal({
       );
     }
 
-    // Use Lob's normalized address when we have one, otherwise the raw
-    // user input. Lob fixes things like "St" vs "Street" and adds the
-    // ZIP+4 — the printer prefers the normalized form.
+    // Resolve the address that actually gets sent to the provider.
+    // Priority: user-accepted override (from the "Use Lob's version"
+    // button) > Lob's normalized version > raw user input. The
+    // override is the strongest signal — the customer explicitly
+    // accepted that exact address.
     const normalizedFor = (r: SendMailModalRecipient) => {
+      const override = addressOverrides[r.key];
+      if (override) return override;
       const v = nextResults[r.key];
       if (v && v.ok && v.deliverability !== "undeliverable") {
         return {
@@ -634,47 +697,90 @@ export function SendMailModal({
               ) : (
                 candidates.map((c) => {
                   const checked = selectedKeys.has(c.key);
+                  const override = addressOverrides[c.key] ?? null;
+                  const addr = effectiveAddress(c);
+                  const verifyResult = verifyResults[c.key] ?? null;
+                  const isExpanded = expandedFixRecipient === c.key;
+                  const canFix =
+                    verifyResult &&
+                    verifyResult.ok &&
+                    verifyResult.deliverability !== "deliverable";
                   return (
-                    <label
+                    <div
                       key={c.key}
-                      className="flex cursor-pointer items-start gap-3 border-b border-gray-150 px-3 py-[10px] last:border-b-0 hover:bg-white"
+                      className="border-b border-gray-150 last:border-b-0 hover:bg-white"
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleRecipient(c.key)}
-                        className="mt-[4px] cursor-pointer"
-                      />
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[13px] font-medium text-ink">
-                            {c.contact.full_name}
-                          </span>
-                          <span className="rounded-full border border-petrol-200 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700">
-                            {c.relation}
-                          </span>
-                          {c.mailed ? (
-                            <span className="rounded-full bg-gradient-to-br from-[#0d4b3a] to-[#13644e] px-2 py-[1px] text-[10px] font-medium text-white">
-                              Mailed
-                              {c.mailed_at
-                                ? ` ${new Date(c.mailed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-                                : ""}
+                      <label className="flex cursor-pointer items-start gap-3 px-3 py-[10px]">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleRecipient(c.key)}
+                          className="mt-[4px] cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[13px] font-medium text-ink">
+                              {c.contact.full_name}
                             </span>
-                          ) : (
-                            <span className="rounded-full border border-gray-200 bg-white px-2 py-[1px] text-[10px] font-medium text-gray-500">
-                              Not Mailed
+                            <span className="rounded-full border border-petrol-200 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700">
+                              {c.relation}
                             </span>
-                          )}
-                          <AddressBadge result={verifyResults[c.key] ?? null} />
+                            {c.mailed ? (
+                              <span className="rounded-full bg-gradient-to-br from-[#0d4b3a] to-[#13644e] px-2 py-[1px] text-[10px] font-medium text-white">
+                                Mailed
+                                {c.mailed_at
+                                  ? ` ${new Date(c.mailed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                                  : ""}
+                              </span>
+                            ) : (
+                              <span className="rounded-full border border-gray-200 bg-white px-2 py-[1px] text-[10px] font-medium text-gray-500">
+                                Not Mailed
+                              </span>
+                            )}
+                            {/* Status badge — clickable when there's
+                                something to fix. */}
+                            <AddressBadge
+                              result={verifyResult}
+                              loading={reVerifyingKey === c.key}
+                              onClick={
+                                canFix
+                                  ? (e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setExpandedFixRecipient((prev) =>
+                                        prev === c.key ? null : c.key
+                                      );
+                                    }
+                                  : undefined
+                              }
+                            />
+                            {override && (
+                              <span
+                                className="rounded-full border border-petrol-200 bg-petrol-50 px-2 py-[1px] text-[10px] font-medium text-petrol-700"
+                                title="Address was corrected using Lob's suggestion"
+                              >
+                                Corrected
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-[2px] text-[11.5px] text-gray-500">
+                            {addr.line1}
+                            {addr.line2 ? `, ${addr.line2}` : ""},{" "}
+                            {addr.city}, {addr.state} {addr.postal_code}
+                          </div>
                         </div>
-                        <div className="mt-[2px] text-[11.5px] text-gray-500">
-                          {c.contact.line1}
-                          {c.contact.line2 ? `, ${c.contact.line2}` : ""},{" "}
-                          {c.contact.city}, {c.contact.state}{" "}
-                          {c.contact.postal_code}
-                        </div>
-                      </div>
-                    </label>
+                      </label>
+                      {isExpanded && verifyResult && verifyResult.ok && (
+                        <AddressFixPanel
+                          original={addr}
+                          result={verifyResult}
+                          onApply={(suggested) =>
+                            applyAddressSuggestion(c, suggested)
+                          }
+                          onClose={() => setExpandedFixRecipient(null)}
+                        />
+                      )}
+                    </div>
                   );
                 })
               )}
@@ -1417,39 +1523,69 @@ function PdfPreview({ blob }: { blob: Blob }) {
 
 // Inline badge that surfaces the Lob /us_verifications result on each
 // recipient row after the user clicks Send. Shows nothing pre-verify.
-function AddressBadge({ result }: { result: AddressVerifyResult | null }) {
+// Becomes clickable when there's something the customer can fix (any
+// non-"deliverable" outcome) — the click opens the AddressFixPanel
+// directly below the row.
+function AddressBadge({
+  result,
+  loading,
+  onClick,
+}: {
+  result: AddressVerifyResult | null;
+  loading?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
+}) {
+  if (loading) {
+    return (
+      <span className="rounded-full border border-gray-200 bg-white px-2 py-[1px] text-[10px] font-medium text-gray-500">
+        Re-verifying…
+      </span>
+    );
+  }
   if (!result) return null;
+
+  const Wrapper = onClick
+    ? ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
+        <button type="button" onClick={onClick} {...rest}>
+          {children}
+        </button>
+      )
+    : ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
+        <span {...rest}>{children}</span>
+      );
+
   if (!result.ok) {
     return (
-      <span
-        className="rounded-full border border-gray-200 bg-white px-2 py-[1px] text-[10px] font-medium text-gray-500"
+      <Wrapper
+        className="cursor-default rounded-full border border-gray-200 bg-white px-2 py-[1px] text-[10px] font-medium text-gray-500"
         title={result.error}
       >
         Address Check Failed
-      </span>
+      </Wrapper>
     );
   }
   if (result.deliverability === "undeliverable") {
     return (
-      <span
-        className="rounded-full border border-danger/30 bg-red-50 px-2 py-[1px] text-[10px] font-medium text-danger"
-        title="USPS will not deliver mail to this address. Fix the address or remove this recipient."
+      <Wrapper
+        className={`rounded-full border border-danger/30 bg-red-50 px-2 py-[1px] text-[10px] font-medium text-danger ${onClick ? "cursor-pointer hover:bg-red-100" : "cursor-default"}`}
+        title={onClick ? "Click to see why and apply a fix" : undefined}
       >
-        Undeliverable
-      </span>
+        Undeliverable {onClick ? "·" : ""} {onClick && <span className="underline">Fix</span>}
+      </Wrapper>
     );
   }
   if (
     result.deliverability === "deliverable_incorrect_unit" ||
-    result.deliverability === "deliverable_missing_unit"
+    result.deliverability === "deliverable_missing_unit" ||
+    result.deliverability === "deliverable_unnecessary_unit"
   ) {
     return (
-      <span
-        className="rounded-full border border-gray-300 bg-white px-2 py-[1px] text-[10px] font-medium text-ink"
-        title="Lob suggests the unit number is missing or wrong. Mail may still deliver but consider fixing the unit."
+      <Wrapper
+        className={`rounded-full border border-gray-300 bg-white px-2 py-[1px] text-[10px] font-medium text-ink ${onClick ? "cursor-pointer hover:bg-gray-50" : "cursor-default"}`}
+        title={onClick ? "Click to see the unit issue + apply a fix" : undefined}
       >
-        Unit Warning
-      </span>
+        Unit Warning {onClick ? "·" : ""} {onClick && <span className="underline">Fix</span>}
+      </Wrapper>
     );
   }
   return (
@@ -1463,6 +1599,106 @@ function AddressBadge({ result }: { result: AddressVerifyResult | null }) {
     >
       {result.test_mode ? "Test Verified" : "Verified"}
     </span>
+  );
+}
+
+// Inline panel that appears below a recipient row when the user
+// clicks the Undeliverable / Unit Warning badge. Shows the entered
+// address, Lob's suggested corrected version, plain-English issues
+// pulled from the deliverability_analysis footnotes, and an Apply
+// button that swaps the address and re-verifies.
+function AddressFixPanel({
+  original,
+  result,
+  onApply,
+  onClose,
+}: {
+  original: {
+    line1: string;
+    line2: string | null;
+    city: string;
+    state: string;
+    postal_code: string;
+  };
+  result: AddressVerifyResult & { ok: true };
+  onApply: (suggested: {
+    line1: string;
+    line2: string | null;
+    city: string;
+    state: string;
+    postal_code: string;
+  }) => void;
+  onClose: () => void;
+}) {
+  const suggested = result.normalized;
+  const fmt = (a: typeof original) =>
+    `${a.line1}${a.line2 ? ", " + a.line2 : ""}, ${a.city}, ${a.state} ${a.postal_code}`;
+
+  return (
+    <div className="border-t border-gray-150 bg-gray-50/60 px-3 py-3">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+        What USPS sees
+      </div>
+      {result.issues.length > 0 ? (
+        <ul className="mb-3 list-disc pl-5 text-[12px] text-ink">
+          {result.issues.map((issue, i) => (
+            <li key={i}>{issue}</li>
+          ))}
+        </ul>
+      ) : (
+        <div className="mb-3 text-[12px] text-ink">
+          USPS couldn&apos;t match this address to a delivery point.
+        </div>
+      )}
+
+      <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1 text-[12px]">
+        <div className="text-[10.5px] uppercase tracking-wider text-gray-500">
+          You entered
+        </div>
+        <div className="text-ink">{fmt(original)}</div>
+        {result.has_suggestion && (
+          <>
+            <div className="text-[10.5px] uppercase tracking-wider text-gray-500">
+              Lob suggests
+            </div>
+            <div className="font-medium text-petrol-700">{fmt(suggested)}</div>
+          </>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        {result.has_suggestion && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onApply(suggested);
+            }}
+            className="cursor-pointer rounded-md bg-petrol-500 px-3 py-[5px] text-[11.5px] font-semibold text-white hover:bg-petrol-600"
+          >
+            Use Lob&apos;s version
+          </button>
+        )}
+        {!result.has_suggestion && (
+          <div className="text-[11.5px] text-gray-600">
+            Lob doesn&apos;t have a suggested correction for this address.
+            Edit the address from the Contacts tab, then re-open Send Mail.
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}
+          className="cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-[5px] text-[11.5px] font-medium text-ink hover:border-gray-300"
+        >
+          Close
+        </button>
+      </div>
+    </div>
   );
 }
 
