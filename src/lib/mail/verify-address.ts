@@ -167,12 +167,12 @@ export async function verifyAddress(
     const zip = json.components?.zip_code_plus_4
       ? `${json.components.zip_code}-${json.components.zip_code_plus_4}`
       : (json.components?.zip_code ?? input.postal_code);
-    // In test mode, the provider sometimes returns documentation /
-    // tutorial text in primary_line (e.g. "SET primary_line TO
-    // 'deliverable' AND zip_code to '11111' to simulate..."). That
-    // text is for developers reading provider docs, NOT for end
-    // users. Detect it and fall back to the original input so the
-    // customer never sees provider-internal hint copy.
+    // The provider sometimes returns documentation/tutorial text in
+    // primary_line (e.g. "SET primary_line TO 'deliverable' AND
+    // zip_code to '11111' to simulate..."). That text is for
+    // developers reading provider docs, NOT for end users. Detect
+    // it and fall back to the original input so the customer never
+    // sees provider-internal hint copy.
     const looksLikeProviderHint = (s: string | undefined) => {
       if (!s) return false;
       const lower = s.toLowerCase();
@@ -184,30 +184,61 @@ export async function verifyAddress(
         lower.includes("see https://")
       );
     };
-    const safePrimary = looksLikeProviderHint(json.primary_line)
-      ? input.line1
-      : (json.primary_line ?? input.line1);
-    const safeSecondary = looksLikeProviderHint(json.secondary_line)
-      ? (input.line2 ?? null)
-      : ((json.secondary_line as string | undefined) ?? input.line2 ?? null);
 
-    const normalizedLine1 = safePrimary;
-    const normalizedLine2 = safeSecondary;
-    const normalizedCity = json.components?.city ?? input.city;
-    const normalizedState = json.components?.state ?? input.state;
-    const normalizedZip = zip;
+    // Use the provider value only when it's a non-empty, non-junk
+    // string. Empty / hint / whitespace-only -> fall back to input.
+    // Without this guard, an undeliverable address with empty
+    // components in the response would produce a half-blank
+    // "corrected" address that re-verification then rejects.
+    const pickField = (
+      providerValue: string | undefined | null,
+      inputValue: string,
+      treatAsHint = false
+    ): string => {
+      const v = (providerValue ?? "").trim();
+      if (!v) return inputValue;
+      if (treatAsHint && looksLikeProviderHint(v)) return inputValue;
+      return v;
+    };
+    const pickOptionalField = (
+      providerValue: string | undefined | null,
+      inputValue: string | null
+    ): string | null => {
+      const v = (providerValue ?? "").trim();
+      if (!v) return inputValue;
+      if (looksLikeProviderHint(v)) return inputValue;
+      return v;
+    };
+
+    const normalizedLine1 = pickField(json.primary_line, input.line1, true);
+    const normalizedLine2 = pickOptionalField(
+      json.secondary_line,
+      input.line2 ?? null
+    );
+    const normalizedCity = pickField(json.components?.city, input.city);
+    const normalizedState = pickField(json.components?.state, input.state);
+    const normalizedZip = pickField(zip, input.postal_code);
 
     // Surface a meaningful "we changed something" signal so the popover
-    // can show a "Use Lob's version" button only when there's actually
-    // something to apply. Case-insensitive compare on each part.
+    // shows the "Use corrected version" button only when the
+    // corrected address is materially different AND complete. A
+    // suggestion with empty parts is never offered — that's a
+    // half-corrected address that would just fail again on submit.
     const norm = (s: string | null | undefined) =>
       (s ?? "").trim().toLowerCase();
-    const hasSuggestion =
+    const correctedIsComplete = Boolean(
+      normalizedLine1 &&
+        normalizedCity &&
+        normalizedState &&
+        normalizedZip
+    );
+    const correctedDiffersFromInput =
       norm(normalizedLine1) !== norm(input.line1) ||
       norm(normalizedLine2) !== norm(input.line2) ||
       norm(normalizedCity) !== norm(input.city) ||
       norm(normalizedState) !== norm(input.state) ||
       norm(normalizedZip) !== norm(input.postal_code);
+    const hasSuggestion = correctedIsComplete && correctedDiffersFromInput;
 
     // Map Lob's footnote codes to plain English, plus tack on a
     // catch-all deliverability message so the popover always says
