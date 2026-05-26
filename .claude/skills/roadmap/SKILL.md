@@ -1,3 +1,8 @@
+---
+name: roadmap
+description: Updates the Product Build Status & Roadmap and/or Architecture documentation when the user wants to record a feature, priority change, timeline, technical decision, or integration choice. Invoked via /roadmap, /architecture, or /docs slash commands. Classifies content as Roadmap-only, Architecture-only, or both. Shows a preview before committing.
+---
+
 # Roadmap and Architecture Doc Update Skill
 
 ## When this skill triggers
