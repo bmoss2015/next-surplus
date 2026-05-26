@@ -1,124 +1,297 @@
 # Architecture
 
-One-page reference for how the Moss Equity Portal fits together. Update when topology changes.
+Technical reference for the Moss Equity Partners - Web App. Audience: developers, technical contractors, future engineering hires. Bree edits this through the `/architecture` slash command in Claude Code, not by direct file edits.
 
-## Topology
+For product direction and timeline, see the Product Build Status & Roadmap in the Shared Drive (auto-generated weekly).
 
-```
-                    ┌─────────────────────────┐
-                    │  Browser                │
-                    └────────────┬────────────┘
-                                 │
-                       ┌─────────▼─────────┐
-                       │  Vercel           │
-                       │  Next.js 16       │
-                       │  App Router       │
-                       │  src/proxy.ts     │
-                       └─────────┬─────────┘
-                                 │
-        ┌────────────────────────┼─────────────────────────────┐
-        │                        │                             │
-┌───────▼──────────┐  ┌──────────▼──────────┐  ┌───────────────▼─────────────┐
-│ Supabase         │  │ Vendor APIs         │  │ Cloudflare Workers          │
-│  Postgres        │  │  Resend             │  │  moss-equity-email-poller   │
-│  Auth            │  │  Lob                │  │   cron */2 * * * *          │
-│  Storage         │  │  Click2Mail         │  │   hits /api/email/sync      │
-│ (staging + prod) │  │  Google OAuth       │  │                             │
-│                  │  │  HLR Lookup         │  │  workflow-minds-quo-poller  │
-│                  │  │  OpenPhone (QUO)    │  │   cron * * * * *            │
-│                  │  │  Veriphone (paused) │  │   polls QUO, emails codes   │
-└──────────────────┘  └─────────────────────┘  └─────────────────────────────┘
-```
+For day-to-day operational rules and Claude Code instructions, see `CLAUDE.md`.
 
-## Hosting
+For granular ship history, see `CHANGELOG.md`.
 
-- App: Vercel, auto-deployed from `main` branch of `github.com/bmoss2015/MossEquityPartners`
-- Custom domain: `portal.mossequitypartners.com`
-- Supabase projects: staging (`sghfmudgnddybsayfqbd`), production (`qvyhdexoicoppgrvvtov`)
-- Two Cloudflare Workers in their own repos (see "Workers" below)
+---
 
-A third Supabase project (`hkubwxpyyejxffncxrez`) belongs to a separate MD research agent and must never be linked from this repo.
+## Tech Stack
 
-## Code layout
+- **Frontend:** Next.js 16.2.6 (App Router), React 19, Tailwind CSS
+- **Database, Auth, Storage:** Supabase (Postgres + RLS + Auth + Storage)
+- **Icons:** Tabler
+- **Font:** Inter
+- **Color palette:** petrol gradient #0a3d4a → #0d6c7d → #1a8a9c, charcoal text #0f1729
+- **Transactional email:** Resend API (direct, not via Supabase SMTP)
+- **Hosting:** Vercel (web app), Railway (Maryland research agent), Cloudflare (Product Roadmap Worker)
+- **DNS:** Cloudflare
+- **CI/CD:** Vercel auto-deploy on main push; GitHub Actions CI build gate pending
+- **Development assistant:** Claude Code for solo development
 
-```
-src/
-  app/                Next.js App Router pages
-    (app)/            Authenticated routes (sidebar layout)
-    (auth)/           Sign-in, password reset, accept-invite
-    api/              Server routes (email sync, webhooks, etc.)
-    auth/callback/    Supabase OAuth callback (runs unauth'd)
-  components/         Shared UI components
-  lib/                Domain logic, keyed by feature
-    auth/             Supabase client factories
-    email/            Inbound Gmail sync, encryption
-    leads/            Lead CRUD + computed fields
-    mail/             Lob + Click2Mail integrations
-    notifications/    In-app + email notifications
-    phone-validate.ts HLR phone validation
-    reports/          Reporting queries
-    settings/         App settings reads/writes
-    supabase/         Browser + server + service-role clients
-    tasks/            Task CRUD
-  proxy.ts            Auth middleware (was middleware.ts pre-Next 16)
-supabase/
-  migrations/         Numbered SQL migrations, source of truth for schema
-  functions/          Edge Functions (currently: notify-mention)
-  config.toml         Pinned to staging project ref
-scripts/              Operational scripts (admin user, invite, seed, harness)
-docs/                 Original spec and reference material
-```
+---
 
-## Data model
+## Environments
 
-Multi-tenant by `org_id`. Every data table has `org_id` NOT NULL, defaulting to `auth_org_id()`, a SECURITY DEFINER function that reads the caller's profile row. RLS policies on every table restrict select / insert / update / delete to `org_id = auth_org_id()`. The canonical pattern is in `supabase/migrations/0011_multi_org_rls.sql`; every later migration follows the same shape.
+| Environment | Identifier | Purpose |
+|---|---|---|
+| Staging Supabase | `sghfmudgnddybsayfqbd` | Test data. Source of truth for local dev. |
+| Production Supabase | `qvyhdexoicoppgrvvtov` | Live database. Migrations 0080-0094 applied. |
+| Automations Supabase | `hkubwxpyyejxffncxrez` | Separate project (Maryland research agent). NEVER push web app migrations here. |
+| GitHub repo | `bmoss2015/MossEquityPartners` | main branch is source of truth |
+| Vercel production | `moss-equity-portal.vercel.app` | Aliased to portal.mossequitypartners.com |
+| Custom domain | `portal.mossequitypartners.com` | CNAME via Cloudflare, SSL active 2026-05-12 |
+| Local dev | `localhost:3000` | `npm run dev` from `C:\Users\info\moss-equity-portal` |
+| Maryland research agent | `md-mortgage-research-production.up.railway.app` | Railway. FastAPI + Playwright + Anthropic + Supabase. |
+| Product Roadmap Worker | `moss-equity-living-doc.holy-thunder-2538.workers.dev` | Cloudflare Worker. Cron Mondays 14:00 UTC. |
+| Roadmap Shared Drive | `0AIdvxjnjcpkrUk9PVA` | Service account `living-doc-uploader@moss-equity-living-doc.iam.gserviceaccount.com` has Content Manager access. |
 
-Key tables:
+---
 
-- `orgs`, `profiles` — tenant + user identity (with admin / member role)
-- `leads`, `owners`, `contacts`, `verification_items`, `tasks`, `activities` — core operational data
-- `documents` — Supabase storage bucket, path-scoped by `<org_id>/...`
-- `app_settings`, `state_rules`, `lost_reasons`, `lead_sources`, `data_sources` — per-org reference data
-- `mail_*`, `email_*` — outbound mail and inbound email modules
-- `import_*`, `templates`, `notification_*` — supporting modules
-- `audit_log` — admin-write, org-read, sensitive action trail
+## Deploy Process
 
-Migrations are numbered with intentional gaps (0001–0030, 0040, 0050, 0065, 0070, 0080…) to leave room for inserts. Apply with `npx supabase db push --linked`. Never use the Supabase dashboard SQL editor, never use MCP `apply_migration`, never run DDL through `execute_sql`. If the file isn't in git, the change doesn't exist.
+- **Local development:** `cd C:\Users\info\moss-equity-portal && npm run dev`. Points at staging Supabase by default.
+- **Staging migration push:** verify `supabase/.temp/project-ref` reads `sghfmudgnddybsayfqbd`, then `npx supabase db push --linked`
+- **Production migration push:** relink to production project ref, push, then relink back to staging
+- **Production code deploy:** automatic on push to main via Vercel. Manual override: `npx vercel --prod`.
+- **Git workflow:** one commit per fix with descriptive message (`Fix LABEL: description` or conventional commit prefix)
+- **CHANGELOG.md:** auto-updated by git post-commit hook on every commit (Added / Changed / Fixed / Removed categorization based on commit prefix)
+- **Roadmap doc:** auto-regenerated by Cloudflare Worker Mondays 14:00 UTC (9am CDT / 8am CST). Manual trigger via `curl -X POST https://moss-equity-living-doc.holy-thunder-2538.workers.dev/regenerate`.
 
-## Auth flow
+---
 
-`src/proxy.ts` runs Supabase SSR `getUser()` on every non-asset request. Behavior:
+## Integrations
 
-- Bypass: `/_next/*`, `/api/*`, `/auth/callback`, favicon
-- Public paths (signed-out only, signed-in users get bounced home): `/login`, `/forgot`
-- Auth-flow paths (reachable with or without a session, used to set a password while holding a recovery / invite token): `/reset`, `/accept-invite`
-- Everything else requires a session, otherwise redirect to `/login?redirectTo=<path>`
+External services the platform depends on.
 
-Cookie refresh tokens are propagated through redirects so the session doesn't flap.
+### Supabase
 
-## Workers
+- Postgres database with Row Level Security enforced on every table
+- Auth (email/password, magic link invites)
+- Storage (file uploads)
+- Two projects: staging and production, kept in lockstep via migrations
+- Service role key only used in server-side contexts (never exposed to client)
 
-Each worker lives in a separate repo and is deployed independently via Wrangler.
+### Resend
 
-**moss-equity-email-poller** — `C:\Users\info\moss-equity-email-poller`
-- Cron: `*/2 * * * *`
-- Action: POST `${PORTAL_URL}/api/email/sync` with the `INTERNAL_TRIGGER_SECRET` header
-- Purpose: drives Gmail mailbox sync so inbox doesn't require manual refresh
-- Replaces the previous Vercel cron
+- Transactional email (invite emails, @mention notifications, system messages)
+- Replaced Supabase SMTP after silent delivery failures (see ADR 002)
+- From address: `bree@mossequitypartners.com`
+- Domain `mossequitypartners.com` verified in Resend dashboard
 
-**workflow-minds-quo-poller** — `C:\Users\info\workflow-minds-quo-poller`
-- Cron: `* * * * *`
-- Action: poll `api.openphone.com/v1/messages`, email new verification codes to `workflowminds@gmail.com` via Resend
-- KV namespace `SEEN_MESSAGES` for dedup
-- Replaces n8n workflow `R2oSjgxNiYBvmuCK`
+### Vercel
 
-## Deploy
+- Hosts the Next.js app at `moss-equity-portal.vercel.app`
+- Custom domain `portal.mossequitypartners.com` via Cloudflare CNAME
+- Hobby plan currently — function timeout limits apply (10 sec free, 60 sec on Pro)
+- Environment variables managed via Vercel dashboard
 
-The default path is git-driven, no `vercel --prod` from local. Full sequence in `CLAUDE.md`. Short version: branch → push → preview auto-builds → confirm on preview → `gh pr merge` → Vercel auto-deploys main to production within seconds.
+### Cloudflare
 
-## Decisions worth knowing
+- DNS for `mossequitypartners.com`
+- Hosts the Product Roadmap Worker (`moss-equity-living-doc`)
+- R2 bucket `moss-equity-living-docs` stores the generated doc + 10 versioned archives
+- Worker secrets: `GITHUB_TOKEN`, `RESEND_API_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_DRIVE_FOLDER_ID`
 
-- **Mail provider split**: Lob handles ONLY checks. Click2Mail handles ALL letters. No silent fallback for letters (pricing call: Lob letters cost ~50% more). See `src/lib/mail/`.
-- **Phone validation**: currently paused. HLR Lookup is the chosen provider, replacing Clearout, which replaced Veriphone. Clearout env vars still sit on Vercel and are pending removal.
-- **HTML to PDF**: the print vendor handles rendering. No live server-side LibreOffice or Gotenberg in the request path, despite `GOTENBERG_URL` existing as an env var.
-- **Type checking off in prod builds**: `next.config.ts` has `typescript.ignoreBuildErrors: true` to ship through 4 known errors in the mail module. To be removed once those are fixed; CI typecheck is wired but kept off the required path until then.
+### Google Drive (for Roadmap doc)
+
+- Shared Drive: "Moss Equity Partners - Product Build Status & Roadmap"
+- Shared Drive ID: `0AIdvxjnjcpkrUk9PVA`
+- Service account: `living-doc-uploader@moss-equity-living-doc.iam.gserviceaccount.com`
+- Service account has Content Manager role on the Shared Drive
+- The Worker uses a JSON key (stored as Cloudflare Worker secret) to authenticate
+
+### GoHighLevel
+
+- Currently handles SMS outreach and email outreach for leads
+- Will be replaced by the in-app Inbox once Twilio + Resend outreach ships (see Roadmap)
+- A2P SMS compliance approved
+
+### Railway (Maryland research agent)
+
+- FastAPI + Playwright + Anthropic SDK + Supabase + Google Drive/Gmail APIs
+- Bright Data Web Unlocker for DataDome bot detection bypass on Maryland Judiciary Case Search
+- Not part of the web app's deploy pipeline — runs as a separate service
+
+---
+
+## Architecture Decisions
+
+Numbered, append-only record of major design choices. Each one would normally be its own file in `/docs/adr/` for a larger team; consolidated here for solo workflow.
+
+### ADR-001: Use Supabase RLS for Multi-Tenant Isolation (not Schema Per Org)
+
+**Decision:** Single shared database with Row Level Security policies scoped by organization_id.
+
+**Why:** Lower cost, simpler ops, faster to ship. Schema per org adds significant maintenance overhead. RLS is the standard Supabase pattern.
+
+**Trade off:** A misconfigured RLS policy could leak data across orgs. Mitigation: every table has RLS enforced; penetration testing required before public signups.
+
+**Decided:** 2026-05-11
+
+### ADR-002: Resend API for Email Instead of Supabase SMTP
+
+**Decision:** Send all transactional email via Resend API directly. Bypass Supabase Auth's built-in SMTP.
+
+**Why:** Supabase SMTP fails silently in connection to Resend (known bug). Direct API call is reliable and gives visibility into delivery.
+
+**Trade off:** Custom code path for invite email. Two step: `inviteUserByEmail` creates the account, Resend sends the email.
+
+**Decided:** 2026-05-12 via Fix OOOOO
+
+### ADR-003: Single Database, Two Supabase Projects (Staging + Production)
+
+**Decision:** Maintain separate Supabase projects for staging (`sghfmudgnddybsayfqbd`) and production (`qvyhdexoicoppgrvvtov`). Third project (`hkubwxpyyejxffncxrez`) is unrelated automations and never touched by web app migrations.
+
+**Why:** Standard SaaS pattern. Eliminates risk of dev work hitting live data.
+
+**Trade off:** CLI link state drifts between projects. Solved by adding standing rule to CLAUDE.md to verify link state before every DB command.
+
+**Decided:** 2026-05-11
+
+### ADR-004: Liens Table Replaces Junior Liens Concept
+
+**Decision:** Removed the concept of "junior liens" as a separate field. Replaced with a Liens table where each lien has name + amount, multiple liens propagate to total surplus calculation.
+
+**Why:** Simpler mental model. All liens are liens to be subtracted from the surplus.
+
+**Decided:** 2026-05-12
+
+### ADR-005: Recovery Type Is Read-Only From Lookup Table
+
+**Decision:** `state_recovery_rules` table determines `recovery_type` from state + sale_type. Never user editable.
+
+**Why:** Recovery type (judicial vs non-judicial) is determined by state statute, not user preference. SC mortgage foreclosure is always judicial. SC tax sale is always non-judicial.
+
+**Decided:** 2026-05-12
+
+### ADR-006: Lead ID Format STATE-SALETYPE-YEAR-SEQUENCE
+
+**Decision:** `SC-TAX-2025-0247` format generated by database function on insert. Currently global; will scope per organization in next phase.
+
+**Why:** Human readable, sortable, encodes useful metadata.
+
+**Decided:** 2026-04-30
+
+### ADR-007: Confirmed Surplus Supersedes Calculated Surplus
+
+**Decision:** `active_surplus` hierarchy = `confirmed_surplus` first, then `estimated_surplus` if `closing_bid` is not null, then `source_surplus`. Calculated Surplus dims with strikethrough when Confirmed Surplus is set.
+
+**Why:** Operator may confirm exact surplus via court records that differs from auto calculation. The confirmed value is authoritative.
+
+**Decided:** 2026-05-12
+
+### ADR-008: One Commit Per Fix in Git
+
+**Decision:** Every fix in a commit with descriptive message (`Fix LABEL: Description`). Never bundle multiple fixes in one commit.
+
+**Why:** Surgical reverts. If Fix 12 breaks production, revert only that commit; everything else stays.
+
+**Decided:** 2026-05-12. Standing rule in `CLAUDE.md`.
+
+### ADR-009: RabbitSign for E-Signature (Not DocuSign)
+
+**Decision:** Use RabbitSign when e-signature integration ships.
+
+**Why:** Free, validated by another operator in the surplus recovery space. DocuSign cost not justified at current volume.
+
+**Decided:** 2026-05-11
+
+### ADR-010: Three Doc System with Git Hook Auto-Sync
+
+**Decision:** Maintain three synced documents (`CLAUDE.md`, `CHANGELOG.md`, Product Build Status & Roadmap auto-generated by Cloudflare Worker). A git post-commit hook in `.git/hooks/post-commit` automatically appends every commit to `CHANGELOG.md` under [Unreleased].
+
+**Why:** Three docs serve distinct audiences (developer onboarding, public release notes, strategic view). A git hook eliminates manual sync overhead and human forgetfulness. Real timestamps from git make the changelog authoritative.
+
+**Trade off:** Hook lives in `.git/hooks/` which is not versioned by git. Must be re-installed on every fresh clone.
+
+**Decided:** 2026-05-26
+
+### ADR-011: Product Name and Legal Entity
+
+**Decision:** Customer-facing product name is "Moss Equity Partners - Web App". Legal entity is Moss Equity Partners LLC, a separate registered LLC. Mossy Land LLC is an unrelated company and never referenced in any product or web app context.
+
+**Why:** Eliminates confusion. The Supabase staging project label "Moss Equity Operations Portal" is internal only and predates the product naming decision.
+
+**Decided:** 2026-05-26
+
+### ADR-012: Product Roadmap Doc Uploaded to Google Drive
+
+**Decision:** The auto-generated Product Build Status & Roadmap doc is uploaded to a dedicated Google Drive Shared Drive on every rebuild, in addition to being stored in Cloudflare R2.
+
+**Why:** Claude Cowork connects to Google Drive, not Cloudflare R2. The Drive copy is the one Cowork (and Bree) reference daily. R2 stays as the technical backup and stable URL fallback.
+
+**Trade off:** One extra dependency (Google Drive API). Mitigation: service account with scoped permissions on a single Shared Drive; key rotation reminders set for 1 year out.
+
+**Decided:** 2026-05-26
+
+### ADR-013: Roadmap Doc Uses Shared Drive, Not Personal Drive
+
+**Decision:** The Product Roadmap doc lives in a Google Workspace Shared Drive, not in Bree's personal "My Drive."
+
+**Why:** Service accounts have zero storage quota of their own and cannot own files in personal Drive folders (Google returns 403 storageQuotaExceeded). Shared Drives use org-level pooled quota and allow service account uploads. Required `supportsAllDrives=true` on all Drive API calls in the Worker.
+
+**Trade off:** Requires Google Workspace (paid plan). Personal Gmail users would need to use OAuth user delegation instead.
+
+**Decided:** 2026-05-26
+
+### ADR-014: Slash Command Pattern for Doc Updates
+
+**Decision:** Roadmap and Architecture doc updates triggered via slash commands (`/roadmap`, `/architecture`, `/docs`) in Claude Code. Skill file at `.claude/skills/roadmap/SKILL.md` handles classification, preview-before-commit, and file edits.
+
+**Why:** Explicit triggers eliminate ambiguity about when doc updates should happen. Preview-before-commit prevents accidental commits. Skill classifies content as Roadmap, Architecture, or Both so Bree doesn't have to know which file content belongs in.
+
+**Trade off:** Skill only works in Claude Code in the portal repo (not in claude.ai chat). For chat-based updates, conversation generates content that gets pasted to Claude Code.
+
+**Decided:** 2026-05-26
+
+---
+
+## RFCs Needed
+
+Design docs to write BEFORE building. RFC = Request for Comments. 1-2 pages each. Forces clear thinking on data model, edge cases, rollout, trade-offs.
+
+### RFC Template
+
+1. **Problem:** What problem are we solving? One paragraph.
+2. **Goals and Non-Goals:** What this MUST do. What this WILL NOT do.
+3. **Proposed Design:** Data model. API endpoints. UI changes. Background jobs. External services.
+4. **Alternatives Considered:** At least 2 alternatives with why rejected.
+5. **Trade-offs and Risks:** What does this make worse? Mitigation?
+6. **Rollout Plan:** Migrations needed. Feature flag? Backfill? Staging test plan?
+7. **Open Questions:** Things you don't know yet.
+
+### RFC-001: Google Drive Auto File Management
+
+Open questions to answer before building:
+
+- How are OAuth refresh tokens encrypted and rotated per org?
+- What happens when a user's Drive account hits storage limits?
+- How do we detect and resolve conflicts when both web app and Drive have changes?
+- What is the failure mode when Drive API is down or rate limited?
+- Should the worker be Vercel Cron or Supabase Edge Function?
+
+### RFC-002: Integrations Tab Architecture
+
+Open questions to answer before building:
+
+- Where do per-org encrypted credentials live?
+- How do per-org webhook URLs route to the correct organization?
+- What is the auth model for the Test button?
+- How do BYO API keys attribute cost back to the org?
+- What's the disconnect flow when an integration has pending jobs?
+
+### RFC-003: Multi-Tenant Hardening
+
+Open questions to answer before building:
+
+- Owner vs Admin distinction (billing access, org deletion permissions)
+- Multi-org user model (one user, many orgs, switcher logic)
+- Storage path migration plan for existing org data
+- Stripe billing webhooks and subscription lifecycle
+- Rate limiting strategy (Vercel-level vs application-level)
+- Audit log volume (storage costs at 100 orgs, 1000 orgs)
+
+### RFC-004: Outreach Engine (Inbox, Cadences, Triggers)
+
+Open questions to answer before building:
+
+- Twilio number model: pool per org, per state, or operator-purchased?
+- Inbound webhook routing to correct lead
+- Cadence state machine: pause, resume, exit triggers
+- Compliance: TCPA, DNC, time-of-day per state
+- Transition plan to shut GHL off
