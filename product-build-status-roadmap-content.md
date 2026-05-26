@@ -31,6 +31,7 @@ Active priorities for the current quarter (April - June 2026).
 - Integrations Tab — one-click connect for the third-party services the platform depends on
 - Multi-tenant hardening — Owner and Viewer roles, Stripe billing, usage tracking, per-org isolation polish
 - Maryland research agent DataDome bypass evaluation (Bright Data vs ScrapFly)
+- Secure secrets management — migrate API keys out of Vercel env vars into a dedicated secrets manager that the app reads from at runtime
 
 ---
 

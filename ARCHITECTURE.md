@@ -305,3 +305,9 @@ Open questions to answer before building:
 - Cadence state machine: pause, resume, exit triggers
 - Compliance: TCPA, DNC, time-of-day per state
 - Transition plan to shut GHL off
+
+### RFC-005: Secrets Management Migration
+
+Open questions to answer before building:
+
+- Vendor choice, runtime read pattern, rotation policy, migration order, and rollback — all to be figured out
