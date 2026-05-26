@@ -10,6 +10,10 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Added
+- Fix VVVV4: "Last action" line on Kanban lead cards. Plain-text rendering of the most recent activity (mail sent/returned, stage change, note, task, etc.) so users can see at a glance which leads have been worked recently without opening each one. Sourced from a new `lead_latest_activity` view that uses DISTINCT ON over the existing (lead_id, created_at desc) index. No pips, no counts, no fractions per design feedback. (2026-05-26T17:16:25-05:00)
+
+
 ### Changed
 - chore(docs): restructure roadmap with quarter labels, move technical content to ARCHITECTURE.md (2026-05-26T15:57:32-05:00)
 - chore(docs): add Plaid bank verification to Q3 + ADR-015 for Plaid on Lob funding (2026-05-26T16:44:34-05:00)
@@ -20,6 +24,9 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 
 ### Fixed
 - fix: add required YAML frontmatter to roadmap skill (2026-05-26T16:21:07-05:00)
+
+### Fixed
+- Fix VVVV4: Last action line on Kanban lead cards (2026-05-26T17:16:25-05:00)
 
 ## [2026-05-26] - 2026-05-26
 

@@ -12,6 +12,7 @@ import {
 import { advanceStage } from "@/app/(app)/leads/[id]/_actions";
 import { formatCurrency, primaryOwner, toTitleCase } from "@/lib/leads/format";
 import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
+import { formatActivity, relativeTime } from "@/lib/leads/activity-format";
 import { LeadActionsMenu } from "@/app/(app)/leads/[id]/_components/LeadActionsMenu";
 import { cn } from "@/lib/cn";
 
@@ -300,6 +301,22 @@ function KanbanCard({
               {formatCurrency(activeNetPayout(lead))}
             </span>
           </div>
+          {/* Fix VVVV4: "Last action" line. Plain text only - no pips, no
+              counts. Source of truth is the most recent activity row. Lets
+              Rick scan which leads have been worked recently without opening
+              each one. Stays out of the way when no activity exists yet. */}
+          {lead.last_activity && (
+            <div className="mt-[6px] truncate text-[10.5px] text-gray-500">
+              <span className="text-gray-400">Last: </span>
+              <span className="text-gray-600">
+                {formatActivity(lead.last_activity).text}
+              </span>
+              <span className="text-gray-400">
+                {" · "}
+                {relativeTime(lead.last_activity.created_at)}
+              </span>
+            </div>
+          )}
           {tags.length > 0 && (
             <div className="mt-[9px] flex flex-wrap items-center gap-1.5">
               {visibleTags.map((t) => (

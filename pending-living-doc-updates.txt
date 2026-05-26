@@ -4,3 +4,5 @@
 #
 # Entries here render in the "Pending Buffer" section of the Living Doc until they ship and get moved into CHANGELOG.md under a real version header.
 # Lines starting with '#' and blank lines are ignored by the parser.
+
+2026-05-26T22:00Z | Fix VVVV4: Last action line on Kanban lead cards (plain text from activities, no pips/counts) | Leads / Kanban

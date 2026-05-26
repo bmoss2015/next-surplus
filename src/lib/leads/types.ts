@@ -105,6 +105,15 @@ export type LeadRow = {
   // auto-logged "lead created" record. Populated by the Leads-table fetcher;
   // used to show a "New" pill in the Status column for untouched new leads.
   has_activity?: boolean;
+  // Fix VVVV4: most recent activity for this lead, joined from the
+  // lead_latest_activity view. Rendered as the "Last action" line on the
+  // Kanban card so Rick can scan which leads have been worked recently
+  // without opening each one.
+  last_activity?: {
+    activity_type: string;
+    payload: Record<string, unknown>;
+    created_at: string;
+  } | null;
 };
 
 export type SortColumn =
