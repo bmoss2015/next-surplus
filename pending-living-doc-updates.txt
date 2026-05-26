@@ -1,0 +1,6 @@
+# Pending Living Doc Updates buffer
+# Format per line: TIMESTAMP | Fix LABEL: Description | Section
+# Example:        2026-05-26T18:30Z | Fix MAIL-007: Lob fallback when address validation returns soft-fail | Mail Module
+#
+# Entries here render in the "Pending Buffer" section of the Living Doc until they ship and get moved into CHANGELOG.md under a real version header.
+# Lines starting with '#' and blank lines are ignored by the parser.
