@@ -45,6 +45,7 @@ Planned workstreams for July through September 2026.
 - Automated task generation — system creates follow-up tasks based on activity rules
 - E-signature integration via RabbitSign
 - Skip trace API integration for pay-per-lookup contact enrichment
+- Instant bank verification via Plaid for direct mail funding setup (foundation for Lob direct mail in Q4)
 
 ---
 

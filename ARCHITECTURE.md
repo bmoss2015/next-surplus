@@ -239,6 +239,16 @@ Numbered, append-only record of major design choices. Each one would normally be
 
 **Decided:** 2026-05-26
 
+### ADR-015: Plaid for Bank Verification on Lob Funding Connection
+
+**Decision:** When users connect a bank account to fund Lob mailings, use Plaid Auth for instant verification instead of Lob's native micro-deposit bank-link flow.
+
+**Why:** Lob's default bank connection requires 1-3 business day micro-deposits to verify ownership, which delays a new firm's ability to send their first piece of mail. Plaid Auth returns verified routing and account numbers instantly, so onboarding to direct mail completes in one session rather than across multiple days.
+
+**Trade off:** Adds a Plaid dependency (subscription cost, additional vendor in the integration surface) on top of Lob. Users connect through Plaid Link instead of typing routing/account numbers, which is faster but requires Plaid to support their bank.
+
+**Decided:** 2026-05-26
+
 ---
 
 ## RFCs Needed

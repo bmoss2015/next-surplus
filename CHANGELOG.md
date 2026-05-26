@@ -12,6 +12,7 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 
 ### Changed
 - chore(docs): restructure roadmap with quarter labels, move technical content to ARCHITECTURE.md (2026-05-26T15:57:32-05:00)
+- chore(docs): add Plaid bank verification to Q3 + ADR-015 for Plaid on Lob funding (2026-05-26T16:44:34-05:00)
 
 ### Changed
 - chore(docs): add /roadmap and /architecture slash commands with skill (2026-05-26T16:04:31-05:00)
