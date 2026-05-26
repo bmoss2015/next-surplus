@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 Versions below are grouped by day rather than semver release tags. Each `## [YYYY-MM-DD]` block represents the work merged to `main` on that calendar day. Backfilled from git log on 2026-05-26.
 
+
+## [Unreleased]
+
+
+### Changed
+- chore(docs): restructure roadmap with quarter labels, move technical content to ARCHITECTURE.md (2026-05-26T15:57:32-05:00)
+
 ## [2026-05-26] - 2026-05-26
 
 ### Changed
