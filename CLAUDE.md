@@ -251,3 +251,59 @@ The assistant should drive the entire flow without manual GitHub clicks. `gh` CL
 
 &#x20; from this repo
 
+---
+
+## Slash Command Doc Updates
+
+For updating the Product Build Status & Roadmap and the Architecture documentation, use slash command triggers. The skill at `.claude/skills/roadmap/SKILL.md` handles classification, preview, and commit.
+
+**Triggers (any of these activate the skill):**
+
+- `/roadmap [description]` — for product priorities, features, timeline changes (may also update Architecture if technically warranted)
+- `/architecture [description]` — for pure technical decisions (no roadmap implication)
+- `/docs [description]` — alias for `/roadmap`
+
+**Behavior:**
+
+1. Read the user's content after the slash command
+2. Classify as Roadmap-only, Architecture-only, or Both
+3. **Show a preview** of what will be added and to which file
+4. Wait for user confirmation: `yes` / `edit` / `cancel`
+5. On `yes`: edit files, commit with `chore(docs):` prefix, ask whether to trigger Worker rebuild
+
+**Files this skill edits:**
+
+- `product-build-status-roadmap-content.md` — the Roadmap source (rendered weekly into the Drive doc)
+- `ARCHITECTURE.md` — the technical reference (ADRs, RFCs, tech stack, deploy, integrations)
+
+**What this skill does NOT edit:**
+
+- `CHANGELOG.md` (handled by git post-commit hook)
+- `CLAUDE.md` (operational rules — manual edits only)
+
+**Example interaction:**
+
+User: `/roadmap We're going to add SMS outreach in Q3 using Twilio with per-org subaccounts.`
+
+Claude Code response:
+```
+I'm interpreting this as TWO updates:
+
+1. ROADMAP (product-build-status-roadmap-content.md)
+   Section: Later This Year
+   Adding:
+   - SMS outreach via Twilio (Q3 launch)
+
+2. ARCHITECTURE (ARCHITECTURE.md)
+   Adding new ADR-015:
+   Title: Twilio per-org subaccounts for SMS outreach
+   Decision: ...
+   Why: ...
+   Decided: 2026-05-26
+
+Commit message: "chore(docs): add SMS outreach to roadmap + ADR-015 for Twilio architecture"
+
+Confirm? (yes / edit / cancel)
+```
+
+

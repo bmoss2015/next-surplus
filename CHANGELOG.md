@@ -13,6 +13,9 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ### Changed
 - chore(docs): restructure roadmap with quarter labels, move technical content to ARCHITECTURE.md (2026-05-26T15:57:32-05:00)
 
+### Changed
+- chore(docs): add /roadmap and /architecture slash commands with skill (2026-05-26T16:04:31-05:00)
+
 ## [2026-05-26] - 2026-05-26
 
 ### Changed
