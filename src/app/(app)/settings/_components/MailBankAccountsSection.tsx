@@ -7,7 +7,7 @@
 // unverified card opens the drawer in "verify" mode. Per-card delete shows
 // a native confirm dialog and calls deleteMailBankAccount.
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { MailBankAccountRow } from "@/lib/settings/fetch";
 import { deleteMailBankAccount } from "@/app/(app)/settings/_actions";
