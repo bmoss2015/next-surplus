@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   createStage,
@@ -26,6 +26,10 @@ export function PipelineStagesCard({
 }) {
   const router = useRouter();
   const [stages, setStages] = useState(initialStages);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStages(initialStages);
+  }, [initialStages]);
   const [, startTransition] = useTransition();
   const [addingName, setAddingName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -373,6 +377,10 @@ function DeleteStageDialog({
   onCancel: () => void;
 }) {
   const eligible = stages.filter((s) => s.id !== target.id);
+  const count = target.activeLeadCount;
+  const hasLeads = count > 0;
+  const needsPick = hasLeads && !moveToId;
+
   return (
     <div
       style={{
@@ -408,28 +416,37 @@ function DeleteStageDialog({
           Delete &quot;{target.name}&quot;?
         </div>
         <div style={{ fontSize: 12.5, color: "var(--text-2)", marginBottom: 14, lineHeight: 1.5 }}>
-          Any leads currently in this stage need a new home. Pick another
-          stage to move them to (skip if you&apos;re sure no leads use this
-          stage).
+          {hasLeads ? (
+            <>
+              <strong style={{ color: "var(--text-1)" }}>
+                {count} {count === 1 ? "lead is" : "leads are"} currently in this stage.
+              </strong>{" "}
+              Pick a different stage to move {count === 1 ? "it" : "them"} to before deleting.
+            </>
+          ) : (
+            <>No leads are currently in this stage, so it&apos;s safe to delete.</>
+          )}
         </div>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 11, color: "var(--text-3)", display: "block", marginBottom: 4 }}>
-            Move existing leads to
-          </label>
-          <select
-            className="input"
-            value={moveToId}
-            onChange={(e) => setMoveToId(e.target.value)}
-            style={{ width: "100%" }}
-          >
-            <option value="">No leads to move</option>
-            {eligible.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {hasLeads && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 11, color: "var(--text-3)", display: "block", marginBottom: 4 }}>
+              Move Existing Leads To
+            </label>
+            <select
+              className="input"
+              value={moveToId}
+              onChange={(e) => setMoveToId(e.target.value)}
+              style={{ width: "100%" }}
+            >
+              <option value="">Pick a stage...</option>
+              {eligible.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button
             type="button"
@@ -442,7 +459,12 @@ function DeleteStageDialog({
             type="button"
             className="btn btn-sm"
             onClick={onConfirm}
-            style={{ background: "var(--danger)", color: "#fff" }}
+            disabled={needsPick}
+            style={{
+              background: needsPick ? "#cbd5e1" : "var(--danger)",
+              color: "#fff",
+              cursor: needsPick ? "not-allowed" : "pointer",
+            }}
           >
             Delete Stage
           </button>

@@ -13,6 +13,7 @@ export type OrgStage = {
   position: number;
   kind: StageKind;
   isActive: boolean;
+  activeLeadCount: number;
 };
 
 export const MAX_STAGES = 20;
