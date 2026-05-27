@@ -306,7 +306,6 @@ function ResearchEditor({
 }) {
   const router = useRouter();
   const [name, setName] = useState(row?.name ?? "");
-  const [description, setDescription] = useState(row?.description ?? "");
   const [stateCode, setStateCode] = useState(row?.state ?? "");
   const [saleType, setSaleType] = useState<"TAX" | "MTG" | "">(
     row?.sale_type ?? ""
@@ -328,7 +327,6 @@ function ResearchEditor({
       // Re-seed the step editor fields each time the drawer opens for a new row.
       /* eslint-disable react-hooks/set-state-in-effect */
       setName(row?.name ?? "");
-      setDescription(row?.description ?? "");
       setStateCode(row?.state ?? "");
       setSaleType(row?.sale_type ?? "");
       setSteps(
@@ -378,7 +376,10 @@ function ResearchEditor({
       const res = await upsertResearchTemplate({
         id: row?.id ?? null,
         name: name.trim(),
-        description: description.trim() || null,
+        // Playbook-level description is no longer surfaced in the UI (per
+        // design decision); preserve any existing value rather than wipe it
+        // when an old playbook is edited. New playbooks pass null.
+        description: row?.description ?? null,
         state: stateCode.trim() || null,
         sale_type: saleType || null,
         steps: steps.map((s) => ({
@@ -466,19 +467,6 @@ function ResearchEditor({
           onChange={(e) => setName(e.target.value)}
           placeholder="Texas Tax Sale Research"
           autoFocus
-        />
-      </div>
-      <div className="drawer-field">
-        <label className="drawer-label">Description</label>
-        <div className="drawer-hint">
-          Optional context shown on the research checklist on each lead.
-        </div>
-        <textarea
-          className="input drawer-textarea"
-          style={{ width: "100%" }}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Outlines the steps to pull SOS filings and tax-sale notices for Texas leads."
         />
       </div>
       <div className="drawer-field">
@@ -673,12 +661,26 @@ function ResearchEditor({
                 {steps.length > 1 && (
                   <button
                     type="button"
-                    className="icon-btn"
-                    title="Remove this step"
-                    style={{ color: "var(--danger)" }}
                     onClick={() => removeStep(selectedStepIdx)}
+                    title="Remove this step from the playbook"
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 500,
+                      color: "var(--danger, #b91c1c)",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "rgba(185, 28, 28, 0.08)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
                   >
-                    <i className="icon icon-trash" />
+                    Remove Step
                   </button>
                 )}
               </div>

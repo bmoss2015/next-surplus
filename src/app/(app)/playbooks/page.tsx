@@ -17,6 +17,12 @@ export default async function PlaybooksPage() {
 
   return (
     <>
+      {/* Lucide icon font for any .icon.* glyphs inside the shared
+          TemplateEditorDrawer. Loaded the same way /settings does. */}
+      <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/lucide-static@0.460.0/font/lucide.css"
+      />
       <style
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: cssText }}
