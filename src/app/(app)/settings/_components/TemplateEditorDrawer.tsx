@@ -518,8 +518,9 @@ function ResearchEditor({
       <div className="drawer-field">
         <label className="drawer-label">State</label>
         <div className="drawer-hint">
-          Which state does this checklist apply to. Pick All States for a
-          template that runs on every lead regardless of state.
+          This playbook is automatically applied to every matching lead.
+          Pick a specific state to limit it, or leave All States to apply
+          regardless of state.
         </div>
         <select
           className="input"
@@ -556,10 +557,10 @@ function ResearchEditor({
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-2)" }}>
                   {v === ""
-                    ? "Applies to both tax and mortgage leads."
+                    ? "Auto-applied to every lead, tax sale or mortgage."
                     : v === "TAX"
-                      ? "Only suggested on tax-sale leads."
-                      : "Only suggested on mortgage-foreclosure leads."}
+                      ? "Auto-applied to every tax sale lead."
+                      : "Auto-applied to every mortgage foreclosure lead."}
                 </div>
               </div>
             </label>
