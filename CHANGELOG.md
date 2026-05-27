@@ -10,6 +10,10 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Added
+- Fix WWWW4: Playbooks board. Cross-lead Kanban view of any research template. `/playbooks` lists every template with its active lead count; `/playbooks/[id]` renders the per-template board with one column per step and cards for each lead currently sitting on that step. "Current step" = first incomplete step in the lead's snapshotted checklist. Days-in-step flags red past 7 days. No schema work, uses the existing `lead_research_templates` table. Preview via URL for now, no nav item yet. (2026-05-27T16:30:00-05:00)
+
+
 ### Changed
 - chore(docs): restructure roadmap with quarter labels, move technical content to ARCHITECTURE.md (2026-05-26T15:57:32-05:00)
 - chore(docs): add Plaid bank verification to Q3 + ADR-015 for Plaid on Lob funding (2026-05-26T16:44:34-05:00)
@@ -19,6 +23,9 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 
 ### Fixed
 - fix: add required YAML frontmatter to roadmap skill (2026-05-26T16:21:07-05:00)
+
+### Fixed
+- Fix WWWW4: Playbooks board (cross-lead template-step Kanban) (2026-05-27T08:29:16-05:00)
 
 ## [2026-05-26] - 2026-05-26
 
