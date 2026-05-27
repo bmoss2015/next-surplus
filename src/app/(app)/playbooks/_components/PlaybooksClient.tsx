@@ -51,20 +51,25 @@ export function PlaybooksClient({
         </div>
       ) : (
         <div className="max-w-4xl space-y-2">
+          {/* Fixed grid template across every row so the Active / Completed
+              columns line up vertically regardless of playbook name length. */}
           {playbooks.map((p) => (
             <div
               key={p.id}
-              className="flex items-center gap-8 rounded-md border border-gray-200 bg-surface px-4 py-3 transition-colors hover:border-petrol-300"
+              className="grid items-center gap-4 rounded-md border border-gray-200 bg-surface px-4 py-3 transition-colors hover:border-petrol-300"
+              style={{
+                gridTemplateColumns: "minmax(0, 1fr) 90px 130px auto",
+              }}
             >
-              <div className="min-w-0 max-w-[280px]">
+              <div className="min-w-0">
                 <Link
                   href={`/playbooks/${p.id}`}
-                  className="truncate text-sm font-medium text-ink hover:text-petrol-700 hover:underline"
+                  className="block truncate text-sm font-medium text-ink hover:text-petrol-700 hover:underline"
                 >
                   {p.name}
                 </Link>
                 <div className="mt-0.5 truncate text-[11px] text-gray-500">
-                  {p.stepCount} {p.stepCount === 1 ? "step" : "steps"}
+                  {p.stepCount} {p.stepCount === 1 ? "Step" : "Steps"}
                   {(p.state || p.saleType) && (
                     <>
                       {" · "}
@@ -89,7 +94,7 @@ export function PlaybooksClient({
               </div>
               <Link
                 href={`/playbooks/${p.id}`}
-                className="ml-auto text-xs font-medium text-petrol-700 hover:underline"
+                className="text-xs font-medium text-petrol-700 hover:underline"
               >
                 Open Board →
               </Link>
