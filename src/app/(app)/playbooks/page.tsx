@@ -4,15 +4,15 @@ import { fetchPlaybooks } from "@/lib/playbooks/fetch-list";
 export const dynamic = "force-dynamic";
 
 // Playbooks index: every research template in the org with per-template stats.
-// Pattern C from the multi-template mockup: row per playbook with stacked
-// metric columns (Active leads, Completed in last 30 days). Title text is its
-// own link and the row hover-area also navigates so either click works.
+// Pattern C from the multi-template mockup: each row is its own bordered card,
+// name + step subtitle on the left, metrics packed adjacent to it (no big
+// horizontal gap), "Open Board ->" pushed to the right edge via ml-auto.
 export default async function PlaybooksPage() {
   const playbooks = await fetchPlaybooks();
 
   return (
     <div className="px-7 py-6">
-      <div className="mb-3">
+      <div className="mb-3 max-w-4xl">
         <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
           Playbooks
         </h1>
@@ -23,26 +23,24 @@ export default async function PlaybooksPage() {
       </div>
 
       {playbooks.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-surface p-8 text-center text-sm text-gray-500">
+        <div className="max-w-4xl rounded-lg border border-gray-200 bg-surface p-8 text-center text-sm text-gray-500">
           No playbooks yet. Create one in Settings to get started.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-surface">
-          {playbooks.map((p, i) => (
+        <div className="max-w-4xl space-y-2">
+          {playbooks.map((p) => (
             <div
               key={p.id}
-              className={`grid grid-cols-[1fr_auto_auto_auto] items-center gap-8 px-5 py-4 transition-colors hover:bg-gray-50 ${
-                i > 0 ? "border-t border-gray-100" : ""
-              }`}
+              className="flex items-center gap-8 rounded-md border border-gray-200 bg-surface px-4 py-3 transition-colors hover:border-petrol-300"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 max-w-[280px]">
                 <Link
                   href={`/playbooks/${p.id}`}
-                  className="text-sm font-medium text-ink hover:text-petrol-700 hover:underline"
+                  className="truncate text-sm font-medium text-ink hover:text-petrol-700 hover:underline"
                 >
                   {p.name}
                 </Link>
-                <div className="mt-0.5 text-[11px] text-gray-500">
+                <div className="mt-0.5 truncate text-[11px] text-gray-500">
                   {p.stepCount} {p.stepCount === 1 ? "step" : "steps"}
                   {(p.state || p.saleType) && (
                     <>
@@ -68,7 +66,7 @@ export default async function PlaybooksPage() {
               </div>
               <Link
                 href={`/playbooks/${p.id}`}
-                className="text-xs font-medium text-petrol-700 hover:underline"
+                className="ml-auto text-xs font-medium text-petrol-700 hover:underline"
               >
                 Open Board →
               </Link>
