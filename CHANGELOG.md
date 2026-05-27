@@ -10,6 +10,10 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Fixed
+- Fix WWWW5: drop orphan `lead_latest_activity` view from staging (left over from abandoned Branch 1) and renumber the stuck `0120_revert_clearout_validations.sql` to `0135_revert_clearout_validations.sql` so it can finally apply. Migration content is unchanged: same Clearout-validated phone reset. Both pushed to staging. (2026-05-27T12:00:00-05:00)
+
+
 ### Changed
 - chore(docs): restructure roadmap with quarter labels, move technical content to ARCHITECTURE.md (2026-05-26T15:57:32-05:00)
 
