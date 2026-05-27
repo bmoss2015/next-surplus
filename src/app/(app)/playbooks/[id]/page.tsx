@@ -30,9 +30,11 @@ export default async function PlaybookBoardPage({
             {board.templateName}
           </h1>
           <div className="mt-1 text-[13px] text-gray-500">
-            {totalActive} active leads across {board.steps.length} steps
+            {totalActive} Active {totalActive === 1 ? "Lead" : "Leads"} ·{" "}
+            {board.steps.length}{" "}
+            {board.steps.length === 1 ? "Step" : "Steps"}
             {board.completedLeads.length > 0
-              ? ` · ${board.completedLeads.length} completed`
+              ? ` · ${board.completedLeads.length} Completed`
               : ""}
           </div>
         </div>

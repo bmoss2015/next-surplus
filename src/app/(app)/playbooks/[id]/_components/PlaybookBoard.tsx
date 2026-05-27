@@ -42,7 +42,7 @@ export function PlaybookBoard({ board }: { board: PlaybookBoardType }) {
   if (board.steps.length === 0) {
     return (
       <div className="rounded-lg border border-gray-200 bg-surface p-8 text-center text-sm text-gray-500">
-        This playbook has no steps defined. Add steps in Settings → Templates.
+        This playbook has no steps yet. Open it in Settings to add some.
       </div>
     );
   }
