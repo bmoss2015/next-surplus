@@ -10,6 +10,9 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Changed
+- Fix XXXX4: Lead-detail stage strip switches to a horizontally scrollable layout with the current stage auto-centered on mount. Current stage gets a larger ring + brand-color label so it reads instantly. Stages stay clickable for jump-to-stage. Works the same at 5 stages or 50, no auto-switching modes. Sets up custom stages (the next branch) to render correctly at any count without further work. (2026-05-27T18:00:00-05:00)
+
 ### Added
 - Fix WWWW4: Playbooks board. Cross-lead Kanban view of any research template. `/playbooks` lists every template with its active lead count; `/playbooks/[id]` renders the per-template board with one column per step and cards for each lead currently sitting on that step. "Current step" = first incomplete step in the lead's snapshotted checklist. Days-in-step flags red past 7 days. No schema work, uses the existing `lead_research_templates` table. Preview via URL for now, no nav item yet. (2026-05-27T16:30:00-05:00)
 
