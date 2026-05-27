@@ -17,6 +17,7 @@ export function Drawer({
   title,
   children,
   footer,
+  width,
 }: {
   open: boolean;
   onClose: () => void;
@@ -24,6 +25,9 @@ export function Drawer({
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  // Override the default 480px width (e.g. for a two-pane editor body). The
+  // CSS still caps at 92vw so very wide values stay responsive.
+  width?: number;
 }) {
   // Lock body scroll while the drawer is open, and close on Escape.
   useEffect(() => {
@@ -51,6 +55,7 @@ export function Drawer({
         role="dialog"
         aria-modal="true"
         aria-hidden={!open}
+        style={width ? { width } : undefined}
       >
         <div className="drawer-head">
           <div>

@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 import {
   LayoutDashboard,
   Users,
+  BookOpen,
   CheckSquare,
   Inbox,
   Mail,
@@ -44,6 +45,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { label: "Dashboard", href: "/",         Icon: LayoutDashboard },
   { label: "Leads",     href: "/leads",    Icon: Users },
+  { label: "Playbooks", href: "/playbooks",Icon: BookOpen },
   { label: "Tasks",     href: "/tasks",    Icon: CheckSquare },
   { label: "Inbox",     href: "/inbox",    Icon: Inbox },
   { label: "Mail",      href: "/mail",     Icon: Mail },

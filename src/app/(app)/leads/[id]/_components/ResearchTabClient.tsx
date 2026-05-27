@@ -162,7 +162,7 @@ export function ResearchTabClient({
       className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-petrol-500 px-3 py-[6px] text-xs font-medium text-petrol-500 hover:bg-petrol-50"
     >
       <IconPlus size={13} stroke={1.75} />
-      Add From Template
+      Add Playbook
     </button>
   );
 
@@ -173,7 +173,7 @@ export function ResearchTabClient({
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
-          Research
+          Playbooks
         </h3>
         {addButton}
       </div>
@@ -181,7 +181,7 @@ export function ResearchTabClient({
       {templates.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-[#f8fafc] px-4 py-7 text-center">
           <div className="text-[12.5px] text-gray-500">
-            No research checklist on this lead yet.
+            No playbook on this lead yet.
           </div>
           <button
             type="button"
@@ -189,7 +189,7 @@ export function ResearchTabClient({
             className="btn-primary mt-3 inline-flex items-center gap-1 rounded-md px-3 py-[6px] text-[12px] font-medium"
           >
             <IconPlus size={13} stroke={1.75} />
-            Add From Template
+            Add Playbook
           </button>
         </div>
       ) : (
@@ -222,6 +222,15 @@ export function ResearchTabClient({
                   <span className="shrink-0 text-[11px] font-medium text-gray-500">
                     {doneCount} / {total} {total === 1 ? "Step" : "Steps"} Done
                   </span>
+                  {t.sourceTemplateId && (
+                    <Link
+                      href={`/playbooks/${t.sourceTemplateId}`}
+                      className="shrink-0 text-[11px] font-medium text-[#0d4b3a] hover:underline"
+                      title="See every lead currently using this playbook"
+                    >
+                      View Board →
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => setConfirmRemoveIdx(tIdx)}
@@ -340,13 +349,15 @@ export function ResearchTabClient({
         />
       </div>
 
-      {/* PART 5: Add From Template modal. */}
-      <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Add From Template">
+      {/* Add Playbook modal: lists every playbook in the org. Each row has
+          an explicit "Add" button so the action is unmistakable; already-
+          added playbooks show a disabled "Added" pill instead. */}
+      <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Add Playbook">
         {availableTemplates.length === 0 ? (
           <div className="text-[13px] text-gray-600">
-            No research templates yet. Add templates in{" "}
-            <Link href="/settings" className="font-medium text-petrol-500 hover:text-petrol-700">
-              Settings
+            No playbooks yet. Create one in{" "}
+            <Link href="/playbooks" className="font-medium text-petrol-500 hover:text-petrol-700">
+              Playbooks
             </Link>
             .
           </div>
@@ -357,45 +368,47 @@ export function ResearchTabClient({
               const meta = [
                 ...(t.state ? [t.state] : []),
                 ...(t.saleType ? [t.saleType] : []),
-                `${t.stepCount} ${t.stepCount === 1 ? "step" : "steps"}`,
+                `${t.stepCount} ${t.stepCount === 1 ? "Step" : "Steps"}`,
               ].join(" · ");
               return (
-                <button
+                <div
                   key={t.id}
-                  type="button"
-                  disabled={isAdded}
-                  onClick={() => pickTemplate(t.id)}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-[13px]",
-                    isAdded
-                      ? "cursor-not-allowed text-gray-400"
-                      : "cursor-pointer text-ink hover:bg-[#f3f4f6]"
-                  )}
+                  className="flex items-center justify-between gap-3 rounded-md px-3 py-2 text-[13px] hover:bg-[#f3f4f6]"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate font-medium">{displayHeader(t.name)}</span>
+                    <span className="block truncate font-medium text-ink">
+                      {displayHeader(t.name)}
+                    </span>
                     <span className="block text-[11px] text-gray-400">{meta}</span>
                   </span>
-                  {isAdded && (
-                    <span className="shrink-0 rounded bg-gray-150 px-2 py-[2px] text-[10.5px] font-medium text-gray-500">
+                  {isAdded ? (
+                    <span className="shrink-0 rounded bg-gray-150 px-2 py-[3px] text-[10.5px] font-medium text-gray-500">
                       Added
                     </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => pickTemplate(t.id)}
+                      className="btn-primary shrink-0 cursor-pointer rounded-md px-3 py-[5px] text-[11.5px] font-medium text-white"
+                    >
+                      Add
+                    </button>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
         )}
       </Modal>
 
-      {/* Fix SSSS2 PART 1: confirm before removing a checklist from this lead. */}
+      {/* Fix SSSS2 PART 1: confirm before removing a playbook from this lead. */}
       <Modal
         open={confirmRemoveIdx != null}
         onClose={() => setConfirmRemoveIdx(null)}
-        title="Remove Template From Lead"
+        title="Remove Playbook From Lead"
       >
         <p className="text-[13px] leading-relaxed text-gray-700">
-          Remove{pendingRemoveName ? ` "${displayHeader(pendingRemoveName)}"` : " this template"} from this lead? Steps and findings will be deleted. This does not affect the template in Settings.
+          Remove{pendingRemoveName ? ` "${displayHeader(pendingRemoveName)}"` : " this playbook"} from this lead? Steps and findings will be deleted. This does not affect the playbook in Settings.
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <button

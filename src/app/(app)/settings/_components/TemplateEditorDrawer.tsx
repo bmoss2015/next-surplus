@@ -14,7 +14,13 @@
 // upgrade. The drawer surfaces a small hint about the {{merge_field}} syntax
 // so users know it'll get substituted when sending.
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+
+// Hard cap for the number of steps in a single playbook. Two-pane editor
+// stays readable up to about this number; past it the left rail gets too
+// scrolly. If we ever need 20+ step playbooks we should switch to a list
+// view or paginate.
+const MAX_PLAYBOOK_STEPS = 20;
 import { useRouter } from "next/navigation";
 import { Drawer } from "./Drawer";
 import { MergeFieldPicker } from "./MergeFieldPicker";
@@ -306,7 +312,6 @@ function ResearchEditor({
 }) {
   const router = useRouter();
   const [name, setName] = useState(row?.name ?? "");
-  const [description, setDescription] = useState(row?.description ?? "");
   const [stateCode, setStateCode] = useState(row?.state ?? "");
   const [saleType, setSaleType] = useState<"TAX" | "MTG" | "">(
     row?.sale_type ?? ""
@@ -316,16 +321,45 @@ function ResearchEditor({
       ? row.steps
       : [{ name: "", url: null, instructions: null }]
   );
+  // Two-pane editor: which step's edit form is shown in the right pane. Reset
+  // to 0 each time the drawer opens.
+  const [selectedStepIdx, setSelectedStepIdx] = useState(0);
+  // Drag-reorder state. dragFromIdx = the step being dragged; dragOverIdx =
+  // the row currently being hovered (drawn with a top accent line).
+  const [dragFromIdx, setDragFromIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const stepNameRef = useRef<HTMLInputElement | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  // Auto-focus the step name field whenever the user changes selection. Skip
+  // the very first run after the drawer opens so the playbook name's
+  // autoFocus wins for fresh playbooks. Uses useLayoutEffect so focus lands
+  // before paint = no flicker.
+  const skipNextFocus = useRef(true);
+  useLayoutEffect(() => {
+    if (!open) {
+      skipNextFocus.current = true;
+      return;
+    }
+    if (skipNextFocus.current) {
+      skipNextFocus.current = false;
+      return;
+    }
+    stepNameRef.current?.focus();
+    // Move the caret to end so existing names are easy to extend.
+    const el = stepNameRef.current;
+    if (el && el.value) {
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, [selectedStepIdx, open]);
 
   useEffect(() => {
     if (open) {
       // Re-seed the step editor fields each time the drawer opens for a new row.
       /* eslint-disable react-hooks/set-state-in-effect */
       setName(row?.name ?? "");
-      setDescription(row?.description ?? "");
       setStateCode(row?.state ?? "");
       setSaleType(row?.sale_type ?? "");
       setSteps(
@@ -333,6 +367,7 @@ function ResearchEditor({
           ? row.steps
           : [{ name: "", url: null, instructions: null }]
       );
+      setSelectedStepIdx(0);
       setErrMsg(null);
       setConfirmDelete(false);
       /* eslint-enable react-hooks/set-state-in-effect */
@@ -349,10 +384,36 @@ function ResearchEditor({
     setSteps((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
   }
   function addStep() {
-    setSteps((prev) => [...prev, { name: "", url: null, instructions: null }]);
+    setSteps((prev) => {
+      if (prev.length >= MAX_PLAYBOOK_STEPS) return prev;
+      const next = [...prev, { name: "", url: null, instructions: null }];
+      // Jump the right pane to the newly added step so the user can type
+      // immediately.
+      setSelectedStepIdx(next.length - 1);
+      return next;
+    });
   }
   function removeStep(idx: number) {
-    setSteps((prev) => prev.filter((_, i) => i !== idx));
+    setSteps((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      // Clamp the selection so we never point past the new array.
+      setSelectedStepIdx((cur) =>
+        Math.min(cur, Math.max(0, next.length - 1))
+      );
+      return next;
+    });
+  }
+  function moveStep(from: number, to: number) {
+    if (from === to) return;
+    setSteps((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    // Keep the moved step selected after reorder so the right pane stays
+    // in sync with what the user just dropped.
+    setSelectedStepIdx(to);
   }
 
   function onSave() {
@@ -361,7 +422,10 @@ function ResearchEditor({
       const res = await upsertResearchTemplate({
         id: row?.id ?? null,
         name: name.trim(),
-        description: description.trim() || null,
+        // Playbook-level description is no longer surfaced in the UI (per
+        // design decision); preserve any existing value rather than wipe it
+        // when an old playbook is edited. New playbooks pass null.
+        description: row?.description ?? null,
         state: stateCode.trim() || null,
         sale_type: saleType || null,
         steps: steps.map((s) => ({
@@ -396,8 +460,9 @@ function ResearchEditor({
     <Drawer
       open={open}
       onClose={onClose}
-      eyebrow={row ? "Edit Research Template" : "New Research Template"}
-      title={row?.name || "Research Template"}
+      width={720}
+      eyebrow={row ? "Edit Playbook" : "New Playbook"}
+      title={row?.name || "Playbook"}
       footer={
         <>
           <div className="flex items-center gap-2">
@@ -407,7 +472,7 @@ function ResearchEditor({
               disabled={!ready || pending}
               onClick={onSave}
             >
-              {pending ? "Saving…" : row ? "Save Changes" : "Add Template"}
+              {pending ? "Saving…" : row ? "Save Changes" : "Save Playbook"}
             </button>
             <button
               type="button"
@@ -433,7 +498,7 @@ function ResearchEditor({
                 confirmDelete ? onDelete() : setConfirmDelete(true)
               }
             >
-              {confirmDelete ? "Click again to confirm" : "Delete Template"}
+              {confirmDelete ? "Click again to confirm" : "Delete Playbook"}
             </button>
           )}
         </>
@@ -451,23 +516,11 @@ function ResearchEditor({
         />
       </div>
       <div className="drawer-field">
-        <label className="drawer-label">Description</label>
-        <div className="drawer-hint">
-          Optional context shown on the research checklist on each lead.
-        </div>
-        <textarea
-          className="input drawer-textarea"
-          style={{ width: "100%" }}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Outlines the steps to pull SOS filings and tax-sale notices for Texas leads."
-        />
-      </div>
-      <div className="drawer-field">
         <label className="drawer-label">State</label>
         <div className="drawer-hint">
-          Which state does this checklist apply to. Pick All States for a
-          template that runs on every lead regardless of state.
+          This playbook is automatically applied to every matching lead.
+          Pick a specific state to limit it, or leave All States to apply
+          regardless of state.
         </div>
         <select
           className="input"
@@ -504,10 +557,10 @@ function ResearchEditor({
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-2)" }}>
                   {v === ""
-                    ? "Applies to both tax and mortgage leads."
+                    ? "Auto-applied to every lead, tax sale or mortgage."
                     : v === "TAX"
-                      ? "Only suggested on tax-sale leads."
-                      : "Only suggested on mortgage-foreclosure leads."}
+                      ? "Auto-applied to every tax sale lead."
+                      : "Auto-applied to every mortgage foreclosure lead."}
                 </div>
               </div>
             </label>
@@ -517,55 +570,306 @@ function ResearchEditor({
       <div className="drawer-field">
         <label className="drawer-label">Steps</label>
         <div className="drawer-hint">
-          One row per checkbox you want to see on the lead&apos;s Research
-          tab. URL is optional and renders as a link next to the step name.
+          One row per checkbox the operator will see on the lead&apos;s
+          Playbook tab. Click any step on the left to edit it on the right.
         </div>
-        {steps.map((s, idx) => (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "220px 1fr",
+            gap: 12,
+            marginTop: 8,
+            minHeight: 280,
+          }}
+        >
+          {/* LEFT: step list */}
           <div
-            key={idx}
             style={{
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              background: "var(--canvas, #fafbfc)",
+              overflow: "hidden",
               display: "flex",
-              gap: 8,
-              marginBottom: 8,
-              alignItems: "center",
+              flexDirection: "column",
             }}
           >
-            <input
-              className="input"
-              style={{ flex: 1 }}
-              value={s.name}
-              onChange={(e) => setStep(idx, { name: e.target.value })}
-              placeholder={`Step ${idx + 1} (e.g. "Pull SOS filings")`}
-            />
-            <input
-              className="input"
-              style={{ width: 180 }}
-              value={s.url ?? ""}
-              onChange={(e) =>
-                setStep(idx, { url: e.target.value || null })
-              }
-              placeholder="URL (optional)"
-            />
-            {steps.length > 1 && (
-              <button
-                type="button"
-                className="icon-btn"
-                title="Remove step"
-                onClick={() => removeStep(idx)}
-              >
-                <i className="icon icon-trash" />
-              </button>
-            )}
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {steps.map((s, idx) => {
+                const isSelected = idx === selectedStepIdx;
+                const isDragging = dragFromIdx === idx;
+                const isDragOver =
+                  dragOverIdx === idx && dragFromIdx !== null && dragFromIdx !== idx;
+                const displayName = s.name.trim() || `Step ${idx + 1}`;
+                return (
+                  <div
+                    key={idx}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragFromIdx(idx);
+                      e.dataTransfer.effectAllowed = "move";
+                      // Some browsers require data to be set for drag to fire.
+                      e.dataTransfer.setData("text/plain", String(idx));
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOverIdx !== idx) setDragOverIdx(idx);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverIdx === idx) setDragOverIdx(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragFromIdx !== null) moveStep(dragFromIdx, idx);
+                      setDragFromIdx(null);
+                      setDragOverIdx(null);
+                    }}
+                    onDragEnd={() => {
+                      setDragFromIdx(null);
+                      setDragOverIdx(null);
+                    }}
+                    onClick={() => setSelectedStepIdx(idx)}
+                    role="button"
+                    tabIndex={0}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      width: "100%",
+                      padding: "8px 8px 8px 4px",
+                      background: isSelected
+                        ? "rgba(13, 75, 58, 0.08)"
+                        : "transparent",
+                      borderLeft: isSelected
+                        ? "3px solid var(--brand, #0d4b3a)"
+                        : "3px solid transparent",
+                      borderTop: isDragOver
+                        ? "2px solid var(--brand, #0d4b3a)"
+                        : "2px solid transparent",
+                      borderBottom: "1px solid var(--hairline, #e2e8f0)",
+                      cursor: "grab",
+                      textAlign: "left",
+                      fontSize: 12.5,
+                      color: isSelected ? "var(--text-1, #0f172a)" : "var(--text-2, #475569)",
+                      fontWeight: isSelected ? 500 : 400,
+                      opacity: isDragging ? 0.4 : 1,
+                    }}
+                  >
+                    {/* Drag handle dots */}
+                    <span
+                      aria-hidden
+                      style={{
+                        color: "#cbd5e1",
+                        fontSize: 12,
+                        lineHeight: 1,
+                        userSelect: "none",
+                        flexShrink: 0,
+                        width: 10,
+                        textAlign: "center",
+                      }}
+                    >
+                      ⋮⋮
+                    </span>
+                    <span
+                      style={{
+                        background: "var(--brand, #0d4b3a)",
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        height: 18,
+                        minWidth: 22,
+                        padding: "0 5px",
+                        borderRadius: 3,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {idx + 1}
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={displayName}
+                    >
+                      {displayName}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={addStep}
+              disabled={steps.length >= MAX_PLAYBOOK_STEPS}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                background: "var(--surface, #fff)",
+                borderTop: "1px solid var(--hairline, #e2e8f0)",
+                cursor:
+                  steps.length >= MAX_PLAYBOOK_STEPS ? "not-allowed" : "pointer",
+                textAlign: "left",
+                fontSize: 12,
+                fontWeight: 500,
+                color:
+                  steps.length >= MAX_PLAYBOOK_STEPS
+                    ? "var(--text-3, #94a3b8)"
+                    : "var(--brand, #0d4b3a)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>
+                {steps.length >= MAX_PLAYBOOK_STEPS
+                  ? `Limit reached (${MAX_PLAYBOOK_STEPS})`
+                  : "+ Add Step"}
+              </span>
+              <span style={{ fontSize: 10.5, color: "var(--text-3, #94a3b8)" }}>
+                {steps.length} / {MAX_PLAYBOOK_STEPS}
+              </span>
+            </button>
           </div>
-        ))}
-        <button
-          type="button"
-          className="btn btn-outline btn-sm"
-          onClick={addStep}
-          style={{ marginTop: 6 }}
-        >
-          <i className="icon icon-plus" /> Add Step
-        </button>
+
+          {/* RIGHT: edit form for selected step */}
+          {steps[selectedStepIdx] && (
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                padding: 12,
+                background: "var(--surface, #fff)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 500,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--text-3, #64748b)",
+                  }}
+                >
+                  Editing Step {selectedStepIdx + 1}
+                </span>
+                {steps.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeStep(selectedStepIdx)}
+                    title="Remove this step from the playbook"
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 500,
+                      color: "var(--danger, #b91c1c)",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "rgba(185, 28, 28, 0.08)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
+                  >
+                    Remove Step
+                  </button>
+                )}
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-3, #64748b)",
+                    display: "block",
+                    marginBottom: 3,
+                  }}
+                >
+                  Step Name
+                </label>
+                <input
+                  ref={stepNameRef}
+                  className="input"
+                  style={{ width: "100%" }}
+                  value={steps[selectedStepIdx].name}
+                  onChange={(e) =>
+                    setStep(selectedStepIdx, { name: e.target.value })
+                  }
+                  placeholder='e.g. "Send opening letter"'
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-3, #64748b)",
+                    display: "block",
+                    marginBottom: 3,
+                  }}
+                >
+                  URL (optional)
+                </label>
+                <input
+                  className="input"
+                  style={{ width: "100%" }}
+                  value={steps[selectedStepIdx].url ?? ""}
+                  onChange={(e) =>
+                    setStep(selectedStepIdx, {
+                      url: e.target.value || null,
+                    })
+                  }
+                  placeholder="https://..."
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-3, #64748b)",
+                    display: "block",
+                    marginBottom: 3,
+                  }}
+                >
+                  Description (optional)
+                </label>
+                <textarea
+                  className="input"
+                  style={{
+                    width: "100%",
+                    minHeight: 100,
+                    resize: "vertical",
+                  }}
+                  value={steps[selectedStepIdx].instructions ?? ""}
+                  onChange={(e) =>
+                    setStep(selectedStepIdx, {
+                      instructions: e.target.value || null,
+                    })
+                  }
+                  placeholder="What should the operator do at this step?"
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </Drawer>
   );

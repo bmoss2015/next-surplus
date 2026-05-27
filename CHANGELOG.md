@@ -10,24 +10,33 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Added
+- Fix WWWW4: Playbooks board. Cross-lead Kanban view of any research template. `/playbooks` lists every template with its active lead count; `/playbooks/[id]` renders the per-template board with one column per step and cards for each lead currently sitting on that step. "Current step" = first incomplete step in the lead's snapshotted checklist. Days-in-step flags red past 7 days. No schema work, uses the existing `lead_research_templates` table. Preview via URL for now, no nav item yet. (2026-05-27T16:30:00-05:00)
+
 ### Fixed
 - Fix WWWW5: drop orphan `lead_latest_activity` view from staging (left over from abandoned Branch 1) and renumber the stuck `0120_revert_clearout_validations.sql` to `0135_revert_clearout_validations.sql` so it can finally apply. Migration content is unchanged: same Clearout-validated phone reset. Both pushed to staging. (2026-05-27T12:00:00-05:00)
 
 
 ### Changed
 - chore(docs): restructure roadmap with quarter labels, move technical content to ARCHITECTURE.md (2026-05-26T15:57:32-05:00)
+- chore(docs): add Plaid bank verification to Q3 + ADR-015 for Plaid on Lob funding (2026-05-26T16:44:34-05:00)
 
 ### Changed
 - chore(docs): add /roadmap and /architecture slash commands with skill (2026-05-26T16:04:31-05:00)
 
 ### Fixed
 - fix: add required YAML frontmatter to roadmap skill (2026-05-26T16:21:07-05:00)
+- Fix WWWW4 v2: Playbooks index Pattern C layout (2026-05-27T08:51:39-05:00)
+- Fix WWWW4 v3: pack name+metrics, card-per-row Pattern C (2026-05-27T08:56:06-05:00)
+- Fix WWWW4 v4: Add Playbooks to top nav (2026-05-27T09:00:09-05:00)
+- Fix WWWW4 v5: Rename Research -> Playbook + lead-context View Board (2026-05-27T09:04:14-05:00)
 - Fix: Restore useState import in MailBankAccountsSection (2026-05-27T08:30:08-05:00)
 - Fix: In-app modal for bank account delete confirm (2026-05-27T08:37:16-05:00)
 - Fix: Accept Account Holder placeholder with Right Arrow or Tab (2026-05-27T08:39:11-05:00)
 - Fix: Accept Account Holder placeholder with Right Arrow or Tab (2026-05-27T08:39:11-05:00)
 
 ### Fixed
+- Fix WWWW4: Playbooks board (cross-lead template-step Kanban) (2026-05-27T08:29:16-05:00)
 - Fix: Confirm before deleting bank account (2026-05-27T07:57:56-05:00)
 
 ## [2026-05-26] - 2026-05-26
