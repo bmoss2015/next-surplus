@@ -70,10 +70,16 @@ export function SettingsSaveProvider({
 
   const ctx = useMemo(() => ({ register, unregister }), [register, unregister]);
 
+  // Intentional ref-read during render: the version counter is what
+  // actually triggers re-renders; the ref is just the live registry
+  // SaveBarUI reads on each one.
+  /* eslint-disable-next-line react-hooks/refs */
+  const regs = regsRef.current;
+
   return (
     <SaveBarContext.Provider value={ctx}>
       {children}
-      <SaveBarUI regs={regsRef.current} version={version} />
+      <SaveBarUI regs={regs} version={version} />
     </SaveBarContext.Provider>
   );
 }

@@ -25,13 +25,17 @@ export default async function MailDebugPage() {
   const lobKeyPrefix = (process.env.LOB_API_KEY ?? "").slice(0, 5);
   const gotenbergSet = Boolean(process.env.GOTENBERG_URL);
   const webhookSecretSet = Boolean(process.env.LOB_WEBHOOK_SECRET);
+  // Server component runs once per request; reading the clock here
+  // gives every row the same "now" anchor for age math below.
+  /* eslint-disable-next-line react-hooks/purity */
+  const nowMs = Date.now();
 
   return (
     <div className="mx-auto max-w-[1100px] px-8 py-8">
       <h1 className="mb-1 text-[22px] font-semibold text-ink">Mail Debug</h1>
       <p className="mb-6 text-[13px] text-gray-600">
         Latest 20 mail_jobs rows + server-side env state. Use this to
-        verify what's actually in the DB vs what the UI is rendering.
+        verify what&apos;s actually in the DB vs what the UI is rendering.
       </p>
 
       <div className="mb-6 rounded-md border border-gray-200 bg-gray-50 p-4">
@@ -75,7 +79,7 @@ export default async function MailDebugPage() {
             {(rows ?? []).map((r) => {
               const created = (r.created_at as string | null) ?? null;
               const ageSec = created
-                ? Math.round((Date.now() - new Date(created).getTime()) / 1000)
+                ? Math.round((nowMs - new Date(created).getTime()) / 1000)
                 : 0;
               const ageLabel =
                 ageSec < 60

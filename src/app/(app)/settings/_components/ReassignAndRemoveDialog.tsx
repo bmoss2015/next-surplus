@@ -48,9 +48,12 @@ export function ReassignAndRemoveDialog({
 
   useEffect(() => {
     if (!open) return;
+    // Reset dialog state each time it opens — intentional setState in effect.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setChoice(null);
     setSubmitting(false);
     setErr(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape" && !submitting) onClose();
     }
