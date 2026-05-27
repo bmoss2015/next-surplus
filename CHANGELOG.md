@@ -23,6 +23,7 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 
 ### Fixed
 - fix: add required YAML frontmatter to roadmap skill (2026-05-26T16:21:07-05:00)
+- Fix WWWW4 v2: Playbooks index Pattern C layout (2026-05-27T08:51:39-05:00)
 
 ### Fixed
 - Fix WWWW4: Playbooks board (cross-lead template-step Kanban) (2026-05-27T08:29:16-05:00)

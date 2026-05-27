@@ -3,54 +3,76 @@ import { fetchPlaybooks } from "@/lib/playbooks/fetch-list";
 
 export const dynamic = "force-dynamic";
 
-// Playbooks index: every research template in the org, with the count of leads
-// currently using it. Click a row to open the per-playbook board.
+// Playbooks index: every research template in the org with per-template stats.
+// Pattern C from the multi-template mockup: row per playbook with stacked
+// metric columns (Active leads, Completed in last 30 days). Title text is its
+// own link and the row hover-area also navigates so either click works.
 export default async function PlaybooksPage() {
   const playbooks = await fetchPlaybooks();
 
   return (
     <div className="px-7 py-6">
-      <div className="mb-[22px]">
+      <div className="mb-3">
         <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
           Playbooks
         </h1>
         <div className="mt-1 text-[13px] text-gray-500">
-          Each playbook is a research template. Click into one to see leads
-          grouped by which step they're currently on.
+          Each playbook is a reusable outreach checklist. Click into one to see
+          leads grouped by which step they're currently on.
         </div>
       </div>
 
       {playbooks.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-surface p-8 text-center text-sm text-gray-500">
-          No playbooks yet. Create a research template in Settings to get
-          started.
+          No playbooks yet. Create one in Settings to get started.
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-surface">
-          <div className="grid grid-cols-[1fr_120px_120px_120px] gap-4 border-b border-gray-200 px-5 py-3 text-[11px] font-medium uppercase tracking-wider text-gray-500">
-            <span>Playbook</span>
-            <span className="text-right">Steps</span>
-            <span className="text-right">Active Leads</span>
-            <span></span>
-          </div>
-          {playbooks.map((p) => (
-            <Link
+          {playbooks.map((p, i) => (
+            <div
               key={p.id}
-              href={`/playbooks/${p.id}`}
-              className="grid grid-cols-[1fr_120px_120px_120px] items-center gap-4 border-b border-gray-100 px-5 py-4 transition-colors hover:bg-gray-50 last:border-b-0"
+              className={`grid grid-cols-[1fr_auto_auto_auto] items-center gap-8 px-5 py-4 transition-colors hover:bg-gray-50 ${
+                i > 0 ? "border-t border-gray-100" : ""
+              }`}
             >
-              <div>
-                <div className="text-sm font-medium text-ink">{p.name}</div>
-                {(p.state || p.saleType) && (
-                  <div className="mt-0.5 text-[11px] text-gray-500">
-                    {[p.state, p.saleType].filter(Boolean).join(" · ")}
-                  </div>
-                )}
+              <div className="min-w-0">
+                <Link
+                  href={`/playbooks/${p.id}`}
+                  className="text-sm font-medium text-ink hover:text-petrol-700 hover:underline"
+                >
+                  {p.name}
+                </Link>
+                <div className="mt-0.5 text-[11px] text-gray-500">
+                  {p.stepCount} {p.stepCount === 1 ? "step" : "steps"}
+                  {(p.state || p.saleType) && (
+                    <>
+                      {" · "}
+                      {[p.state, p.saleType].filter(Boolean).join(" · ")}
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="text-right text-sm text-ink">{p.stepCount}</div>
-              <div className="text-right text-sm text-ink">{p.activeLeads}</div>
-              <div className="text-right text-xs text-petrol-700">Open →</div>
-            </Link>
+              <div className="text-center">
+                <div className="text-[11px] text-gray-500">Active</div>
+                <div className="text-sm font-medium text-ink">
+                  {p.activeLeads}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-[11px] text-gray-500">
+                  Completed (30d)
+                </div>
+                <div className="text-sm font-medium text-ink">
+                  {p.completedLast30Days}
+                </div>
+              </div>
+              <Link
+                href={`/playbooks/${p.id}`}
+                className="text-xs font-medium text-petrol-700 hover:underline"
+              >
+                Open Board →
+              </Link>
+            </div>
           ))}
         </div>
       )}

@@ -23,20 +23,40 @@ export async function fetchPlaybooks(): Promise<PlaybookListItem[]> {
   if (rows.length === 0) return [];
 
   const ids = rows.map((r) => r.id);
-  // Count active (non-archived) leads currently using each template by joining
-  // through lead_research_templates -> leads and grouping in JS.
+  // Fetch every snapshot for these templates so we can compute both "active"
+  // and "completed in last 30 days" in JS. Cheap at our scale; revisit if a
+  // workspace grows large.
   const { data: lrts } = await sb
     .from("lead_research_templates")
-    .select("source_template_id, lead_id, leads!inner(archived)")
+    .select("source_template_id, steps, updated_at, leads!inner(archived)")
     .in("source_template_id", ids)
     .eq("leads.archived", false);
 
-  const counts = new Map<string, number>();
-  for (const row of (lrts ?? []) as Array<{ source_template_id: string }>) {
-    counts.set(
-      row.source_template_id,
-      (counts.get(row.source_template_id) ?? 0) + 1
-    );
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const active = new Map<string, number>();
+  const completed30 = new Map<string, number>();
+
+  for (const row of (lrts ?? []) as Array<{
+    source_template_id: string;
+    steps: unknown;
+    updated_at: string;
+  }>) {
+    const steps = Array.isArray(row.steps) ? (row.steps as Array<{ done?: boolean }>) : [];
+    const allDone = steps.length > 0 && steps.every((s) => s?.done === true);
+    if (allDone) {
+      const t = new Date(row.updated_at).getTime();
+      if (!Number.isNaN(t) && t >= thirtyDaysAgo) {
+        completed30.set(
+          row.source_template_id,
+          (completed30.get(row.source_template_id) ?? 0) + 1
+        );
+      }
+    } else {
+      active.set(
+        row.source_template_id,
+        (active.get(row.source_template_id) ?? 0) + 1
+      );
+    }
   }
 
   return rows.map((r) => ({
@@ -45,6 +65,7 @@ export async function fetchPlaybooks(): Promise<PlaybookListItem[]> {
     state: r.state,
     saleType: r.sale_type,
     stepCount: Array.isArray(r.steps) ? r.steps.length : 0,
-    activeLeads: counts.get(r.id) ?? 0,
+    activeLeads: active.get(r.id) ?? 0,
+    completedLast30Days: completed30.get(r.id) ?? 0,
   }));
 }

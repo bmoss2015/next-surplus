@@ -11,6 +11,7 @@ export type PlaybookListItem = {
   saleType: string | null;
   stepCount: number;
   activeLeads: number;
+  completedLast30Days: number;
 };
 
 export type PlaybookBoardLead = {
