@@ -48,13 +48,13 @@ export function TemplatesSection({
   };
 
   const crumbLabel =
-    tab === "email" ? "Email" : tab === "sms" ? "SMS" : "Research";
+    tab === "email" ? "Email" : tab === "sms" ? "SMS" : "Playbooks";
   const addLabel =
     tab === "email"
       ? "Add Email Template"
       : tab === "sms"
         ? "Add SMS Template"
-        : "Add Research Template";
+        : "Add Playbook";
 
   return (
     <section id="panel-templates" className="panel active">
@@ -69,7 +69,7 @@ export function TemplatesSection({
         <div>
           <h1 className="section-h1">Templates</h1>
           <p className="section-desc">
-            Reusable email bodies, SMS messages, and research checklists with
+            Reusable email bodies, SMS messages, and playbook checklists with
             merge fields.
           </p>
         </div>
@@ -104,7 +104,7 @@ export function TemplatesSection({
           className={"tpl-tab" + (tab === "research" ? " active" : "")}
           onClick={() => setTab("research")}
         >
-          Research<span className="tpl-tab-count">{counts.research}</span>
+          Playbooks<span className="tpl-tab-count">{counts.research}</span>
         </button>
       </div>
 

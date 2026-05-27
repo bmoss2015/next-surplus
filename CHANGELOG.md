@@ -26,6 +26,7 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 - Fix WWWW4 v2: Playbooks index Pattern C layout (2026-05-27T08:51:39-05:00)
 - Fix WWWW4 v3: pack name+metrics, card-per-row Pattern C (2026-05-27T08:56:06-05:00)
 - Fix WWWW4 v4: Add Playbooks to top nav (2026-05-27T09:00:09-05:00)
+- Fix WWWW4 v5: Rename Research -> Playbook + lead-context View Board (2026-05-27T09:04:14-05:00)
 
 ### Fixed
 - Fix WWWW4: Playbooks board (cross-lead template-step Kanban) (2026-05-27T08:29:16-05:00)

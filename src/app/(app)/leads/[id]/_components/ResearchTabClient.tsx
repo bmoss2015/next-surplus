@@ -222,6 +222,15 @@ export function ResearchTabClient({
                   <span className="shrink-0 text-[11px] font-medium text-gray-500">
                     {doneCount} / {total} {total === 1 ? "Step" : "Steps"} Done
                   </span>
+                  {t.sourceTemplateId && (
+                    <Link
+                      href={`/playbooks/${t.sourceTemplateId}`}
+                      className="shrink-0 text-[11px] font-medium text-[#0d4b3a] hover:underline"
+                      title="See every lead currently using this playbook"
+                    >
+                      View Board →
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => setConfirmRemoveIdx(tIdx)}

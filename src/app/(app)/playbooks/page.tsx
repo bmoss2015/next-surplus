@@ -18,7 +18,7 @@ export default async function PlaybooksPage() {
         </h1>
         <div className="mt-1 text-[13px] text-gray-500">
           Each playbook is a reusable outreach checklist. Click into one to see
-          leads grouped by which step they're currently on.
+          leads grouped by which step they&apos;re currently on.
         </div>
       </div>
 
