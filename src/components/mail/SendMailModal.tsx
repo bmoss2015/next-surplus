@@ -1741,6 +1741,34 @@ function PdfPreview({ blob }: { blob: Blob }) {
   );
 }
 
+// Shared shell for AddressBadge pills — renders a <button> when there's
+// an onClick handler (clickable Fix/Review variants), else a <span>.
+// Module-scope so React doesn't see a new component identity each render.
+function AddressPillShell({
+  onClick,
+  className,
+  title,
+  children,
+}: {
+  onClick?: (e: React.MouseEvent) => void;
+  className: string;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={className} title={title}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <span className={className} title={title}>
+      {children}
+    </span>
+  );
+}
+
 // Inline badge that surfaces the Lob /us_verifications result on each
 // recipient row after the user clicks Send. Shows nothing pre-verify.
 // Becomes clickable when there's something the customer can fix (any
@@ -1767,34 +1795,26 @@ function AddressBadge({
   // (verified-no-correction case rendered at the end as a small
   // green check — see the return at bottom of this function)
 
-  const Wrapper = onClick
-    ? ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
-        <button type="button" onClick={onClick} {...rest}>
-          {children}
-        </button>
-      )
-    : ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
-        <span {...rest}>{children}</span>
-      );
-
   if (!result.ok) {
     return (
-      <Wrapper
+      <AddressPillShell
+        onClick={onClick}
         className="cursor-default rounded-full border border-gray-200 bg-white px-2 py-[1px] text-[10px] font-medium text-gray-500"
         title={result.error}
       >
         Address Check Failed
-      </Wrapper>
+      </AddressPillShell>
     );
   }
   if (result.deliverability === "undeliverable") {
     return (
-      <Wrapper
+      <AddressPillShell
+        onClick={onClick}
         className={`rounded-full border border-danger/30 bg-red-50 px-2 py-[1px] text-[10px] font-medium text-danger ${onClick ? "cursor-pointer hover:bg-red-100" : "cursor-default"}`}
         title={onClick ? "Click to see why and apply a fix" : undefined}
       >
         Undeliverable {onClick ? "·" : ""} {onClick && <span className="underline">Fix</span>}
-      </Wrapper>
+      </AddressPillShell>
     );
   }
   if (
@@ -1802,12 +1822,13 @@ function AddressBadge({
     result.deliverability === "deliverable_missing_unit"
   ) {
     return (
-      <Wrapper
+      <AddressPillShell
+        onClick={onClick}
         className={`rounded-full border border-gray-300 bg-white px-2 py-[1px] text-[10px] font-medium text-ink ${onClick ? "cursor-pointer hover:bg-gray-50" : "cursor-default"}`}
         title={onClick ? "Click to see the unit issue + apply a fix" : undefined}
       >
         Unit Warning {onClick ? "·" : ""} {onClick && <span className="underline">Fix</span>}
-      </Wrapper>
+      </AddressPillShell>
     );
   }
   // Deliverable BUT USPS auto-corrected something (e.g. fixed a
@@ -1819,7 +1840,8 @@ function AddressBadge({
   // either accept the correction or edit the address.
   if (result.ok && result.has_suggestion) {
     return (
-      <Wrapper
+      <AddressPillShell
+        onClick={onClick}
         className={`rounded-full border border-rose-500/40 bg-rose-50 px-2 py-[1px] text-[10px] font-semibold text-rose-700 ${onClick ? "cursor-pointer hover:bg-rose-100" : "cursor-default"}`}
         title={
           onClick
@@ -1829,7 +1851,7 @@ function AddressBadge({
       >
         Auto-corrected{onClick ? " · " : ""}
         {onClick && <span className="underline">Review</span>}
-      </Wrapper>
+      </AddressPillShell>
     );
   }
   // Verified, no correction needed — small confirmation pill so the

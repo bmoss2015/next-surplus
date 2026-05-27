@@ -40,10 +40,13 @@ export function LetterThumbnail({
 
   useEffect(() => {
     if (hasInlineHtml) {
+      // Sync inline body changes into render state — intentional.
+      /* eslint-disable-next-line react-hooks/set-state-in-effect */
       setState({ kind: "html", html: bodyHtml as string });
       return;
     }
     let cancelled = false;
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setState({ kind: "loading" });
 
     (async () => {

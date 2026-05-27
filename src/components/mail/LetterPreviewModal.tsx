@@ -48,6 +48,8 @@ export function LetterPreviewModal({
     if (!data) return;
     let cancelled = false;
     let blobUrl: string | null = null;
+    // Reset to loading state whenever the modal opens with new data.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setRendered({ kind: "loading" });
 
     if (data.bodyHtml && data.bodyHtml.trim().length > 0) {

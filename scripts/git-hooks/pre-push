@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Lint files staged in commits about to be pushed. Blocks pushes that
+# would introduce new lint errors in files we touched, without making
+# us first clean every pre-existing error elsewhere in the repo.
+#
+# Skip by exporting NO_PRE_PUSH_LINT=1 (use sparingly).
+
+if [ "$NO_PRE_PUSH_LINT" = "1" ]; then
+  exit 0
+fi
+
+# Read refs from stdin (git push contract). For each ref, diff the
+# range being pushed against the remote tip to find changed files.
+# z40 is git's "all zeros" hash meaning "branch doesn't exist remotely
+# yet" — fall back to diffing against origin/main in that case.
+z40="0000000000000000000000000000000000000000"
+files=""
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$local_sha" = "$z40" ]; then
+    continue
+  fi
+  if [ "$remote_sha" = "$z40" ]; then
+    range="origin/main..$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+  changed=$(git diff --name-only --diff-filter=ACMR "$range" -- '*.ts' '*.tsx' 2>/dev/null)
+  files="$files
+$changed"
+done
+
+files=$(echo "$files" | sort -u | grep -E '\.(ts|tsx)$' || true)
+if [ -z "$files" ]; then
+  exit 0
+fi
+
+echo "[pre-push] Linting changed TS/TSX files..."
+# shellcheck disable=SC2086
+npx eslint --max-warnings=-1 $files
+status=$?
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "[pre-push] Lint failed. Fix the errors above, or push with NO_PRE_PUSH_LINT=1 to skip."
+  exit $status
+fi
+
+exit 0

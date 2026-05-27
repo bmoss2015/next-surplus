@@ -174,6 +174,9 @@ export function LeadMailV11Client({
   // thumbnail). Only one request in flight at a time.
   useEffect(() => {
     if (!selectedId) {
+      // Clearing detail when selection is cleared is a deliberate
+      // input → derived-state reset; ok to setState in this effect.
+      /* eslint-disable-next-line react-hooks/set-state-in-effect */
       setDetail(null);
       return;
     }
@@ -196,9 +199,13 @@ export function LeadMailV11Client({
     if (!resendId) return;
     const piece = rows.find((r) => r.id === resendId);
     if (!piece) return;
+    // Deep-link bootstrap: read the URL once on mount and prime modal
+    // state. Intentional one-shot setState pattern.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setResendingFor(piece);
     setSendMailOpen(true);
     setSelectedId(resendId);
+    /* eslint-enable react-hooks/set-state-in-effect */
     const next = new URLSearchParams(searchParams.toString());
     next.delete("resend");
     const qs = next.toString();
