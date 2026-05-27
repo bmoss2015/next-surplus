@@ -517,45 +517,66 @@ function ResearchEditor({
       <div className="drawer-field">
         <label className="drawer-label">Steps</label>
         <div className="drawer-hint">
-          One row per checkbox you want to see on the lead&apos;s Research
+          One row per checkbox you want to see on the lead&apos;s Playbook
           tab. URL is optional and renders as a link next to the step name.
+          Description is the longer instruction shown when the step is
+          expanded.
         </div>
         {steps.map((s, idx) => (
           <div
             key={idx}
             style={{
-              display: "flex",
-              gap: 8,
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              padding: 8,
               marginBottom: 8,
-              alignItems: "center",
+              background: "var(--surface)",
             }}
           >
-            <input
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginBottom: 6,
+                alignItems: "center",
+              }}
+            >
+              <input
+                className="input"
+                style={{ flex: 1 }}
+                value={s.name}
+                onChange={(e) => setStep(idx, { name: e.target.value })}
+                placeholder={`Step ${idx + 1} name (e.g. "Pull SOS filings")`}
+              />
+              <input
+                className="input"
+                style={{ width: 200 }}
+                value={s.url ?? ""}
+                onChange={(e) =>
+                  setStep(idx, { url: e.target.value || null })
+                }
+                placeholder="URL (optional)"
+              />
+              {steps.length > 1 && (
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title="Remove step"
+                  onClick={() => removeStep(idx)}
+                >
+                  <i className="icon icon-trash" />
+                </button>
+              )}
+            </div>
+            <textarea
               className="input"
-              style={{ flex: 1 }}
-              value={s.name}
-              onChange={(e) => setStep(idx, { name: e.target.value })}
-              placeholder={`Step ${idx + 1} (e.g. "Pull SOS filings")`}
-            />
-            <input
-              className="input"
-              style={{ width: 180 }}
-              value={s.url ?? ""}
+              style={{ width: "100%", minHeight: 56, resize: "vertical" }}
+              value={s.instructions ?? ""}
               onChange={(e) =>
-                setStep(idx, { url: e.target.value || null })
+                setStep(idx, { instructions: e.target.value || null })
               }
-              placeholder="URL (optional)"
+              placeholder="Description (optional). What should the operator do at this step?"
             />
-            {steps.length > 1 && (
-              <button
-                type="button"
-                className="icon-btn"
-                title="Remove step"
-                onClick={() => removeStep(idx)}
-              >
-                <i className="icon icon-trash" />
-              </button>
-            )}
           </div>
         ))}
         <button

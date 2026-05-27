@@ -12,19 +12,27 @@ export default async function PlaybooksPage() {
 
   return (
     <div className="px-7 py-6">
-      <div className="mb-3 max-w-4xl">
-        <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-          Playbooks
-        </h1>
-        <div className="mt-1 text-[13px] text-gray-500">
-          Each playbook is a reusable outreach checklist. Click into one to see
-          leads grouped by which step they&apos;re currently on.
+      <div className="mb-3 flex max-w-4xl items-start justify-between">
+        <div>
+          <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
+            Playbooks
+          </h1>
+          <div className="mt-1 text-[13px] text-gray-500">
+            Each playbook is a reusable checklist. Click into one to see leads
+            grouped by which step they&apos;re currently on.
+          </div>
         </div>
+        <Link
+          href="/settings#panel-templates"
+          className="btn-primary shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium text-white"
+        >
+          + Create Playbook
+        </Link>
       </div>
 
       {playbooks.length === 0 ? (
         <div className="max-w-4xl rounded-lg border border-gray-200 bg-surface p-8 text-center text-sm text-gray-500">
-          No playbooks yet. Create one in Settings to get started.
+          No playbooks yet. Click + Create Playbook to add one.
         </div>
       ) : (
         <div className="max-w-4xl space-y-2">

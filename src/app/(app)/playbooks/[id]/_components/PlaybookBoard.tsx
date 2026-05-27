@@ -104,8 +104,8 @@ function PlaybookCard({ lead }: { lead: PlaybookBoardLead }) {
   const daysLabel = (() => {
     if (lead.daysInStep == null) return null;
     if (lead.daysInStep === 0) return "Today";
-    if (lead.daysInStep === 1) return "1 day in step";
-    return `${lead.daysInStep} days in step`;
+    if (lead.daysInStep === 1) return "1 Day In Step";
+    return `${lead.daysInStep} Days In Step`;
   })();
 
   return (
