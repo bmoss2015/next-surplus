@@ -4,10 +4,10 @@
 //
 // Two-column bank-grid of bank-card panels. Add Bank Account opens
 // BankAccountDrawer in "add" mode. The Enter Test Deposits button on each
-// unverified card opens the drawer in "verify" mode. Per-card delete uses
-// a two-click confirm and calls deleteMailBankAccount.
+// unverified card opens the drawer in "verify" mode. Per-card delete shows
+// a native confirm dialog and calls deleteMailBankAccount.
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { MailBankAccountRow } from "@/lib/settings/fetch";
 import { deleteMailBankAccount } from "@/app/(app)/settings/_actions";
@@ -110,11 +110,14 @@ function BankCard({
   onVerify: () => void;
 }) {
   const router = useRouter();
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [, startTransition] = useTransition();
   const isVerified = bank.status === "verified";
 
   function remove() {
+    const label = bank.bank_name
+      ? `${bank.bank_name} (${maskLast4(bank.account_last_four)})`
+      : `account ending ${maskLast4(bank.account_last_four)}`;
+    if (!confirm(`Remove ${label}? This can't be undone.`)) return;
     startTransition(async () => {
       await deleteMailBankAccount(bank.id);
       router.refresh();
@@ -186,9 +189,8 @@ function BankCard({
         <button
           type="button"
           className="icon-btn"
-          title={confirmDelete ? "Click again to confirm" : "Remove"}
-          onClick={() => (confirmDelete ? remove() : setConfirmDelete(true))}
-          style={confirmDelete ? { color: "var(--danger)" } : undefined}
+          title="Remove"
+          onClick={remove}
         >
           <i className="icon icon-trash" />
         </button>

@@ -19,6 +19,9 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ### Fixed
 - fix: add required YAML frontmatter to roadmap skill (2026-05-26T16:21:07-05:00)
 
+### Fixed
+- Fix: Confirm before deleting bank account (2026-05-27T07:57:56-05:00)
+
 ## [2026-05-26] - 2026-05-26
 
 ### Changed
