@@ -316,6 +316,9 @@ function ResearchEditor({
       ? row.steps
       : [{ name: "", url: null, instructions: null }]
   );
+  // Two-pane editor: which step's edit form is shown in the right pane. Reset
+  // to 0 each time the drawer opens.
+  const [selectedStepIdx, setSelectedStepIdx] = useState(0);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -333,6 +336,7 @@ function ResearchEditor({
           ? row.steps
           : [{ name: "", url: null, instructions: null }]
       );
+      setSelectedStepIdx(0);
       setErrMsg(null);
       setConfirmDelete(false);
       /* eslint-enable react-hooks/set-state-in-effect */
@@ -349,10 +353,23 @@ function ResearchEditor({
     setSteps((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
   }
   function addStep() {
-    setSteps((prev) => [...prev, { name: "", url: null, instructions: null }]);
+    setSteps((prev) => {
+      const next = [...prev, { name: "", url: null, instructions: null }];
+      // Jump the right pane to the newly added step so the user can type
+      // immediately.
+      setSelectedStepIdx(next.length - 1);
+      return next;
+    });
   }
   function removeStep(idx: number) {
-    setSteps((prev) => prev.filter((_, i) => i !== idx));
+    setSteps((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      // Clamp the selection so we never point past the new array.
+      setSelectedStepIdx((cur) =>
+        Math.min(cur, Math.max(0, next.length - 1))
+      );
+      return next;
+    });
   }
 
   function onSave() {
@@ -396,8 +413,9 @@ function ResearchEditor({
     <Drawer
       open={open}
       onClose={onClose}
-      eyebrow={row ? "Edit Research Template" : "New Research Template"}
-      title={row?.name || "Research Template"}
+      width={720}
+      eyebrow={row ? "Edit Playbook" : "New Playbook"}
+      title={row?.name || "Playbook"}
       footer={
         <>
           <div className="flex items-center gap-2">
@@ -407,7 +425,7 @@ function ResearchEditor({
               disabled={!ready || pending}
               onClick={onSave}
             >
-              {pending ? "Saving…" : row ? "Save Changes" : "Add Template"}
+              {pending ? "Saving…" : row ? "Save Changes" : "Save Playbook"}
             </button>
             <button
               type="button"
@@ -433,7 +451,7 @@ function ResearchEditor({
                 confirmDelete ? onDelete() : setConfirmDelete(true)
               }
             >
-              {confirmDelete ? "Click again to confirm" : "Delete Template"}
+              {confirmDelete ? "Click again to confirm" : "Delete Playbook"}
             </button>
           )}
         </>
@@ -517,76 +535,227 @@ function ResearchEditor({
       <div className="drawer-field">
         <label className="drawer-label">Steps</label>
         <div className="drawer-hint">
-          One row per checkbox you want to see on the lead&apos;s Playbook
-          tab. URL is optional and renders as a link next to the step name.
-          Description is the longer instruction shown when the step is
-          expanded.
+          One row per checkbox the operator will see on the lead&apos;s
+          Playbook tab. Click any step on the left to edit it on the right.
         </div>
-        {steps.map((s, idx) => (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "220px 1fr",
+            gap: 12,
+            marginTop: 8,
+            minHeight: 280,
+          }}
+        >
+          {/* LEFT: step list */}
           <div
-            key={idx}
             style={{
               border: "1px solid var(--border)",
               borderRadius: 6,
-              padding: 8,
-              marginBottom: 8,
-              background: "var(--surface)",
+              background: "var(--canvas, #fafbfc)",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
-            <div
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {steps.map((s, idx) => {
+                const isSelected = idx === selectedStepIdx;
+                const displayName = s.name.trim() || `Step ${idx + 1}`;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedStepIdx(idx)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      width: "100%",
+                      padding: "8px 10px",
+                      background: isSelected
+                        ? "rgba(13, 75, 58, 0.08)"
+                        : "transparent",
+                      borderLeft: isSelected
+                        ? "3px solid var(--brand, #0d4b3a)"
+                        : "3px solid transparent",
+                      borderBottom: "1px solid var(--hairline, #e2e8f0)",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontSize: 12.5,
+                      color: isSelected ? "var(--text-1, #0f172a)" : "var(--text-2, #475569)",
+                      fontWeight: isSelected ? 500 : 400,
+                    }}
+                  >
+                    <span
+                      style={{
+                        background: "var(--brand, #0d4b3a)",
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        height: 18,
+                        minWidth: 22,
+                        padding: "0 5px",
+                        borderRadius: 3,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {idx + 1}
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {displayName}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={addStep}
               style={{
-                display: "flex",
-                gap: 8,
-                marginBottom: 6,
-                alignItems: "center",
+                width: "100%",
+                padding: "8px 10px",
+                background: "var(--surface, #fff)",
+                borderTop: "1px solid var(--hairline, #e2e8f0)",
+                cursor: "pointer",
+                textAlign: "left",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--brand, #0d4b3a)",
               }}
             >
-              <input
-                className="input"
-                style={{ flex: 1 }}
-                value={s.name}
-                onChange={(e) => setStep(idx, { name: e.target.value })}
-                placeholder={`Step ${idx + 1} name (e.g. "Pull SOS filings")`}
-              />
-              <input
-                className="input"
-                style={{ width: 200 }}
-                value={s.url ?? ""}
-                onChange={(e) =>
-                  setStep(idx, { url: e.target.value || null })
-                }
-                placeholder="URL (optional)"
-              />
-              {steps.length > 1 && (
-                <button
-                  type="button"
-                  className="icon-btn"
-                  title="Remove step"
-                  onClick={() => removeStep(idx)}
-                >
-                  <i className="icon icon-trash" />
-                </button>
-              )}
-            </div>
-            <textarea
-              className="input"
-              style={{ width: "100%", minHeight: 56, resize: "vertical" }}
-              value={s.instructions ?? ""}
-              onChange={(e) =>
-                setStep(idx, { instructions: e.target.value || null })
-              }
-              placeholder="Description (optional). What should the operator do at this step?"
-            />
+              + Add Step
+            </button>
           </div>
-        ))}
-        <button
-          type="button"
-          className="btn btn-outline btn-sm"
-          onClick={addStep}
-          style={{ marginTop: 6 }}
-        >
-          <i className="icon icon-plus" /> Add Step
-        </button>
+
+          {/* RIGHT: edit form for selected step */}
+          {steps[selectedStepIdx] && (
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                padding: 12,
+                background: "var(--surface, #fff)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 500,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--text-3, #64748b)",
+                  }}
+                >
+                  Editing Step {selectedStepIdx + 1}
+                </span>
+                {steps.length > 1 && (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="Remove this step"
+                    style={{ color: "var(--danger)" }}
+                    onClick={() => removeStep(selectedStepIdx)}
+                  >
+                    <i className="icon icon-trash" />
+                  </button>
+                )}
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-3, #64748b)",
+                    display: "block",
+                    marginBottom: 3,
+                  }}
+                >
+                  Step Name
+                </label>
+                <input
+                  className="input"
+                  style={{ width: "100%" }}
+                  value={steps[selectedStepIdx].name}
+                  onChange={(e) =>
+                    setStep(selectedStepIdx, { name: e.target.value })
+                  }
+                  placeholder='e.g. "Send opening letter"'
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-3, #64748b)",
+                    display: "block",
+                    marginBottom: 3,
+                  }}
+                >
+                  URL (optional)
+                </label>
+                <input
+                  className="input"
+                  style={{ width: "100%" }}
+                  value={steps[selectedStepIdx].url ?? ""}
+                  onChange={(e) =>
+                    setStep(selectedStepIdx, {
+                      url: e.target.value || null,
+                    })
+                  }
+                  placeholder="https://..."
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-3, #64748b)",
+                    display: "block",
+                    marginBottom: 3,
+                  }}
+                >
+                  Description (optional)
+                </label>
+                <textarea
+                  className="input"
+                  style={{
+                    width: "100%",
+                    minHeight: 100,
+                    resize: "vertical",
+                  }}
+                  value={steps[selectedStepIdx].instructions ?? ""}
+                  onChange={(e) =>
+                    setStep(selectedStepIdx, {
+                      instructions: e.target.value || null,
+                    })
+                  }
+                  placeholder="What should the operator do at this step?"
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </Drawer>
   );
