@@ -8,3 +8,4 @@
 2026-05-27T16:30Z | Fix WWWW4: Playbooks board (cross-lead Kanban per research template) | Playbooks
 2026-05-27T17:00Z | Fix WWWW5: Drop orphan lead_latest_activity view + renumber stuck 0120_revert_clearout to 0135 | Migrations / Infra
 2026-05-27T18:00Z | Fix XXXX4: Lead-detail stage strip scrolls and auto-centers on current stage | Leads / Detail
+2026-05-27T19:00Z | Fix YYYY4 part 1: Custom stages schema + types + server query + CRUD actions (no UI yet) | Custom Stages

@@ -10,6 +10,10 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Added
+- Fix YYYY4 part 1: Custom stages schema + server query layer. New `org_stages` table (org_id, name, position, kind, is_active) with hidden `stage_kind` enum (open/won/lost). Migration seeds the 9 current default stages per existing org and adds a `stage_id` FK on the leads table backfilled from the existing enum. New `OrgStage` types, `fetchOrgStages` server query, and CRUD server actions (create/update/reorder/delete with safe-delete: blocks if leads use the stage unless caller provides a fallback stage; blocks deleting the only stage of a given kind). No UI yet. (2026-05-27T19:00:00-05:00)
+
+
 ### Changed
 - Fix XXXX4: Lead-detail stage strip switches to a horizontally scrollable layout with the current stage auto-centered on mount. Current stage gets a larger ring + brand-color label so it reads instantly. Stages stay clickable for jump-to-stage. Works the same at 5 stages or 50, no auto-switching modes. Sets up custom stages (the next branch) to render correctly at any count without further work. (2026-05-27T18:00:00-05:00)
 
