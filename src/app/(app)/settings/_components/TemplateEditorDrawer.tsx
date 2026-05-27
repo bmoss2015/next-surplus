@@ -14,7 +14,13 @@
 // upgrade. The drawer surfaces a small hint about the {{merge_field}} syntax
 // so users know it'll get substituted when sending.
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+
+// Hard cap for the number of steps in a single playbook. Two-pane editor
+// stays readable up to about this number; past it the left rail gets too
+// scrolly. If we ever need 20+ step playbooks we should switch to a list
+// view or paginate.
+const MAX_PLAYBOOK_STEPS = 20;
 import { useRouter } from "next/navigation";
 import { Drawer } from "./Drawer";
 import { MergeFieldPicker } from "./MergeFieldPicker";
@@ -318,9 +324,36 @@ function ResearchEditor({
   // Two-pane editor: which step's edit form is shown in the right pane. Reset
   // to 0 each time the drawer opens.
   const [selectedStepIdx, setSelectedStepIdx] = useState(0);
+  // Drag-reorder state. dragFromIdx = the step being dragged; dragOverIdx =
+  // the row currently being hovered (drawn with a top accent line).
+  const [dragFromIdx, setDragFromIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const stepNameRef = useRef<HTMLInputElement | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  // Auto-focus the step name field whenever the user changes selection. Skip
+  // the very first run after the drawer opens so the playbook name's
+  // autoFocus wins for fresh playbooks. Uses useLayoutEffect so focus lands
+  // before paint = no flicker.
+  const skipNextFocus = useRef(true);
+  useLayoutEffect(() => {
+    if (!open) {
+      skipNextFocus.current = true;
+      return;
+    }
+    if (skipNextFocus.current) {
+      skipNextFocus.current = false;
+      return;
+    }
+    stepNameRef.current?.focus();
+    // Move the caret to end so existing names are easy to extend.
+    const el = stepNameRef.current;
+    if (el && el.value) {
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, [selectedStepIdx, open]);
 
   useEffect(() => {
     if (open) {
@@ -352,6 +385,7 @@ function ResearchEditor({
   }
   function addStep() {
     setSteps((prev) => {
+      if (prev.length >= MAX_PLAYBOOK_STEPS) return prev;
       const next = [...prev, { name: "", url: null, instructions: null }];
       // Jump the right pane to the newly added step so the user can type
       // immediately.
@@ -368,6 +402,18 @@ function ResearchEditor({
       );
       return next;
     });
+  }
+  function moveStep(from: number, to: number) {
+    if (from === to) return;
+    setSteps((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    // Keep the moved step selected after reorder so the right pane stays
+    // in sync with what the user just dropped.
+    setSelectedStepIdx(to);
   }
 
   function onSave() {
@@ -549,32 +595,80 @@ function ResearchEditor({
             <div style={{ flex: 1, overflowY: "auto" }}>
               {steps.map((s, idx) => {
                 const isSelected = idx === selectedStepIdx;
+                const isDragging = dragFromIdx === idx;
+                const isDragOver =
+                  dragOverIdx === idx && dragFromIdx !== null && dragFromIdx !== idx;
                 const displayName = s.name.trim() || `Step ${idx + 1}`;
                 return (
-                  <button
+                  <div
                     key={idx}
-                    type="button"
+                    draggable
+                    onDragStart={(e) => {
+                      setDragFromIdx(idx);
+                      e.dataTransfer.effectAllowed = "move";
+                      // Some browsers require data to be set for drag to fire.
+                      e.dataTransfer.setData("text/plain", String(idx));
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOverIdx !== idx) setDragOverIdx(idx);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverIdx === idx) setDragOverIdx(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragFromIdx !== null) moveStep(dragFromIdx, idx);
+                      setDragFromIdx(null);
+                      setDragOverIdx(null);
+                    }}
+                    onDragEnd={() => {
+                      setDragFromIdx(null);
+                      setDragOverIdx(null);
+                    }}
                     onClick={() => setSelectedStepIdx(idx)}
+                    role="button"
+                    tabIndex={0}
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
+                      gap: 6,
                       width: "100%",
-                      padding: "8px 10px",
+                      padding: "8px 8px 8px 4px",
                       background: isSelected
                         ? "rgba(13, 75, 58, 0.08)"
                         : "transparent",
                       borderLeft: isSelected
                         ? "3px solid var(--brand, #0d4b3a)"
                         : "3px solid transparent",
+                      borderTop: isDragOver
+                        ? "2px solid var(--brand, #0d4b3a)"
+                        : "2px solid transparent",
                       borderBottom: "1px solid var(--hairline, #e2e8f0)",
-                      cursor: "pointer",
+                      cursor: "grab",
                       textAlign: "left",
                       fontSize: 12.5,
                       color: isSelected ? "var(--text-1, #0f172a)" : "var(--text-2, #475569)",
                       fontWeight: isSelected ? 500 : 400,
+                      opacity: isDragging ? 0.4 : 1,
                     }}
                   >
+                    {/* Drag handle dots */}
+                    <span
+                      aria-hidden
+                      style={{
+                        color: "#cbd5e1",
+                        fontSize: 12,
+                        lineHeight: 1,
+                        userSelect: "none",
+                        flexShrink: 0,
+                        width: 10,
+                        textAlign: "center",
+                      }}
+                    >
+                      ⋮⋮
+                    </span>
                     <span
                       style={{
                         background: "var(--brand, #0d4b3a)",
@@ -601,29 +695,45 @@ function ResearchEditor({
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                       }}
+                      title={displayName}
                     >
                       {displayName}
                     </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
             <button
               type="button"
               onClick={addStep}
+              disabled={steps.length >= MAX_PLAYBOOK_STEPS}
               style={{
                 width: "100%",
                 padding: "8px 10px",
                 background: "var(--surface, #fff)",
                 borderTop: "1px solid var(--hairline, #e2e8f0)",
-                cursor: "pointer",
+                cursor:
+                  steps.length >= MAX_PLAYBOOK_STEPS ? "not-allowed" : "pointer",
                 textAlign: "left",
                 fontSize: 12,
                 fontWeight: 500,
-                color: "var(--brand, #0d4b3a)",
+                color:
+                  steps.length >= MAX_PLAYBOOK_STEPS
+                    ? "var(--text-3, #94a3b8)"
+                    : "var(--brand, #0d4b3a)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              + Add Step
+              <span>
+                {steps.length >= MAX_PLAYBOOK_STEPS
+                  ? `Limit reached (${MAX_PLAYBOOK_STEPS})`
+                  : "+ Add Step"}
+              </span>
+              <span style={{ fontSize: 10.5, color: "var(--text-3, #94a3b8)" }}>
+                {steps.length} / {MAX_PLAYBOOK_STEPS}
+              </span>
             </button>
           </div>
 
@@ -696,6 +806,7 @@ function ResearchEditor({
                   Step Name
                 </label>
                 <input
+                  ref={stepNameRef}
                   className="input"
                   style={{ width: "100%" }}
                   value={steps[selectedStepIdx].name}
