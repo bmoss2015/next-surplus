@@ -6,3 +6,4 @@
 # Lines starting with '#' and blank lines are ignored by the parser.
 
 2026-05-26T22:00Z | Fix VVVV4: Last action line on Kanban lead cards (plain text from activities, no pips/counts) | Leads / Kanban
+2026-05-27T16:00Z | Fix VVVV5: Renumber stuck 0120_revert_clearout_validations.sql to 0135 to unblock migration pushes (Supabase migrations keyed by leading number) | Migrations / Infra

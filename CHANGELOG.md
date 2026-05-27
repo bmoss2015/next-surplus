@@ -13,6 +13,9 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ### Added
 - Fix VVVV4: "Last action" line on Kanban lead cards. Plain-text rendering of the most recent activity (mail sent/returned, stage change, note, task, etc.) so users can see at a glance which leads have been worked recently without opening each one. Sourced from a new `lead_latest_activity` view that uses DISTINCT ON over the existing (lead_id, created_at desc) index. No pips, no counts, no fractions per design feedback. (2026-05-26T17:16:25-05:00)
 
+### Fixed
+- Fix VVVV5: Renumber stuck migration `0120_revert_clearout_validations.sql` to `0135_revert_clearout_validations.sql`. The Supabase `schema_migrations` table uses the leading number as primary key, so the file could never apply alongside the already-applied `0120_lob_pricing_config.sql`. Renumbering to the next free slot unblocks both staging and prod migration pushes. Migration content is unchanged: same Clearout-validated phone reset (resets `status` to `'untested'` for rows where `validation_provider` was `'clearout'` or `'clearout-cache'`). Discovered while pushing Fix VVVV4. (2026-05-27T11:00:00-05:00)
+- Fix VVVV5: Renumber stuck clearout-revert migration from 0120 to 0135 (2026-05-27T08:19:31-05:00)
 
 ### Changed
 - chore(docs): restructure roadmap with quarter labels, move technical content to ARCHITECTURE.md (2026-05-26T15:57:32-05:00)
