@@ -4,14 +4,15 @@
 //
 // Two-column bank-grid of bank-card panels. Add Bank Account opens
 // BankAccountDrawer in "add" mode. The Enter Test Deposits button on each
-// unverified card opens the drawer in "verify" mode. Per-card delete shows
-// a native confirm dialog and calls deleteMailBankAccount.
+// unverified card opens the drawer in "verify" mode. Per-card delete opens
+// a styled in-app confirm modal and calls deleteMailBankAccount.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { MailBankAccountRow } from "@/lib/settings/fetch";
 import { deleteMailBankAccount } from "@/app/(app)/settings/_actions";
 import { BankAccountDrawer, type BankDrawerState } from "./BankAccountDrawer";
+import { Modal } from "@/components/Modal";
 
 function maskLast4(last4: string | null): string {
   if (!last4) return "•••• ••••";
@@ -33,7 +34,20 @@ export function MailBankAccountsSection({
 }: {
   initial: MailBankAccountRow[];
 }) {
+  const router = useRouter();
   const [drawer, setDrawer] = useState<BankDrawerState>({ kind: "closed" });
+  const [confirmRow, setConfirmRow] = useState<MailBankAccountRow | null>(null);
+  const [deleting, startDelete] = useTransition();
+
+  function confirmDelete() {
+    if (!confirmRow) return;
+    const id = confirmRow.id;
+    startDelete(async () => {
+      await deleteMailBankAccount(id);
+      setConfirmRow(null);
+      router.refresh();
+    });
+  }
 
   return (
     <section id="panel-mail-bank" className="panel active">
@@ -87,6 +101,7 @@ export function MailBankAccountsSection({
               bank={b}
               isFirst={idx === 0}
               onVerify={() => setDrawer({ kind: "verify", row: b })}
+              onRemove={() => setConfirmRow(b)}
             />
           ))}
         </div>
@@ -96,6 +111,47 @@ export function MailBankAccountsSection({
         state={drawer}
         onClose={() => setDrawer({ kind: "closed" })}
       />
+
+      <Modal
+        open={confirmRow !== null}
+        onClose={() => {
+          if (!deleting) setConfirmRow(null);
+        }}
+        title="Remove Bank Account"
+      >
+        <p className="m-0 text-[13px] text-ink">
+          Remove{" "}
+          <strong>
+            {confirmRow?.bank_name ?? "this account"}{" "}
+            {maskLast4(confirmRow?.account_last_four ?? null)}
+          </strong>
+          ? It will no longer be available for funding checks or certified
+          mail. This can&apos;t be undone.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => setConfirmRow(null)}
+            disabled={deleting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={confirmDelete}
+            disabled={deleting}
+            style={{
+              background: "var(--danger)",
+              color: "#fff",
+              border: "1px solid var(--danger)",
+            }}
+          >
+            {deleting ? "Removing…" : "Remove Bank Account"}
+          </button>
+        </div>
+      </Modal>
     </section>
   );
 }
@@ -104,25 +160,14 @@ function BankCard({
   bank,
   isFirst,
   onVerify,
+  onRemove,
 }: {
   bank: MailBankAccountRow;
   isFirst: boolean;
   onVerify: () => void;
+  onRemove: () => void;
 }) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
   const isVerified = bank.status === "verified";
-
-  function remove() {
-    const label = bank.bank_name
-      ? `${bank.bank_name} (${maskLast4(bank.account_last_four)})`
-      : `account ending ${maskLast4(bank.account_last_four)}`;
-    if (!confirm(`Remove ${label}? This can't be undone.`)) return;
-    startTransition(async () => {
-      await deleteMailBankAccount(bank.id);
-      router.refresh();
-    });
-  }
 
   return (
     <div className="bank-card">
@@ -190,7 +235,7 @@ function BankCard({
           type="button"
           className="icon-btn"
           title="Remove"
-          onClick={remove}
+          onClick={onRemove}
         >
           <i className="icon icon-trash" />
         </button>
