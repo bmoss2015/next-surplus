@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/current-user";
 import { MAX_STAGES, type StageKind } from "./types";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -10,6 +11,9 @@ export async function createStage(input: {
   name: string;
   kind: StageKind;
 }): Promise<ActionResult> {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate;
+
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Name is required" };
 
@@ -45,6 +49,9 @@ export async function updateStage(input: {
   name?: string;
   kind?: StageKind;
 }): Promise<ActionResult> {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate;
+
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) {
     const trimmed = input.name.trim();
@@ -64,6 +71,9 @@ export async function updateStage(input: {
 }
 
 export async function reorderStages(orderedIds: string[]): Promise<ActionResult> {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate;
+
   const sb = await createClient();
   for (let i = 0; i < orderedIds.length; i++) {
     const { error } = await sb
@@ -82,6 +92,9 @@ export async function deleteStage(input: {
   id: string;
   moveLeadsToStageId: string | null;
 }): Promise<ActionResult> {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate;
+
   const sb = await createClient();
 
   const { data: target } = await sb
