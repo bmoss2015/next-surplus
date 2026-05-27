@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { fetchPlaybookBoard } from "@/lib/playbooks/fetch-board";
-import { PlaybookBoard } from "./_components/PlaybookBoard";
+import { PlaybookViewSwitcher } from "./_components/PlaybookViewSwitcher";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,7 @@ export default async function PlaybookBoardPage({
         </div>
       </div>
 
-      <PlaybookBoard board={board} />
+      <PlaybookViewSwitcher board={board} />
     </div>
   );
 }
