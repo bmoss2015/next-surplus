@@ -144,7 +144,18 @@ function AddDrawer({
           style={{ width: "100%" }}
           value={holder}
           onChange={(e) => setHolder(e.target.value)}
-          placeholder="Moss Equity Partners LLC"
+          onKeyDown={(e) => {
+            // Accept the placeholder as the value with Right Arrow or Tab,
+            // mirroring the shell-suggestion behavior people expect.
+            if (
+              holder === "" &&
+              (e.key === "ArrowRight" || e.key === "Tab")
+            ) {
+              e.preventDefault();
+              setHolder("Moss Equity Partners LLC");
+            }
+          }}
+          placeholder="Moss Equity Partners LLC  (→ to accept)"
           autoFocus
         />
       </div>
