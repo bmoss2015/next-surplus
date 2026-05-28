@@ -78,16 +78,28 @@ function groupSteps(steps: LeadResearchTemplate["steps"]): Group[] {
   return groups;
 }
 
+export type LeadInfo = {
+  name: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  saleType: string | null;
+  importedAt: string | null;
+  stage: string | null;
+};
+
 export function ResearchTabClient({
   leadId,
   templates: initialTemplates,
   availableTemplates,
   overallFindings,
+  leadInfo,
 }: {
   leadId: string;
   templates: LeadResearchTemplate[];
   availableTemplates: AvailableTemplate[];
   overallFindings: string | null;
+  leadInfo: LeadInfo;
 }) {
   const [, startTransition] = useTransition();
   const [templates, setTemplates] =
@@ -230,6 +242,7 @@ export function ResearchTabClient({
               key={t.id}
               t={t}
               tIdx={tIdx}
+              leadInfo={leadInfo}
               openFindings={openFindings}
               setOpenFindings={setOpenFindings}
               onToggleDone={toggleDone}
@@ -350,9 +363,21 @@ export function ResearchTabClient({
   );
 }
 
+function formatUSDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function PlaybookTimeline({
   t,
   tIdx,
+  leadInfo,
   openFindings,
   setOpenFindings,
   onToggleDone,
@@ -363,6 +388,7 @@ function PlaybookTimeline({
 }: {
   t: LeadResearchTemplate;
   tIdx: number;
+  leadInfo: LeadInfo;
   openFindings: Set<string>;
   setOpenFindings: React.Dispatch<React.SetStateAction<Set<string>>>;
   onToggleDone: (tIdx: number, sIdx: number, lrtId: string) => void;
@@ -380,44 +406,104 @@ function PlaybookTimeline({
   const doneCount = t.steps.filter((s) => s.done).length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
   const nextIdx = t.steps.findIndex((s) => !s.done);
+  const stageCount = groups.length;
+  const subStepCount = groups.reduce(
+    (acc, g) => acc + (g.leaves.length > 1 || !g.leaves[0]?.isStandalone ? g.leaves.length : 0),
+    0
+  );
+
+  const ownerName = leadInfo.name ?? "Lead";
+  const initials = ownerName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase() || "LD";
+  const addressLine = [
+    leadInfo.address,
+    [leadInfo.city, leadInfo.state].filter(Boolean).join(", "),
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const subParts = [
+    addressLine,
+    leadInfo.saleType === "TAX"
+      ? "Tax Sale"
+      : leadInfo.saleType === "MTG"
+        ? "Mortgage Foreclosure"
+        : null,
+    leadInfo.importedAt
+      ? `Added ${formatUSDate(leadInfo.importedAt) ?? ""}`.trim()
+      : null,
+  ].filter(Boolean);
 
   return (
     <div className="ptl">
-      <div className="ptl__head">
+      <div className="ptl__lead">
+        <div className="ptl__avatar">{initials}</div>
+        <div className="ptl__meta">
+          <div className="ptl__lead-name">{ownerName}</div>
+          {subParts.length > 0 && (
+            <div className="ptl__lead-sub">
+              {subParts.map((p, i) => (
+                <span key={i}>
+                  {p}
+                  {i < subParts.length - 1 && (
+                    <span className="ptl__lead-sep"> · </span>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        {leadInfo.stage && (
+          <span className="ptl__lead-badge">{leadInfo.stage}</span>
+        )}
         <button
           type="button"
           onClick={onCollapseToggle}
-          className="ptl__head-toggle"
+          className="ptl__lead-chev"
+          aria-label={t.collapsed ? "Expand" : "Collapse"}
         >
           {t.collapsed ? (
             <IconChevronRight size={14} stroke={2.25} />
           ) : (
             <IconChevronDown size={14} stroke={2.25} />
           )}
-          <span className="ptl__head-name">{displayHeader(t.name)}</span>
         </button>
-        <span className="ptl__head-prog">
-          <strong>{doneCount}</strong> of {total}{" "}
-          {total === 1 ? "Step" : "Steps"} Done
-        </span>
-        {t.sourceTemplateId && (
-          <Link
-            href={`/playbooks/${t.sourceTemplateId}`}
-            className="ptl__head-link"
-            title="See every lead currently using this playbook"
-          >
-            View Board →
-          </Link>
-        )}
         <button
           type="button"
           onClick={onRemove}
-          className="ptl__head-x"
+          className="ptl__lead-x"
           aria-label="Remove template from lead"
           title="Remove from lead"
         >
           <IconX size={14} stroke={2.25} />
         </button>
+      </div>
+
+      <div className="ptl__top">
+        <div>
+          <div className="ptl__title">
+            Playbook <span className="ptl__title-sep">·</span>{" "}
+            {displayHeader(t.name)}
+          </div>
+          {t.sourceTemplateId && (
+            <Link
+              href={`/playbooks/${t.sourceTemplateId}`}
+              className="ptl__view"
+            >
+              View Board →
+            </Link>
+          )}
+        </div>
+        <span className="ptl__top-meta">
+          {stageCount} {stageCount === 1 ? "Stage" : "Stages"}
+          {subStepCount > 0
+            ? ` · ${subStepCount} Sub-${subStepCount === 1 ? "Step" : "Steps"}`
+            : ""}
+        </span>
       </div>
 
       {!t.collapsed && (
@@ -559,17 +645,26 @@ function PlaybookTimelineCss() {
   return (
     <style>{`
 .ptl { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,41,0.04), 0 1px 3px rgba(15,23,41,0.06); }
-.ptl__head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #e5e7eb; background: #fafbfc; }
-.ptl__head-toggle { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; background: transparent; border: 0; color: #0f1729; font-family: inherit; padding: 0; text-align: left; }
-.ptl__head-name { font-size: 14px; font-weight: 600; color: #0f1729; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ptl__head-prog { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; flex: none; }
-.ptl__head-prog strong { color: #0f1729; font-weight: 600; }
-.ptl__head-link { font-size: 11.5px; color: #0d4b3a; font-weight: 500; flex: none; }
-.ptl__head-link:hover { text-decoration: underline; }
-.ptl__head-x { flex: none; background: transparent; border: 0; color: #9ca3af; padding: 2px; border-radius: 4px; cursor: pointer; }
-.ptl__head-x:hover { background: #fff; color: #b91c1c; }
+.ptl__lead { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #e5e7eb; background: #fafbfc; border-radius: 10px 10px 0 0; }
+.ptl__avatar { width: 36px; height: 36px; border-radius: 50%; background: #0d4b3a; color: #fff; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: none; }
+.ptl__meta { flex: 1; min-width: 0; }
+.ptl__lead-name { font-size: 14px; font-weight: 600; color: #0f1729; }
+.ptl__lead-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
+.ptl__lead-sep { color: #d1d5db; padding: 0 4px; }
+.ptl__lead-badge { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid #e5e7eb; color: #374151; font-weight: 500; flex: none; }
+.ptl__lead-chev { flex: none; background: transparent; border: 0; color: #6b7280; padding: 4px; border-radius: 4px; cursor: pointer; }
+.ptl__lead-chev:hover { background: #fff; color: #0f1729; }
+.ptl__lead-x { flex: none; background: transparent; border: 0; color: #9ca3af; padding: 4px; border-radius: 4px; cursor: pointer; }
+.ptl__lead-x:hover { background: #fff; color: #b91c1c; }
 
-.ptl__body { padding: 22px 26px 24px; }
+.ptl__top { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 22px 0; gap: 12px; }
+.ptl__title { font-size: 16px; font-weight: 600; color: #0f1729; letter-spacing: -0.005em; }
+.ptl__title-sep { color: #9ca3af; padding: 0 4px; font-weight: 400; }
+.ptl__view { font-size: 11.5px; color: #0d4b3a; font-weight: 500; margin-top: 4px; display: inline-block; }
+.ptl__view:hover { text-decoration: underline; }
+.ptl__top-meta { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; }
+
+.ptl__body { padding: 18px 22px 22px; }
 .ptl__node { position: relative; padding-left: 32px; padding-bottom: 20px; }
 .ptl__node.is-last { padding-bottom: 0; }
 .ptl__trunk { position: absolute; left: 9px; top: 22px; bottom: -2px; width: 2px; background: #e5e7eb; }
