@@ -494,7 +494,7 @@ function Editor({
           <h3>Steps</h3>
           <span className="pe-blk__sub">Click A Step To Edit. Drag To Reorder.</span>
         </header>
-        <div className="pe-blk__body">
+        <div className="pe-blk__body pe-steps-grid">
           <div className="pe-steps">
             {steps.map((s, idx) => {
               const isOpen = openStepIdx === idx;
@@ -645,11 +645,77 @@ function Editor({
               + Add Step
             </button>
           </div>
+
+          <aside className="pe-preview">
+            <div className="pe-preview__head">
+              <div className="pe-preview__h">Live Preview</div>
+              <div className="pe-preview__sub">How This Step Looks On A Lead</div>
+            </div>
+            <div className="pe-preview__body">
+              <div className="pe-preview__lead">
+                <div className="pe-preview__av">RM</div>
+                <span>Roberta Mendes</span>
+              </div>
+              {openStepIdx !== null && steps[openStepIdx] ? (
+                <PreviewNode step={steps[openStepIdx]} />
+              ) : (
+                <div className="pe-preview__empty">
+                  Click a step on the left to preview it here.
+                </div>
+              )}
+              <div className="pe-preview__note">
+                Updates live as you type. Toggle off Sub-Steps to see the
+                single-step view.
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
 
       {savedFlash === "saved" && (
         <div className="pe-flash">Saved</div>
+      )}
+    </div>
+  );
+}
+
+function PreviewNode({ step }: { step: ResearchStep }) {
+  const hasChildren = (step.children ?? []).length > 0;
+  const stepName = step.name.trim() || "Step";
+  return (
+    <div className="pe-pv">
+      <div className="pe-pv__trunk" />
+      <div className="pe-pv__dot" />
+      <div className="pe-pv__name">{stepName}</div>
+      {hasChildren ? (
+        <>
+          <div className="pe-pv__progress">
+            0 of {step.children!.length} Done
+          </div>
+          <div className="pe-pv__branch">
+            {step.children!.map((c, i) => (
+              <div key={i} className="pe-pv__leaf">
+                <span className="pe-pv__ch" />
+                <span className="pe-pv__leaf-lbl">
+                  {c.name.trim() || `Sub ${i + 1}`}
+                  {c.instructions && (
+                    <span className="pe-pv__leaf-sub"> {c.instructions}</span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          {step.instructions && (
+            <div className="pe-pv__desc">{step.instructions}</div>
+          )}
+          <div className="pe-pv__leaf pe-pv__leaf--single">
+            <span className="pe-pv__ch" />
+            <span className="pe-pv__leaf-lbl">{stepName}</span>
+          </div>
+        </>
       )}
     </div>
   );
@@ -876,6 +942,32 @@ function PageCss() {
 
 .pe-flash { position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%); background: var(--pe-petrol); color: #fff; padding: 9px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(13,75,58,0.35); z-index: 200; animation: pe-flash-in 200ms ease-out; }
 @keyframes pe-flash-in { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+.pe-steps-grid { display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
+@media (max-width: 1000px) { .pe-steps-grid { grid-template-columns: 1fr; } }
+
+.pe-preview { position: sticky; top: 20px; background: var(--pe-card); border: 1px solid var(--pe-hairline); border-radius: 10px; overflow: hidden; }
+.pe-preview__head { padding: 12px 16px; border-bottom: 1px solid var(--pe-hairline); background: var(--pe-surface-muted); }
+.pe-preview__h { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pe-muted); font-weight: 600; }
+.pe-preview__sub { font-size: 11px; color: var(--pe-muted-2); margin-top: 2px; }
+.pe-preview__body { padding: 18px 18px 20px; }
+.pe-preview__lead { font-size: 11px; color: var(--pe-muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.pe-preview__av { width: 22px; height: 22px; border-radius: 50%; background: var(--pe-petrol); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; }
+.pe-preview__empty { font-size: 12px; color: var(--pe-muted); padding: 12px 0; }
+.pe-preview__note { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--pe-hairline); font-size: 11px; color: var(--pe-muted); line-height: 1.55; }
+
+.pe-pv { position: relative; padding-left: 26px; }
+.pe-pv__trunk { position: absolute; left: 7px; top: 16px; bottom: -2px; width: 2px; background: var(--pe-hairline); }
+.pe-pv__dot { position: absolute; left: 1px; top: 2px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--pe-hairline-2); background: var(--pe-card); }
+.pe-pv__name { font-size: 14px; font-weight: 600; color: var(--pe-ink); }
+.pe-pv__desc { font-size: 12px; color: var(--pe-muted); margin-top: 4px; line-height: 1.5; }
+.pe-pv__progress { font-size: 11px; color: var(--pe-muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.pe-pv__branch { margin-top: 10px; }
+.pe-pv__leaf { display: grid; grid-template-columns: 14px 1fr; gap: 8px; align-items: center; padding: 5px 0; }
+.pe-pv__leaf--single { margin-top: 10px; }
+.pe-pv__ch { width: 13px; height: 13px; border-radius: 4px; border: 1.5px solid var(--pe-hairline-2); background: var(--pe-card); }
+.pe-pv__leaf-lbl { font-size: 12px; color: var(--pe-ink); }
+.pe-pv__leaf-sub { color: var(--pe-muted); margin-left: 4px; font-size: 11px; }
     `}</style>
   );
 }
