@@ -10,6 +10,10 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Fixed
+- Fix ZZZZ4: Deleting a saved bank account in Settings now propagates to Lob. Previously `deleteMailBankAccount` only removed the local `mail_bank_accounts` row, leaving the Lob bank account record alive on the provider side. Repeated add / delete cycles accumulated orphan accounts in Lob (visible in the Lob event log), and each orphan continued sending its own microdeposit pair to the customer's bank, making reconciliation impossible. New `lobDeleteBankAccount(bnkId)` helper calls `DELETE /v1/bank_accounts/{id}`. The settings action looks up the row first, calls Lob (treating 404 as success so already-cleaned-up accounts don't block), and only deletes the local row if Lob succeeded. Stub IDs from the test harness (prefix `bnk_stub_`) skip the API call. (2026-05-28T09:00:00-05:00)
+
+
 ### Changed
 - Fix XXXX4: Lead-detail stage strip switches to a horizontally scrollable layout with the current stage auto-centered on mount. Current stage gets a larger ring + brand-color label so it reads instantly. Stages stay clickable for jump-to-stage. Works the same at 5 stages or 50, no auto-switching modes. Sets up custom stages (the next branch) to render correctly at any count without further work. (2026-05-27T18:00:00-05:00)
 
