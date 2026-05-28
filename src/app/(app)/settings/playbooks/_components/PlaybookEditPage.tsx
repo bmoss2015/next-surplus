@@ -1,20 +1,14 @@
 "use client";
 
-// Full-page playbook editor. Two blocks on one scrolling page:
-//   1. Playbook Settings: name, description, When To Apply (manual /
-//      all imported / leads matching states) with an inline state
-//      checkbox grid.
-//   2. Steps: accordion list. Click a step row to expand the inline
-//      editor with Step Name + Sub-Steps toggle. Toggle on swaps the
-//      Description input for a Name / Description sub-step table.
-//
-// Save lives in the standard SettingsSaveBar at bottom-right via
-// useSaveBarSection. Discard reverts to the row's last saved state.
+// Full-page playbook editor that ports the v5 design mockup verbatim.
+// CSS lives inline at the bottom of this file so the visual treatment
+// (card outlines, section strips, state picker dropdown, sub-step
+// table) matches the approved mockup exactly without fighting Tailwind
+// utility defaults.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { IconChevronRight, IconGripVertical, IconPlus, IconTrash } from "@tabler/icons-react";
 import {
   SettingsSaveProvider,
   useSaveBarSection,
@@ -40,6 +34,7 @@ export function PlaybookEditPage({
   return (
     <SettingsSaveProvider>
       <Editor row={row} canEdit={canEdit} />
+      <PageCss />
     </SettingsSaveProvider>
   );
 }
@@ -72,6 +67,8 @@ function Editor({
   const [openStepIdx, setOpenStepIdx] = useState<number | null>(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [stateFilter, setStateFilter] = useState("");
 
   const [savedSnap, setSavedSnap] = useState({
     name: row?.name ?? "",
@@ -80,6 +77,7 @@ function Editor({
     applyStates: row?.apply_states ?? [],
     steps: initialSteps,
   });
+  const [savedFlash, setSavedFlash] = useState<null | "saved">(null);
 
   const isDirty =
     name !== savedSnap.name ||
@@ -87,6 +85,17 @@ function Editor({
     applyMode !== savedSnap.applyMode ||
     !arrEq(applyStates, savedSnap.applyStates) ||
     JSON.stringify(steps) !== JSON.stringify(savedSnap.steps);
+
+  // Close the state picker when clicking outside.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onClick(e: MouseEvent) {
+      const target = e.target as Element | null;
+      if (!target?.closest("[data-state-picker]")) setPickerOpen(false);
+    }
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [pickerOpen]);
 
   const save = useCallback(async () => {
     if (!name.trim()) return { ok: false as const, error: "Name is required" };
@@ -116,13 +125,19 @@ function Editor({
       })),
     });
     if (!res.ok) return res;
+    const trimmedName = name.trim();
+    const trimmedDesc = description.trim();
+    setName(trimmedName);
+    setDescription(trimmedDesc);
     setSavedSnap({
-      name: name.trim(),
-      description: description.trim(),
+      name: trimmedName,
+      description: trimmedDesc,
       applyMode,
       applyStates: [...applyStates],
       steps: JSON.parse(JSON.stringify(steps)) as ResearchStep[],
     });
+    setSavedFlash("saved");
+    setTimeout(() => setSavedFlash(null), 2200);
     if (!row) {
       router.replace(`/settings/playbooks/${res.id}`);
     } else {
@@ -157,10 +172,7 @@ function Editor({
       prev.map((s, i) => {
         if (i !== idx) return s;
         const has = (s.children ?? []).length > 0;
-        return {
-          ...s,
-          children: has ? [] : [emptyStep()],
-        };
+        return { ...s, children: has ? [] : [emptyStep()] };
       })
     );
 
@@ -230,26 +242,77 @@ function Editor({
     [steps]
   );
 
+  const allStates = US_STATES.map((s) => s.code);
+  const totalStates = allStates.length;
+  const selectedCount = applyStates.length;
+  const filteredStates = stateFilter
+    ? US_STATES.filter(
+        (s) =>
+          s.code.toLowerCase().includes(stateFilter.toLowerCase()) ||
+          s.label.toLowerCase().includes(stateFilter.toLowerCase())
+      )
+    : US_STATES;
+
+  const summaryText = useMemo(() => {
+    if (selectedCount === 0) {
+      return (
+        <span>
+          <strong>No states selected.</strong> Pick at least one state for this
+          playbook to auto-apply.
+        </span>
+      );
+    }
+    if (selectedCount === totalStates) {
+      return (
+        <span>
+          Auto-applies to <strong>every new imported lead</strong>, with no
+          state filter.
+        </span>
+      );
+    }
+    if (selectedCount <= 6) {
+      const names = US_STATES.filter((s) => applyStates.includes(s.code)).map(
+        (s) => s.label
+      );
+      const joined =
+        names.length === 1
+          ? names[0]
+          : names.length === 2
+            ? names.join(" or ")
+            : names.slice(0, -1).join(", ") + ", or " + names.slice(-1);
+      return (
+        <span>
+          Auto-applies to new imported leads in <strong>{joined}</strong>.
+          Other leads will not get this playbook.
+        </span>
+      );
+    }
+    const excluded = US_STATES.filter(
+      (s) => !applyStates.includes(s.code)
+    ).map((s) => s.label);
+    return (
+      <span>
+        Auto-applies to new imported leads in{" "}
+        <strong>{selectedCount} states</strong>. Excluded: {excluded.join(", ")}
+        .
+      </span>
+    );
+  }, [applyStates, selectedCount, totalStates]);
+
   return (
-    <div className="mx-auto max-w-5xl px-7 py-6 pb-32">
-      <div className="text-[12px] text-gray-500 mb-2">
-        <Link href="/settings" className="hover:underline">
-          Settings
-        </Link>
-        <span className="mx-1.5 text-gray-300">/</span>
-        <Link href="/settings" className="hover:underline">
-          Playbooks
-        </Link>
-        <span className="mx-1.5 text-gray-300">/</span>
-        <span className="text-ink">{row?.name || "New Playbook"}</span>
+    <div className="pe-page">
+      <div className="pe-crumbs">
+        <Link href="/settings">Settings</Link>
+        <span className="pe-crumbs__sep">/</span>
+        <Link href="/settings">Playbooks</Link>
+        <span className="pe-crumbs__sep">/</span>
+        <span className="pe-crumbs__cur">{row?.name || "New Playbook"}</span>
       </div>
 
-      <div className="mb-5 flex items-end justify-between gap-4">
+      <div className="pe-head">
         <div>
-          <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-            {row ? "Edit Playbook" : "New Playbook"}
-          </h1>
-          <div className="mt-1 text-[13px] text-gray-500">
+          <h1 className="pe-h1">{row ? "Edit Playbook" : "New Playbook"}</h1>
+          <div className="pe-sub">
             {stepCount} {stepCount === 1 ? "Step" : "Steps"}
             {subCount > 0 ? `, ${subCount} Sub-Steps` : ""}
           </div>
@@ -259,7 +322,7 @@ function Editor({
             type="button"
             onClick={() => (confirmDelete ? onDelete() : setConfirmDelete(true))}
             disabled={pendingDelete}
-            className="cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-red-700 hover:bg-red-50 hover:border-red-200 disabled:opacity-50"
+            className="pe-danger-btn"
           >
             {pendingDelete
               ? "Deleting..."
@@ -270,288 +333,231 @@ function Editor({
         )}
       </div>
 
-      {/* === Block 1: Playbook Settings === */}
-      <section className="mb-5 rounded-lg border border-gray-200 bg-surface shadow-card">
-        <header className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-3">
-          <div>
-            <div className="text-[13px] font-semibold text-ink">
-              Playbook Settings
-            </div>
-            <div className="text-[11.5px] text-gray-500 mt-0.5">
-              Name, Description, And When To Apply
-            </div>
-          </div>
+      {/* ============ Block 1: Playbook Settings ============ */}
+      <section className="pe-blk">
+        <header className="pe-blk__head">
+          <h3>Playbook Settings</h3>
+          <span className="pe-blk__sub">Name, Description, And When To Apply</span>
         </header>
-        <div className="px-5 py-5">
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <Field label="Playbook Name">
+        <div className="pe-blk__body">
+          <div className="pe-row-2">
+            <PeField label="Playbook Name">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={!canEdit}
                 placeholder="Texas Tax Sale Research"
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] focus:border-petrol-500 focus:outline-none focus:ring-2 focus:ring-petrol-200"
+                className="pe-input"
               />
-            </Field>
-            <Field label="Short Description" hint="Optional">
+            </PeField>
+            <PeField label="Short Description" hint="Optional">
               <input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={!canEdit}
                 placeholder="Three calls, three texts, two letters, close"
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] focus:border-petrol-500 focus:outline-none focus:ring-2 focus:ring-petrol-200"
+                className="pe-input"
               />
-            </Field>
+            </PeField>
           </div>
 
-          <div className="mt-4">
-            <div className="text-[12px] font-semibold text-ink mb-1">
-              When To Apply
-            </div>
-            <div className="text-[11.5px] text-gray-500 mb-3">
-              Pick how this playbook attaches to imported leads. You can change
-              it any time.
-            </div>
-            <div className="space-y-2">
+          <PeField label="When To Apply" topPad>
+            <div className="pe-apply-list">
               {(
                 [
                   {
-                    v: "manual",
+                    v: "manual" as const,
                     title: "Manually Only",
-                    hint: "Reps add this playbook from the lead page.",
+                    hint: "Reps Add This Playbook From The Lead Page",
                   },
                   {
-                    v: "all",
+                    v: "all" as const,
                     title: "All Imported Leads",
-                    hint: "Every newly imported lead gets this playbook, no filters.",
+                    hint: "No Filters",
                   },
                   {
-                    v: "match",
-                    title: "Leads That Match States",
-                    hint: "Auto-apply when an imported lead's state is in the list below.",
+                    v: "match" as const,
+                    title: "Auto-Apply To Leads That Match States",
+                    hint: "Recommended",
                   },
-                ] as const
+                ]
               ).map((opt) => {
-                const isOn = applyMode === opt.v;
+                const on = applyMode === opt.v;
                 return (
-                  <label
+                  <div
                     key={opt.v}
+                    className={"pe-apply" + (on ? " is-on" : "")}
                     onClick={() => canEdit && setApplyMode(opt.v)}
-                    className={
-                      "block cursor-pointer rounded-md border-2 px-4 py-3 transition-colors " +
-                      (isOn
-                        ? "border-petrol-600 bg-white"
-                        : "border-gray-200 bg-white hover:border-gray-300")
-                    }
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={
-                          "h-4 w-4 rounded-full border-2 flex-none " +
-                          (isOn ? "border-petrol-600" : "border-gray-300")
-                        }
-                        style={{
-                          position: "relative",
-                        }}
-                      >
-                        {isOn && (
-                          <span
-                            className="absolute rounded-full bg-petrol-600"
-                            style={{
-                              left: 2,
-                              top: 2,
-                              width: 8,
-                              height: 8,
-                            }}
-                          />
-                        )}
-                      </span>
-                      <span className="text-[13px] font-semibold text-ink">
-                        {opt.title}
-                      </span>
-                      <span className="ml-auto text-[12px] text-gray-500">
-                        {opt.hint}
-                      </span>
+                    <div className="pe-apply__head">
+                      <span className="pe-apply__radio" />
+                      <span className="pe-apply__title">{opt.title}</span>
+                      <span className="pe-apply__hint">{opt.hint}</span>
                     </div>
-
-                    {isOn && opt.v === "match" && (
-                      <div className="mt-3 pl-7" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-3 mb-2 text-[11.5px]">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setApplyStates(US_STATES.map((s) => s.code))
-                            }
-                            className="cursor-pointer font-semibold text-petrol-700 hover:underline"
-                          >
-                            Select All
-                          </button>
-                          <span className="text-gray-300">·</span>
-                          <button
-                            type="button"
-                            onClick={() => setApplyStates([])}
-                            className="cursor-pointer font-semibold text-gray-500 hover:underline"
-                          >
-                            Clear All
-                          </button>
-                          <span className="ml-auto tabular-nums text-gray-500">
-                            {applyStates.length} of {US_STATES.length} selected
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1 rounded-md border border-gray-200 bg-gray-50 p-2 max-h-60 overflow-y-auto">
-                          {US_STATES.map((s) => {
-                            const on = applyStates.includes(s.code);
-                            return (
-                              <label
-                                key={s.code}
-                                onClick={() =>
-                                  setApplyStates((prev) =>
-                                    on
-                                      ? prev.filter((x) => x !== s.code)
-                                      : [...prev, s.code]
-                                  )
-                                }
-                                className={
-                                  "flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[12px] " +
-                                  (on ? "bg-petrol-50" : "hover:bg-white")
-                                }
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={on}
-                                  onChange={() => {}}
-                                  className="cursor-pointer"
-                                />
-                                <span className="tabular-nums font-semibold text-ink w-6">
-                                  {s.code}
-                                </span>
-                                <span className="truncate text-gray-600">
-                                  {s.label}
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                        {applyStates.length === 0 && (
-                          <div className="mt-2 text-[11.5px] text-red-700">
-                            Pick at least one state, or switch to All Imported Leads.
+                    {on && opt.v === "match" && (
+                      <div
+                        className="pe-apply__body"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <PeField label="States" hint="Pick One Or More">
+                          <div className="pe-picker" data-state-picker>
+                            <div
+                              className={
+                                "pe-picker__trigger" + (pickerOpen ? " is-open" : "")
+                              }
+                              onClick={() =>
+                                canEdit && setPickerOpen((v) => !v)
+                              }
+                            >
+                              <PickerTriggerBody
+                                applyStates={applyStates}
+                                totalStates={totalStates}
+                                setApplyStates={setApplyStates}
+                              />
+                            </div>
+                            {pickerOpen && (
+                              <div className="pe-picker__panel">
+                                <div className="pe-picker__search">
+                                  <span className="pe-picker__ic">🔍</span>
+                                  <input
+                                    autoFocus
+                                    value={stateFilter}
+                                    onChange={(e) =>
+                                      setStateFilter(e.target.value)
+                                    }
+                                    placeholder="Search states..."
+                                  />
+                                </div>
+                                <div className="pe-picker__actions">
+                                  <button
+                                    type="button"
+                                    className="pe-picker__action"
+                                    onClick={() => setApplyStates(allStates)}
+                                  >
+                                    Select All
+                                  </button>
+                                  <span className="pe-picker__count">
+                                    {selectedCount} of {totalStates} Selected
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="pe-picker__action pe-picker__action--muted"
+                                    onClick={() => setApplyStates([])}
+                                  >
+                                    Clear All
+                                  </button>
+                                </div>
+                                <div className="pe-picker__list">
+                                  {filteredStates.map((s) => {
+                                    const isOn = applyStates.includes(s.code);
+                                    return (
+                                      <div
+                                        key={s.code}
+                                        className={
+                                          "pe-picker__opt" + (isOn ? " is-on" : "")
+                                        }
+                                        onClick={() =>
+                                          setApplyStates((prev) =>
+                                            isOn
+                                              ? prev.filter((x) => x !== s.code)
+                                              : [...prev, s.code]
+                                          )
+                                        }
+                                      >
+                                        <span className="pe-picker__box" />
+                                        <span className="pe-picker__abbr">
+                                          {s.code}
+                                        </span>
+                                        <span className="pe-picker__full">
+                                          {s.label}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </PeField>
+                        <div className="pe-summary">{summaryText}</div>
                       </div>
                     )}
-                  </label>
+                  </div>
                 );
               })}
             </div>
-          </div>
+          </PeField>
         </div>
       </section>
 
-      {/* === Block 2: Steps === */}
-      <section className="mb-5 rounded-lg border border-gray-200 bg-surface shadow-card">
-        <header className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-3">
-          <div>
-            <div className="text-[13px] font-semibold text-ink">Steps</div>
-            <div className="text-[11.5px] text-gray-500 mt-0.5">
-              Click A Step To Edit. Drag To Reorder.
-            </div>
-          </div>
+      {/* ============ Block 2: Steps ============ */}
+      <section className="pe-blk">
+        <header className="pe-blk__head">
+          <h3>Steps</h3>
+          <span className="pe-blk__sub">Click A Step To Edit. Drag To Reorder.</span>
         </header>
-        <div className="px-5 py-4 space-y-1.5">
-          {steps.map((s, idx) => {
-            const isOpen = openStepIdx === idx;
-            const hasChildren = (s.children ?? []).length > 0;
-            const subStepLabel = hasChildren
-              ? `${s.children!.length} Sub-Steps`
-              : "Single Step";
-            return (
-              <div
-                key={idx}
-                className={
-                  "rounded-lg border bg-surface transition-colors " +
-                  (isOpen
-                    ? "border-petrol-500 ring-2 ring-petrol-100"
-                    : "border-gray-200 hover:border-gray-300")
-                }
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenStepIdx(isOpen ? null : idx)}
-                  className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+        <div className="pe-blk__body">
+          <div className="pe-steps">
+            {steps.map((s, idx) => {
+              const isOpen = openStepIdx === idx;
+              const hasChildren = (s.children ?? []).length > 0;
+              const subLabel = hasChildren
+                ? `${s.children!.length} Sub-Steps`
+                : "Single Step";
+              return (
+                <div
+                  key={idx}
+                  className={"pe-step" + (isOpen ? " is-open" : "")}
                 >
-                  <IconGripVertical
-                    size={14}
-                    className="flex-none text-gray-300"
-                  />
-                  <span className="flex-none text-[12px] tabular-nums font-medium text-gray-500">
-                    {idx + 1}
-                  </span>
-                  <span className="flex-1 truncate text-[13px] font-semibold text-ink">
-                    {s.name.trim() || `Step ${idx + 1}`}
-                  </span>
-                  <span className="flex-none rounded bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
-                    {subStepLabel}
-                  </span>
-                  <IconChevronRight
-                    size={14}
-                    className={
-                      "flex-none text-gray-400 transition-transform " +
-                      (isOpen ? "rotate-90 text-petrol-600" : "")
-                    }
-                  />
-                </button>
-
-                {isOpen && (
-                  <div className="border-t border-gray-200 px-4 pb-4 pt-3 pl-12">
-                    <Field label="Step Name">
-                      <input
-                        value={s.name}
-                        onChange={(e) =>
-                          setStep(idx, { name: e.target.value })
-                        }
-                        disabled={!canEdit}
-                        placeholder='e.g. "Send opening letter"'
-                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] focus:border-petrol-500 focus:outline-none focus:ring-2 focus:ring-petrol-200"
-                      />
-                    </Field>
-
-                    <label
-                      onClick={() => canEdit && toggleChildren(idx)}
-                      className="mt-3 flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5"
+                  <button
+                    type="button"
+                    onClick={() => setOpenStepIdx(isOpen ? null : idx)}
+                    className="pe-step__head"
+                  >
+                    <span className="pe-step__grip">⋮⋮</span>
+                    <span className="pe-step__num">{idx + 1}</span>
+                    <span className="pe-step__name">
+                      {s.name.trim() || `Step ${idx + 1}`}
+                    </span>
+                    <span className="pe-step__sub">{subLabel}</span>
+                    <span
+                      className={"pe-step__caret" + (isOpen ? " is-open" : "")}
                     >
-                      <span
-                        className="relative flex-none transition-colors"
-                        style={{
-                          width: 32,
-                          height: 20,
-                          borderRadius: 999,
-                          background: hasChildren ? "#0d4b3a" : "#cbd5e1",
-                        }}
-                      >
-                        <span
-                          className="absolute bg-white transition-all"
-                          style={{
-                            top: 2,
-                            left: hasChildren ? 14 : 2,
-                            width: 14,
-                            height: 14,
-                            borderRadius: "50%",
-                          }}
-                        />
-                      </span>
-                      <span className="text-[13px] font-semibold text-ink">
-                        {hasChildren
-                          ? "This Step Has Sub-Steps"
-                          : "This Step Doesn't Have Sub-Steps"}
-                      </span>
-                      <span className="ml-auto text-[11.5px] text-gray-500">
-                        For Repeating Actions Like Call 1, Call 2, Call 3
-                      </span>
-                    </label>
+                      ▶
+                    </span>
+                  </button>
 
-                    {!hasChildren && (
-                      <div className="mt-3">
-                        <Field label="Step Description" hint="Optional">
+                  {isOpen && (
+                    <div className="pe-step__body">
+                      <PeField label="Step Name">
+                        <input
+                          value={s.name}
+                          onChange={(e) =>
+                            setStep(idx, { name: e.target.value })
+                          }
+                          disabled={!canEdit}
+                          placeholder='e.g. "Send opening letter"'
+                          className="pe-input"
+                        />
+                      </PeField>
+
+                      <div
+                        className={"pe-toggle" + (hasChildren ? "" : " is-off")}
+                        onClick={() => canEdit && toggleChildren(idx)}
+                      >
+                        <span className="pe-toggle__tog" />
+                        <span className="pe-toggle__lbl">
+                          {hasChildren
+                            ? "This Step Has Sub-Steps"
+                            : "This Step Doesn't Have Sub-Steps"}
+                        </span>
+                        <span className="pe-toggle__helper">
+                          For Repeating Actions Like Call 1, Call 2, Call 3
+                        </span>
+                      </div>
+
+                      {!hasChildren && (
+                        <PeField label="Step Description" hint="Optional" topPad>
                           <textarea
                             value={s.instructions ?? ""}
                             onChange={(e) =>
@@ -561,125 +567,171 @@ function Editor({
                             }
                             disabled={!canEdit}
                             placeholder="What should the operator do at this step?"
-                            className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] resize-y min-h-[80px] focus:border-petrol-500 focus:outline-none focus:ring-2 focus:ring-petrol-200"
+                            className="pe-input pe-textarea"
                           />
-                        </Field>
-                      </div>
-                    )}
+                        </PeField>
+                      )}
 
-                    {hasChildren && (
-                      <div className="mt-3 overflow-hidden rounded-md border border-gray-200">
-                        <div className="grid grid-cols-[16px_28px_minmax(0,1.1fr)_minmax(0,1.4fr)_56px] gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wide text-gray-500">
-                          <span></span>
-                          <span>#</span>
-                          <span>Sub-Step Name</span>
-                          <span>Description</span>
-                          <span></span>
-                        </div>
-                        {(s.children ?? []).map((c, ci) => (
-                          <div
-                            key={ci}
-                            className="grid grid-cols-[16px_28px_minmax(0,1.1fr)_minmax(0,1.4fr)_56px] items-center gap-2 border-b border-gray-200 bg-white px-3 py-2 last:border-b-0"
-                          >
-                            <IconGripVertical
-                              size={12}
-                              className="text-gray-300"
-                            />
-                            <span className="text-[11px] tabular-nums text-gray-500">
-                              {idx + 1}.{ci + 1}
-                            </span>
-                            <input
-                              value={c.name}
-                              onChange={(e) =>
-                                setChild(idx, ci, { name: e.target.value })
-                              }
-                              disabled={!canEdit}
-                              placeholder="Name"
-                              className="w-full rounded border border-transparent bg-gray-50 px-2 py-1 text-[12.5px] hover:border-gray-200 hover:bg-white focus:border-petrol-500 focus:bg-white focus:outline-none"
-                            />
-                            <input
-                              value={c.instructions ?? ""}
-                              onChange={(e) =>
-                                setChild(idx, ci, {
-                                  instructions: e.target.value || null,
-                                })
-                              }
-                              disabled={!canEdit}
-                              placeholder="Optional"
-                              className="w-full rounded border border-transparent bg-gray-50 px-2 py-1 text-[12.5px] hover:border-gray-200 hover:bg-white focus:border-petrol-500 focus:bg-white focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeChild(idx, ci)}
-                              className="cursor-pointer rounded px-1.5 py-1 text-[11px] text-gray-500 hover:bg-gray-100 hover:text-red-700"
-                            >
-                              <IconTrash size={12} />
-                            </button>
+                      {hasChildren && (
+                        <div className="pe-sstable">
+                          <div className="pe-sstable__thead">
+                            <span />
+                            <span>#</span>
+                            <span>Sub-Step Name</span>
+                            <span>Description</span>
+                            <span />
                           </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => addChild(idx)}
-                          className="flex w-full cursor-pointer items-center justify-center gap-1.5 border-t border-gray-200 bg-gray-50 px-3 py-2 text-[12px] font-semibold text-petrol-700 hover:bg-white"
-                        >
-                          <IconPlus size={12} />
-                          Add Sub-Step
-                        </button>
-                      </div>
-                    )}
+                          {(s.children ?? []).map((c, ci) => (
+                            <div key={ci} className="pe-sstable__row">
+                              <span className="pe-sstable__grip">⋮⋮</span>
+                              <span className="pe-sstable__num">
+                                {idx + 1}.{ci + 1}
+                              </span>
+                              <input
+                                value={c.name}
+                                onChange={(e) =>
+                                  setChild(idx, ci, { name: e.target.value })
+                                }
+                                disabled={!canEdit}
+                                placeholder="Name"
+                                className="pe-sstable__input"
+                              />
+                              <input
+                                value={c.instructions ?? ""}
+                                onChange={(e) =>
+                                  setChild(idx, ci, {
+                                    instructions: e.target.value || null,
+                                  })
+                                }
+                                disabled={!canEdit}
+                                placeholder="Optional"
+                                className="pe-sstable__input"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeChild(idx, ci)}
+                                className="pe-sstable__del"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => addChild(idx)}
+                            className="pe-sstable__add"
+                          >
+                            + Add Sub-Step
+                          </button>
+                        </div>
+                      )}
 
-                    {steps.length > 1 && (
-                      <div className="mt-4 flex justify-end border-t border-gray-200 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => removeStep(idx)}
-                          className="cursor-pointer rounded text-[12px] font-medium text-gray-500 hover:text-red-700"
-                        >
-                          Remove Step
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      {steps.length > 1 && (
+                        <div className="pe-step__actions">
+                          <button
+                            type="button"
+                            onClick={() => removeStep(idx)}
+                            className="pe-step__remove"
+                          >
+                            Remove Step
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
-          <button
-            type="button"
-            onClick={addStep}
-            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-300 bg-white px-3 py-3 text-[13px] font-semibold text-gray-500 hover:border-petrol-500 hover:bg-gray-50 hover:text-petrol-700"
-          >
-            <IconPlus size={14} />
-            Add Step
-          </button>
+            <button type="button" onClick={addStep} className="pe-add-step">
+              + Add Step
+            </button>
+          </div>
         </div>
       </section>
+
+      {savedFlash === "saved" && (
+        <div className="pe-flash">Saved</div>
+      )}
     </div>
   );
 }
 
-function Field({
+function PeField({
   label,
   hint,
+  topPad,
   children,
 }: {
   label: string;
   hint?: string;
+  topPad?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 flex items-center text-[12px] font-semibold text-ink">
+    <label className={"pe-field" + (topPad ? " pe-field--toppad" : "")}>
+      <span className="pe-field__lbl">
         {label}
-        {hint && (
-          <span className="ml-1.5 text-[11px] font-normal text-gray-500">
-            {hint}
-          </span>
-        )}
+        {hint && <span className="pe-field__hint">{hint}</span>}
       </span>
       {children}
     </label>
+  );
+}
+
+function PickerTriggerBody({
+  applyStates,
+  totalStates,
+  setApplyStates,
+}: {
+  applyStates: string[];
+  totalStates: number;
+  setApplyStates: (next: string[]) => void;
+}) {
+  const count = applyStates.length;
+  if (count === totalStates) {
+    return (
+      <>
+        <span className="pe-picker__all">All States Selected</span>
+        <span className="pe-picker__caret">▼</span>
+      </>
+    );
+  }
+  if (count === 0) {
+    return (
+      <>
+        <span className="pe-picker__placeholder">No States Selected</span>
+        <span className="pe-picker__caret">▼</span>
+      </>
+    );
+  }
+  if (count <= 4) {
+    const labels = US_STATES.filter((s) => applyStates.includes(s.code));
+    return (
+      <>
+        {labels.map((s) => (
+          <span key={s.code} className="pe-picker__chip">
+            {s.label}
+            <span
+              className="pe-picker__chip-x"
+              onClick={(e) => {
+                e.stopPropagation();
+                setApplyStates(applyStates.filter((x) => x !== s.code));
+              }}
+            >
+              ×
+            </span>
+          </span>
+        ))}
+        <span className="pe-picker__caret">▼</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="pe-picker__chip">{count} States Selected</span>
+      <span className="pe-picker__caret">▼</span>
+    </>
   );
 }
 
@@ -688,4 +740,144 @@ function arrEq(a: string[], b: string[]) {
   const sa = [...a].sort();
   const sb = [...b].sort();
   return sa.every((v, i) => v === sb[i]);
+}
+
+function PageCss() {
+  return (
+    <style>{`
+:root {
+  --pe-bg: #f0f3f7;
+  --pe-card: #ffffff;
+  --pe-surface-muted: #fafbfc;
+  --pe-ink: #0f1729;
+  --pe-ink-2: #374151;
+  --pe-muted: #6b7280;
+  --pe-muted-2: #9ca3af;
+  --pe-hairline: #e5e7eb;
+  --pe-hairline-2: #d1d5db;
+  --pe-petrol: #0d4b3a;
+  --pe-petrol-hover: #13644e;
+  --pe-shadow-card: 0 1px 2px rgba(15,23,41,0.04), 0 1px 3px rgba(15,23,41,0.06);
+  --pe-shadow-pop: 0 8px 28px rgba(15,23,41,0.12);
+}
+.pe-page { max-width: 1180px; margin: 0 auto; padding: 32px 28px 140px; color: var(--pe-ink); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.pe-crumbs { color: var(--pe-muted); font-size: 13px; margin-bottom: 14px; }
+.pe-crumbs a { color: var(--pe-muted); text-decoration: none; }
+.pe-crumbs a:hover { text-decoration: underline; }
+.pe-crumbs__sep { color: var(--pe-hairline-2); padding: 0 8px; }
+.pe-crumbs__cur { color: var(--pe-ink); font-weight: 500; }
+.pe-head { display: flex; align-items: end; justify-content: space-between; margin-bottom: 22px; gap: 16px; }
+.pe-h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0; color: var(--pe-ink); }
+.pe-sub { margin-top: 4px; font-size: 13px; color: var(--pe-muted); }
+.pe-danger-btn { font-size: 12px; color: #b91c1c; border: 1px solid var(--pe-hairline); padding: 6px 12px; border-radius: 6px; background: var(--pe-card); cursor: pointer; font-weight: 500; }
+.pe-danger-btn:hover { background: #fff5f5; border-color: #fecaca; }
+
+.pe-blk { background: var(--pe-card); border: 1px solid var(--pe-hairline); border-radius: 10px; box-shadow: var(--pe-shadow-card); margin-bottom: 20px; }
+.pe-blk__head { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; border-bottom: 1px solid var(--pe-hairline); background: var(--pe-surface-muted); border-radius: 10px 10px 0 0; }
+.pe-blk__head h3 { font-size: 14px; font-weight: 600; margin: 0; color: var(--pe-ink); }
+.pe-blk__sub { font-size: 12px; color: var(--pe-muted); }
+.pe-blk__body { padding: 22px 24px; }
+
+.pe-field { display: block; margin-bottom: 0; }
+.pe-field--toppad { margin-top: 18px; }
+.pe-field__lbl { display: block; font-size: 12px; font-weight: 600; color: var(--pe-ink); margin-bottom: 6px; }
+.pe-field__hint { color: var(--pe-muted); font-weight: 400; margin-left: 6px; font-size: 11px; }
+.pe-input { width: 100%; padding: 10px 12px; font-size: 13px; border: 1px solid var(--pe-hairline); border-radius: 8px; background: var(--pe-card); color: var(--pe-ink); font-family: inherit; box-sizing: border-box; }
+.pe-input:focus { outline: 0; border-color: var(--pe-petrol); box-shadow: 0 0 0 3px rgba(13,75,58,0.15); }
+.pe-textarea { min-height: 80px; resize: vertical; line-height: 1.55; }
+.pe-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.pe-apply-list { display: flex; flex-direction: column; gap: 8px; }
+.pe-apply { padding: 14px 16px; border: 1.5px solid var(--pe-hairline); border-radius: 10px; cursor: pointer; transition: all .15s ease; background: var(--pe-card); }
+.pe-apply:hover { border-color: var(--pe-muted-2); }
+.pe-apply.is-on { border-color: var(--pe-petrol); }
+.pe-apply__head { display: flex; align-items: center; gap: 10px; }
+.pe-apply__radio { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--pe-hairline-2); flex: none; position: relative; }
+.pe-apply.is-on .pe-apply__radio { border-color: var(--pe-petrol); }
+.pe-apply.is-on .pe-apply__radio::after { content: ''; position: absolute; left: 3px; top: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--pe-petrol); }
+.pe-apply__title { font-size: 13px; font-weight: 600; }
+.pe-apply__hint { font-size: 12px; color: var(--pe-muted); margin-left: auto; }
+.pe-apply__body { padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--pe-hairline); }
+
+.pe-picker { position: relative; }
+.pe-picker__trigger { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 42px; padding: 7px 10px; border: 1px solid var(--pe-hairline); border-radius: 8px; background: var(--pe-card); cursor: pointer; }
+.pe-picker__trigger:hover { border-color: var(--pe-muted-2); }
+.pe-picker__trigger.is-open { border-color: var(--pe-petrol); box-shadow: 0 0 0 3px rgba(13,75,58,0.15); }
+.pe-picker__all { color: var(--pe-ink); font-weight: 500; font-size: 13px; }
+.pe-picker__placeholder { color: var(--pe-muted); font-size: 13px; }
+.pe-picker__caret { font-size: 10px; color: var(--pe-muted-2); margin-left: auto; }
+.pe-picker__chip { display: inline-flex; align-items: center; gap: 4px; background: var(--pe-surface-muted); border: 1px solid var(--pe-hairline); padding: 3px 4px 3px 10px; border-radius: 999px; font-size: 12px; color: var(--pe-ink-2); font-weight: 500; }
+.pe-picker__chip-x { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--pe-muted); font-size: 13px; cursor: pointer; }
+.pe-picker__chip-x:hover { background: var(--pe-hairline); color: var(--pe-ink); }
+
+.pe-picker__panel { position: absolute; top: calc(100% + 6px); left: 0; width: 460px; max-width: 100%; background: var(--pe-card); border: 1px solid var(--pe-hairline); border-radius: 10px; box-shadow: var(--pe-shadow-pop); z-index: 100; padding: 0; overflow: hidden; }
+.pe-picker__search { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--pe-hairline); }
+.pe-picker__search input { flex: 1; border: 0; outline: 0; padding: 4px 0; font-family: inherit; font-size: 13px; background: transparent; color: var(--pe-ink); }
+.pe-picker__ic { color: var(--pe-muted-2); font-size: 14px; }
+.pe-picker__actions { display: flex; align-items: center; justify-content: space-between; padding: 9px 16px; background: var(--pe-surface-muted); border-bottom: 1px solid var(--pe-hairline); font-size: 12px; }
+.pe-picker__action { background: transparent; border: 0; color: var(--pe-petrol); cursor: pointer; font-weight: 600; font-size: 12px; padding: 2px 0; }
+.pe-picker__action:hover { text-decoration: underline; }
+.pe-picker__action--muted { color: var(--pe-muted); }
+.pe-picker__count { color: var(--pe-muted); font-variant-numeric: tabular-nums; }
+.pe-picker__list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; }
+.pe-picker__opt { display: grid; grid-template-columns: 18px 36px 1fr; align-items: center; gap: 12px; padding: 9px 16px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--pe-hairline); }
+.pe-picker__opt:last-child { border-bottom: 0; }
+.pe-picker__opt:hover { background: var(--pe-surface-muted); }
+.pe-picker__box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--pe-hairline-2); background: var(--pe-card); position: relative; }
+.pe-picker__opt.is-on .pe-picker__box { background: var(--pe-petrol); border-color: var(--pe-petrol); }
+.pe-picker__opt.is-on .pe-picker__box::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.pe-picker__abbr { font-weight: 600; color: var(--pe-ink); font-variant-numeric: tabular-nums; }
+.pe-picker__full { color: var(--pe-muted); }
+.pe-picker__opt.is-on .pe-picker__full { color: var(--pe-ink-2); }
+
+.pe-summary { margin-top: 14px; padding: 12px 14px; background: var(--pe-surface-muted); border-left: 3px solid var(--pe-petrol); border-radius: 0 8px 8px 0; font-size: 13px; color: var(--pe-ink-2); line-height: 1.55; }
+.pe-summary strong { color: var(--pe-ink); font-weight: 600; }
+
+.pe-steps { display: flex; flex-direction: column; gap: 6px; }
+.pe-step { background: var(--pe-card); border: 1px solid var(--pe-hairline); border-radius: 10px; transition: border-color .12s ease; }
+.pe-step:hover { border-color: var(--pe-muted-2); }
+.pe-step.is-open { border-color: var(--pe-petrol); box-shadow: 0 0 0 3px rgba(13,75,58,0.06); }
+.pe-step__head { display: grid; grid-template-columns: 16px 24px 1fr auto auto; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; background: transparent; border: 0; width: 100%; text-align: left; font-family: inherit; }
+.pe-step__grip { color: var(--pe-muted-2); font-size: 14px; line-height: 1; cursor: grab; }
+.pe-step__num { font-size: 12px; color: var(--pe-muted); font-variant-numeric: tabular-nums; font-weight: 500; }
+.pe-step__name { font-size: 13px; font-weight: 600; color: var(--pe-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-step__sub { font-size: 11px; color: var(--pe-muted); background: var(--pe-surface-muted); padding: 3px 8px; border-radius: 4px; }
+.pe-step__caret { font-size: 11px; color: var(--pe-muted); transition: transform .15s ease; }
+.pe-step__caret.is-open { color: var(--pe-petrol); transform: rotate(90deg); }
+.pe-step__body { padding: 6px 14px 16px 50px; border-top: 1px solid var(--pe-hairline); }
+.pe-step__body .pe-field { margin-top: 14px; }
+.pe-step__actions { display: flex; justify-content: flex-end; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--pe-hairline); }
+.pe-step__remove { font-size: 12px; color: var(--pe-muted); cursor: pointer; padding: 4px 8px; border-radius: 4px; background: transparent; border: 0; font-family: inherit; }
+.pe-step__remove:hover { color: #b91c1c; }
+
+.pe-toggle { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--pe-surface-muted); border: 1px solid var(--pe-hairline); border-radius: 8px; cursor: pointer; margin: 14px 0 0; }
+.pe-toggle__tog { width: 32px; height: 20px; border-radius: 999px; background: var(--pe-petrol); position: relative; flex: none; transition: all .15s ease; }
+.pe-toggle__tog::after { content: ''; position: absolute; right: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: all .15s ease; }
+.pe-toggle.is-off .pe-toggle__tog { background: var(--pe-hairline-2); }
+.pe-toggle.is-off .pe-toggle__tog::after { right: 15px; }
+.pe-toggle__lbl { font-size: 13px; font-weight: 600; color: var(--pe-ink); }
+.pe-toggle__helper { font-size: 12px; color: var(--pe-muted); margin-left: auto; }
+
+.pe-sstable { margin-top: 14px; border: 1px solid var(--pe-hairline); border-radius: 10px; overflow: hidden; background: var(--pe-card); }
+.pe-sstable__thead { display: grid; grid-template-columns: 16px 28px 1.1fr 1.4fr 60px; gap: 10px; padding: 10px 14px; background: var(--pe-surface-muted); border-bottom: 1px solid var(--pe-hairline); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pe-muted); font-weight: 600; }
+.pe-sstable__row { display: grid; grid-template-columns: 16px 28px 1.1fr 1.4fr 60px; gap: 10px; padding: 10px 14px; align-items: center; border-bottom: 1px solid var(--pe-hairline); }
+.pe-sstable__row:hover { background: var(--pe-surface-muted); }
+.pe-sstable__row:last-of-type { border-bottom: 0; }
+.pe-sstable__grip { color: var(--pe-muted-2); font-size: 13px; line-height: 1; cursor: grab; text-align: center; }
+.pe-sstable__num { font-size: 11px; color: var(--pe-muted); font-variant-numeric: tabular-nums; text-align: center; }
+.pe-sstable__input { padding: 6px 8px; font-size: 13px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--pe-ink); font-family: inherit; width: 100%; box-sizing: border-box; }
+.pe-sstable__input:hover { background: var(--pe-surface-muted); }
+.pe-sstable__input:focus { outline: 0; background: var(--pe-card); border-color: var(--pe-petrol); box-shadow: 0 0 0 2px rgba(13,75,58,0.1); }
+.pe-sstable__del { font-size: 11px; color: var(--pe-muted); cursor: pointer; padding: 4px 8px; border-radius: 4px; text-align: center; background: transparent; border: 0; font-family: inherit; }
+.pe-sstable__del:hover { background: var(--pe-card); color: #b91c1c; }
+.pe-sstable__add { display: block; width: 100%; padding: 10px 14px; background: var(--pe-surface-muted); border: 0; border-top: 1px solid var(--pe-hairline); color: var(--pe-petrol); font-size: 12px; cursor: pointer; font-weight: 600; font-family: inherit; text-align: center; }
+.pe-sstable__add:hover { background: var(--pe-card); }
+
+.pe-add-step { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px; border: 1px dashed var(--pe-hairline-2); border-radius: 10px; color: var(--pe-muted); font-size: 13px; cursor: pointer; font-weight: 500; margin-top: 6px; background: transparent; font-family: inherit; }
+.pe-add-step:hover { color: var(--pe-petrol); border-color: var(--pe-petrol); background: var(--pe-surface-muted); }
+
+.pe-flash { position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%); background: var(--pe-petrol); color: #fff; padding: 9px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(13,75,58,0.35); z-index: 200; animation: pe-flash-in 200ms ease-out; }
+@keyframes pe-flash-in { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    `}</style>
+  );
 }
