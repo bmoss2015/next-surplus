@@ -478,7 +478,19 @@ function PlaybookTimeline({
 
   return (
     <div className="ptl">
-      <div className="ptl__lead">
+      <div
+        className="ptl__lead"
+        role="button"
+        tabIndex={0}
+        onClick={onCollapseToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onCollapseToggle();
+          }
+        }}
+        aria-expanded={!t.collapsed}
+      >
         <div className="ptl__avatar">{initials}</div>
         <div className="ptl__meta">
           <div className="ptl__lead-name">{ownerName}</div>
@@ -495,24 +507,28 @@ function PlaybookTimeline({
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onCollapseToggle}
-          className="ptl__lead-chev"
-          aria-label={t.collapsed ? "Expand" : "Collapse"}
-        >
+        <span className="ptl__collapse-pill" aria-hidden="true">
           {t.collapsed ? (
-            <IconChevronRight size={14} stroke={2.25} />
+            <>
+              <span>Show {total} {total === 1 ? "Step" : "Steps"}</span>
+              <IconChevronRight size={13} stroke={2.25} />
+            </>
           ) : (
-            <IconChevronDown size={14} stroke={2.25} />
+            <>
+              <span>Hide</span>
+              <IconChevronDown size={13} stroke={2.25} />
+            </>
           )}
-        </button>
+        </span>
         <button
           type="button"
-          onClick={onRemove}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
           className="ptl__lead-x"
-          aria-label="Remove template from lead"
-          title="Remove from lead"
+          aria-label="Remove playbook from lead"
+          title="Remove playbook from lead"
         >
           <IconX size={14} stroke={2.25} />
         </button>
@@ -693,15 +709,17 @@ function PlaybookTimelineCss() {
   return (
     <style>{`
 .ptl { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,41,0.04), 0 1px 3px rgba(15,23,41,0.06); }
-.ptl__lead { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #e5e7eb; background: #fafbfc; border-radius: 10px 10px 0 0; }
+.ptl__lead { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #e5e7eb; background: #fafbfc; border-radius: 10px 10px 0 0; cursor: pointer; transition: background 0.12s ease; outline: none; }
+.ptl__lead:hover { background: #f3f4f6; }
+.ptl__lead:focus-visible { box-shadow: inset 0 0 0 2px #0d4b3a; }
 .ptl__avatar { width: 36px; height: 36px; border-radius: 50%; background: #0d4b3a; color: #fff; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: none; }
 .ptl__meta { flex: 1; min-width: 0; }
 .ptl__lead-name { font-size: 14px; font-weight: 600; color: #0f1729; }
 .ptl__lead-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
 .ptl__lead-sep { color: #d1d5db; padding: 0 4px; }
 .ptl__lead-badge { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid #e5e7eb; color: #374151; font-weight: 500; flex: none; }
-.ptl__lead-chev { flex: none; background: transparent; border: 0; color: #6b7280; padding: 4px; border-radius: 4px; cursor: pointer; }
-.ptl__lead-chev:hover { background: #fff; color: #0f1729; }
+.ptl__collapse-pill { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: #fff; border: 1px solid #e5e7eb; color: #0f1729; font-size: 11.5px; font-weight: 600; }
+.ptl__lead:hover .ptl__collapse-pill { border-color: #0d4b3a; color: #0d4b3a; }
 .ptl__lead-x { flex: none; background: transparent; border: 0; color: #9ca3af; padding: 4px; border-radius: 4px; cursor: pointer; }
 .ptl__lead-x:hover { background: #fff; color: #b91c1c; }
 
