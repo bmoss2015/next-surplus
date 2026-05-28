@@ -735,9 +735,9 @@ function PlaybookTimelineCss() {
 .ptl__node.is-last { padding-bottom: 0; }
 .ptl__trunk { position: absolute; left: 9px; top: 22px; bottom: -2px; width: 2px; background: #e5e7eb; }
 .ptl__node.is-last .ptl__trunk { display: none; }
-.ptl__node.is-done .ptl__trunk { background: #0f1729; }
+.ptl__node.is-done .ptl__trunk { background: #0d4b3a; }
 .ptl__dot { position: absolute; left: 3px; top: 4px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #d1d5db; background: #fff; }
-.ptl__node.is-done .ptl__dot { background: #0f1729; border-color: #0f1729; }
+.ptl__node.is-done .ptl__dot { background: #0d4b3a; border-color: #0d4b3a; }
 .ptl__node.is-done .ptl__dot::after { content: ''; position: absolute; left: 2px; top: 0; width: 3px; height: 6px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
 
 .ptl__group-head { display: flex; align-items: baseline; gap: 10px; }
@@ -750,7 +750,7 @@ function PlaybookTimelineCss() {
 .ptl__leaf:hover { background: #fafbfc; }
 .ptl__check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #d1d5db; background: #fff; padding: 0; cursor: pointer; position: relative; }
 .ptl__leaf:hover .ptl__check { border-color: #0f1729; }
-.ptl__leaf.is-done .ptl__check { background: #0f1729; border-color: #0f1729; }
+.ptl__leaf.is-done .ptl__check { background: #0d4b3a; border-color: #0d4b3a; }
 .ptl__leaf.is-done .ptl__check::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .ptl__leaf.is-current .ptl__check { border-color: #0d4b3a; box-shadow: 0 0 0 3px rgba(13,75,58,0.15); }
 .ptl__leaf-body { display: flex; align-items: center; gap: 10px; background: transparent; border: 0; padding: 0; color: #0f1729; font-family: inherit; font-size: 13px; cursor: pointer; text-align: left; min-width: 0; }
@@ -776,7 +776,7 @@ function PlaybookTimelineCss() {
 .ptl__progress { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e5e7eb; display: flex; align-items: center; gap: 14px; }
 .ptl__progress-lbl { font-size: 12px; color: #6b7280; white-space: nowrap; }
 .ptl__progress-bar { flex: 1; height: 6px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
-.ptl__progress-fill { height: 100%; background: #0f1729; transition: width .25s ease; }
+.ptl__progress-fill { height: 100%; background: #0d4b3a; transition: width .25s ease; }
 .ptl__progress-stat { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ptl__progress-stat strong { color: #0f1729; font-weight: 600; }
     `}</style>

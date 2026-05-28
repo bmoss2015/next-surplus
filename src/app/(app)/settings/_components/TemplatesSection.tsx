@@ -8,7 +8,6 @@
 // SettingsSaveBar.
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import type {
   ResearchTemplateRow,
   TemplateRow,
@@ -18,27 +17,19 @@ import {
   type TemplateEditorState,
 } from "./TemplateEditorDrawer";
 
-type Tab = "email" | "sms" | "research";
+type Tab = "email" | "sms";
 
 export function TemplatesSection({
   templates,
-  research,
   canEdit,
 }: {
   templates: TemplateRow[];
   research: ResearchTemplateRow[];
   canEdit: boolean;
 }) {
-  const router = useRouter();
   const [tab, setTab] = useState<Tab>("email");
   const [editor, setEditor] = useState<TemplateEditorState>({ kind: "closed" });
-  const openCreate = () => {
-    if (tab === "research") {
-      router.push("/settings/playbooks/new");
-    } else {
-      setEditor({ kind: "new", channel: tab });
-    }
-  };
+  const openCreate = () => setEditor({ kind: "new", channel: tab });
 
   const email = useMemo(
     () => templates.filter((t) => t.channel.toLowerCase() === "email"),
@@ -52,17 +43,10 @@ export function TemplatesSection({
   const counts = {
     email: email.length,
     sms: sms.length,
-    research: research.length,
   };
 
-  const crumbLabel =
-    tab === "email" ? "Email" : tab === "sms" ? "SMS" : "Playbooks";
-  const addLabel =
-    tab === "email"
-      ? "Add Email Template"
-      : tab === "sms"
-        ? "Add SMS Template"
-        : "Add Playbook";
+  const crumbLabel = tab === "email" ? "Email" : "SMS";
+  const addLabel = tab === "email" ? "Add Email Template" : "Add SMS Template";
 
   return (
     <section id="panel-templates" className="panel active">
@@ -75,10 +59,10 @@ export function TemplatesSection({
       </div>
       <div className="page-head">
         <div>
-          <h1 className="section-h1">Templates</h1>
+          <h1 className="section-h1">Message Templates</h1>
           <p className="section-desc">
-            Reusable email bodies, SMS messages, and playbook checklists with
-            merge fields.
+            Reusable email bodies and SMS messages with merge fields.
+            Playbooks moved to their own section in the rail on the left.
           </p>
         </div>
         {canEdit && (
@@ -107,13 +91,6 @@ export function TemplatesSection({
         >
           SMS<span className="tpl-tab-count">{counts.sms}</span>
         </button>
-        <button
-          type="button"
-          className={"tpl-tab" + (tab === "research" ? " active" : "")}
-          onClick={() => setTab("research")}
-        >
-          Playbooks<span className="tpl-tab-count">{counts.research}</span>
-        </button>
       </div>
 
       {tab === "email" && (
@@ -126,12 +103,6 @@ export function TemplatesSection({
         <SmsList
           rows={sms}
           onEdit={canEdit ? (row) => setEditor({ kind: "edit-template", row }) : null}
-        />
-      )}
-      {tab === "research" && (
-        <ResearchList
-          rows={research}
-          onEdit={canEdit ? (row) => router.push(`/settings/playbooks/${row.id}`) : null}
         />
       )}
 

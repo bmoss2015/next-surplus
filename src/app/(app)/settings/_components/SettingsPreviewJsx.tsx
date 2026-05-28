@@ -27,6 +27,7 @@ import { MailBankAccountsSection } from "./MailBankAccountsSection";
 import { LobPricingSection } from "./LobPricingSection";
 import { CustomerPricingViewSection } from "./CustomerPricingViewSection";
 import { TemplatesSection } from "./TemplatesSection";
+import { PlaybooksSection } from "./PlaybooksSection";
 
 import type {
   AppSettings,
@@ -112,8 +113,8 @@ export function SettingsPreviewJsx({
     team: data.members.length,
     attorneys: data.attorneys.length,
     "mail-bank": data.mailBank.length,
-    templates:
-      data.templates.length + data.research.length,
+    templates: data.templates.length,
+    playbooks: data.research.length,
   };
 
   // Settings now sits inside AppShell, so the portal-wide IconSidebar
@@ -222,6 +223,13 @@ function renderPanel(
       return (
         <TemplatesSection
           templates={data.templates}
+          research={data.research}
+          canEdit={currentUser.isAdmin}
+        />
+      );
+    case "playbooks":
+      return (
+        <PlaybooksSection
           research={data.research}
           canEdit={currentUser.isAdmin}
         />
