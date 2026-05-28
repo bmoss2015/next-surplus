@@ -193,7 +193,7 @@ export function GlobalSearch() {
             <div className="px-4 py-6 text-center text-[12.5px] text-gray-400">Searching…</div>
           ) : results.length === 0 ? (
             <div className="px-4 py-6 text-center text-[12.5px] text-gray-400">
-              No matches for <span className="font-mono text-ink">&ldquo;{q}&rdquo;</span>
+              No matches for <span className="font-medium text-ink">&ldquo;{q}&rdquo;</span>
             </div>
           ) : (
             <div className="max-h-[420px] overflow-y-auto py-1">

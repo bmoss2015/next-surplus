@@ -93,7 +93,7 @@ function Section({
                   href={`/leads/${lead.id}`}
                   className="grid grid-cols-[120px_1fr_140px_150px_120px] items-center gap-[14px] px-[18px] py-[13px] pr-[44px]"
                 >
-                  <span className="truncate font-mono text-[11px] text-gray-500">
+                  <span className="truncate text-[11px] tabular-nums text-gray-500">
                     {lead.lead_id}
                   </span>
                   <div className="min-w-0">
