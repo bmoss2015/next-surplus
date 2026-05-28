@@ -225,12 +225,20 @@ export function ResearchTabClient({
     confirmRemoveIdx != null ? templates[confirmRemoveIdx]?.name ?? "" : "";
 
   return (
-    <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
+    <div className="mx-auto max-w-[920px] rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
-          Playbooks
-        </h3>
-        {addButton}
+        <div className="flex items-baseline gap-3">
+          <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
+            Playbooks
+          </h3>
+          <Link
+            href="/playbooks"
+            className="text-[11px] font-medium text-gray-500 hover:text-petrol-700 hover:underline"
+          >
+            See All Playbooks →
+          </Link>
+        </div>
+        {templates.length > 0 && addButton}
       </div>
 
       {templates.length === 0 ? (
@@ -268,18 +276,23 @@ export function ResearchTabClient({
         </div>
       )}
 
-      <div className="mt-5 rounded-xl border border-gray-200 bg-[#f8fafc] p-4">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
-            Overall Findings
-          </span>
+      <div className="mt-5 overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-card">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
+          <div>
+            <div className="text-[13px] font-semibold text-ink">
+              Lead Summary
+            </div>
+            <div className="mt-0.5 text-[11.5px] text-gray-500">
+              One paragraph the team can scan instead of every step note.
+            </div>
+          </div>
           <button
             type="button"
             onClick={commitOverall}
             disabled={!overallDirty}
             className="btn-primary cursor-pointer rounded-md px-3 py-[5px] text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Save Findings
+            Save Summary
           </button>
         </div>
         <textarea
@@ -287,8 +300,8 @@ export function ResearchTabClient({
           onChange={(e) => setOverall(e.target.value)}
           onBlur={commitOverall}
           rows={4}
-          placeholder="Summarize your research findings here. Saved findings are also posted as a note on this lead."
-          className="w-full resize-y rounded-md border border-gray-200 bg-surface px-3 py-2 text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+          placeholder="Write the big picture on this lead. Who is the owner, what's the situation, where are you in the play. Saves on blur. Step notes from above are separate."
+          className="w-full resize-y border-0 bg-surface px-4 py-3 text-[13px] text-ink outline-none placeholder:text-gray-400"
         />
       </div>
 
@@ -473,7 +486,7 @@ function PlaybookTimeline({
           )}
         </div>
         {leadInfo.stage && (
-          <span className="ptl__lead-badge">{leadInfo.stage}</span>
+          <span className="ptl__lead-badge">Stage: {leadInfo.stage}</span>
         )}
         <button
           type="button"
@@ -509,7 +522,7 @@ function PlaybookTimeline({
               href={`/playbooks/${t.sourceTemplateId}`}
               className="ptl__view"
             >
-              View Board →
+              See Other Leads on This Playbook →
             </Link>
           )}
         </div>
@@ -552,7 +565,11 @@ function PlaybookTimeline({
                     const isCurrent = leaf.idx === nextIdx;
                     const key = `${tIdx}:${leaf.idx}`;
                     const hasFindings = (step.findings ?? "").trim() !== "";
-                    const detailOpen = hasFindings || openFindings.has(key);
+                    // Detail panel: hasFindings is the default state, but the
+                    // user's last click wins. Without this, leaves with notes
+                    // can't be collapsed.
+                    const userToggled = openFindings.has(key);
+                    const detailOpen = userToggled ? !hasFindings : hasFindings;
                     const labelText =
                       leaf.isStandalone && g.leaves.length === 1
                         ? g.parent
@@ -691,7 +708,7 @@ function PlaybookTimelineCss() {
 .ptl__top { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 22px 0; gap: 12px; }
 .ptl__title { font-size: 16px; font-weight: 600; color: #0f1729; letter-spacing: -0.005em; }
 .ptl__title-sep { color: #9ca3af; padding: 0 4px; font-weight: 400; }
-.ptl__view { font-size: 11.5px; color: #0d4b3a; font-weight: 500; margin-top: 4px; display: inline-block; }
+.ptl__view { font-size: 11.5px; color: #0d4b3a; font-weight: 500; margin-top: 6px; margin-bottom: 14px; display: inline-block; }
 .ptl__view:hover { text-decoration: underline; }
 .ptl__top-meta { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; }
 
