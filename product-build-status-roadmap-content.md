@@ -106,6 +106,7 @@ Planned workstreams for October through December 2026. Moat and automation.
 - Public claim status portal (read-only share link the operator sends to the property owner so they can see claim filed date, court date, expected disbursement). Reduces "is this real" calls and converts skeptical leads.
 - Voicemail transcription (missed inbound calls become readable text in the per-lead conversation thread).
 - Multi-state expansion (research agents inside the platform for SC, TN, PA, GA, plus per-state fee structures and per-state filing checklists driven by the existing playbook system).
+- Certified mail via Lob (requires Lob plan upgrade to unlock the certified mail API tier; gives operators a trackable, signature-required option for time-sensitive owner notifications alongside the existing first-class mail flow).
 
 ---
 
