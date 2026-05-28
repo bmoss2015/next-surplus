@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
+  IconCheck,
   IconExternalLink,
   IconChevronDown,
   IconChevronRight,
@@ -599,7 +600,11 @@ function PlaybookTimeline({
                 }
               >
                 <div className="ptl__trunk" />
-                <div className="ptl__dot" />
+                <div className="ptl__dot">
+                  {groupDone && (
+                    <IconCheck size={9} stroke={3.25} color="#fff" />
+                  )}
+                </div>
                 {isStandaloneOne ? null : (
                   <div className="ptl__group-head">
                     <span className="ptl__group-name">{g.parent}</span>
@@ -617,7 +622,7 @@ function PlaybookTimeline({
                   >
                     Show {g.leaves.length}{" "}
                     {g.leaves.length === 1 ? "Step" : "Sub-Steps"}
-                    <IconChevronRight size={11} stroke={2.25} />
+                    <IconChevronRight size={13} stroke={2.25} />
                   </button>
                 )}
                 {canAutoCollapse && expanded && (
@@ -627,7 +632,7 @@ function PlaybookTimeline({
                     className="ptl__group-show"
                   >
                     Hide
-                    <IconChevronDown size={11} stroke={2.25} />
+                    <IconChevronDown size={13} stroke={2.25} />
                   </button>
                 )}
                 <div
@@ -659,7 +664,15 @@ function PlaybookTimeline({
                             onClick={() => onToggleDone(tIdx, leaf.idx, t.id)}
                             className="ptl__check"
                             aria-label={step.done ? "Mark not done" : "Mark done"}
-                          />
+                          >
+                            {step.done && (
+                              <IconCheck
+                                size={11}
+                                stroke={3.25}
+                                color="#fff"
+                              />
+                            )}
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
@@ -787,25 +800,25 @@ function PlaybookTimelineCss() {
 .ptl__trunk { position: absolute; left: 9px; top: 22px; bottom: -2px; width: 2px; background: #e5e7eb; }
 .ptl__node.is-last .ptl__trunk { display: none; }
 .ptl__node.is-done .ptl__trunk { background: #0d4b3a; }
-.ptl__dot { position: absolute; left: 3px; top: 4px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #d1d5db; background: #fff; }
+.ptl__dot { position: absolute; left: 3px; top: 4px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #d1d5db; background: #fff; display: flex; align-items: center; justify-content: center; }
 .ptl__node.is-done .ptl__dot { background: #0d4b3a; border-color: #0d4b3a; }
-.ptl__node.is-done .ptl__dot::after { content: ''; position: absolute; left: 3px; top: 1px; width: 3px; height: 6px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.ptl__node.is-done .ptl__dot svg { display: block; }
 
 .ptl__group-head { display: flex; align-items: baseline; gap: 10px; }
 .ptl__group-name { font-size: 14px; font-weight: 600; color: #0f1729; letter-spacing: -0.005em; }
 .ptl__group-prog { font-size: 11.5px; color: #6b7280; margin-left: auto; font-variant-numeric: tabular-nums; }
 .ptl__group-prog strong { color: #0f1729; font-weight: 600; }
 .ptl__branch { margin-top: 6px; display: flex; flex-direction: column; }
-.ptl__group-show { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 4px 0; background: transparent; border: 0; color: #6b7280; font-size: 11.5px; font-weight: 500; cursor: pointer; font-family: inherit; line-height: 1; }
+.ptl__group-show { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 4px 0; background: transparent; border: 0; color: #6b7280; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; line-height: 1; }
 .ptl__group-show:hover { color: #0d4b3a; }
 .ptl__group-show svg { display: block; }
 
 .ptl__leaf { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; transition: background .12s ease; }
 .ptl__leaf:hover { background: #fafbfc; }
-.ptl__check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #d1d5db; background: #fff; padding: 0; cursor: pointer; position: relative; }
+.ptl__check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #d1d5db; background: #fff; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .ptl__leaf:hover .ptl__check { border-color: #0f1729; }
 .ptl__leaf.is-done .ptl__check { background: #0d4b3a; border-color: #0d4b3a; }
-.ptl__leaf.is-done .ptl__check::after { content: ''; position: absolute; left: 5px; top: 2px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.ptl__leaf.is-done .ptl__check svg { display: block; }
 .ptl__leaf.is-current .ptl__check { border-color: #0d4b3a; box-shadow: 0 0 0 3px rgba(13,75,58,0.15); }
 .ptl__leaf-body { display: flex; align-items: center; gap: 10px; background: transparent; border: 0; padding: 0; color: #0f1729; font-family: inherit; font-size: 13px; cursor: pointer; text-align: left; min-width: 0; }
 .ptl__leaf-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -829,7 +842,7 @@ function PlaybookTimelineCss() {
 
 .ptl__progress { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e5e7eb; display: flex; align-items: center; gap: 14px; }
 .ptl__progress-lbl { font-size: 12px; color: #6b7280; white-space: nowrap; }
-.ptl__progress-bar { flex: 1; height: 6px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
+.ptl__progress-bar { flex: 1; height: 9px; background: #f3f4f6; border-radius: 999px; overflow: hidden; }
 .ptl__progress-fill { height: 100%; background: #0d4b3a; transition: width .25s ease; }
 .ptl__progress-stat { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ptl__progress-stat strong { color: #0f1729; font-weight: 600; }
