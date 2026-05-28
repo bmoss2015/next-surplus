@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { fetchDashboard } from "@/lib/leads/fetch-dashboard";
-import { STAGES, STAGE_LABELS } from "@/lib/leads/types";
 import { formatCurrency } from "@/lib/leads/format";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +20,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="px-7 py-6">
-      {/* Title — date is a quiet overline so the eye lands on "Dashboard"
-          first. The active-leads count lives in the metric row, so no need
-          to repeat it inline here. */}
       <div className="mb-[26px]">
         <div className="text-[11px] font-medium uppercase tracking-[0.6px] text-petrol-500">
           {today}
@@ -33,30 +29,26 @@ export default async function DashboardPage() {
         </h1>
       </div>
 
-      {/* Metric row */}
       <div className="mb-[22px] grid grid-cols-4 overflow-hidden rounded-lg border border-gray-200 bg-surface">
         <Metric
           label="Pipeline Value"
           value={formatCurrency(data.pipelineValue)}
-          context="Estimated Surplus, Active Leads"
-          trend={
-            data.newThisWeekCount > 0
-              ? { kind: "success", text: `+${data.newThisWeekCount} New This Week` }
-              : { kind: "muted", text: "No New Leads This Week" }
-          }
+          context={`${data.activeLeadsCount} Active Leads`}
         />
         <Metric
-          label="Active Claims"
-          value={String(data.activeClaimsCount)}
-          context={`${formatCurrency(data.activeClaimsAmount)} Filed At Counties`}
-          trend={{ kind: "muted", text: "All On Track" }}
+          label="Won (30 Days)"
+          value={String(data.wonLast30Count)}
+          context={`${formatCurrency(data.wonLast30Amount)} Recovered`}
           divider
         />
         <Metric
-          label="Active Conversations"
-          value={String(data.activeConversationsCount)}
-          context="Leads In Conversation"
-          trend={{ kind: "info", text: "Live" }}
+          label="Win Rate"
+          value={
+            data.conversionRate == null
+              ? "—"
+              : `${Math.round(data.conversionRate * 100)}%`
+          }
+          context="Of Closed Leads, Last 30 Days"
           divider
         />
         <Link href="/tasks?filter=overdue" className="block">
@@ -64,56 +56,13 @@ export default async function DashboardPage() {
             label="Overdue Tasks"
             value={String(data.overdueTasksCount)}
             context="Past Due, Not Completed"
-            trend={
-              data.overdueTasksCount > 0
-                ? { kind: "alert", text: "Action Required" }
-                : { kind: "success", text: "All Caught Up" }
-            }
             divider
           />
         </Link>
       </div>
 
-      {/* Stages strip — count duplicated the metric row, so the sub-line
-          now just gives the section its purpose ("by stage"). */}
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="section-subheader">Lead Stages</h2>
-        <Link
-          href="/leads"
-          className="text-[12px] text-ink underline decoration-gray-300 underline-offset-[3px] hover:decoration-petrol-500"
-        >View All Leads</Link>
-      </div>
-      <div className="mb-[26px] grid grid-cols-9 gap-2">
-        {STAGES.map((stage) => {
-          const numColor =
-            stage === "won"
-              ? "text-success"
-              : stage === "lost"
-                ? "text-gray-500"
-                : "text-petrol-700";
-          return (
-            <Link
-              key={stage}
-              href={`/leads?stage=${stage}`}
-              className="rounded-lg border border-gray-200 bg-white p-4 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:-translate-y-[1px] hover:border-petrol-300 hover:shadow-[0_4px_14px_rgba(13,75,58,0.10)]"
-            >
-              <div className={`text-[28px] font-semibold leading-none tracking-tight ${numColor}`}>
-                {data.stagesCounts[stage]}
-              </div>
-              <div className="mt-2 text-[12px] font-medium text-gray-500">
-                {STAGE_LABELS[stage]}
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Split row: Leads Needing Action + Markets/Deadlines */}
       <div className="grid grid-cols-[1.5fr_1fr] gap-[22px]">
         <div>
-          {/* Leads Needing Action — the primary daily work surface. Thin
-              emerald accent strip up top quietly anoints it without going
-              full dark hero. */}
           <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-card">
             <div
               aria-hidden
@@ -125,9 +74,7 @@ export default async function DashboardPage() {
             />
             <div className="flex items-center justify-between border-b border-gray-200 px-[18px] py-[14px]">
               <div>
-                <h2 className="section-subheader">
-                  Leads Needing Action
-                </h2>
+                <h2 className="section-subheader">Leads Needing Action</h2>
                 <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
                   Sorted By Surplus Value
                 </div>
@@ -161,8 +108,8 @@ export default async function DashboardPage() {
                       {lead.primary_owner} · {lead.city}, {lead.state}
                     </div>
                   </div>
-                  <span className="w-[80px] shrink-0 text-[11px] text-gray-500">
-                    {STAGE_LABELS[lead.stage]}
+                  <span className="w-[100px] shrink-0 truncate text-[11px] text-gray-500">
+                    {lead.stageName}
                   </span>
                   <div className="w-[100px] shrink-0 text-right">
                     <div className="text-[13px] font-medium text-ink">
@@ -180,9 +127,7 @@ export default async function DashboardPage() {
 
         <div>
           <div className="mb-[10px]">
-            <h2 className="section-subheader">
-              Active Markets
-            </h2>
+            <h2 className="section-subheader">Active Markets</h2>
             <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
               Pipeline By State
             </div>
@@ -208,8 +153,8 @@ export default async function DashboardPage() {
                     />
                   </div>
                   <div className="mt-1 text-[11px] text-gray-500">
-                    {formatCurrency(m.pipeline)} Pipeline · {m.inConversation} In
-                    Conversation
+                    {formatCurrency(m.pipeline)} Pipeline · {m.inProgress} In
+                    Progress
                   </div>
                 </div>
               ))
@@ -217,9 +162,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="mb-[10px] flex items-baseline justify-between">
-            <h2 className="section-subheader">
-              Upcoming Deadlines
-            </h2>
+            <h2 className="section-subheader">Upcoming Deadlines</h2>
             <Link
               href="/leads"
               className="text-[12px] text-ink underline decoration-gray-300 underline-offset-[3px] hover:decoration-petrol-500"
@@ -279,23 +222,13 @@ function Metric({
   label,
   value,
   context,
-  trend,
   divider,
 }: {
   label: string;
   value: string;
   context: string;
-  trend: { kind: "success" | "muted" | "alert" | "info"; text: string };
   divider?: boolean;
 }) {
-  const trendColor =
-    trend.kind === "success"
-      ? "text-success"
-      : trend.kind === "alert"
-        ? "text-danger"
-        : trend.kind === "info"
-          ? "text-petrol-500"
-          : "text-gray-500";
   return (
     <div className={`p-[18px] px-[22px] ${divider ? "border-l border-gray-200" : ""}`}>
       <div className="mb-2 text-[11px] tracking-[0.4px] text-gray-500">
@@ -305,9 +238,6 @@ function Metric({
         {value}
       </div>
       <div className="mt-1 text-[12px] text-gray-500">{context}</div>
-      <div className={`mt-[10px] text-[11px] font-medium ${trendColor}`}>
-        {trend.text}
-      </div>
     </div>
   );
 }

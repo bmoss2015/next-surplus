@@ -42,26 +42,78 @@ async function currentUserId(): Promise<string | null> {
   return profile?.id ?? null;
 }
 
-// Validates and applies a stage transition. The DB triggers handle the activity
-// log entry and stamp `stage_changed_at`.
+const ENUM_NAME_MAP: Record<string, Stage> = {
+  "New Leads": "new_leads",
+  Qualifying: "qualifying",
+  Outreach: "outreach",
+  "In Conversation": "in_conversation",
+  Contract: "contract",
+  "With Attorney": "with_attorney",
+  "Claim Filed": "claim_filed",
+  Won: "won",
+  Lost: "lost",
+};
+
+const STAGE_LABEL_FROM_ENUM: Record<string, string> = {
+  new_leads: "New Leads",
+  qualifying: "Qualifying",
+  outreach: "Outreach",
+  in_conversation: "In Conversation",
+  contract: "Contract",
+  with_attorney: "With Attorney",
+  claim_filed: "Claim Filed",
+  won: "Won",
+  lost: "Lost",
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function advanceStage(
   leadId: string,
-  toStage: Stage,
+  toStageIdOrEnum: string,
   options?: { lostReason?: string }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!STAGES.includes(toStage)) {
-    return { ok: false, error: "Invalid stage" };
-  }
+  const sb = await createClient();
 
-  const update: Record<string, unknown> = { stage: toStage };
-  if (toStage === "lost") {
+  let target: { id: string; name: string; kind: string } | null;
+  if (UUID_RE.test(toStageIdOrEnum)) {
+    const { data } = await sb
+      .from("org_stages")
+      .select("id, name, kind")
+      .eq("id", toStageIdOrEnum)
+      .maybeSingle();
+    target = (data as { id: string; name: string; kind: string } | null) ?? null;
+  } else {
+    const label = STAGE_LABEL_FROM_ENUM[toStageIdOrEnum];
+    if (!label) return { ok: false, error: "Invalid stage" };
+    const { data } = await sb
+      .from("org_stages")
+      .select("id, name, kind")
+      .eq("name", label)
+      .maybeSingle();
+    target = (data as { id: string; name: string; kind: string } | null) ?? null;
+  }
+  if (!target) return { ok: false, error: "Invalid stage" };
+  const toStageId = target.id;
+
+  const update: Record<string, unknown> = { stage_id: toStageId };
+
+  if (target.kind === "lost") {
     if (!options?.lostReason || options.lostReason.trim().length === 0) {
       return { ok: false, error: "Lost reason is required when marking lost" };
     }
     update.lost_reason = options.lostReason.trim();
   }
 
-  const sb = await createClient();
+  const mapped = ENUM_NAME_MAP[target.name as string];
+  if (mapped) {
+    update.stage = mapped;
+  } else if (target.kind === "won") {
+    update.stage = "won";
+  } else if (target.kind === "lost") {
+    update.stage = "lost";
+  }
+
   const { error } = await sb.from("leads").update(update).eq("id", leadId);
   if (error) return { ok: false, error: error.message };
 

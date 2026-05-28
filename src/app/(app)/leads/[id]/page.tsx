@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { fetchLeadDetail } from "@/lib/leads/fetch-detail";
 import { fetchLostReasons } from "@/lib/leads/lost-reasons";
+import { fetchOrgStages } from "@/lib/stages/fetch";
 import { createClient } from "@/lib/supabase/server";
 import { listTeamMembers } from "./_discussion-actions";
 import { AssignToField } from "./_components/AssignToField";
@@ -52,8 +53,6 @@ export default async function LeadDetailPage({
   const { id } = await params;
   const sp = await searchParams;
   const rawTab = typeof sp.tab === "string" ? sp.tab : undefined;
-  // Notify-mention links and the bell historically pointed at ?tab=discussion;
-  // the Notes tab took that experience over, so any legacy URL lands on Notes.
   const normalizedTab = rawTab === "discussion" ? "notes" : rawTab;
   const activeTab: TabKey =
     normalizedTab && VALID_TABS.includes(normalizedTab as TabKey)
@@ -61,7 +60,7 @@ export default async function LeadDetailPage({
       : "overview";
 
   const sb = await createClient();
-  const [lead, lostReasons, teamMembers, openTaskRes, convUnreadRes] =
+  const [lead, lostReasons, teamMembers, openTaskRes, convUnreadRes, orgStages] =
     await Promise.all([
       fetchLeadDetail(id),
       fetchLostReasons(),
@@ -75,6 +74,7 @@ export default async function LeadDetailPage({
         .from("conversations")
         .select("unread_count")
         .eq("lead_id", id),
+      fetchOrgStages(),
     ]);
   if (!lead) notFound();
   const openTaskCount = openTaskRes.count ?? 0;
@@ -95,7 +95,11 @@ export default async function LeadDetailPage({
       {lead.stage === "lost" && <LostBanner reason={lead.lost_reason} />}
 
       <div className="rounded-[10px] border border-gray-200 bg-surface px-6 py-5 shadow-card">
-        <StageProgressStrip leadId={lead.id} currentStage={lead.stage} />
+        <StageProgressStrip
+          leadId={lead.id}
+          currentStageId={lead.stage_id}
+          stages={orgStages}
+        />
         <MetricStripDetail lead={lead} />
       </div>
 
@@ -121,8 +125,6 @@ export default async function LeadDetailPage({
             {activeTab === "activity" && <ActivityTab leadId={lead.id} />}
           </div>
 
-          {/* Fix QQQQ: Tasks moved to a body tab — the right rail is Recovery
-              Fee, Stage Actions, Quick Facts, Assigned To, Recent Activity. */}
           <div className="flex flex-col gap-[14px]">
             <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
               <RecoveryFeeField
@@ -132,7 +134,8 @@ export default async function LeadDetailPage({
             </div>
             <StageActions
               leadId={lead.id}
-              currentStage={lead.stage}
+              currentStageId={lead.stage_id}
+              stages={orgStages}
               needsReview={lead.needs_action_flag}
               lostReasons={lostReasons}
             />

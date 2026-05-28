@@ -72,6 +72,7 @@ export type SettingsData = {
   phoneUsage: PhoneValidationUsage | null;
   phoneValidationEnabled: boolean;
   notificationPrefs: Record<string, boolean>;
+  orgStages: import("@/lib/stages/types").OrgStage[];
 };
 
 const RAIL_KEYS = new Set(GROUPS.flatMap((g) => g.items.map((i) => i.key)));
@@ -156,6 +157,8 @@ function renderPanel(
         <PipelineSection
           initialNeedsActionThreshold={data.needsActionThreshold}
           initialLostReasons={data.lostReasons}
+          initialStages={data.orgStages}
+          canEdit={currentUser.isAdmin}
         />
       ) : (
         <AdminGate />

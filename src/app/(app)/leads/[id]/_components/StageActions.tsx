@@ -8,7 +8,7 @@ import {
   IconFlag,
   IconFlagOff,
 } from "@tabler/icons-react";
-import { STAGES, STAGE_LABELS, type Stage } from "@/lib/leads/types";
+import type { OrgStage } from "@/lib/stages/types";
 import {
   advanceStage,
   reopenLead,
@@ -21,26 +21,24 @@ import type { LostReasonOption } from "@/lib/leads/lost-reasons";
 import { SectionSubheader } from "./SectionSubheader";
 import { cn } from "@/lib/cn";
 
-// The 8-step pipeline excludes "lost" — that path is the Mark Lost button.
-const FORWARD_STAGES: Stage[] = STAGES.filter((s) => s !== "lost");
 const CUSTOM_REASON_KEY = "__custom__";
 
 type Dialog =
-  | { kind: "stage"; toStage: Stage }
+  | { kind: "stage"; toStage: OrgStage }
   | { kind: "lost" }
   | { kind: "review" }
   | null;
 
-// Fix W: stage actions moved out of the progress-strip area into a right-rail
-// "Stage Actions" card (sits above Assigned To). The strip is display-only.
 export function StageActions({
   leadId,
-  currentStage,
+  currentStageId,
+  stages,
   needsReview,
   lostReasons,
 }: {
   leadId: string;
-  currentStage: Stage;
+  currentStageId: string | null;
+  stages: OrgStage[];
   needsReview: boolean;
   lostReasons: LostReasonOption[];
 }) {
@@ -48,24 +46,30 @@ export function StageActions({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const currentIdx = FORWARD_STAGES.indexOf(currentStage);
-  const isTerminal = currentStage === "won" || currentStage === "lost";
+  const forwardStages = stages.filter((s) => s.kind !== "lost");
+  const lostStages = stages.filter((s) => s.kind === "lost");
+  const currentStage = stages.find((s) => s.id === currentStageId) ?? null;
+  const currentIdx = currentStage
+    ? forwardStages.findIndex((s) => s.id === currentStage.id)
+    : -1;
+  const isTerminal = currentStage?.kind === "won" || currentStage?.kind === "lost";
   const nextStage =
-    currentIdx >= 0 && currentIdx < FORWARD_STAGES.length - 1
-      ? FORWARD_STAGES[currentIdx + 1]
+    currentIdx >= 0 && currentIdx < forwardStages.length - 1
+      ? forwardStages[currentIdx + 1]
       : null;
+  const defaultLostStage = lostStages[0] ?? null;
 
   function close() {
     setDialog(null);
     setError(null);
   }
-  function openStage(stage: Stage) {
-    if (stage === currentStage) return;
+  function openStage(stage: OrgStage) {
+    if (stage.id === currentStageId) return;
     setError(null);
     setDialog({ kind: "stage", toStage: stage });
   }
   function openLost() {
-    if (isTerminal) return;
+    if (isTerminal || !defaultLostStage) return;
     setError(null);
     setDialog({ kind: "lost" });
   }
@@ -74,16 +78,19 @@ export function StageActions({
     setDialog({ kind: "review" });
   }
 
-  function confirmStage(toStage: Stage) {
+  function confirmStage(toStage: OrgStage) {
     startTransition(async () => {
-      const result = await advanceStage(leadId, toStage);
+      const result = await advanceStage(leadId, toStage.id);
       if (result.ok) close();
       else setError(result.error);
     });
   }
   function confirmLost(reason: string) {
+    if (!defaultLostStage) return;
     startTransition(async () => {
-      const result = await advanceStage(leadId, "lost", { lostReason: reason });
+      const result = await advanceStage(leadId, defaultLostStage.id, {
+        lostReason: reason,
+      });
       if (result.ok) close();
       else setError(result.error);
     });
@@ -122,7 +129,7 @@ export function StageActions({
             className="btn-primary flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[12.5px] font-medium disabled:opacity-50"
           >
             <IconArrowRight size={14} stroke={2} />
-            {nextStage ? `Next Stage: ${STAGE_LABELS[nextStage]}` : "No Next Stage"}
+            {nextStage ? `Next Stage: ${nextStage.name}` : "No Next Stage"}
           </button>
           {needsReview ? (
             <button
@@ -145,20 +152,16 @@ export function StageActions({
               Needs Review
             </button>
           )}
-          {/* Mark Lost stays last in the panel — destructive action belongs
-              after Needs Review, not above it. */}
           <button
             type="button"
             onClick={openLost}
-            disabled={isTerminal || pending}
+            disabled={isTerminal || pending || !defaultLostStage}
             className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-danger bg-surface px-3 py-2 text-[12.5px] font-medium text-danger hover:bg-danger-bg disabled:opacity-50"
           >
             <IconBan size={14} stroke={2} />
             Mark Lost
           </button>
         </div>
-        {/* A lost/won lead can be put back into its previous stage — kept
-            low-key (text link, no big button). */}
         {isTerminal && (
           <button
             type="button"
@@ -171,10 +174,13 @@ export function StageActions({
         )}
       </div>
 
-      {dialog?.kind === "stage" && (
+      {dialog?.kind === "stage" && currentStage && (
         <StageTransitionDialog
-          fromStage={currentStage}
-          toStage={dialog.toStage}
+          fromStageName={currentStage.name}
+          toStageName={dialog.toStage.name}
+          isForward={
+            forwardStages.findIndex((s) => s.id === dialog.toStage.id) > currentIdx
+          }
           isTransitioning={pending}
           error={error}
           onConfirm={() => confirmStage(dialog.toStage)}
@@ -202,25 +208,23 @@ export function StageActions({
   );
 }
 
-// Exported so the (display-only) progress strip can reuse it for backward jumps.
 export function StageTransitionDialog({
-  fromStage,
-  toStage,
+  fromStageName,
+  toStageName,
+  isForward,
   isTransitioning,
   error,
   onConfirm,
   onCancel,
 }: {
-  fromStage: Stage;
-  toStage: Stage;
+  fromStageName: string;
+  toStageName: string;
+  isForward: boolean;
   isTransitioning: boolean;
   error: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const direction =
-    STAGES.indexOf(toStage) > STAGES.indexOf(fromStage) ? "forward" : "backward";
-
   return (
     <Overlay onCancel={onCancel}>
       <div className="text-[11px] tracking-[0.4px] text-gray-500">
@@ -228,9 +232,9 @@ export function StageTransitionDialog({
       </div>
       <div className="mt-2 text-[15px] text-ink">
         Move this lead from{" "}
-        <strong className="font-medium">{STAGE_LABELS[fromStage]}</strong>{" "}
-        {direction === "forward" ? "to" : "back to"}{" "}
-        <strong className="font-medium">{STAGE_LABELS[toStage]}</strong>?
+        <strong className="font-medium">{fromStageName}</strong>{" "}
+        {isForward ? "to" : "back to"}{" "}
+        <strong className="font-medium">{toStageName}</strong>?
       </div>
       <div className="mt-2 text-[12px] text-gray-500">
         This Logs An Activity Record And Updates The Time In Stage Counter.
@@ -441,8 +445,6 @@ function MarkLostDialog({
     </Overlay>
   );
 }
-
-// -- shared dialog chrome -----------------------------------------------------
 
 function Overlay({
   children,

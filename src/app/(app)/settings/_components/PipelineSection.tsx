@@ -17,17 +17,23 @@ import {
   reassignAndArchiveLostReason,
 } from "@/app/(app)/settings/_actions";
 import type { LostReasonAdminRow } from "@/lib/settings/fetch";
+import type { OrgStage } from "@/lib/stages/types";
 import {
   ReassignAndRemoveDialog,
   type ReassignOption,
 } from "./ReassignAndRemoveDialog";
+import { PipelineStagesCard } from "./PipelineStagesCard";
 
 export function PipelineSection({
   initialNeedsActionThreshold,
   initialLostReasons,
+  initialStages,
+  canEdit,
 }: {
   initialNeedsActionThreshold: number | null;
   initialLostReasons: LostReasonAdminRow[];
+  initialStages: OrgStage[];
+  canEdit: boolean;
 }) {
   const router = useRouter();
   const [threshold, setThreshold] = useState(
@@ -133,6 +139,8 @@ export function PipelineSection({
           </p>
         </div>
       </div>
+
+      <PipelineStagesCard initialStages={initialStages} canEdit={canEdit} />
 
       <div className="settings-card">
         <div className="settings-card-head">

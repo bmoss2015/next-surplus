@@ -29,6 +29,7 @@ import {
 } from "@/lib/settings/fetch";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
+import { fetchOrgStages } from "@/lib/stages/fetch";
 import { getValidationUsage, isPhoneValidationEnabled } from "@/lib/phone-validate";
 import { SettingsPreviewJsx } from "./_components/SettingsPreviewJsx";
 
@@ -50,6 +51,7 @@ export default async function SettingsPreviewJsxPage() {
     research,
     notificationPrefs,
     customerPricing,
+    orgStages,
   ] = await Promise.all([
     fetchAttorneys(),
     fetchOrgCustomRoles(),
@@ -58,6 +60,7 @@ export default async function SettingsPreviewJsxPage() {
     fetchResearchTemplates(),
     fetchMyNotificationPrefs(),
     fetchMyCustomerPricing(),
+    fetchOrgStages(),
   ]);
 
   // Admin-only data.
@@ -156,6 +159,7 @@ export default async function SettingsPreviewJsxPage() {
           phoneValidationEnabled: isPhoneValidationEnabled(),
           notificationPrefs,
           customerPricing,
+          orgStages,
         }}
       />
     </>
