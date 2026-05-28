@@ -805,9 +805,7 @@ function PlaybookTimelineCss() {
 .ptl__group-show:hover { color: #0d4b3a; }
 .ptl__group-show svg { display: block; }
 
-.ptl__leaf { position: relative; display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; transition: background .12s ease; }
-.ptl__leaf::before { content: ''; position: absolute; left: -20px; top: 50%; width: 14px; height: 1px; background: #e5e7eb; }
-.ptl__node.is-done .ptl__leaf::before { background: #0d4b3a; }
+.ptl__leaf { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; transition: background .12s ease; }
 .ptl__leaf:hover { background: #fafbfc; }
 .ptl__check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #d1d5db; background: #fff; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .ptl__leaf:hover .ptl__check { border-color: #0f1729; }
