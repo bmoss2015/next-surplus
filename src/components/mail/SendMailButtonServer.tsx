@@ -9,7 +9,7 @@ import { SendMailButton, type SendMailButtonProps } from "./SendMailButton";
 
 type Props = Omit<
   SendMailButtonProps,
-  "templates" | "bankAccounts" | "mailReady"
+  "templates" | "bankAccounts" | "mailReady" | "fromAddress"
 >;
 
 // Server wrapper that fetches the org's templates + verified bank accounts

@@ -212,7 +212,7 @@ export async function click2mailCreateMergedDocument(
     for (const f of files) {
       fd.append(
         "file",
-        new Blob([f.buffer], { type: f.contentType }),
+        new Blob([new Uint8Array(f.buffer)], { type: f.contentType }),
         f.name
       );
     }

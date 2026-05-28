@@ -835,7 +835,7 @@ export async function uploadMailTemplateDocx(
       }
       if (touched) {
         const newBuf = zip.generate({ type: "nodebuffer" });
-        uploadBlob = new Blob([newBuf], { type: contentType });
+        uploadBlob = new Blob([new Uint8Array(newBuf)], { type: contentType });
       }
     } catch {
       // Best-effort — if the docx is malformed for any reason, fall
