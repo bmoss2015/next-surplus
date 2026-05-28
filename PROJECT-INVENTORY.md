@@ -77,7 +77,7 @@ Surplus calc: Est. Net To You = (estimated surplus × recovery fee percent) − 
 - Gmail thread fetch and threading in `/inbox`
 - Send / receive via Gmail API
 - Vercel cron `/api/cron/email-sync`, pinged externally by Cloudflare worker "Moss Equity Email Poller" every 2 minutes for near-real-time updates
-- SMS (QUO/OpenPhone) — Inbox UI scaffolded (channel exists, send path wired), inbound poller not live in production
+- SMS — Inbox UI scaffolded (channel exists, send path wired against an internal-only QUO/OpenPhone test setup the owner used to prototype). The production customer-facing SMS provider has not been chosen yet and will NOT be QUO. Likely Twilio or Telnyx; A2P 10DLC registration is the long pole regardless of provider.
 - Filters: All / Unread / Email / SMS / Unlinked
 
 ## Calling / SMS
@@ -157,7 +157,7 @@ All under `/settings`. Admin-only unless noted.
 - Resend — team invite emails, notification emails
 - Clearout — phone HLR validation (env-gated, credit pool)
 - Gotenberg — docx→PDF rendering (GCP Cloud Run)
-- QUO (OpenPhone) — phone number per org, SMS send path wired, inbound poller not live
+- Internal-only QUO (OpenPhone) prototype — phone number used by the owner for prototyping, SMS send path wired against it. NOT the production direction. The customer-facing SMS / voice provider will be chosen separately (Twilio or Telnyx are the candidates).
 - Vercel Cron jobs — email-sync, lob-pricing-sync, mail reconcile (auth via `CRON_SECRET` header)
 - Cloudflare Workers:
   - Moss Equity Email Poller (pings Gmail sync)
@@ -168,7 +168,7 @@ All under `/settings`. Admin-only unless noted.
 
 ## Partial / Ambiguous / Not built
 
-- **SMS (QUO):** Inbox UI threads display, send path wired, but inbound poller for QUO is not live in production
+- **SMS (customer-facing):** Inbox UI threads display, send path wired against an internal QUO prototype only. Production provider is not chosen yet (Twilio or Telnyx are the candidates) and QUO will NOT be the customer-facing provider. A2P 10DLC registration is required before launch regardless of provider.
 - **Scripts:** A Settings section was scaffolded once but no user-facing editor exists today
 - **Click-to-call:** Phone numbers are display-only, no dialer wired
 - **Plaid bank verification:** Planned, not built (would layer on Lob's existing microdeposit flow to skip the 1–3 business day wait)
