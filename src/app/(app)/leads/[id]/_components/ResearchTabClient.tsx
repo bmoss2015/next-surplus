@@ -789,22 +789,23 @@ function PlaybookTimelineCss() {
 .ptl__node.is-done .ptl__trunk { background: #0d4b3a; }
 .ptl__dot { position: absolute; left: 3px; top: 4px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #d1d5db; background: #fff; }
 .ptl__node.is-done .ptl__dot { background: #0d4b3a; border-color: #0d4b3a; }
-.ptl__node.is-done .ptl__dot::after { content: ''; position: absolute; left: 2px; top: 0; width: 3px; height: 6px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.ptl__node.is-done .ptl__dot::after { content: ''; position: absolute; left: 3px; top: 1px; width: 3px; height: 6px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
 
 .ptl__group-head { display: flex; align-items: baseline; gap: 10px; }
 .ptl__group-name { font-size: 14px; font-weight: 600; color: #0f1729; letter-spacing: -0.005em; }
 .ptl__group-prog { font-size: 11.5px; color: #6b7280; margin-left: auto; font-variant-numeric: tabular-nums; }
 .ptl__group-prog strong { color: #0f1729; font-weight: 600; }
 .ptl__branch { margin-top: 6px; display: flex; flex-direction: column; }
-.ptl__group-show { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 4px 8px 4px 0; background: transparent; border: 0; color: #6b7280; font-size: 11.5px; font-weight: 500; cursor: pointer; font-family: inherit; }
+.ptl__group-show { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 4px 0; background: transparent; border: 0; color: #6b7280; font-size: 11.5px; font-weight: 500; cursor: pointer; font-family: inherit; line-height: 1; }
 .ptl__group-show:hover { color: #0d4b3a; }
+.ptl__group-show svg { display: block; }
 
 .ptl__leaf { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; transition: background .12s ease; }
 .ptl__leaf:hover { background: #fafbfc; }
 .ptl__check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #d1d5db; background: #fff; padding: 0; cursor: pointer; position: relative; }
 .ptl__leaf:hover .ptl__check { border-color: #0f1729; }
 .ptl__leaf.is-done .ptl__check { background: #0d4b3a; border-color: #0d4b3a; }
-.ptl__leaf.is-done .ptl__check::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.ptl__leaf.is-done .ptl__check::after { content: ''; position: absolute; left: 5px; top: 2px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .ptl__leaf.is-current .ptl__check { border-color: #0d4b3a; box-shadow: 0 0 0 3px rgba(13,75,58,0.15); }
 .ptl__leaf-body { display: flex; align-items: center; gap: 10px; background: transparent; border: 0; padding: 0; color: #0f1729; font-family: inherit; font-size: 13px; cursor: pointer; text-align: left; min-width: 0; }
 .ptl__leaf-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
