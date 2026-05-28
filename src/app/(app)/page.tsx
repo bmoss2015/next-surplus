@@ -107,72 +107,75 @@ export default async function DashboardPage() {
         ) : (
           <>
             {openStages.length > 0 && (
-              <div className="flex flex-col items-center gap-[2px]">
-                {openStages.map((stage, i) => (
-                  <Link
-                    key={stage.id}
-                    href={leadsHrefForStage(stage.name)}
-                    className="flex items-center justify-between px-4 py-2 text-[12px] text-white transition-opacity hover:opacity-90"
-                    style={{
-                      width: `${openStageWidthPct(i, openStages.length)}%`,
-                      maxWidth: 620,
-                      background: openStageColor(i, openStages.length),
-                      borderTopLeftRadius: i === 0 ? 4 : 0,
-                      borderTopRightRadius: i === 0 ? 4 : 0,
-                      borderBottomLeftRadius:
-                        i === openStages.length - 1 ? 4 : 0,
-                      borderBottomRightRadius:
-                        i === openStages.length - 1 ? 4 : 0,
-                    }}
-                    title={stage.name}
-                  >
-                    <span className="truncate">{stage.name}</span>
-                    <span className="ml-3 shrink-0 font-semibold">
-                      {stage.count}
-                    </span>
-                  </Link>
-                ))}
+              <div className="flex flex-col items-center">
+                {openStages.map((stage, i) => {
+                  const isFirst = i === 0;
+                  const isLast = i === openStages.length - 1;
+                  return (
+                    <Link
+                      key={stage.id}
+                      href={leadsHrefForStage(stage.name)}
+                      className="group flex items-center justify-between px-4 py-[7px] text-[12px] text-white transition-opacity hover:opacity-95"
+                      style={{
+                        width: `${openStageWidthPct(i, openStages.length)}%`,
+                        maxWidth: 640,
+                        background: openStageColor(i, openStages.length),
+                        borderTopLeftRadius: isFirst ? 4 : 0,
+                        borderTopRightRadius: isFirst ? 4 : 0,
+                        borderBottomLeftRadius: isLast ? 4 : 0,
+                        borderBottomRightRadius: isLast ? 4 : 0,
+                      }}
+                      title={stage.name}
+                    >
+                      <span className="truncate">{stage.name}</span>
+                      <span className="ml-3 shrink-0 font-semibold tabular-nums">
+                        {stage.count}
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
             )}
 
             {(wonStages.length > 0 || lostStages.length > 0) && (
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <div className="mt-5 flex justify-center gap-6 border-t border-gray-150 pt-4 text-[12px]">
                 {wonStages.length > 0 && (
                   <Link
                     href={leadsHrefForStage(wonStages[0].name)}
-                    className="rounded border px-6 py-3 text-center transition-opacity hover:opacity-90"
-                    style={{
-                      background: "#f0fbf5",
-                      borderColor: "#0d4b3a",
-                      minWidth: 180,
-                    }}
+                    className="flex items-center gap-2 text-ink hover:underline"
                   >
-                    <p className="text-[11px] font-medium uppercase tracking-[0.6px] text-petrol-700">
-                      Won (30 Days)
-                    </p>
-                    <p className="mt-1 text-[22px] font-semibold tracking-tight text-petrol-700">
+                    <span
+                      aria-hidden
+                      className="h-2 w-2 rounded-full"
+                      style={{ background: "#0d4b3a" }}
+                    />
+                    <span className="text-gray-500">Won 30 Days</span>
+                    <span className="font-semibold tabular-nums">
                       {wonTotals.count}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-gray-500">
+                    </span>
+                    <span className="text-gray-400">·</span>
+                    <span className="text-gray-500">
                       {formatCurrency(wonTotals.amount)} Recovered
-                    </p>
+                    </span>
                   </Link>
                 )}
                 {lostStages.length > 0 && (
                   <Link
                     href={leadsHrefForStage(lostStages[0].name)}
-                    className="rounded border border-gray-200 bg-gray-50 px-6 py-3 text-center transition-opacity hover:opacity-90"
-                    style={{ minWidth: 180 }}
+                    className="flex items-center gap-2 text-ink hover:underline"
                   >
-                    <p className="text-[11px] font-medium uppercase tracking-[0.6px] text-gray-500">
-                      Lost (30 Days)
-                    </p>
-                    <p className="mt-1 text-[22px] font-semibold tracking-tight text-ink">
+                    <span
+                      aria-hidden
+                      className="h-2 w-2 rounded-full bg-gray-400"
+                    />
+                    <span className="text-gray-500">Lost 30 Days</span>
+                    <span className="font-semibold tabular-nums">
                       {lostTotals.count}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-gray-500">
-                      {formatCurrency(lostTotals.amount)} Value
-                    </p>
+                    </span>
+                    <span className="text-gray-400">·</span>
+                    <span className="text-gray-500">
+                      {formatCurrency(lostTotals.amount)}
+                    </span>
                   </Link>
                 )}
               </div>
@@ -365,14 +368,14 @@ function Metric({
 function openStageWidthPct(i: number, n: number): number {
   if (n <= 1) return 100;
   const start = 100;
-  const end = 38;
+  const end = 32;
   return start - ((start - end) * i) / (n - 1);
 }
 
 function openStageColor(i: number, n: number): string {
   const t = n <= 1 ? 0 : i / (n - 1);
-  const top = [10, 75, 58];
-  const bottom = [26, 138, 156];
+  const top = [13, 75, 58];
+  const bottom = [74, 156, 117];
   const r = Math.round(top[0] + (bottom[0] - top[0]) * t);
   const g = Math.round(top[1] + (bottom[1] - top[1]) * t);
   const b = Math.round(top[2] + (bottom[2] - top[2]) * t);
