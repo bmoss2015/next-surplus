@@ -2,22 +2,27 @@
 
 import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { IconCheck } from "@tabler/icons-react";
-import { STAGES, STAGE_LABELS, type Stage } from "@/lib/leads/types";
+import type { OrgStage } from "@/lib/stages/types";
 import { advanceStage } from "../_actions";
 import { StageTransitionDialog } from "./StageActions";
 import { cn } from "@/lib/cn";
 
-const FORWARD_STAGES: Stage[] = STAGES.filter((s) => s !== "lost");
-
 export function StageProgressStrip({
   leadId,
-  currentStage,
+  currentStageId,
+  stages,
 }: {
   leadId: string;
-  currentStage: Stage;
+  currentStageId: string | null;
+  stages: OrgStage[];
 }) {
-  const currentIdx = FORWARD_STAGES.indexOf(currentStage);
-  const [jumpTo, setJumpTo] = useState<Stage | null>(null);
+  const forwardStages = stages.filter((s) => s.kind !== "lost");
+  const currentIdx = currentStageId
+    ? forwardStages.findIndex((s) => s.id === currentStageId)
+    : -1;
+  const currentStage = stages.find((s) => s.id === currentStageId) ?? null;
+
+  const [jumpTo, setJumpTo] = useState<OrgStage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -33,9 +38,9 @@ export function StageProgressStrip({
     scroller.scrollLeft = Math.max(0, target);
   }, [currentIdx]);
 
-  function confirmJump(stage: Stage) {
+  function confirmJump(stage: OrgStage) {
     startTransition(async () => {
-      const result = await advanceStage(leadId, stage);
+      const result = await advanceStage(leadId, stage.id);
       if (result.ok) {
         setJumpTo(null);
         setError(null);
@@ -45,6 +50,10 @@ export function StageProgressStrip({
     });
   }
 
+  if (forwardStages.length === 0) {
+    return null;
+  }
+
   return (
     <>
       <div
@@ -52,21 +61,21 @@ export function StageProgressStrip({
         className="kanban-scroll mb-[18px] flex items-start gap-0 overflow-x-auto px-0 pt-3 pb-2"
       >
         <div className="flex items-start" style={{ minWidth: "100%" }}>
-          {FORWARD_STAGES.map((stage, idx) => {
-            const isDone = idx < currentIdx;
+          {forwardStages.map((stage, idx) => {
+            const isDone = currentIdx >= 0 && idx < currentIdx;
             const isCurrent = idx === currentIdx;
-            const isUpcoming = idx > currentIdx;
-            const isLast = idx === FORWARD_STAGES.length - 1;
+            const isUpcoming = currentIdx < 0 || idx > currentIdx;
+            const isLast = idx === forwardStages.length - 1;
             const isClickable = !isCurrent;
 
             return (
               <button
-                key={stage}
+                key={stage.id}
                 ref={isCurrent ? currentRef : undefined}
                 type="button"
                 disabled={!isClickable}
                 onClick={() => isClickable && setJumpTo(stage)}
-                title={isClickable ? `Move to ${STAGE_LABELS[stage]}` : undefined}
+                title={isClickable ? `Move to ${stage.name}` : undefined}
                 className={cn(
                   "relative flex flex-1 shrink-0 flex-col items-center px-2",
                   isClickable ? "cursor-pointer" : "cursor-default"
@@ -102,7 +111,7 @@ export function StageProgressStrip({
                     isUpcoming && "text-gray-500"
                   )}
                 >
-                  {STAGE_LABELS[stage]}
+                  {stage.name}
                 </span>
               </button>
             );
@@ -110,10 +119,13 @@ export function StageProgressStrip({
         </div>
       </div>
 
-      {jumpTo && (
+      {jumpTo && currentStage && (
         <StageTransitionDialog
-          fromStage={currentStage}
-          toStage={jumpTo}
+          fromStageName={currentStage.name}
+          toStageName={jumpTo.name}
+          isForward={
+            forwardStages.findIndex((s) => s.id === jumpTo.id) > currentIdx
+          }
           isTransitioning={pending}
           error={error}
           onConfirm={() => confirmJump(jumpTo)}

@@ -109,7 +109,7 @@ export async function fetchLeadDetail(
     .from("leads")
     .select(
       `id, lead_id, address, city, state, zip, county,
-       sale_type, sale_date, stage, stage_changed_at,
+       sale_type, sale_date, stage, stage_id, stage_changed_at,
        closing_bid, opening_bid, outstanding_debt, court_costs, total_liens,
        estimated_surplus, confirmed_surplus, source_surplus, estimated_net_payout,
        recovery_fee_percent, attorney_cost, case_number, parcel_number,
