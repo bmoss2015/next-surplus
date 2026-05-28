@@ -11,6 +11,10 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 
 
 ### Added
+- Fix YYYY4 part 3: Lead Kanban + advanceStage refactor for custom stages. `fetchKanbanLeads` returns the workspace's `org_stages` + leads grouped by `stage_id`. KanbanBoard renders dynamic columns from the configured stages, derives the column header dot color from `kind` (open=petrol, won=success, lost=gray), and tints Won/Lost column headers. Drag-and-drop now writes `stage_id`. `advanceStage` accepts either a stage UUID (new) or a legacy stage enum string (backward-compat for StageActions + StageProgressStrip until they're refactored next). Lead.stage enum column is still dual-written when the target maps to a known seed name, so any code still reading `lead.stage` keeps working. (2026-05-27T20:00:00-05:00)
+- Fix YYYY4 part 2.2: Drop position unique constraint on `org_stages` so multi-row reorder updates don't trip duplicate-key errors. Position uniqueness is enforced by the app instead.
+- Fix YYYY4 part 2: Settings stages manager with admin-only gating. New "Stages" card in the Settings → Leads → Pipeline panel (drag-reorder, inline rename, outcome dropdown, safe-delete that pre-counts affected leads and forces a "move to" pick when N > 0). `requireAdmin()` at the top of every CRUD action; UI hides write controls for non-admin viewers.
+
 - Fix YYYY4 part 1: Custom stages schema + server query layer. New `org_stages` table (org_id, name, position, kind, is_active) with hidden `stage_kind` enum (open/won/lost). Migration seeds the 9 current default stages per existing org and adds a `stage_id` FK on the leads table backfilled from the existing enum. New `OrgStage` types, `fetchOrgStages` server query, and CRUD server actions (create/update/reorder/delete with safe-delete: blocks if leads use the stage unless caller provides a fallback stage; blocks deleting the only stage of a given kind). No UI yet. (2026-05-27T19:00:00-05:00)
 
 

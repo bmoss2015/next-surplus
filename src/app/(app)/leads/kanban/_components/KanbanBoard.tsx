@@ -3,51 +3,32 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconCircleCheck } from "@tabler/icons-react";
-import {
-  STAGES,
-  STAGE_LABELS,
-  type Stage,
-  type LeadRow,
-} from "@/lib/leads/types";
+import { type LeadRow } from "@/lib/leads/types";
+import type { KanbanData } from "@/lib/leads/fetch-kanban";
+import type { OrgStage, StageKind } from "@/lib/stages/types";
 import { advanceStage } from "@/app/(app)/leads/[id]/_actions";
 import { formatCurrency, primaryOwner, toTitleCase } from "@/lib/leads/format";
 import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
 import { LeadActionsMenu } from "@/app/(app)/leads/[id]/_components/LeadActionsMenu";
 import { cn } from "@/lib/cn";
 
-const STAGE_DOT: Record<Stage, string> = {
-  new_leads: "bg-gray-400",
-  qualifying: "bg-petrol-500",
-  outreach: "bg-petrol-500",
-  in_conversation: "bg-info-violet",
-  contract: "bg-warn",
-  with_attorney: "bg-warn",
-  claim_filed: "bg-success",
+const KIND_DOT: Record<StageKind, string> = {
+  open: "bg-petrol-500",
   won: "bg-success-strong",
   lost: "bg-gray-500",
 };
 
-// Columns are a fixed 240px each with a 10px gap — so the board's total scroll
-// width is constant. The sticky top scrollbar mirrors this width. (Keep in sync
-// with the `w-[240px]` / `gap-[10px]` classes below.)
-const KANBAN_COLUMN_WIDTH = 240;
-const KANBAN_COLUMN_GAP = 10;
-const KANBAN_CONTENT_WIDTH =
-  STAGES.length * KANBAN_COLUMN_WIDTH + (STAGES.length - 1) * KANBAN_COLUMN_GAP;
+const COLUMN_WIDTH = 240;
+const COLUMN_GAP = 10;
 
-export function KanbanBoard({
-  initialGrouped,
-}: {
-  initialGrouped: Record<Stage, LeadRow[]>;
-}) {
+export function KanbanBoard({ initialData }: { initialData: KanbanData }) {
   const router = useRouter();
-  const [grouped, setGrouped] = useState(initialGrouped);
+  const [stages] = useState(initialData.stages);
+  const [grouped, setGrouped] = useState(initialData.leadsByStage);
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
-  const [hoverStage, setHoverStage] = useState<Stage | null>(null);
+  const [hoverStageId, setHoverStageId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  // Fix V: a sticky mirrored horizontal scrollbar above the columns, kept in
-  // sync with the real (bottom) scrollbar on the board so either can drive it.
   const bodyRef = useRef<HTMLDivElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
@@ -64,19 +45,21 @@ export function KanbanBoard({
     });
   }
 
-  function findStageOfLead(leadId: string): Stage | null {
-    for (const stage of STAGES) {
-      if (grouped[stage].some((l) => l.id === leadId)) return stage;
+  const contentWidth =
+    stages.length * COLUMN_WIDTH + Math.max(0, stages.length - 1) * COLUMN_GAP;
+
+  function findStageOfLead(leadId: string): string | null {
+    for (const s of stages) {
+      if (grouped[s.id]?.some((l) => l.id === leadId)) return s.id;
     }
     return null;
   }
 
-  // Fix U: a lead archived or deleted from its card disappears from the board.
   function removeLead(leadId: string) {
     setGrouped((prev) => {
-      const next = { ...prev };
-      for (const stage of STAGES) {
-        next[stage] = prev[stage].filter((l) => l.id !== leadId);
+      const next: Record<string, LeadRow[]> = {};
+      for (const s of stages) {
+        next[s.id] = (prev[s.id] ?? []).filter((l) => l.id !== leadId);
       }
       return next;
     });
@@ -90,55 +73,58 @@ export function KanbanBoard({
 
   function onDragEnd() {
     setDraggingLeadId(null);
-    setHoverStage(null);
+    setHoverStageId(null);
   }
 
-  function onDragOver(e: React.DragEvent, stage: Stage) {
+  function onDragOver(e: React.DragEvent, stageId: string) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    setHoverStage(stage);
+    setHoverStageId(stageId);
   }
 
-  function onDrop(e: React.DragEvent, toStage: Stage) {
+  function onDrop(e: React.DragEvent, toStageId: string) {
     e.preventDefault();
     const leadId = e.dataTransfer.getData("text/plain") || draggingLeadId;
     setDraggingLeadId(null);
-    setHoverStage(null);
+    setHoverStageId(null);
     if (!leadId) return;
 
-    const fromStage = findStageOfLead(leadId);
-    if (!fromStage || fromStage === toStage) return;
+    const fromStageId = findStageOfLead(leadId);
+    if (!fromStageId || fromStageId === toStageId) return;
 
-    // Marking lost from kanban requires a reason; punt to the detail page
-    if (toStage === "lost") {
-      const lead = grouped[fromStage].find((l) => l.id === leadId);
+    const toStage = stages.find((s) => s.id === toStageId);
+    if (!toStage) return;
+
+    if (toStage.kind === "lost") {
+      const lead = grouped[fromStageId]?.find((l) => l.id === leadId);
       if (lead && confirm("Marking lost requires a reason. Open the lead?")) {
         router.push(`/leads/${leadId}`);
       }
       return;
     }
 
-    // Optimistic move
     setGrouped((prev) => {
-      const lead = prev[fromStage].find((l) => l.id === leadId);
+      const lead = prev[fromStageId]?.find((l) => l.id === leadId);
       if (!lead) return prev;
       const next = { ...prev };
-      next[fromStage] = prev[fromStage].filter((l) => l.id !== leadId);
-      next[toStage] = [{ ...lead, stage: toStage }, ...prev[toStage]];
+      next[fromStageId] = (prev[fromStageId] ?? []).filter((l) => l.id !== leadId);
+      next[toStageId] = [{ ...lead, stage_id: toStageId }, ...(prev[toStageId] ?? [])];
       return next;
     });
 
     startTransition(async () => {
-      const result = await advanceStage(leadId, toStage);
+      const result = await advanceStage(leadId, toStageId);
       if (!result.ok) {
         alert(`Failed to move: ${result.error}`);
-        // Revert
         setGrouped((prev) => {
-          const lead = prev[toStage].find((l) => l.id === leadId);
+          const lead = prev[toStageId]?.find((l) => l.id === leadId);
           if (!lead) return prev;
           const next = { ...prev };
-          next[toStage] = prev[toStage].filter((l) => l.id !== leadId);
-          next[fromStage] = [{ ...lead, stage: fromStage }, ...prev[fromStage]];
+          next[toStageId] = (prev[toStageId] ?? []).filter((l) => l.id !== leadId);
+          next[fromStageId] = [
+            { ...lead, stage_id: fromStageId },
+            ...(prev[fromStageId] ?? []),
+          ];
           return next;
         });
       }
@@ -147,64 +133,107 @@ export function KanbanBoard({
 
   return (
     <div>
-      {/* Fix V: sticky mirrored scrollbar — sits at the top of the board and
-          stays visible while scrolling down through cards. Its inner spacer is
-          as wide as the board so the thumb proportions match. */}
       <div
         ref={mirrorRef}
         onScroll={() => syncScroll("mirror")}
         className="kanban-scroll sticky top-0 z-30 mb-2 h-[12px] overflow-x-scroll overflow-y-hidden bg-canvas"
         aria-hidden
       >
-        <div className="h-px" style={{ width: KANBAN_CONTENT_WIDTH }} />
+        <div className="h-px" style={{ width: contentWidth }} />
       </div>
 
-      {/* Fix P / Fix V: the board itself keeps a real (now styled) horizontal
-          scrollbar at the bottom — overflow-x-scroll, never auto. */}
       <div
         ref={bodyRef}
         onScroll={() => syncScroll("body")}
         className="kanban-scroll overflow-x-scroll pb-3"
       >
         <div className="flex w-max gap-[10px]">
-          {STAGES.map((stage) => {
-          const leads = grouped[stage];
-          const isHover = hoverStage === stage;
-          return (
-            <div
-              key={stage}
-              onDragOver={(e) => onDragOver(e, stage)}
-              onDrop={(e) => onDrop(e, stage)}
-              className={cn(
-                "w-[240px] shrink-0 overflow-hidden rounded-lg border bg-gray-100 transition-colors",
-                isHover ? "border-petrol-500 bg-petrol-50" : "border-gray-200"
-              )}
-            >
-              <div className="flex items-center justify-between border-b border-gray-200 bg-surface px-3 py-[11px]">
-                <div className="flex items-center gap-[7px] text-xs font-medium text-ink">
-                  <span className={cn("h-[7px] w-[7px] rounded-full", STAGE_DOT[stage])} />
-                  {STAGE_LABELS[stage]}
-                </div>
-                <span className="text-[11px] font-medium text-gray-500">
-                  {leads.length}
-                </span>
-              </div>
-              <div className="min-h-[460px] space-y-[7px] p-2">
-                {leads.map((lead) => (
-                  <KanbanCard
-                    key={lead.id}
-                    lead={lead}
-                    isDragging={draggingLeadId === lead.id}
-                    onDragStart={(e) => onDragStart(e, lead.id)}
-                    onDragEnd={onDragEnd}
-                    onRemoved={() => removeLead(lead.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          );
+          {stages.map((stage) => {
+            const leads = grouped[stage.id] ?? [];
+            const isHover = hoverStageId === stage.id;
+            return (
+              <KanbanColumn
+                key={stage.id}
+                stage={stage}
+                leads={leads}
+                isHover={isHover}
+                onDragOver={(e) => onDragOver(e, stage.id)}
+                onDrop={(e) => onDrop(e, stage.id)}
+                draggingLeadId={draggingLeadId}
+                onCardDragStart={onDragStart}
+                onCardDragEnd={onDragEnd}
+                onCardRemoved={removeLead}
+              />
+            );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function KanbanColumn({
+  stage,
+  leads,
+  isHover,
+  onDragOver,
+  onDrop,
+  draggingLeadId,
+  onCardDragStart,
+  onCardDragEnd,
+  onCardRemoved,
+}: {
+  stage: OrgStage;
+  leads: LeadRow[];
+  isHover: boolean;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  draggingLeadId: string | null;
+  onCardDragStart: (e: React.DragEvent, leadId: string) => void;
+  onCardDragEnd: () => void;
+  onCardRemoved: (leadId: string) => void;
+}) {
+  const tintClass =
+    stage.kind === "won"
+      ? "bg-[#ecfdf5]"
+      : stage.kind === "lost"
+        ? "bg-[#fef2f2]"
+        : "bg-surface";
+
+  return (
+    <div
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={cn(
+        "w-[240px] shrink-0 overflow-hidden rounded-lg border bg-gray-100 transition-colors",
+        isHover ? "border-petrol-500 bg-petrol-50" : "border-gray-200"
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center justify-between border-b border-gray-200 px-3 py-[11px]",
+          tintClass
+        )}
+      >
+        <div className="flex items-center gap-[7px] text-xs font-medium text-ink">
+          <span className={cn("h-[7px] w-[7px] rounded-full", KIND_DOT[stage.kind])} />
+          {stage.name}
+        </div>
+        <span className="text-[11px] font-medium text-gray-500">
+          {leads.length}
+        </span>
+      </div>
+      <div className="min-h-[460px] space-y-[7px] p-2">
+        {leads.map((lead) => (
+          <KanbanCard
+            key={lead.id}
+            lead={lead}
+            isDragging={draggingLeadId === lead.id}
+            onDragStart={(e) => onCardDragStart(e, lead.id)}
+            onDragEnd={onCardDragEnd}
+            onRemoved={() => onCardRemoved(lead.id)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -223,25 +252,27 @@ function KanbanCard({
   onDragEnd: () => void;
   onRemoved: () => void;
 }) {
-  // Fix BBBB2: "Charleston, SC" — county (title-cased) + state, below the owner.
   const locationLine = [lead.county ? toTitleCase(lead.county) : null, lead.state]
     .filter(Boolean)
     .join(", ");
   const surplus = activeSurplus(lead);
-  // Fix BBBB2: every card label is a uniform tag pill; show at most 2, then a
-  // neutral "+N more" pill. The lead detail page still shows them all.
   const tags: Array<{ key: string; label: string; cls: string }> = [];
   if (lead.below_floor)
-    tags.push({ key: "below_floor", label: "Below Minimum", cls: "border-warn-border bg-warn-bg text-warn-strong" });
+    tags.push({
+      key: "below_floor",
+      label: "Below Minimum",
+      cls: "border-warn-border bg-warn-bg text-warn-strong",
+    });
   if (lead.needs_action_flag)
-    tags.push({ key: "needs_action", label: "Needs Action", cls: "border-petrol-200 bg-[#f3f4f6] text-[#0d4b3a]" });
+    tags.push({
+      key: "needs_action",
+      label: "Needs Action",
+      cls: "border-petrol-200 bg-[#f3f4f6] text-[#0d4b3a]",
+    });
   const visibleTags = tags.slice(0, 2);
   const hiddenTagCount = tags.length - visibleTags.length;
 
   return (
-    // Fix U: the ⋯ menu sits OUTSIDE the <a> so its clicks never trigger card
-    // navigation or the card drag. Fix BBBB2: it lives at the top-right corner
-    // (hover-reveal, not a tag); every actual tag pill lives in the bottom row.
     <div
       className={cn(
         "group relative rounded-md border border-gray-200 bg-surface shadow-card transition-opacity",
@@ -291,7 +322,9 @@ function KanbanCard({
                 />
               </span>
             ) : (
-              <span className="font-medium text-gray-500">Est. {formatCurrency(surplus.value)}</span>
+              <span className="font-medium text-gray-500">
+                Est. {formatCurrency(surplus.value)}
+              </span>
             )}
           </div>
           <div className="mt-[1px] whitespace-nowrap text-[10px]">
@@ -308,7 +341,12 @@ function KanbanCard({
                 </span>
               ))}
               {hiddenTagCount > 0 && (
-                <span className={cn(KANBAN_TAG_PILL, "border-gray-200 bg-gray-100 text-gray-500")}>
+                <span
+                  className={cn(
+                    KANBAN_TAG_PILL,
+                    "border-gray-200 bg-gray-100 text-gray-500"
+                  )}
+                >
                   +{hiddenTagCount} more
                 </span>
               )}
@@ -320,7 +358,5 @@ function KanbanCard({
   );
 }
 
-// Fix BBBB2: one tag-pill shape (radius / padding / font size / border weight)
-// shared by every kanban tag; only the colors differ per tag type.
 const KANBAN_TAG_PILL =
   "rounded-md border px-2 py-[2px] text-[10px] font-medium leading-none";

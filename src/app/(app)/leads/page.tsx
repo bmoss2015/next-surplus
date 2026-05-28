@@ -4,11 +4,11 @@ import { KanbanBoard } from "./kanban/_components/KanbanBoard";
 
 export const dynamic = "force-dynamic";
 
-// Fix P: the Leads page now defaults to the Kanban view — navigating to
-// /leads loads Kanban. The table moved to /leads/table.
 export default async function LeadsPage() {
-  const grouped = await fetchKanbanLeads();
-  const total = Object.values(grouped).reduce((acc, arr) => acc + arr.length, 0);
+  const data = await fetchKanbanLeads();
+  const total =
+    Object.values(data.leadsByStage).reduce((acc, arr) => acc + arr.length, 0) +
+    data.unstaged.length;
 
   return (
     <div className="px-7 py-6">
@@ -23,7 +23,7 @@ export default async function LeadsPage() {
         </div>
         <ViewToggle active="kanban" />
       </div>
-      <KanbanBoard initialGrouped={grouped} />
+      <KanbanBoard initialData={data} />
     </div>
   );
 }

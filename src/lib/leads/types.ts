@@ -78,6 +78,7 @@ export type LeadRow = {
   sale_type: SaleType;
   sale_date: string | null;
   stage: Stage;
+  stage_id: string | null;
   stage_changed_at: string;
   closing_bid: number | null;
   estimated_surplus: number | null;
