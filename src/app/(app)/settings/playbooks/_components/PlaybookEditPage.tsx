@@ -302,9 +302,7 @@ function Editor({
   return (
     <div className="pe-page">
       <div className="pe-crumbs">
-        <Link href="/settings">Settings</Link>
-        <span className="pe-crumbs__sep">/</span>
-        <Link href="/settings">Playbooks</Link>
+        <Link href="/playbooks">Playbooks</Link>
         <span className="pe-crumbs__sep">/</span>
         <span className="pe-crumbs__cur">{row?.name || "New Playbook"}</span>
       </div>
