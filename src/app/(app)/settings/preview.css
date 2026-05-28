@@ -171,6 +171,12 @@
         gap: 20px; margin-top: 4px;
       }
       .page-head .section-desc { margin-top: 8px; }
+      .page-head + .list,
+      .page-head + .tpl-tabs,
+      .page-head + section,
+      .page-head + .stats-strip {
+        margin-top: 24px;
+      }
 
       /* ─── Stats strip ───────────────────────────────────── */
       .stats-strip {
