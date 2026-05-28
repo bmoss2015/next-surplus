@@ -4,23 +4,6 @@ import { formatCurrency } from "@/lib/leads/format";
 
 export const dynamic = "force-dynamic";
 
-const ENUM_FROM_NAME: Record<string, string> = {
-  "New Leads": "new_leads",
-  Qualifying: "qualifying",
-  Outreach: "outreach",
-  "In Conversation": "in_conversation",
-  Contract: "contract",
-  "With Attorney": "with_attorney",
-  "Claim Filed": "claim_filed",
-  Won: "won",
-  Lost: "lost",
-};
-
-function leadsHrefForStage(name: string): string {
-  const enumVal = ENUM_FROM_NAME[name];
-  return enumVal ? `/leads?stage=${enumVal}` : "/leads";
-}
-
 export default async function DashboardPage() {
   const data = await fetchDashboard();
   const today = new Date().toLocaleDateString("en-US", {
@@ -34,40 +17,6 @@ export default async function DashboardPage() {
     ...data.marketsByState.map((m) => m.pipeline),
     1
   );
-
-  const openStages = data.funnel.filter((s) => s.kind === "open");
-  const wonStages = data.funnel.filter((s) => s.kind === "won");
-  const lostStages = data.funnel.filter((s) => s.kind === "lost");
-  const lostTotals = lostStages.reduce(
-    (acc, s) => ({ count: acc.count + s.count, amount: acc.amount + s.amount }),
-    { count: 0, amount: 0 }
-  );
-  const funnelRows: Array<{
-    id: string;
-    name: string;
-    count: number;
-    kind: "open" | "won";
-  }> = [
-    ...openStages.map((s) => ({
-      id: s.id,
-      name: s.name,
-      count: s.count,
-      kind: "open" as const,
-    })),
-    ...(wonStages.length > 0
-      ? [
-          {
-            id: "__won__",
-            name: "Won",
-            count: wonStages.reduce((sum, s) => sum + s.count, 0),
-            kind: "won" as const,
-          },
-        ]
-      : []),
-  ];
-  const maxFunnelCount = Math.max(...funnelRows.map((r) => r.count), 1);
-  const wonHref =
-    wonStages.length > 0 ? leadsHrefForStage(wonStages[0].name) : "/leads";
 
   return (
     <div className="px-7 py-6">
@@ -110,94 +59,6 @@ export default async function DashboardPage() {
             divider
           />
         </Link>
-      </div>
-
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="section-subheader">Pipeline Funnel</h2>
-        <Link
-          href="/leads"
-          className="text-[12px] text-ink underline decoration-gray-300 underline-offset-[3px] hover:decoration-petrol-500"
-        >
-          View All Leads
-        </Link>
-      </div>
-      <div className="mb-[26px] rounded-lg border border-gray-200 bg-surface px-5 py-4 shadow-card">
-        {funnelRows.length === 0 ? (
-          <div className="text-center text-[12px] text-gray-500">
-            No stages configured yet.
-          </div>
-        ) : (
-          <>
-            <div className="mx-auto" style={{ maxWidth: 480 }}>
-              {funnelRows.map((stage, i) => {
-                const slotPct = funnelSlotWidthPct(i, funnelRows.length);
-                const fillPct = Math.min(
-                  100,
-                  (stage.count / maxFunnelCount) * 100
-                );
-                const isWon = stage.kind === "won";
-                const isFirst = i === 0;
-                const isLast = i === funnelRows.length - 1;
-                const fillColor = isWon
-                  ? "#0d4b3a"
-                  : openStageColor(i, openStages.length);
-                const href = isWon ? wonHref : leadsHrefForStage(stage.name);
-                return (
-                  <Link
-                    key={stage.id}
-                    href={href}
-                    className="relative mx-auto mb-[2px] block h-[26px] overflow-hidden transition-opacity last:mb-0 hover:opacity-90"
-                    style={{
-                      width: `${slotPct}%`,
-                      background: "#eef2f6",
-                      borderTopLeftRadius: isFirst ? 4 : 0,
-                      borderTopRightRadius: isFirst ? 4 : 0,
-                      borderBottomLeftRadius: isLast ? 4 : 0,
-                      borderBottomRightRadius: isLast ? 4 : 0,
-                    }}
-                    title={stage.name}
-                  >
-                    <div
-                      aria-hidden
-                      className="absolute inset-y-0 left-0"
-                      style={{
-                        width: `${fillPct}%`,
-                        background: fillColor,
-                      }}
-                    />
-                    <div
-                      className="relative flex h-full items-center justify-between px-3 text-[11px] font-medium"
-                      style={{ color: "#ffffff", mixBlendMode: "difference" }}
-                    >
-                      <span className="truncate">{stage.name}</span>
-                      <span className="ml-3 shrink-0 tabular-nums">
-                        {stage.count}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-
-            {lostStages.length > 0 && (
-              <div className="mt-4 text-center">
-                <Link
-                  href={leadsHrefForStage(lostStages[0].name)}
-                  className="inline-flex items-center gap-2 text-[11px] text-gray-500 hover:text-ink hover:underline"
-                >
-                  <span
-                    aria-hidden
-                    className="h-1.5 w-1.5 rounded-full bg-gray-400"
-                  />
-                  <span>
-                    {lostTotals.count} Lost (30 Days) ·{" "}
-                    {formatCurrency(lostTotals.amount)}
-                  </span>
-                </Link>
-              </div>
-            )}
-          </>
-        )}
       </div>
 
       <div className="grid grid-cols-[1.5fr_1fr] gap-[22px]">
@@ -379,21 +240,4 @@ function Metric({
       <div className="mt-1 text-[12px] text-gray-500">{context}</div>
     </div>
   );
-}
-
-function funnelSlotWidthPct(i: number, n: number): number {
-  if (n <= 1) return 100;
-  const start = 100;
-  const end = 24;
-  return start - ((start - end) * i) / (n - 1);
-}
-
-function openStageColor(i: number, n: number): string {
-  const t = n <= 1 ? 0 : i / Math.max(1, n);
-  const top = [13, 75, 58];
-  const bottom = [74, 156, 117];
-  const r = Math.round(top[0] + (bottom[0] - top[0]) * t);
-  const g = Math.round(top[1] + (bottom[1] - top[1]) * t);
-  const b = Math.round(top[2] + (bottom[2] - top[2]) * t);
-  return `rgb(${r}, ${g}, ${b})`;
 }

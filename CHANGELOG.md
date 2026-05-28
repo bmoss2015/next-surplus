@@ -10,6 +10,9 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Removed
+- Fix YYYY4 part 12: Pipeline Funnel section pulled from the dashboard. After multiple iterations (uniform bars, narrowing trapezoid v1, narrowing trapezoid v2 with proportional fills + Won-as-point), none of them landed. Section removed entirely, will revisit. The funnel-options.html mockup at moss-equity-mockups.vercel.app/funnel-options.html is kept (4 design directions + a 20-stage scaling check) for the future pass. KPI tiles (Pipeline Value, Won 30 Days, Win Rate, Overdue Tasks) and the rest of the dashboard are untouched. (2026-05-28T16:00:00-05:00)
+
 ### Added
 - Fix YYYY4 part 9: Dashboard Pipeline Funnel adopts the narrowing-trapezoid layout (Option C from the mockup set). Open stages render as a centered top-to-bottom funnel with each row narrower than the last (100% to 38% width) and a petrol gradient. Won and Lost split out as separate outcome cards centered below the funnel so the visual stays honest, those are outcomes, not stages. Replaces the previous uniform horizontal-bar funnel. (2026-05-28T15:00:00-05:00)
 - Fix YYYY4 part 3: Lead Kanban + advanceStage refactor for custom stages. `fetchKanbanLeads` returns the workspace's `org_stages` + leads grouped by `stage_id`. KanbanBoard renders dynamic columns from the configured stages, derives the column header dot color from `kind` (open=petrol, won=success, lost=gray), and tints Won/Lost column headers. Drag-and-drop now writes `stage_id`. `advanceStage` accepts either a stage UUID (new) or a legacy stage enum string (backward-compat for StageActions + StageProgressStrip until they're refactored next). Lead.stage enum column is still dual-written when the target maps to a known seed name, so any code still reading `lead.stage` keeps working. (2026-05-27T20:00:00-05:00)
