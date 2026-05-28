@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { fetchDashboard } from "@/lib/leads/fetch-dashboard";
 import { formatCurrency } from "@/lib/leads/format";
-import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +35,17 @@ export default async function DashboardPage() {
     1
   );
 
-  const maxFunnelCount = Math.max(...data.funnel.map((f) => f.count), 1);
+  const openStages = data.funnel.filter((s) => s.kind === "open");
+  const wonStages = data.funnel.filter((s) => s.kind === "won");
+  const lostStages = data.funnel.filter((s) => s.kind === "lost");
+  const wonTotals = wonStages.reduce(
+    (acc, s) => ({ count: acc.count + s.count, amount: acc.amount + s.amount }),
+    { count: 0, amount: 0 }
+  );
+  const lostTotals = lostStages.reduce(
+    (acc, s) => ({ count: acc.count + s.count, amount: acc.amount + s.amount }),
+    { count: 0, amount: 0 }
+  );
 
   return (
     <div className="px-7 py-6">
@@ -96,51 +105,79 @@ export default async function DashboardPage() {
             No stages configured yet.
           </div>
         ) : (
-          <div className="space-y-2">
-            {data.funnel.map((stage) => {
-              const barColor =
-                stage.kind === "won"
-                  ? "bg-petrol-700"
-                  : stage.kind === "lost"
-                    ? "bg-gray-400"
-                    : "bg-petrol-500";
-              const widthPct =
-                stage.count > 0
-                  ? Math.max(2, (stage.count / maxFunnelCount) * 100)
-                  : 0;
-
-              return (
-                <div key={stage.id} className="flex items-center gap-3">
+          <>
+            {openStages.length > 0 && (
+              <div className="flex flex-col items-center gap-[2px]">
+                {openStages.map((stage, i) => (
                   <Link
+                    key={stage.id}
                     href={leadsHrefForStage(stage.name)}
-                    className="w-[140px] shrink-0 truncate text-right text-[12px] text-gray-500 hover:text-ink hover:underline"
+                    className="flex items-center justify-between px-4 py-2 text-[12px] text-white transition-opacity hover:opacity-90"
+                    style={{
+                      width: `${openStageWidthPct(i, openStages.length)}%`,
+                      maxWidth: 620,
+                      background: openStageColor(i, openStages.length),
+                      borderTopLeftRadius: i === 0 ? 4 : 0,
+                      borderTopRightRadius: i === 0 ? 4 : 0,
+                      borderBottomLeftRadius:
+                        i === openStages.length - 1 ? 4 : 0,
+                      borderBottomRightRadius:
+                        i === openStages.length - 1 ? 4 : 0,
+                    }}
                     title={stage.name}
                   >
-                    {stage.name}
+                    <span className="truncate">{stage.name}</span>
+                    <span className="ml-3 shrink-0 font-semibold">
+                      {stage.count}
+                    </span>
                   </Link>
+                ))}
+              </div>
+            )}
+
+            {(wonStages.length > 0 || lostStages.length > 0) && (
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                {wonStages.length > 0 && (
                   <Link
-                    href={leadsHrefForStage(stage.name)}
-                    className="flex-1 h-7 rounded bg-gray-100 overflow-hidden hover:opacity-90"
+                    href={leadsHrefForStage(wonStages[0].name)}
+                    className="rounded border px-6 py-3 text-center transition-opacity hover:opacity-90"
+                    style={{
+                      background: "#f0fbf5",
+                      borderColor: "#0d4b3a",
+                      minWidth: 180,
+                    }}
                   >
-                    {stage.count > 0 && (
-                      <div
-                        className={cn(
-                          "h-full flex items-center px-2 text-[12px] font-medium text-white",
-                          barColor
-                        )}
-                        style={{ width: `${widthPct}%` }}
-                      >
-                        {stage.count}
-                      </div>
-                    )}
+                    <p className="text-[11px] font-medium uppercase tracking-[0.6px] text-petrol-700">
+                      Won (30 Days)
+                    </p>
+                    <p className="mt-1 text-[22px] font-semibold tracking-tight text-petrol-700">
+                      {wonTotals.count}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-gray-500">
+                      {formatCurrency(wonTotals.amount)} Recovered
+                    </p>
                   </Link>
-                  <div className="w-[100px] shrink-0 text-right text-[11px] text-gray-500">
-                    {stage.kind === "lost" ? "" : formatCurrency(stage.amount)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                )}
+                {lostStages.length > 0 && (
+                  <Link
+                    href={leadsHrefForStage(lostStages[0].name)}
+                    className="rounded border border-gray-200 bg-gray-50 px-6 py-3 text-center transition-opacity hover:opacity-90"
+                    style={{ minWidth: 180 }}
+                  >
+                    <p className="text-[11px] font-medium uppercase tracking-[0.6px] text-gray-500">
+                      Lost (30 Days)
+                    </p>
+                    <p className="mt-1 text-[22px] font-semibold tracking-tight text-ink">
+                      {lostTotals.count}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-gray-500">
+                      {formatCurrency(lostTotals.amount)} Value
+                    </p>
+                  </Link>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -323,4 +360,21 @@ function Metric({
       <div className="mt-1 text-[12px] text-gray-500">{context}</div>
     </div>
   );
+}
+
+function openStageWidthPct(i: number, n: number): number {
+  if (n <= 1) return 100;
+  const start = 100;
+  const end = 38;
+  return start - ((start - end) * i) / (n - 1);
+}
+
+function openStageColor(i: number, n: number): string {
+  const t = n <= 1 ? 0 : i / (n - 1);
+  const top = [10, 75, 58];
+  const bottom = [26, 138, 156];
+  const r = Math.round(top[0] + (bottom[0] - top[0]) * t);
+  const g = Math.round(top[1] + (bottom[1] - top[1]) * t);
+  const b = Math.round(top[2] + (bottom[2] - top[2]) * t);
+  return `rgb(${r}, ${g}, ${b})`;
 }

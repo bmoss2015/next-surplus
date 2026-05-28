@@ -10,3 +10,4 @@
 2026-05-27T18:00Z | Fix XXXX4: Lead-detail stage strip scrolls and auto-centers on current stage | Leads / Detail
 2026-05-27T19:00Z | Fix YYYY4 part 1: Custom stages schema + types + server query + CRUD actions (no UI yet) | Custom Stages
 2026-05-27T20:00Z | Fix YYYY4 part 3: Kanban + advanceStage refactor to use stage_id; dynamic column rendering | Custom Stages
+2026-05-28T15:00Z | Fix YYYY4 part 9: Dashboard Pipeline Funnel narrowing-trapezoid (Option C); Won/Lost split out as outcome cards | Dashboard / Custom Stages
