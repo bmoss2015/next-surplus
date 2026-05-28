@@ -41,11 +41,6 @@ const CLASSES: { value: MailClass; label: string; desc: string }[] = [
     label: "First Class",
     desc: "1–5 days · USPS tracking",
   },
-  {
-    value: "certified",
-    label: "Certified",
-    desc: "Tracked · proof of receipt",
-  },
 ];
 
 export function MailSettingsSection({
