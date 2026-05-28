@@ -3,12 +3,12 @@
 // Settings clone · Phase D.4 — Templates with editor drawer.
 //
 // Three internal tabs share a single panel state: Email, SMS, Research.
-// Email and SMS pull from TemplateRow[] (channel filter), Research pulls
-// from ResearchTemplateRow[]. Add Template + per-row Edit pencil both open
-// <TemplateEditorDrawer /> which routes to the right editor based on the
-// active tab (or the row's channel for edits).
+// Email and SMS still open the drawer in-place; Playbooks navigate to
+// /settings/playbooks/[id] (or /new) for the full-page editor with the
+// SettingsSaveBar.
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type {
   ResearchTemplateRow,
   TemplateRow,
@@ -29,8 +29,16 @@ export function TemplatesSection({
   research: ResearchTemplateRow[];
   canEdit: boolean;
 }) {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("email");
   const [editor, setEditor] = useState<TemplateEditorState>({ kind: "closed" });
+  const openCreate = () => {
+    if (tab === "research") {
+      router.push("/settings/playbooks/new");
+    } else {
+      setEditor({ kind: "new", channel: tab });
+    }
+  };
 
   const email = useMemo(
     () => templates.filter((t) => t.channel.toLowerCase() === "email"),
@@ -77,7 +85,7 @@ export function TemplatesSection({
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            onClick={() => setEditor({ kind: "new", channel: tab })}
+            onClick={openCreate}
           >
             <i className="icon icon-plus" /> {addLabel}
           </button>
@@ -123,7 +131,7 @@ export function TemplatesSection({
       {tab === "research" && (
         <ResearchList
           rows={research}
-          onEdit={canEdit ? (row) => setEditor({ kind: "edit-research", row }) : null}
+          onEdit={canEdit ? (row) => router.push(`/settings/playbooks/${row.id}`) : null}
         />
       )}
 
