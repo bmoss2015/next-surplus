@@ -30,28 +30,28 @@ Snapshot at the $97 to 99 price band, used to ground roadmap and pricing decisio
 
 | Capability | Surplus Funds List ($99 CRM, 3 seats) | Excess Elite ($97 CRM-only) | Surplus Systems (pricing private) | GoHighLevel Starter ($97, 3 sub-accounts) |
 |---|---|---|---|---|
-| SMS in-app | Yes [unverified at depth] | Yes (~$0.02 per SMS pass-through, owner verified) | Yes [unverified] | Yes (usage-priced, LC-Phone or BYO Twilio) |
-| Voice dialer (power / click-to-call) | Yes (recording + voicemail drop) | No in CRM-only tier (owner verified) | Yes (dialer + ringless VM) [unverified] | Yes (LC-Phone, usage-priced) |
-| Phone number purchase | Yes (implied) | Yes (owner verified, even without dialer) | Not advertised | Yes |
-| Ringless voicemail | Yes (with dialer) | No | Yes [unverified] | Yes (usage-priced) |
-| E-signature | Yes (native) | No at any tier (owner verified) | Yes [unverified] | Yes (template-based, not robust workflow) |
-| Direct mail letters / postcards | No | Yes via Rocket Print and Mail or Postcard Mania (owner verified) | Yes ("DirectMail") [unverified] | No native, marketplace integrations only |
-| Physical check cutting | No | No [unverified, Rocket Print is not a check service] | No [unverified] | No |
-| AI assistant in this tier | Yes ("Ivy AI") | Yes (owner verified, form unclear) | Not advertised | Yes (usage-priced, $97 unlimited add-on) |
-| Real Gmail / Outlook OAuth | No (native email only) | No (domain-forwarding shim) | Yes ("video email") [unverified] | Yes (real OAuth, Gmail 500/day, Outlook 3MB attach) |
+| SMS in-app | Yes [unverified at depth] | Yes (~$0.02 per SMS pass-through, owner verified) | Yes (marketed, GHL native) | Yes (usage-priced, LC-Phone or BYO Twilio) |
+| Voice dialer (power / click-to-call) | Yes (recording + voicemail drop) | No in CRM-only tier (owner verified) | Yes ("Built-in Dialer" marketed) | Yes (LC-Phone, usage-priced) |
+| Phone number purchase | Yes (implied) | Yes (owner verified, even without dialer) | [unverified, GHL inheritance implies yes] | Yes |
+| Ringless voicemail | Yes (with dialer) | No | Yes ("RVM" marketed) | Yes (usage-priced) |
+| E-signature | Yes (native) | No at any tier (owner verified) | Yes (marketed as "DocuSign alternative") | Yes (template-based, not robust workflow) |
+| Direct mail letters / postcards | No | Yes via Rocket Print and Mail or Postcard Mania (owner verified) | Yes ("Direct Mail" marketed, scope unverified) | No native, marketplace integrations only |
+| Physical check cutting | No | No [unverified, Rocket Print is not a check service] | No [unverified, no signal in marketing] | No |
+| AI assistant in this tier | Yes ("Ivy AI") | Yes (owner verified, form unclear) | [unverified, GHL has paid add-on] | Yes (usage-priced, $97 unlimited add-on) |
+| Real Gmail / Outlook OAuth | No (native email only) | No (domain-forwarding shim) | [unverified, GHL inheritance implies yes; SS markets "Video Email" separately] | Yes (real OAuth, Gmail 500/day, Outlook 3MB attach) |
 | Lead database | $170+ tier | Higher tier | No | No |
 | Skip trace | Yes (built-in) | Higher tiers only [unverified] | Not advertised | No (third-party only) |
-| Outreach automation / cadences | No in $99 tier [unverified] | Yes (owner verified) | Yes [unverified] | Yes (workflows, core) |
+| Outreach automation / cadences | No in $99 tier [unverified] | Yes (owner verified) | Yes ("Pre-built Campaigns" + "Follow-up automation" marketed) | Yes (workflows, core) |
 | Multi-user seats | 3 included, ~$40 per extra [unverified] | Multi-user, one-time per-seat fee [unverified] | Not specified | Unlimited users at every tier |
-| Pricing model | Flat subscription | Flat subscription | Hidden | $97 subscription + usage on top |
-| A2P 10DLC handling | [unverified] | [unverified] | [unverified] | User-driven through Trust Center, manual, common rejections (owner-experienced "treacherous") |
+| Pricing model | Flat subscription | Flat subscription | Hidden, demo-gated funnel | $97 subscription + usage on top |
+| A2P 10DLC handling | [unverified] | [unverified] | [unverified, inherits GHL manual process] | User-driven through Trust Center, manual, common rejections (owner-experienced "treacherous") |
 
 ### Where Moss can credibly lead
 
 | Lever | Status today | Notes |
 |---|---|---|
-| Physical check cutting via Lob | Live in production | No competitor confirmed to offer. Verify Rocket Print scope to lock the claim. |
-| Done-for-you A2P 10DLC SMS verification | Planned Q3 | GHL's manual process is the single biggest onboarding complaint. One-form wizard wins here. |
+| Physical check cutting via Lob | Live in production | No competitor confirmed to offer (Excess Elite uses Rocket Print and Postcard Mania for letters / postcards only; Surplus Systems markets "Direct Mail" but no check cutting signal). Verify Rocket Print scope to lock the claim. |
+| Done-for-you A2P 10DLC SMS verification | Planned Q3 | GHL's manual process is the single biggest onboarding complaint. Surplus Systems inherits the same GHL process [unverified]. One-form wizard wins here. |
 | State-mapped phone number routing | Planned Q3 | None of the competitors do this. Trust-signal differentiator. |
 | Flat all-in pricing without usage surprises | Already planned | GHL's usage billing on top of $97 is a frequent complaint. |
 | State-specific playbooks + attorney directory | Live (both shipped) | Domain depth at the entry tier. |
@@ -62,11 +62,11 @@ Snapshot at the $97 to 99 price band, used to ground roadmap and pricing decisio
 
 - Excess Elite: Rocket Print mail scope (letters / postcards only, not checks), one-time per-seat fee model, AI surface form
 - Surplus Funds List: automation / cadences in $99 tier, per-additional-seat threshold price
-- Surplus Systems: pricing tiers (everything currently unverified)
+- Surplus Systems: pricing tiers, A2P 10DLC handling, multi-user seat structure, AI assistant tier inclusion, skip trace, lead database, Gmail / Outlook OAuth depth, direct mail scope (postal class, certified, postcards)
 
 ### Sources
 
-Surplus Funds List pricing and features pages; Excess Elite App Store listing, support docs subdomain, owner direct observation; Surplus Systems and Excess Quest marketing pages; GoHighLevel pricing and support knowledge base (A2P guides, Documents & Contracts docs, LC-Phone overview, two-way email sync setup, marketplace integrations).
+Surplus Funds List pricing and features pages; Excess Elite App Store listing, support docs subdomain, owner direct observation; Surplus Systems homepage, YouTube channel, and blog post (GHL hosting confirmed via leadconnectorhq.com image CDN and clients. / onboarding. SaaS Mode subdomain pattern); Excess Quest marketing pages; GoHighLevel pricing and support knowledge base (A2P guides, Documents & Contracts docs, LC-Phone overview, two-way email sync setup, marketplace integrations).
 
 ---
 
@@ -131,3 +131,4 @@ Items deprioritized or held for later evaluation. Not committed to a specific qu
 - Stage progression triggers (replies auto-advance leads through the pipeline). Revisit after cadences ship.
 - Automated task generation based on activity rules. Revisit after cadences ship.
 - Attorney marketplace (operators routed to filers per state with referral revenue share). Interesting product extension once the core platform is launched and monetized.
+- Nationwide county-office directory bundled inside the platform (Surplus Systems markets one as part of their bundle; could fit as a researcher-facing reference layer in Moss). Lower priority than core outreach features.
