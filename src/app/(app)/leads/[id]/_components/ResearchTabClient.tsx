@@ -108,18 +108,11 @@ export function ResearchTabClient({
   const [overall, setOverall] = useState(overallFindings ?? "");
   const [savedOverall, setSavedOverall] = useState(overallFindings ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Step keys (`${tIdx}:${sIdx}`) whose detail panel is currently expanded.
-  // Seed with every leaf that already has a saved note so reps see the note
-  // on first render. Click the leaf name to toggle.
-  const [openFindings, setOpenFindings] = useState<Set<string>>(() => {
-    const seed = new Set<string>();
-    initialTemplates.forEach((t, tIdx) => {
-      t.steps.forEach((s, sIdx) => {
-        if ((s.findings ?? "").trim()) seed.add(`${tIdx}:${sIdx}`);
-      });
-    });
-    return seed;
-  });
+  // Step keys (`${tIdx}:${sIdx}`) whose detail panel the rep has explicitly
+  // expanded. Starts empty — every leaf is collapsed on first render, even
+  // ones with saved notes. The Note badge on the leaf row signals that
+  // content exists; clicking the row opens it.
+  const [openFindings, setOpenFindings] = useState<Set<string>>(new Set());
   // Parent-group keys (`${tIdx}:${parent}`) the user has explicitly expanded
   // after auto-collapse. Fully-done groups collapse by default; clicking
   // Show re-opens them.
@@ -499,7 +492,7 @@ function PlaybookTimeline({
   return (
     <div className="ptl">
       <div
-        className="ptl__lead"
+        className="ptl__head"
         role="button"
         tabIndex={0}
         onClick={onCollapseToggle}
@@ -511,70 +504,72 @@ function PlaybookTimeline({
         }}
         aria-expanded={!t.collapsed}
       >
-        <div className="ptl__avatar">{initials}</div>
-        <div className="ptl__meta">
-          <div className="ptl__lead-name">{ownerName}</div>
-          {subParts.length > 0 && (
-            <div className="ptl__lead-sub">
-              {subParts.map((p, i) => (
-                <span key={i}>
-                  {p}
-                  {i < subParts.length - 1 && (
-                    <span className="ptl__lead-sep"> · </span>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
+        <div className="ptl__head-row1">
+          <div className="ptl__avatar">{initials}</div>
+          <div className="ptl__meta">
+            <div className="ptl__lead-name">{ownerName}</div>
+            {subParts.length > 0 && (
+              <div className="ptl__lead-sub">
+                {subParts.map((p, i) => (
+                  <span key={i}>
+                    {p}
+                    {i < subParts.length - 1 && (
+                      <span className="ptl__lead-sep"> · </span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <span className="ptl__collapse-pill" aria-hidden="true">
+            {t.collapsed ? (
+              <>
+                <span>Show {total} {total === 1 ? "Step" : "Steps"}</span>
+                <IconChevronRight size={13} stroke={2.25} />
+              </>
+            ) : (
+              <>
+                <span>Hide</span>
+                <IconChevronDown size={13} stroke={2.25} />
+              </>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="ptl__lead-x"
+            aria-label="Remove playbook from lead"
+            title="Remove playbook from lead"
+          >
+            <IconX size={14} stroke={2.25} />
+          </button>
         </div>
-        <span className="ptl__collapse-pill" aria-hidden="true">
-          {t.collapsed ? (
-            <>
-              <span>Show {total} {total === 1 ? "Step" : "Steps"}</span>
-              <IconChevronRight size={13} stroke={2.25} />
-            </>
-          ) : (
-            <>
-              <span>Hide</span>
-              <IconChevronDown size={13} stroke={2.25} />
-            </>
-          )}
-        </span>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          className="ptl__lead-x"
-          aria-label="Remove playbook from lead"
-          title="Remove playbook from lead"
-        >
-          <IconX size={14} stroke={2.25} />
-        </button>
-      </div>
-
-      <div className="ptl__top">
-        <div>
+        <div className="ptl__head-row2">
           <div className="ptl__title">
             Playbook <span className="ptl__title-sep">·</span>{" "}
             {displayHeader(t.name)}
           </div>
-          {t.sourceTemplateId && (
-            <Link
-              href={`/playbooks/${t.sourceTemplateId}`}
-              className="ptl__view"
-            >
-              See Other Leads on This Playbook →
-            </Link>
-          )}
+          <div className="ptl__head-meta">
+            <span className="ptl__top-meta">
+              {stageCount} {stageCount === 1 ? "Stage" : "Stages"}
+              {subStepCount > 0
+                ? ` · ${subStepCount} Sub-${subStepCount === 1 ? "Step" : "Steps"}`
+                : ""}
+            </span>
+            {t.sourceTemplateId && (
+              <Link
+                href={`/playbooks/${t.sourceTemplateId}`}
+                className="ptl__view"
+                onClick={(e) => e.stopPropagation()}
+              >
+                See Other Leads →
+              </Link>
+            )}
+          </div>
         </div>
-        <span className="ptl__top-meta">
-          {stageCount} {stageCount === 1 ? "Stage" : "Stages"}
-          {subStepCount > 0
-            ? ` · ${subStepCount} Sub-${subStepCount === 1 ? "Step" : "Steps"}`
-            : ""}
-        </span>
       </div>
 
       {!t.collapsed && (
@@ -600,11 +595,7 @@ function PlaybookTimeline({
                 }
               >
                 <div className="ptl__trunk" />
-                <div className="ptl__dot">
-                  {groupDone && (
-                    <IconCheck size={9} stroke={3.25} color="#fff" />
-                  )}
-                </div>
+                <div className="ptl__dot" />
                 {isStandaloneOne ? null : (
                   <div className="ptl__group-head">
                     <span className="ptl__group-name">{g.parent}</span>
@@ -773,24 +764,25 @@ function PlaybookTimelineCss() {
   return (
     <style>{`
 .ptl { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,41,0.04), 0 1px 3px rgba(15,23,41,0.06); }
-.ptl__lead { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #e5e7eb; background: #fafbfc; border-radius: 10px 10px 0 0; cursor: pointer; transition: background 0.12s ease; outline: none; }
-.ptl__lead:hover { background: #f3f4f6; }
-.ptl__lead:focus-visible { box-shadow: inset 0 0 0 2px #0d4b3a; }
+.ptl__head { padding: 14px 18px 12px; border-bottom: 1px solid #e5e7eb; background: #fafbfc; border-radius: 10px 10px 0 0; cursor: pointer; transition: background 0.12s ease; outline: none; }
+.ptl__head:hover { background: #f3f4f6; }
+.ptl__head:focus-visible { box-shadow: inset 0 0 0 2px #0d4b3a; }
+.ptl__head-row1 { display: flex; align-items: center; gap: 14px; }
+.ptl__head-row2 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-left: 50px; margin-top: 10px; }
+.ptl__head-meta { display: flex; align-items: baseline; gap: 14px; flex: none; }
 .ptl__avatar { width: 36px; height: 36px; border-radius: 50%; background: #0d4b3a; color: #fff; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: none; }
 .ptl__meta { flex: 1; min-width: 0; }
 .ptl__lead-name { font-size: 14px; font-weight: 600; color: #0f1729; }
 .ptl__lead-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
 .ptl__lead-sep { color: #d1d5db; padding: 0 4px; }
-.ptl__lead-badge { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid #e5e7eb; color: #374151; font-weight: 500; flex: none; }
 .ptl__collapse-pill { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: #fff; border: 1px solid #e5e7eb; color: #0f1729; font-size: 11.5px; font-weight: 600; }
-.ptl__lead:hover .ptl__collapse-pill { border-color: #0d4b3a; color: #0d4b3a; }
+.ptl__head:hover .ptl__collapse-pill { border-color: #0d4b3a; color: #0d4b3a; }
 .ptl__lead-x { flex: none; background: transparent; border: 0; color: #9ca3af; padding: 4px; border-radius: 4px; cursor: pointer; }
 .ptl__lead-x:hover { background: #fff; color: #b91c1c; }
 
-.ptl__top { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 22px 0; gap: 12px; }
-.ptl__title { font-size: 16px; font-weight: 600; color: #0f1729; letter-spacing: -0.005em; }
+.ptl__title { font-size: 15px; font-weight: 600; color: #0f1729; letter-spacing: -0.005em; }
 .ptl__title-sep { color: #9ca3af; padding: 0 4px; font-weight: 400; }
-.ptl__view { font-size: 11.5px; color: #0d4b3a; font-weight: 500; margin-top: 6px; margin-bottom: 14px; display: inline-block; }
+.ptl__view { font-size: 11.5px; color: #0d4b3a; font-weight: 600; }
 .ptl__view:hover { text-decoration: underline; }
 .ptl__top-meta { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; }
 
@@ -813,7 +805,9 @@ function PlaybookTimelineCss() {
 .ptl__group-show:hover { color: #0d4b3a; }
 .ptl__group-show svg { display: block; }
 
-.ptl__leaf { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; transition: background .12s ease; }
+.ptl__leaf { position: relative; display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; transition: background .12s ease; }
+.ptl__leaf::before { content: ''; position: absolute; left: -20px; top: 50%; width: 14px; height: 1px; background: #e5e7eb; }
+.ptl__node.is-done .ptl__leaf::before { background: #0d4b3a; }
 .ptl__leaf:hover { background: #fafbfc; }
 .ptl__check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #d1d5db; background: #fff; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .ptl__leaf:hover .ptl__check { border-color: #0f1729; }
