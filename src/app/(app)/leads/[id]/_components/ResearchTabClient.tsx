@@ -107,8 +107,18 @@ export function ResearchTabClient({
   const [overall, setOverall] = useState(overallFindings ?? "");
   const [savedOverall, setSavedOverall] = useState(overallFindings ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Step keys (`${tIdx}:${sIdx}`) whose findings editor the user has opened.
-  const [openFindings, setOpenFindings] = useState<Set<string>>(new Set());
+  // Step keys (`${tIdx}:${sIdx}`) whose detail panel is currently expanded.
+  // Seed with every leaf that already has a saved note so reps see the note
+  // on first render. Click the leaf name to toggle.
+  const [openFindings, setOpenFindings] = useState<Set<string>>(() => {
+    const seed = new Set<string>();
+    initialTemplates.forEach((t, tIdx) => {
+      t.steps.forEach((s, sIdx) => {
+        if ((s.findings ?? "").trim()) seed.add(`${tIdx}:${sIdx}`);
+      });
+    });
+    return seed;
+  });
   // Step keys that just successfully saved their findings — drives the
   // inline "Saved" badge so reps see the commit landed.
   const [savedFlashes, setSavedFlashes] = useState<Set<string>>(new Set());
@@ -225,7 +235,7 @@ export function ResearchTabClient({
     confirmRemoveIdx != null ? templates[confirmRemoveIdx]?.name ?? "" : "";
 
   return (
-    <div className="mx-auto max-w-[920px] rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
+    <div className="max-w-[920px] rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
@@ -485,9 +495,6 @@ function PlaybookTimeline({
             </div>
           )}
         </div>
-        {leadInfo.stage && (
-          <span className="ptl__lead-badge">Stage: {leadInfo.stage}</span>
-        )}
         <button
           type="button"
           onClick={onCollapseToggle}
@@ -565,11 +572,7 @@ function PlaybookTimeline({
                     const isCurrent = leaf.idx === nextIdx;
                     const key = `${tIdx}:${leaf.idx}`;
                     const hasFindings = (step.findings ?? "").trim() !== "";
-                    // Detail panel: hasFindings is the default state, but the
-                    // user's last click wins. Without this, leaves with notes
-                    // can't be collapsed.
-                    const userToggled = openFindings.has(key);
-                    const detailOpen = userToggled ? !hasFindings : hasFindings;
+                    const detailOpen = openFindings.has(key);
                     const labelText =
                       leaf.isStandalone && g.leaves.length === 1
                         ? g.parent
@@ -608,16 +611,13 @@ function PlaybookTimeline({
                                 Note
                               </span>
                             )}
-                            {isCurrent && (
-                              <span className="ptl__leaf-here">Here</span>
-                            )}
                           </button>
                         </div>
                         {detailOpen && (
                           <div className="ptl__detail">
                             {step.instructions && (
                               <>
-                                <div className="ptl__detail-lbl">Instructions</div>
+                                <div className="ptl__detail-lbl">Description</div>
                                 <div className="ptl__detail-body">
                                   {step.instructions}
                                 </div>
