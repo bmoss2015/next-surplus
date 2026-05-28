@@ -5,12 +5,16 @@ import { fetchOrgStages } from "@/lib/stages/fetch";
 import type { StageKind } from "@/lib/stages/types";
 import { primaryOwner } from "./format";
 
+export type FunnelMode = "count" | "value";
+export type FunnelTimeframe = "30d" | "90d" | "all";
+
 export type DashboardFunnelStage = {
   id: string;
   name: string;
   kind: StageKind;
   count: number;
   amount: number;
+  carryFromPrevious: number | null;
 };
 
 export type DashboardData = {
@@ -23,6 +27,8 @@ export type DashboardData = {
   newThisWeekCount: number;
   totalActive: number;
   funnel: DashboardFunnelStage[];
+  funnelTimeframe: FunnelTimeframe;
+  funnelMode: FunnelMode;
   leadsNeedingAction: Array<{
     id: string;
     lead_id: string;
@@ -56,7 +62,21 @@ function daysBetween(a: Date, b: Date): number {
   return Math.floor((a.getTime() - b.getTime()) / 86_400_000);
 }
 
-export async function fetchDashboard(): Promise<DashboardData> {
+function timeframeCutoff(tf: FunnelTimeframe): Date | null {
+  if (tf === "all") return null;
+  const d = new Date();
+  d.setDate(d.getDate() - (tf === "90d" ? 90 : 30));
+  return d;
+}
+
+export async function fetchDashboard(opts?: {
+  funnelTimeframe?: FunnelTimeframe;
+  funnelMode?: FunnelMode;
+}): Promise<DashboardData> {
+  const funnelTimeframe: FunnelTimeframe = opts?.funnelTimeframe ?? "30d";
+  const funnelMode: FunnelMode = opts?.funnelMode ?? "count";
+  const closedCutoff = timeframeCutoff(funnelTimeframe);
+
   const sb = await createClient();
   const stages = await fetchOrgStages();
   const stageById = new Map(stages.map((s) => [s.id, s]));
@@ -85,10 +105,7 @@ export async function fetchDashboard(): Promise<DashboardData> {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const funnelMap = new Map<
-    string,
-    { count: number; amount: number }
-  >();
+  const funnelMap = new Map<string, { count: number; amount: number }>();
   for (const s of stages) funnelMap.set(s.id, { count: 0, amount: 0 });
 
   let pipelineValue = 0;
@@ -111,13 +128,13 @@ export async function fetchDashboard(): Promise<DashboardData> {
     const isWon = stageId ? wonStageIds.has(stageId) : false;
     const isLost = stageId ? lostStageIds.has(stageId) : false;
     const changedAt = new Date(lead.stage_changed_at);
-    const inLast30 = changedAt >= thirtyDaysAgo;
+    const inFunnelWindow = closedCutoff == null || changedAt >= closedCutoff;
 
     if (stageId) {
       const bucket = funnelMap.get(stageId);
       if (bucket) {
-        const includeInFunnel = isOpen || ((isWon || isLost) && inLast30);
-        if (includeInFunnel) {
+        const include = isOpen || ((isWon || isLost) && inFunnelWindow);
+        if (include) {
           bucket.count += 1;
           bucket.amount += lead.estimated_surplus ?? 0;
         }
@@ -140,11 +157,11 @@ export async function fetchDashboard(): Promise<DashboardData> {
       stateAgg.set(lead.state, agg);
     }
 
-    if (isWon && inLast30) {
+    if (isWon && changedAt >= thirtyDaysAgo) {
       wonLast30Count += 1;
       wonLast30Amount += lead.estimated_surplus ?? 0;
     }
-    if (isLost && inLast30) {
+    if (isLost && changedAt >= thirtyDaysAgo) {
       lostLast30Count += 1;
     }
     if (new Date(lead.imported_at) >= oneWeekAgo) newThisWeekCount += 1;
@@ -155,14 +172,25 @@ export async function fetchDashboard(): Promise<DashboardData> {
       ? wonLast30Count / (wonLast30Count + lostLast30Count)
       : null;
 
-  const funnel: DashboardFunnelStage[] = stages.map((s) => {
+  const funnel: DashboardFunnelStage[] = stages.map((s, i) => {
     const b = funnelMap.get(s.id) ?? { count: 0, amount: 0 };
+    let carry: number | null = null;
+    if (s.kind === "open" && i > 0) {
+      const prev = stages[i - 1];
+      if (prev.kind === "open") {
+        const prevBucket = funnelMap.get(prev.id);
+        const prevVal = funnelMode === "value" ? prevBucket?.amount ?? 0 : prevBucket?.count ?? 0;
+        const thisVal = funnelMode === "value" ? b.amount : b.count;
+        if (prevVal > 0) carry = thisVal / prevVal;
+      }
+    }
     return {
       id: s.id,
       name: s.name,
       kind: s.kind,
       count: b.count,
       amount: b.amount,
+      carryFromPrevious: carry,
     };
   });
 
@@ -287,6 +315,8 @@ export async function fetchDashboard(): Promise<DashboardData> {
     newThisWeekCount,
     totalActive: activeLeadsCount,
     funnel,
+    funnelTimeframe,
+    funnelMode,
     leadsNeedingAction,
     marketsByState,
     upcomingDeadlines: deadlines.slice(0, 6),
