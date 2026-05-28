@@ -457,11 +457,6 @@ function PlaybookTimeline({
   const doneCount = t.steps.filter((s) => s.done).length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
   const nextIdx = t.steps.findIndex((s) => !s.done);
-  const stageCount = groups.length;
-  const subStepCount = groups.reduce(
-    (acc, g) => acc + (g.leaves.length > 1 || !g.leaves[0]?.isStandalone ? g.leaves.length : 0),
-    0
-  );
 
   const ownerName = leadInfo.name ?? "Lead";
   const initials = ownerName
@@ -554,10 +549,7 @@ function PlaybookTimeline({
           </div>
           <div className="ptl__head-meta">
             <span className="ptl__top-meta">
-              {stageCount} {stageCount === 1 ? "Stage" : "Stages"}
-              {subStepCount > 0
-                ? ` · ${subStepCount} Sub-${subStepCount === 1 ? "Step" : "Steps"}`
-                : ""}
+              {total} {total === 1 ? "Step" : "Steps"}
             </span>
             {t.sourceTemplateId && (
               <Link
@@ -612,7 +604,7 @@ function PlaybookTimeline({
                     className="ptl__group-show"
                   >
                     Show {g.leaves.length}{" "}
-                    {g.leaves.length === 1 ? "Step" : "Sub-Steps"}
+                    {g.leaves.length === 1 ? "Step" : "Steps"}
                     <IconChevronRight size={13} stroke={2.25} />
                   </button>
                 )}

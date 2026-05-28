@@ -236,9 +236,12 @@ function Editor({
     if (res.ok) router.push("/settings");
   };
 
-  const stepCount = steps.length;
-  const subCount = useMemo(
-    () => steps.reduce((acc, s) => acc + (s.children?.length ?? 0), 0),
+  const totalSteps = useMemo(
+    () =>
+      steps.reduce(
+        (acc, s) => acc + Math.max(1, s.children?.length ?? 0),
+        0
+      ),
     [steps]
   );
 
@@ -311,8 +314,7 @@ function Editor({
         <div>
           <h1 className="pe-h1">{row ? "Edit Playbook" : "New Playbook"}</h1>
           <div className="pe-sub">
-            {stepCount} {stepCount === 1 ? "Step" : "Steps"}
-            {subCount > 0 ? `, ${subCount} Sub-Steps` : ""}
+            {totalSteps} {totalSteps === 1 ? "Step" : "Steps"}
           </div>
         </div>
         {row && canEdit && (

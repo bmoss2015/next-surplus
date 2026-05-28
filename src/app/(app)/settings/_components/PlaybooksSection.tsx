@@ -53,9 +53,8 @@ export function PlaybooksSection({
           </div>
         ) : (
           research.map((p) => {
-            const stepCount = p.steps.length;
-            const subCount = p.steps.reduce(
-              (acc, s) => acc + (s.children?.length ?? 0),
+            const totalSteps = p.steps.reduce(
+              (acc, s) => acc + Math.max(1, s.children?.length ?? 0),
               0
             );
             const applyLabel = describeApply(p);
@@ -82,10 +81,7 @@ export function PlaybooksSection({
                       </>
                     ) : null}
                     <span>
-                      {stepCount} {stepCount === 1 ? "Step" : "Steps"}
-                      {subCount > 0
-                        ? `, ${subCount} Sub-${subCount === 1 ? "Step" : "Steps"}`
-                        : ""}
+                      {totalSteps} {totalSteps === 1 ? "Step" : "Steps"}
                     </span>
                     <span style={{ color: "var(--text-3, #94a3b8)" }}>
                       {" · "}
