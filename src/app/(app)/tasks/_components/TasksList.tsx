@@ -520,7 +520,7 @@ function TaskRowDisplay({
               <Link
                 href={`/leads/${task.lead_id}`}
                 onClick={(e) => e.stopPropagation()}
-                className="font-mono hover:text-petrol-500"
+                className="tabular-nums hover:text-petrol-500"
               >
                 {task.lead.lead_id}
               </Link>

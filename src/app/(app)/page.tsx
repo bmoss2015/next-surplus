@@ -150,7 +150,7 @@ export default async function DashboardPage() {
                   href={`/leads/${lead.id}`}
                   className="flex items-center gap-[12px] border-b border-gray-150 px-[18px] py-[13px] last:border-b-0 hover:bg-gray-50"
                 >
-                  <span className="w-[130px] shrink-0 font-mono text-[11px] text-gray-500">
+                  <span className="w-[130px] shrink-0 text-[11px] tabular-nums text-gray-500">
                     {lead.lead_id}
                   </span>
                   <div className="min-w-0 flex-1">
