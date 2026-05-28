@@ -119,6 +119,19 @@ export function ResearchTabClient({
     });
     return seed;
   });
+  // Parent-group keys (`${tIdx}:${parent}`) the user has explicitly expanded
+  // after auto-collapse. Fully-done groups collapse by default; clicking
+  // Show re-opens them.
+  const [expandedDoneGroups, setExpandedDoneGroups] = useState<Set<string>>(
+    new Set()
+  );
+  const toggleDoneGroup = (key: string) =>
+    setExpandedDoneGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   // Step keys that just successfully saved their findings — drives the
   // inline "Saved" badge so reps see the commit landed.
   const [savedFlashes, setSavedFlashes] = useState<Set<string>>(new Set());
@@ -276,6 +289,8 @@ export function ResearchTabClient({
               openFindings={openFindings}
               setOpenFindings={setOpenFindings}
               savedFlashes={savedFlashes}
+              expandedDoneGroups={expandedDoneGroups}
+              onToggleDoneGroup={toggleDoneGroup}
               onToggleDone={toggleDone}
               onUpdateStep={updateStep}
               onCommitFindings={commitStepFindings}
@@ -417,6 +432,8 @@ function PlaybookTimeline({
   openFindings,
   setOpenFindings,
   savedFlashes,
+  expandedDoneGroups,
+  onToggleDoneGroup,
   onToggleDone,
   onUpdateStep,
   onCommitFindings,
@@ -429,6 +446,8 @@ function PlaybookTimeline({
   openFindings: Set<string>;
   setOpenFindings: React.Dispatch<React.SetStateAction<Set<string>>>;
   savedFlashes: Set<string>;
+  expandedDoneGroups: Set<string>;
+  onToggleDoneGroup: (key: string) => void;
   onToggleDone: (tIdx: number, sIdx: number, lrtId: string) => void;
   onUpdateStep: (
     tIdx: number,
@@ -564,6 +583,14 @@ function PlaybookTimeline({
             const groupDone = groupSteps.every((s) => s.done);
             const groupNext = groupSteps.some((s) => !s.done);
             const isLastGroup = gi === groups.length - 1;
+            const isStandaloneOne =
+              g.leaves[0]?.isStandalone && g.leaves.length === 1;
+            const groupKey = `${tIdx}:${gi}`;
+            // Auto-collapse fully-done multi-leaf parents so reps see only
+            // active work. Standalone single-leaf groups stay visible —
+            // there's nothing to expand back to.
+            const canAutoCollapse = !isStandaloneOne && groupDone;
+            const expanded = !canAutoCollapse || expandedDoneGroups.has(groupKey);
             return (
               <div
                 key={gi}
@@ -573,7 +600,7 @@ function PlaybookTimeline({
               >
                 <div className="ptl__trunk" />
                 <div className="ptl__dot" />
-                {g.leaves[0]?.isStandalone && g.leaves.length === 1 ? null : (
+                {isStandaloneOne ? null : (
                   <div className="ptl__group-head">
                     <span className="ptl__group-name">{g.parent}</span>
                     <span className="ptl__group-prog">
@@ -582,7 +609,31 @@ function PlaybookTimeline({
                     </span>
                   </div>
                 )}
-                <div className="ptl__branch">
+                {canAutoCollapse && !expanded && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleDoneGroup(groupKey)}
+                    className="ptl__group-show"
+                  >
+                    Show {g.leaves.length}{" "}
+                    {g.leaves.length === 1 ? "Step" : "Sub-Steps"}
+                    <IconChevronRight size={11} stroke={2.25} />
+                  </button>
+                )}
+                {canAutoCollapse && expanded && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleDoneGroup(groupKey)}
+                    className="ptl__group-show"
+                  >
+                    Hide
+                    <IconChevronDown size={11} stroke={2.25} />
+                  </button>
+                )}
+                <div
+                  className="ptl__branch"
+                  style={expanded ? undefined : { display: "none" }}
+                >
                   {g.leaves.map((leaf) => {
                     const step = t.steps[leaf.idx];
                     const isCurrent = leaf.idx === nextIdx;
@@ -745,6 +796,8 @@ function PlaybookTimelineCss() {
 .ptl__group-prog { font-size: 11.5px; color: #6b7280; margin-left: auto; font-variant-numeric: tabular-nums; }
 .ptl__group-prog strong { color: #0f1729; font-weight: 600; }
 .ptl__branch { margin-top: 6px; display: flex; flex-direction: column; }
+.ptl__group-show { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 4px 8px 4px 0; background: transparent; border: 0; color: #6b7280; font-size: 11.5px; font-weight: 500; cursor: pointer; font-family: inherit; }
+.ptl__group-show:hover { color: #0d4b3a; }
 
 .ptl__leaf { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; transition: background .12s ease; }
 .ptl__leaf:hover { background: #fafbfc; }
