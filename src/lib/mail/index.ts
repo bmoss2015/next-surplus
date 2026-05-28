@@ -57,7 +57,11 @@ export {
   click2mailCreateMergedDocument,
   click2mailSendFromDocumentId,
 };
-export { lobCreateBankAccount, lobVerifyBankAccount } from "./lob";
+export {
+  lobCreateBankAccount,
+  lobVerifyBankAccount,
+  lobDeleteBankAccount,
+} from "./lob";
 export type {
   LobBankAccountInput,
   LobBankAccountResult,

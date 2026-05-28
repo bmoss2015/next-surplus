@@ -660,3 +660,33 @@ export async function lobVerifyBankAccount(
     };
   }
 }
+
+export async function lobDeleteBankAccount(
+  bnkId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isLobConfigured()) {
+    return { ok: false, error: "Mail service is not configured. Contact support." };
+  }
+  try {
+    const res = await lobFetch(`${LOB_BASE_URL}/bank_accounts/${bnkId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: authHeader(),
+        Accept: "application/json",
+      },
+    });
+    if (res.status === 404) return { ok: true };
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `Lob delete failed: ${res.status} ${await res.text()}`,
+      };
+    }
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Mail service hit an unknown error. Try again.",
+    };
+  }
+}

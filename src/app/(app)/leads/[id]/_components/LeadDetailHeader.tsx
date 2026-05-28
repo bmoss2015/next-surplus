@@ -39,7 +39,7 @@ export function LeadDetailHeader({
         <div className="flex items-start justify-between gap-5">
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="rounded-[5px] border border-gray-200 bg-gray-150 px-[10px] py-1 font-mono text-[11px] font-medium text-ink">
+              <span className="rounded-[5px] border border-gray-200 bg-gray-150 px-[10px] py-1 text-[11px] font-medium tabular-nums text-ink">
                 {lead.lead_id}
               </span>
               {lead.stage === "lost" && (

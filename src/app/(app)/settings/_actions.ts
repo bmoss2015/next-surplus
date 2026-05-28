@@ -599,7 +599,11 @@ export async function removeSignatureImage(): Promise<
 
 // -- Mail bank accounts -----------------------------------------------------
 
-import { lobCreateBankAccount, lobVerifyBankAccount } from "@/lib/mail";
+import {
+  lobCreateBankAccount,
+  lobVerifyBankAccount,
+  lobDeleteBankAccount,
+} from "@/lib/mail";
 
 export async function createMailBankAccount(input: {
   routing_number: string;
@@ -681,6 +685,19 @@ export async function deleteMailBankAccount(
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
   const sb = await createClient();
+  const { data: row, error: lookupErr } = await sb
+    .from("mail_bank_accounts")
+    .select("lob_bank_account_id")
+    .eq("id", id)
+    .single();
+  if (lookupErr || !row) {
+    return { ok: false, error: "Bank account not found" };
+  }
+  const lobId = (row.lob_bank_account_id as string | null) ?? "";
+  if (lobId.startsWith("bank_")) {
+    const lobRes = await lobDeleteBankAccount(lobId);
+    if (!lobRes.ok) return { ok: false, error: lobRes.error };
+  }
   const { error } = await sb.from("mail_bank_accounts").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
