@@ -111,7 +111,7 @@ export function ContactRolesSection({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-4" style={{ maxWidth: 480 }}>
+      <div className="flex items-center gap-2 mb-4" style={{ maxWidth: 480, marginTop: 8 }}>
         <input
           className="input"
           style={{ flex: 1 }}
@@ -139,12 +139,8 @@ export function ContactRolesSection({
         </button>
       </div>
 
-      <div className="role-chip-grid">
-        {labels.length === 0 ? (
-          <span style={{ color: "var(--text-2)", fontSize: 13 }}>
-            No custom roles yet. Add one above.
-          </span>
-        ) : (
+      <div className="role-chip-grid" style={{ marginTop: 8 }}>
+        {labels.length === 0 ? null : (
           labels.map((label) => {
             const armed = confirmingDelete === label;
             return (
