@@ -107,17 +107,22 @@ export async function fetchDashboard(): Promise<DashboardData> {
 
   for (const lead of allLeads) {
     const stageId = lead.stage_id;
-    if (stageId) {
-      const bucket = funnelMap.get(stageId);
-      if (bucket) {
-        bucket.count += 1;
-        bucket.amount += lead.estimated_surplus ?? 0;
-      }
-    }
-
     const isOpen = stageId ? openStageIds.has(stageId) : false;
     const isWon = stageId ? wonStageIds.has(stageId) : false;
     const isLost = stageId ? lostStageIds.has(stageId) : false;
+    const changedAt = new Date(lead.stage_changed_at);
+    const inLast30 = changedAt >= thirtyDaysAgo;
+
+    if (stageId) {
+      const bucket = funnelMap.get(stageId);
+      if (bucket) {
+        const includeInFunnel = isOpen || ((isWon || isLost) && inLast30);
+        if (includeInFunnel) {
+          bucket.count += 1;
+          bucket.amount += lead.estimated_surplus ?? 0;
+        }
+      }
+    }
 
     if (isOpen) {
       activeLeadsCount += 1;
@@ -135,12 +140,11 @@ export async function fetchDashboard(): Promise<DashboardData> {
       stateAgg.set(lead.state, agg);
     }
 
-    const changedAt = new Date(lead.stage_changed_at);
-    if (isWon && changedAt >= thirtyDaysAgo) {
+    if (isWon && inLast30) {
       wonLast30Count += 1;
       wonLast30Amount += lead.estimated_surplus ?? 0;
     }
-    if (isLost && changedAt >= thirtyDaysAgo) {
+    if (isLost && inLast30) {
       lostLast30Count += 1;
     }
     if (new Date(lead.imported_at) >= oneWeekAgo) newThisWeekCount += 1;

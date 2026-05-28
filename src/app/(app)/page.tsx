@@ -36,38 +36,21 @@ export default async function DashboardPage() {
           label="Pipeline Value"
           value={formatCurrency(data.pipelineValue)}
           context={`${data.activeLeadsCount} Active Leads`}
-          trend={
-            data.newThisWeekCount > 0
-              ? { kind: "success", text: `+${data.newThisWeekCount} New This Week` }
-              : { kind: "muted", text: "No New Leads This Week" }
-          }
         />
         <Metric
           label="Won (30 Days)"
           value={String(data.wonLast30Count)}
           context={`${formatCurrency(data.wonLast30Amount)} Recovered`}
-          trend={
-            data.wonLast30Count > 0
-              ? { kind: "success", text: "Closing Deals" }
-              : { kind: "muted", text: "No Wins This Period" }
-          }
           divider
         />
         <Metric
-          label="Conversion Rate"
+          label="Win Rate"
           value={
             data.conversionRate == null
               ? "—"
               : `${Math.round(data.conversionRate * 100)}%`
           }
-          context="Won Over Won + Lost (30d)"
-          trend={
-            data.conversionRate == null
-              ? { kind: "muted", text: "Not Enough Data" }
-              : data.conversionRate >= 0.5
-                ? { kind: "success", text: "Healthy" }
-                : { kind: "info", text: "Below Half" }
-          }
+          context="Of Closed Leads, Last 30 Days"
           divider
         />
         <Link href="/tasks?filter=overdue" className="block">
@@ -75,18 +58,18 @@ export default async function DashboardPage() {
             label="Overdue Tasks"
             value={String(data.overdueTasksCount)}
             context="Past Due, Not Completed"
-            trend={
-              data.overdueTasksCount > 0
-                ? { kind: "alert", text: "Action Required" }
-                : { kind: "success", text: "All Caught Up" }
-            }
             divider
           />
         </Link>
       </div>
 
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="section-subheader">Pipeline Funnel</h2>
+        <div>
+          <h2 className="section-subheader">Pipeline Funnel</h2>
+          <div className="mt-1 text-[11px] text-gray-500">
+            Open Stages: Current Snapshot · Won And Lost: Last 30 Days
+          </div>
+        </div>
         <Link
           href="/leads"
           className="text-[12px] text-ink underline decoration-gray-300 underline-offset-[3px] hover:decoration-petrol-500"
@@ -104,9 +87,9 @@ export default async function DashboardPage() {
             {data.funnel.map((stage) => {
               const barColor =
                 stage.kind === "won"
-                  ? "bg-success"
+                  ? "bg-petrol-700"
                   : stage.kind === "lost"
-                    ? "bg-danger"
+                    ? "bg-gray-400"
                     : "bg-petrol-500";
               const widthPct =
                 stage.count > 0
@@ -132,7 +115,7 @@ export default async function DashboardPage() {
                     )}
                   </div>
                   <div className="w-[100px] shrink-0 text-right text-[11px] text-gray-500">
-                    {formatCurrency(stage.amount)}
+                    {stage.kind === "lost" ? "" : formatCurrency(stage.amount)}
                   </div>
                 </div>
               );
@@ -302,23 +285,13 @@ function Metric({
   label,
   value,
   context,
-  trend,
   divider,
 }: {
   label: string;
   value: string;
   context: string;
-  trend: { kind: "success" | "muted" | "alert" | "info"; text: string };
   divider?: boolean;
 }) {
-  const trendColor =
-    trend.kind === "success"
-      ? "text-success"
-      : trend.kind === "alert"
-        ? "text-danger"
-        : trend.kind === "info"
-          ? "text-petrol-500"
-          : "text-gray-500";
   return (
     <div className={`p-[18px] px-[22px] ${divider ? "border-l border-gray-200" : ""}`}>
       <div className="mb-2 text-[11px] tracking-[0.4px] text-gray-500">
@@ -328,9 +301,6 @@ function Metric({
         {value}
       </div>
       <div className="mt-1 text-[12px] text-gray-500">{context}</div>
-      <div className={`mt-[10px] text-[11px] font-medium ${trendColor}`}>
-        {trend.text}
-      </div>
     </div>
   );
 }
