@@ -34,7 +34,6 @@ const MAIL_CLASS_OPTIONS: {
 }[] = [
   { value: "standard", label: "Standard" },
   { value: "first_class", label: "First Class" },
-  { value: "certified", label: "Certified" },
 ];
 
 // Sentinel folder id for templates that don't live in a real folder.
