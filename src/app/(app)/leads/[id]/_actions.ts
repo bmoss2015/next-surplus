@@ -1351,7 +1351,15 @@ export async function saveLeadResearchStepFindings(
     .eq("id", leadResearchTemplateId);
   if (error) return { ok: false, error: error.message };
   const stepName = String(steps[stepIndex].name ?? "Step");
-  await logResearchUpdate(sb, loaded.lead_id, `${stepName} findings updated`);
+  const clean = findings.trim();
+  const snippet = clean.length > 140 ? clean.slice(0, 137) + "…" : clean;
+  await logResearchUpdate(
+    sb,
+    loaded.lead_id,
+    clean
+      ? `${stepName} note saved: ${snippet}`
+      : `${stepName} note cleared`
+  );
   revalidatePath(`/leads/${loaded.lead_id}`);
   return { ok: true };
 }
@@ -1414,13 +1422,48 @@ export async function addResearchTemplateToLead(
   const nextPos =
     last && last.length > 0 ? ((last[0].position as number) ?? 0) + 1 : 0;
 
-  const steps = (Array.isArray(tpl.steps) ? (tpl.steps as RawJsonStep[]) : []).map((s) => ({
-    name: String(s.name ?? ""),
-    url: (s.url as string | null) ?? null,
-    instructions: (s.instructions as string | null) ?? null,
-    done: false,
-    findings: null as string | null,
-  }));
+  const rawSteps = Array.isArray(tpl.steps) ? (tpl.steps as RawJsonStep[]) : [];
+  const steps: Array<{
+    name: string;
+    url: string | null;
+    instructions: string | null;
+    done: boolean;
+    findings: string | null;
+  }> = [];
+  for (const raw of rawSteps) {
+    const parentName = String(raw.name ?? "");
+    const children = Array.isArray((raw as unknown as { children?: unknown }).children)
+      ? ((raw as unknown as { children: RawJsonStep[] }).children)
+      : [];
+    if (children.length === 0) {
+      steps.push({
+        name: parentName,
+        url: (raw.url as string | null) ?? null,
+        instructions: (raw.instructions as string | null) ?? null,
+        done: false,
+        findings: null,
+      });
+      continue;
+    }
+    for (const child of children) {
+      const childName = String(child.name ?? "");
+      const compositeName = childName
+        ? parentName
+          ? `${parentName} · ${childName}`
+          : childName
+        : parentName;
+      steps.push({
+        name: compositeName,
+        url: (child.url as string | null) ?? null,
+        instructions:
+          (child.instructions as string | null) ??
+          (raw.instructions as string | null) ??
+          null,
+        done: false,
+        findings: null,
+      });
+    }
+  }
 
   const { data: inserted, error } = await sb
     .from("lead_research_templates")

@@ -1470,17 +1470,37 @@ type ResearchStepInput = {
   name: string;
   url: string | null;
   instructions: string | null;
+  children?: ResearchStepInput[];
 };
+
+type PlaybookApplyModeInput = "manual" | "all" | "match";
 
 function cleanResearchSteps(steps: ResearchStepInput[]): ResearchStepInput[] {
   return steps
-    .map((s) => ({
-      name: (s.name ?? "").trim(),
-      url: s.url && s.url.trim() ? s.url.trim() : null,
-      instructions:
-        s.instructions && s.instructions.trim() ? s.instructions.trim() : null,
-    }))
+    .map((s) => {
+      const cleaned: ResearchStepInput = {
+        name: (s.name ?? "").trim(),
+        url: s.url && s.url.trim() ? s.url.trim() : null,
+        instructions:
+          s.instructions && s.instructions.trim() ? s.instructions.trim() : null,
+      };
+      if (Array.isArray(s.children) && s.children.length > 0) {
+        cleaned.children = cleanResearchSteps(s.children);
+      }
+      return cleaned;
+    })
     .filter((s) => s.name.length > 0);
+}
+
+function normalizeApplyStatesInput(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const v of raw) {
+    if (typeof v !== "string") continue;
+    const up = v.trim().toUpperCase();
+    if (/^[A-Z]{2}$/.test(up) && !out.includes(up)) out.push(up);
+  }
+  return out;
 }
 
 export async function upsertResearchTemplate(input: {
@@ -1489,26 +1509,55 @@ export async function upsertResearchTemplate(input: {
   description: string | null;
   state: string | null;
   sale_type: "TAX" | "MTG" | null;
+  apply_mode: PlaybookApplyModeInput;
+  apply_states: string[];
   steps: ResearchStepInput[];
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
   if (!input.name.trim()) return { ok: false, error: "Name is required" };
+
   const saleType: "TAX" | "MTG" | null =
     input.sale_type === "TAX" || input.sale_type === "MTG" ? input.sale_type : null;
+
+  const applyMode: PlaybookApplyModeInput =
+    input.apply_mode === "manual" || input.apply_mode === "all" || input.apply_mode === "match"
+      ? input.apply_mode
+      : "match";
+  const applyStates = normalizeApplyStatesInput(input.apply_states);
+  if (applyMode === "match" && applyStates.length === 0) {
+    return {
+      ok: false,
+      error: "Pick at least one state, or change When To Apply to All Imported Leads",
+    };
+  }
+
   const steps = cleanResearchSteps(input.steps);
   const sb = await createClient();
   const description = input.description?.trim() || null;
+
+  // Mirror apply_states[0] onto the legacy `state` column when only one
+  // state is selected. Keeps existing single-state queries (playbook
+  // board state filter, lead_research_templates snapshot matching)
+  // pointing at the same data while the rest of the app migrates to
+  // reading apply_states.
+  const legacyState =
+    applyMode === "match" && applyStates.length === 1 ? applyStates[0] : null;
+
+  const writeRow = {
+    name: input.name.trim(),
+    description,
+    state: legacyState,
+    sale_type: saleType,
+    apply_mode: applyMode,
+    apply_states: applyStates,
+    steps,
+  };
+
   if (input.id) {
     const { error } = await sb
       .from("research_templates")
-      .update({
-        name: input.name.trim(),
-        description,
-        state: input.state,
-        sale_type: saleType,
-        steps,
-      })
+      .update(writeRow)
       .eq("id", input.id);
     if (error) return { ok: false, error: error.message };
     revalidatePath("/settings");
@@ -1516,13 +1565,7 @@ export async function upsertResearchTemplate(input: {
   }
   const { data, error } = await sb
     .from("research_templates")
-    .insert({
-      name: input.name.trim(),
-      description,
-      state: input.state,
-      sale_type: saleType,
-      steps,
-    })
+    .insert(writeRow)
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };

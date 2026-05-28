@@ -32,6 +32,8 @@ import {
   deleteResearchTemplate,
 } from "@/app/(app)/settings/_actions";
 import type {
+  PlaybookApplyMode,
+  ResearchStep,
   ResearchTemplateRow,
   TemplateRow,
 } from "@/lib/settings/fetch";
@@ -312,14 +314,17 @@ function ResearchEditor({
 }) {
   const router = useRouter();
   const [name, setName] = useState(row?.name ?? "");
-  const [stateCode, setStateCode] = useState(row?.state ?? "");
-  const [saleType, setSaleType] = useState<"TAX" | "MTG" | "">(
-    row?.sale_type ?? ""
+  const [description, setDescription] = useState(row?.description ?? "");
+  const [applyMode, setApplyMode] = useState<PlaybookApplyMode>(
+    row?.apply_mode ?? "match"
   );
-  const [steps, setSteps] = useState(
+  const [applyStates, setApplyStates] = useState<string[]>(
+    row?.apply_states ?? []
+  );
+  const [steps, setSteps] = useState<ResearchStep[]>(
     row?.steps?.length
       ? row.steps
-      : [{ name: "", url: null, instructions: null }]
+      : [{ name: "", url: null, instructions: null, children: [] }]
   );
   // Two-pane editor: which step's edit form is shown in the right pane. Reset
   // to 0 each time the drawer opens.
@@ -360,12 +365,13 @@ function ResearchEditor({
       // Re-seed the step editor fields each time the drawer opens for a new row.
       /* eslint-disable react-hooks/set-state-in-effect */
       setName(row?.name ?? "");
-      setStateCode(row?.state ?? "");
-      setSaleType(row?.sale_type ?? "");
+      setDescription(row?.description ?? "");
+      setApplyMode(row?.apply_mode ?? "match");
+      setApplyStates(row?.apply_states ?? []);
       setSteps(
         row?.steps?.length
           ? row.steps
-          : [{ name: "", url: null, instructions: null }]
+          : [{ name: "", url: null, instructions: null, children: [] }]
       );
       setSelectedStepIdx(0);
       setErrMsg(null);
@@ -375,7 +381,9 @@ function ResearchEditor({
   }, [open, row]);
 
   const ready =
-    name.trim().length > 0 && steps.some((s) => s.name.trim().length > 0);
+    name.trim().length > 0 &&
+    steps.some((s) => s.name.trim().length > 0) &&
+    (applyMode !== "match" || applyStates.length > 0);
 
   function setStep(
     idx: number,
@@ -383,10 +391,70 @@ function ResearchEditor({
   ) {
     setSteps((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
   }
+  function toggleStepHasChildren(idx: number) {
+    setSteps((prev) =>
+      prev.map((s, i) => {
+        if (i !== idx) return s;
+        const hasChildren = s.children && s.children.length > 0;
+        if (hasChildren) return { ...s, children: [] };
+        return {
+          ...s,
+          children: [{ name: "", url: null, instructions: null, children: [] }],
+        };
+      })
+    );
+  }
+  function setChild(
+    idx: number,
+    childIdx: number,
+    patch: Partial<{ name: string; url: string | null; instructions: string | null }>
+  ) {
+    setSteps((prev) =>
+      prev.map((s, i) => {
+        if (i !== idx) return s;
+        return {
+          ...s,
+          children: (s.children ?? []).map((c, ci) =>
+            ci === childIdx ? { ...c, ...patch } : c
+          ),
+        };
+      })
+    );
+  }
+  function addChild(idx: number) {
+    setSteps((prev) =>
+      prev.map((s, i) =>
+        i !== idx
+          ? s
+          : {
+              ...s,
+              children: [
+                ...(s.children ?? []),
+                { name: "", url: null, instructions: null, children: [] },
+              ],
+            }
+      )
+    );
+  }
+  function removeChild(idx: number, childIdx: number) {
+    setSteps((prev) =>
+      prev.map((s, i) =>
+        i !== idx
+          ? s
+          : {
+              ...s,
+              children: (s.children ?? []).filter((_, ci) => ci !== childIdx),
+            }
+      )
+    );
+  }
   function addStep() {
     setSteps((prev) => {
       if (prev.length >= MAX_PLAYBOOK_STEPS) return prev;
-      const next = [...prev, { name: "", url: null, instructions: null }];
+      const next = [
+        ...prev,
+        { name: "", url: null, instructions: null, children: [] },
+      ];
       // Jump the right pane to the newly added step so the user can type
       // immediately.
       setSelectedStepIdx(next.length - 1);
@@ -422,16 +490,20 @@ function ResearchEditor({
       const res = await upsertResearchTemplate({
         id: row?.id ?? null,
         name: name.trim(),
-        // Playbook-level description is no longer surfaced in the UI (per
-        // design decision); preserve any existing value rather than wipe it
-        // when an old playbook is edited. New playbooks pass null.
-        description: row?.description ?? null,
-        state: stateCode.trim() || null,
-        sale_type: saleType || null,
+        description: description.trim() || null,
+        state: row?.state ?? null,
+        sale_type: row?.sale_type ?? null,
+        apply_mode: applyMode,
+        apply_states: applyMode === "match" ? applyStates : [],
         steps: steps.map((s) => ({
           name: s.name,
           url: s.url,
           instructions: s.instructions,
+          children: (s.children ?? []).map((c) => ({
+            name: c.name,
+            url: c.url,
+            instructions: c.instructions,
+          })),
         })),
       });
       if (!res.ok) {
@@ -516,56 +588,190 @@ function ResearchEditor({
         />
       </div>
       <div className="drawer-field">
-        <label className="drawer-label">State</label>
+        <label className="drawer-label">Short Description</label>
         <div className="drawer-hint">
-          This playbook is automatically applied to every matching lead.
-          Pick a specific state to limit it, or leave All States to apply
-          regardless of state.
+          Optional one-liner shown on the playbook list. Leave blank to
+          skip.
         </div>
-        <select
+        <input
           className="input"
-          style={{ width: 220 }}
-          value={stateCode}
-          onChange={(e) => setStateCode(e.target.value)}
-        >
-          <option value="">All States</option>
-          {US_STATE_OPTIONS.map((s) => (
-            <option key={s.code} value={s.code}>
-              {s.code} — {s.label}
-            </option>
-          ))}
-        </select>
+          style={{ width: "100%" }}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Three calls, three texts, two letters, close"
+        />
       </div>
       <div className="drawer-field">
-        <label className="drawer-label">Sale Type</label>
-        <div className="role-choice">
-          {(["", "TAX", "MTG"] as const).map((v) => (
+        <label className="drawer-label">When To Apply</label>
+        <div className="drawer-hint">
+          Pick how this playbook attaches to imported leads. You can
+          change it any time.
+        </div>
+        <div className="role-choice" style={{ marginTop: 6 }}>
+          {(
+            [
+              {
+                v: "manual",
+                title: "Manually Only",
+                hint: "Reps add this playbook from the lead page.",
+              },
+              {
+                v: "all",
+                title: "All Imported Leads",
+                hint: "Every newly imported lead gets this playbook, no filters.",
+              },
+              {
+                v: "match",
+                title: "Leads That Match States",
+                hint: "Auto-apply when an imported lead's state is in the list below.",
+              },
+            ] as const
+          ).map((opt) => (
             <label
-              key={v || "ANY"}
-              className={"role-choice-card" + (saleType === v ? " selected" : "")}
-              onClick={() => setSaleType(v)}
+              key={opt.v}
+              className={
+                "role-choice-card" + (applyMode === opt.v ? " selected" : "")
+              }
+              onClick={() => setApplyMode(opt.v)}
             >
               <input
                 type="radio"
-                name="sale-type"
-                checked={saleType === v}
-                onChange={() => setSaleType(v)}
+                name="apply-mode"
+                checked={applyMode === opt.v}
+                onChange={() => setApplyMode(opt.v)}
               />
               <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>
-                  {v === "" ? "Any" : v === "TAX" ? "Tax Sale" : "Mortgage"}
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{opt.title}</div>
                 <div style={{ fontSize: 12, color: "var(--text-2)" }}>
-                  {v === ""
-                    ? "Auto-applied to every lead, tax sale or mortgage."
-                    : v === "TAX"
-                      ? "Auto-applied to every tax sale lead."
-                      : "Auto-applied to every mortgage foreclosure lead."}
+                  {opt.hint}
                 </div>
               </div>
             </label>
           ))}
         </div>
+        {applyMode === "match" && (
+          <div style={{ marginTop: 10 }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-3, #64748b)",
+                marginBottom: 6,
+              }}
+            >
+              States &nbsp;
+              <button
+                type="button"
+                onClick={() => setApplyStates(US_STATE_OPTIONS.map((s) => s.code))}
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  color: "var(--brand, #0d4b3a)",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                }}
+              >
+                Select All
+              </button>
+              &nbsp;·&nbsp;
+              <button
+                type="button"
+                onClick={() => setApplyStates([])}
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  color: "var(--text-3, #64748b)",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                }}
+              >
+                Clear All
+              </button>
+              <span style={{ marginLeft: 8 }}>
+                {applyStates.length} of {US_STATE_OPTIONS.length} selected
+              </span>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+                gap: 6,
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                padding: 8,
+                maxHeight: 220,
+                overflowY: "auto",
+                background: "var(--canvas, #fafbfc)",
+              }}
+            >
+              {US_STATE_OPTIONS.map((s) => {
+                const isOn = applyStates.includes(s.code);
+                return (
+                  <label
+                    key={s.code}
+                    onClick={() =>
+                      setApplyStates((prev) =>
+                        isOn
+                          ? prev.filter((x) => x !== s.code)
+                          : [...prev, s.code]
+                      )
+                    }
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "4px 6px",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                      background: isOn ? "rgba(13, 75, 58, 0.08)" : "transparent",
+                      fontSize: 12,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isOn}
+                      onChange={() => {}}
+                      style={{ cursor: "pointer" }}
+                    />
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        fontVariantNumeric: "tabular-nums",
+                        width: 24,
+                      }}
+                    >
+                      {s.code}
+                    </span>
+                    <span
+                      style={{
+                        color: "var(--text-2, #475569)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {s.label}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {applyStates.length === 0 && (
+              <div
+                style={{
+                  fontSize: 11.5,
+                  color: "var(--danger, #b91c1c)",
+                  marginTop: 6,
+                }}
+              >
+                Pick at least one state, or switch to All Imported Leads.
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <div className="drawer-field">
         <label className="drawer-label">Steps</label>
@@ -700,6 +906,22 @@ function ResearchEditor({
                     >
                       {displayName}
                     </span>
+                    {(s.children ?? []).length > 0 && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: "var(--text-3, #64748b)",
+                          background: "var(--surface, #fff)",
+                          border: "1px solid var(--hairline, #e2e8f0)",
+                          borderRadius: 3,
+                          padding: "1px 5px",
+                          fontVariantNumeric: "tabular-nums",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {(s.children ?? []).length}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -840,33 +1062,210 @@ function ResearchEditor({
                   placeholder="https://..."
                 />
               </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: 11,
-                    color: "var(--text-3, #64748b)",
-                    display: "block",
-                    marginBottom: 3,
-                  }}
-                >
-                  Description (optional)
-                </label>
-                <textarea
-                  className="input"
-                  style={{
-                    width: "100%",
-                    minHeight: 100,
-                    resize: "vertical",
-                  }}
-                  value={steps[selectedStepIdx].instructions ?? ""}
-                  onChange={(e) =>
-                    setStep(selectedStepIdx, {
-                      instructions: e.target.value || null,
-                    })
-                  }
-                  placeholder="What should the operator do at this step?"
-                />
-              </div>
+              {(() => {
+                const cur = steps[selectedStepIdx];
+                const hasChildren = (cur.children ?? []).length > 0;
+                return (
+                  <>
+                    {!hasChildren && (
+                      <div>
+                        <label
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-3, #64748b)",
+                            display: "block",
+                            marginBottom: 3,
+                          }}
+                        >
+                          Description (optional)
+                        </label>
+                        <textarea
+                          className="input"
+                          style={{
+                            width: "100%",
+                            minHeight: 100,
+                            resize: "vertical",
+                          }}
+                          value={cur.instructions ?? ""}
+                          onChange={(e) =>
+                            setStep(selectedStepIdx, {
+                              instructions: e.target.value || null,
+                            })
+                          }
+                          placeholder="What should the operator do at this step?"
+                        />
+                      </div>
+                    )}
+                    <label
+                      onClick={() => toggleStepHasChildren(selectedStepIdx)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 10px",
+                        background: "var(--canvas, #fafbfc)",
+                        border: "1px solid var(--hairline, #e2e8f0)",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 30,
+                          height: 18,
+                          borderRadius: 999,
+                          background: hasChildren
+                            ? "var(--brand, #0d4b3a)"
+                            : "#cbd5e1",
+                          position: "relative",
+                          flex: "none",
+                          transition: "background 0.15s ease",
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: 2,
+                            left: hasChildren ? 14 : 2,
+                            width: 14,
+                            height: 14,
+                            borderRadius: "50%",
+                            background: "#fff",
+                            transition: "left 0.15s ease",
+                          }}
+                        />
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 500 }}>
+                        {hasChildren
+                          ? "This Step Has Sub-Steps"
+                          : "This Step Doesn't Have Sub-Steps"}
+                      </span>
+                    </label>
+                    {hasChildren && (
+                      <div
+                        style={{
+                          border: "1px solid var(--hairline, #e2e8f0)",
+                          borderRadius: 6,
+                          overflow: "hidden",
+                          background: "var(--canvas, #fafbfc)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "32px 1.1fr 1.4fr 60px",
+                            gap: 8,
+                            padding: "8px 10px",
+                            borderBottom:
+                              "1px solid var(--hairline, #e2e8f0)",
+                            background: "var(--surface, #fff)",
+                            fontSize: 10.5,
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                            color: "var(--text-3, #64748b)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          <span>#</span>
+                          <span>Sub-Step Name</span>
+                          <span>Description</span>
+                          <span></span>
+                        </div>
+                        {(cur.children ?? []).map((child, ci) => (
+                          <div
+                            key={ci}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "32px 1.1fr 1.4fr 60px",
+                              gap: 8,
+                              padding: "8px 10px",
+                              borderBottom:
+                                ci ===
+                                (cur.children ?? []).length - 1
+                                  ? "none"
+                                  : "1px solid var(--hairline, #e2e8f0)",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-3, #64748b)",
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {selectedStepIdx + 1}.{ci + 1}
+                            </span>
+                            <input
+                              className="input"
+                              style={{ fontSize: 12.5 }}
+                              value={child.name}
+                              onChange={(e) =>
+                                setChild(selectedStepIdx, ci, {
+                                  name: e.target.value,
+                                })
+                              }
+                              placeholder="Sub-step name"
+                            />
+                            <input
+                              className="input"
+                              style={{ fontSize: 12.5 }}
+                              value={child.instructions ?? ""}
+                              onChange={(e) =>
+                                setChild(selectedStepIdx, ci, {
+                                  instructions: e.target.value || null,
+                                })
+                              }
+                              placeholder="Optional"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeChild(selectedStepIdx, ci)}
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-3, #64748b)",
+                                background: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                                padding: "4px 6px",
+                                borderRadius: 4,
+                              }}
+                              onMouseEnter={(e) =>
+                                ((e.currentTarget as HTMLButtonElement).style.color =
+                                  "var(--danger, #b91c1c)")
+                              }
+                              onMouseLeave={(e) =>
+                                ((e.currentTarget as HTMLButtonElement).style.color =
+                                  "var(--text-3, #64748b)")
+                              }
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => addChild(selectedStepIdx)}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            padding: "8px 10px",
+                            background: "var(--surface, #fff)",
+                            borderTop: "1px solid var(--hairline, #e2e8f0)",
+                            color: "var(--brand, #0d4b3a)",
+                            fontSize: 12,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                            textAlign: "center",
+                          }}
+                        >
+                          + Add Sub-Step
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

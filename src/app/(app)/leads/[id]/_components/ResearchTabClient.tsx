@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
+  IconCheck,
   IconExternalLink,
   IconChevronDown,
   IconChevronRight,
@@ -22,7 +23,6 @@ import type {
   AvailableTemplate,
 } from "@/lib/leads/fetch-research";
 import { Modal } from "@/components/Modal";
-import { cn } from "@/lib/cn";
 
 // Fix ZZZZ2: Research tab. A lead carries its own snapshot of one or more
 // checklists. Each checklist is a collapsible section with a petrol-tinted
@@ -43,16 +43,64 @@ function displayHeader(name: string): string {
   return name.replace(/-/g, " ");
 }
 
+// Parse a step name into { parent, leaf } when it follows the
+// "Parent · Child" format the snapshot flatten emits for nested templates.
+// Plain steps (no separator) are treated as their own parent group with a
+// single leaf using the same name — render path renders them as one row.
+function splitStepName(name: string): { parent: string; leaf: string } {
+  const i = name.indexOf(" · ");
+  if (i <= 0) return { parent: name, leaf: name };
+  return { parent: name.slice(0, i), leaf: name.slice(i + 3) };
+}
+
+type Group = {
+  parent: string;
+  leaves: Array<{ name: string; idx: number; isStandalone: boolean }>;
+};
+
+function groupSteps(steps: LeadResearchTemplate["steps"]): Group[] {
+  const groups: Group[] = [];
+  let cur: Group | null = null;
+  steps.forEach((step, idx) => {
+    const { parent, leaf } = splitStepName(step.name);
+    const isStandalone = leaf === parent;
+    if (isStandalone) {
+      cur = { parent, leaves: [{ name: leaf, idx, isStandalone: true }] };
+      groups.push(cur);
+      cur = null;
+    } else {
+      if (!cur || cur.parent !== parent) {
+        cur = { parent, leaves: [] };
+        groups.push(cur);
+      }
+      cur.leaves.push({ name: leaf, idx, isStandalone: false });
+    }
+  });
+  return groups;
+}
+
+export type LeadInfo = {
+  name: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  saleType: string | null;
+  importedAt: string | null;
+  stage: string | null;
+};
+
 export function ResearchTabClient({
   leadId,
   templates: initialTemplates,
   availableTemplates,
   overallFindings,
+  leadInfo,
 }: {
   leadId: string;
   templates: LeadResearchTemplate[];
   availableTemplates: AvailableTemplate[];
   overallFindings: string | null;
+  leadInfo: LeadInfo;
 }) {
   const [, startTransition] = useTransition();
   const [templates, setTemplates] =
@@ -60,8 +108,27 @@ export function ResearchTabClient({
   const [overall, setOverall] = useState(overallFindings ?? "");
   const [savedOverall, setSavedOverall] = useState(overallFindings ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Step keys (`${tIdx}:${sIdx}`) whose findings editor the user has opened.
+  // Step keys (`${tIdx}:${sIdx}`) whose detail panel the rep has explicitly
+  // expanded. Starts empty — every leaf is collapsed on first render, even
+  // ones with saved notes. The Note badge on the leaf row signals that
+  // content exists; clicking the row opens it.
   const [openFindings, setOpenFindings] = useState<Set<string>>(new Set());
+  // Parent-group keys (`${tIdx}:${parent}`) the user has explicitly expanded
+  // after auto-collapse. Fully-done groups collapse by default; clicking
+  // Show re-opens them.
+  const [expandedDoneGroups, setExpandedDoneGroups] = useState<Set<string>>(
+    new Set()
+  );
+  const toggleDoneGroup = (key: string) =>
+    setExpandedDoneGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  // Step keys that just successfully saved their findings — drives the
+  // inline "Saved" badge so reps see the commit landed.
+  const [savedFlashes, setSavedFlashes] = useState<Set<string>>(new Set());
   // Index of the checklist pending removal confirmation, or null.
   const [confirmRemoveIdx, setConfirmRemoveIdx] = useState<number | null>(null);
 
@@ -96,13 +163,18 @@ export function ResearchTabClient({
 
   function commitStepFindings(tIdx: number, sIdx: number, lrtId: string) {
     const findings = templates[tIdx].steps[sIdx].findings ?? "";
+    const key = `${tIdx}:${sIdx}`;
     startTransition(async () => {
       await saveLeadResearchStepFindings(lrtId, sIdx, findings);
+      setSavedFlashes((prev) => new Set(prev).add(key));
+      setTimeout(() => {
+        setSavedFlashes((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }, 2200);
     });
-  }
-
-  function openFindingsEditor(tIdx: number, sIdx: number) {
-    setOpenFindings((prev) => new Set(prev).add(`${tIdx}:${sIdx}`));
   }
 
   function toggleCollapsed(tIdx: number, lrtId: string) {
@@ -170,12 +242,20 @@ export function ResearchTabClient({
     confirmRemoveIdx != null ? templates[confirmRemoveIdx]?.name ?? "" : "";
 
   return (
-    <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
+    <div className="max-w-[920px] rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
-          Playbooks
-        </h3>
-        {addButton}
+        <div className="flex items-baseline gap-3">
+          <h3 className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
+            Playbooks
+          </h3>
+          <Link
+            href="/playbooks"
+            className="text-[11px] font-medium text-gray-500 hover:text-petrol-700 hover:underline"
+          >
+            See All Playbooks →
+          </Link>
+        </div>
+        {templates.length > 0 && addButton}
       </div>
 
       {templates.length === 0 ? (
@@ -194,149 +274,44 @@ export function ResearchTabClient({
         </div>
       ) : (
         <div className="space-y-4">
-          {templates.map((t, tIdx) => {
-            const total = t.steps.length;
-            const doneCount = t.steps.filter((s) => s.done).length;
-            const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
-            return (
-              <div
-                key={t.id}
-                className="overflow-hidden rounded-xl border border-gray-200 bg-surface"
-              >
-                {/* Petrol-tinted section header — name · progress · collapse · X. */}
-                <div className="flex items-center gap-2 border-b border-gray-200 bg-[#f3f4f6] px-3 py-[10px]">
-                  <button
-                    type="button"
-                    onClick={() => toggleCollapsed(tIdx, t.id)}
-                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
-                  >
-                    {t.collapsed ? (
-                      <IconChevronRight size={14} stroke={2.25} className="shrink-0 text-gray-500" />
-                    ) : (
-                      <IconChevronDown size={14} stroke={2.25} className="shrink-0 text-gray-500" />
-                    )}
-                    <span className="truncate text-[13px] font-medium text-[#0d4b3a]">
-                      {displayHeader(t.name)}
-                    </span>
-                  </button>
-                  <span className="shrink-0 text-[11px] font-medium text-gray-500">
-                    {doneCount} / {total} {total === 1 ? "Step" : "Steps"} Done
-                  </span>
-                  {t.sourceTemplateId && (
-                    <Link
-                      href={`/playbooks/${t.sourceTemplateId}`}
-                      className="shrink-0 text-[11px] font-medium text-[#0d4b3a] hover:underline"
-                      title="See every lead currently using this playbook"
-                    >
-                      View Board →
-                    </Link>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setConfirmRemoveIdx(tIdx)}
-                    className="shrink-0 cursor-pointer rounded p-[2px] text-gray-400 hover:bg-white hover:text-danger"
-                    aria-label="Remove template from lead"
-                    title="Remove from lead"
-                  >
-                    <IconX size={14} stroke={2.25} />
-                  </button>
-                </div>
-                {/* Thin progress bar reflecting done / total. */}
-                <div className="h-[3px] w-full bg-gray-200">
-                  <div
-                    className="h-full bg-[#13644e] transition-[width] duration-200"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                {!t.collapsed && (
-                  <div className="divide-y divide-gray-150">
-                    {t.steps.map((step, sIdx) => {
-                      const hasFindings = (step.findings ?? "").trim() !== "";
-                      const findingsOpen = hasFindings || openFindings.has(`${tIdx}:${sIdx}`);
-                      return (
-                        <div
-                          key={sIdx}
-                          className={cn(
-                            "flex items-start gap-3 px-3 py-[10px] transition-opacity",
-                            step.done && "opacity-60"
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={step.done}
-                            onChange={() => toggleDone(tIdx, sIdx, t.id)}
-                            className="mt-[3px] h-[14px] w-[14px] shrink-0 cursor-pointer"
-                            aria-label={step.done ? "Mark not done" : "Mark done"}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-3">
-                              <span
-                                className={cn(
-                                  "text-[13px] font-medium leading-snug text-ink",
-                                  step.done && "text-gray-400 line-through"
-                                )}
-                              >
-                                {step.name}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => openFindingsEditor(tIdx, sIdx)}
-                                className="shrink-0 cursor-pointer whitespace-nowrap text-[11px] text-gray-500 underline-offset-2 hover:text-petrol-700 hover:underline"
-                              >
-                                {hasFindings ? "Edit Findings" : "Add Findings"}
-                              </button>
-                            </div>
-                            {step.instructions && (
-                              <div className="mt-[2px] text-[11.5px] leading-snug text-gray-500">
-                                {step.instructions}
-                              </div>
-                            )}
-                            {step.url && (
-                              <a
-                                href={step.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-[2px] inline-flex cursor-pointer items-center gap-1 break-all text-[11px] text-petrol-500 underline hover:text-petrol-700"
-                              >
-                                {step.url}
-                                <IconExternalLink size={10} stroke={1.75} className="shrink-0" />
-                              </a>
-                            )}
-                            {findingsOpen && (
-                              <textarea
-                                value={step.findings ?? ""}
-                                onChange={(e) => updateStep(tIdx, sIdx, { findings: e.target.value })}
-                                onBlur={() => commitStepFindings(tIdx, sIdx, t.id)}
-                                rows={3}
-                                placeholder="Findings"
-                                autoFocus={!hasFindings}
-                                className="mt-2 w-full resize-y rounded-md bg-[#f1f5f9] px-2 py-[6px] text-[12px] text-ink outline-none placeholder:text-gray-400 focus:ring-1 focus:ring-petrol-200"
-                              />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {templates.map((t, tIdx) => (
+            <PlaybookTimeline
+              key={t.id}
+              t={t}
+              tIdx={tIdx}
+              leadInfo={leadInfo}
+              openFindings={openFindings}
+              setOpenFindings={setOpenFindings}
+              savedFlashes={savedFlashes}
+              expandedDoneGroups={expandedDoneGroups}
+              onToggleDoneGroup={toggleDoneGroup}
+              onToggleDone={toggleDone}
+              onUpdateStep={updateStep}
+              onCommitFindings={commitStepFindings}
+              onCollapseToggle={() => toggleCollapsed(tIdx, t.id)}
+              onRemove={() => setConfirmRemoveIdx(tIdx)}
+            />
+          ))}
         </div>
       )}
 
-      <div className="mt-5 rounded-xl border border-gray-200 bg-[#f8fafc] p-4">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#0d4b3a]">
-            Overall Findings
-          </span>
+      <div className="mt-5 overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-card">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
+          <div>
+            <div className="text-[13px] font-semibold text-ink">
+              Lead Summary
+            </div>
+            <div className="mt-0.5 text-[11.5px] text-gray-500">
+              One paragraph the team can scan instead of every step note.
+            </div>
+          </div>
           <button
             type="button"
             onClick={commitOverall}
             disabled={!overallDirty}
             className="btn-primary cursor-pointer rounded-md px-3 py-[5px] text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Save Findings
+            Save Summary
           </button>
         </div>
         <textarea
@@ -344,8 +319,8 @@ export function ResearchTabClient({
           onChange={(e) => setOverall(e.target.value)}
           onBlur={commitOverall}
           rows={4}
-          placeholder="Summarize your research findings here. Saved findings are also posted as a note on this lead."
-          className="w-full resize-y rounded-md border border-gray-200 bg-surface px-3 py-2 text-[13px] text-ink outline-none placeholder:text-gray-400 focus:border-petrol-500"
+          placeholder="Write the big picture on this lead. Who is the owner, what's the situation, where are you in the play. Saves on blur. Step notes from above are separate."
+          className="w-full resize-y border-0 bg-surface px-4 py-3 text-[13px] text-ink outline-none placeholder:text-gray-400"
         />
       </div>
 
@@ -427,6 +402,434 @@ export function ResearchTabClient({
           </button>
         </div>
       </Modal>
+
+      <PlaybookTimelineCss />
     </div>
+  );
+}
+
+function formatUSDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function PlaybookTimeline({
+  t,
+  tIdx,
+  leadInfo,
+  openFindings,
+  setOpenFindings,
+  savedFlashes,
+  expandedDoneGroups,
+  onToggleDoneGroup,
+  onToggleDone,
+  onUpdateStep,
+  onCommitFindings,
+  onCollapseToggle,
+  onRemove,
+}: {
+  t: LeadResearchTemplate;
+  tIdx: number;
+  leadInfo: LeadInfo;
+  openFindings: Set<string>;
+  setOpenFindings: React.Dispatch<React.SetStateAction<Set<string>>>;
+  savedFlashes: Set<string>;
+  expandedDoneGroups: Set<string>;
+  onToggleDoneGroup: (key: string) => void;
+  onToggleDone: (tIdx: number, sIdx: number, lrtId: string) => void;
+  onUpdateStep: (
+    tIdx: number,
+    sIdx: number,
+    patch: Partial<LeadResearchTemplate["steps"][number]>
+  ) => void;
+  onCommitFindings: (tIdx: number, sIdx: number, lrtId: string) => void;
+  onCollapseToggle: () => void;
+  onRemove: () => void;
+}) {
+  const groups = useMemo(() => groupSteps(t.steps), [t.steps]);
+  const total = t.steps.length;
+  const doneCount = t.steps.filter((s) => s.done).length;
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+  const nextIdx = t.steps.findIndex((s) => !s.done);
+
+  const ownerName = leadInfo.name ?? "Lead";
+  const initials = ownerName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase() || "LD";
+  const addressLine = [
+    leadInfo.address,
+    [leadInfo.city, leadInfo.state].filter(Boolean).join(", "),
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const subParts = [
+    addressLine,
+    leadInfo.saleType === "TAX"
+      ? "Tax Sale"
+      : leadInfo.saleType === "MTG"
+        ? "Mortgage Foreclosure"
+        : null,
+    leadInfo.importedAt
+      ? `Added ${formatUSDate(leadInfo.importedAt) ?? ""}`.trim()
+      : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="ptl">
+      <div
+        className="ptl__head"
+        role="button"
+        tabIndex={0}
+        onClick={onCollapseToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onCollapseToggle();
+          }
+        }}
+        aria-expanded={!t.collapsed}
+      >
+        <div className="ptl__head-row1">
+          <div className="ptl__avatar">{initials}</div>
+          <div className="ptl__meta">
+            <div className="ptl__lead-name">{ownerName}</div>
+            {subParts.length > 0 && (
+              <div className="ptl__lead-sub">
+                {subParts.map((p, i) => (
+                  <span key={i}>
+                    {p}
+                    {i < subParts.length - 1 && (
+                      <span className="ptl__lead-sep"> · </span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <span className="ptl__collapse-pill" aria-hidden="true">
+            {t.collapsed ? (
+              <>
+                <span>Show {total} {total === 1 ? "Step" : "Steps"}</span>
+                <IconChevronRight size={13} stroke={2.25} />
+              </>
+            ) : (
+              <>
+                <span>Hide</span>
+                <IconChevronDown size={13} stroke={2.25} />
+              </>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="ptl__lead-x"
+            aria-label="Remove playbook from lead"
+            title="Remove playbook from lead"
+          >
+            <IconX size={14} stroke={2.25} />
+          </button>
+        </div>
+        <div className="ptl__head-row2">
+          <div className="ptl__title">
+            Playbook <span className="ptl__title-sep">·</span>{" "}
+            {displayHeader(t.name)}
+          </div>
+          <div className="ptl__head-meta">
+            <span className="ptl__top-meta">
+              {total} {total === 1 ? "Step" : "Steps"}
+            </span>
+            {t.sourceTemplateId && (
+              <Link
+                href={`/playbooks/${t.sourceTemplateId}`}
+                className="ptl__view"
+                onClick={(e) => e.stopPropagation()}
+              >
+                See Other Leads →
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {!t.collapsed && (
+        <div className="ptl__body">
+          {groups.map((g, gi) => {
+            const groupSteps = g.leaves.map((l) => t.steps[l.idx]);
+            const groupDone = groupSteps.every((s) => s.done);
+            const groupNext = groupSteps.some((s) => !s.done);
+            const isLastGroup = gi === groups.length - 1;
+            const isStandaloneOne =
+              g.leaves[0]?.isStandalone && g.leaves.length === 1;
+            const groupKey = `${tIdx}:${gi}`;
+            // Auto-collapse fully-done multi-leaf parents so reps see only
+            // active work. Standalone single-leaf groups stay visible —
+            // there's nothing to expand back to.
+            const canAutoCollapse = !isStandaloneOne && groupDone;
+            const expanded = !canAutoCollapse || expandedDoneGroups.has(groupKey);
+            return (
+              <div
+                key={gi}
+                className={
+                  "ptl__node" + (groupDone ? " is-done" : "") + (isLastGroup ? " is-last" : "")
+                }
+              >
+                <div className="ptl__trunk" />
+                <div className="ptl__dot" />
+                {isStandaloneOne ? null : (
+                  <div className="ptl__group-head">
+                    <span className="ptl__group-name">{g.parent}</span>
+                    <span className="ptl__group-prog">
+                      <strong>{groupSteps.filter((s) => s.done).length}</strong>{" "}
+                      of {g.leaves.length} Done
+                    </span>
+                  </div>
+                )}
+                {canAutoCollapse && !expanded && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleDoneGroup(groupKey)}
+                    className="ptl__group-show"
+                  >
+                    Show {g.leaves.length}{" "}
+                    {g.leaves.length === 1 ? "Step" : "Steps"}
+                    <IconChevronRight size={13} stroke={2.25} />
+                  </button>
+                )}
+                {canAutoCollapse && expanded && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleDoneGroup(groupKey)}
+                    className="ptl__group-show"
+                  >
+                    Hide
+                    <IconChevronDown size={13} stroke={2.25} />
+                  </button>
+                )}
+                <div
+                  className="ptl__branch"
+                  style={expanded ? undefined : { display: "none" }}
+                >
+                  {g.leaves.map((leaf) => {
+                    const step = t.steps[leaf.idx];
+                    const isCurrent = leaf.idx === nextIdx;
+                    const key = `${tIdx}:${leaf.idx}`;
+                    const hasFindings = (step.findings ?? "").trim() !== "";
+                    const detailOpen = openFindings.has(key);
+                    const labelText =
+                      leaf.isStandalone && g.leaves.length === 1
+                        ? g.parent
+                        : leaf.name;
+                    return (
+                      <div key={leaf.idx}>
+                        <div
+                          className={
+                            "ptl__leaf" +
+                            (step.done ? " is-done" : "") +
+                            (isCurrent ? " is-current" : "") +
+                            (groupNext ? "" : "")
+                          }
+                        >
+                          <button
+                            type="button"
+                            onClick={() => onToggleDone(tIdx, leaf.idx, t.id)}
+                            className="ptl__check"
+                            aria-label={step.done ? "Mark not done" : "Mark done"}
+                          >
+                            {step.done && (
+                              <IconCheck
+                                size={11}
+                                stroke={3.25}
+                                color="#fff"
+                              />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenFindings((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(key)) next.delete(key);
+                                else next.add(key);
+                                return next;
+                              });
+                            }}
+                            className="ptl__leaf-body"
+                          >
+                            <span className="ptl__leaf-label">{labelText}</span>
+                            {hasFindings && (
+                              <span className="ptl__leaf-noted" title="Has a note">
+                                Note
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                        {detailOpen && (
+                          <div className="ptl__detail">
+                            {step.instructions && (
+                              <>
+                                <div className="ptl__detail-lbl">Description</div>
+                                <div className="ptl__detail-body">
+                                  {step.instructions}
+                                </div>
+                              </>
+                            )}
+                            {step.url && (
+                              <>
+                                <div className="ptl__detail-lbl">Link</div>
+                                <a
+                                  href={step.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="ptl__detail-link"
+                                >
+                                  {step.url}
+                                  <IconExternalLink size={11} stroke={1.75} />
+                                </a>
+                              </>
+                            )}
+                            <div className="ptl__detail-lblrow">
+                              <span className="ptl__detail-lbl">Your Notes</span>
+                              {savedFlashes.has(key) && (
+                                <span className="ptl__detail-saved">
+                                  Saved Just Now
+                                </span>
+                              )}
+                            </div>
+                            <textarea
+                              value={step.findings ?? ""}
+                              onChange={(e) =>
+                                onUpdateStep(tIdx, leaf.idx, {
+                                  findings: e.target.value,
+                                })
+                              }
+                              onBlur={() =>
+                                onCommitFindings(tIdx, leaf.idx, t.id)
+                              }
+                              rows={3}
+                              placeholder="What happened on this step? Saves when you click out."
+                              autoFocus={!hasFindings}
+                              className="ptl__detail-input"
+                            />
+                            <div className="ptl__detail-hint">
+                              Saves automatically when you click out. Notes also
+                              appear in the lead Activity feed.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="ptl__progress">
+            <span className="ptl__progress-lbl">Playbook Progress</span>
+            <div className="ptl__progress-bar">
+              <div className="ptl__progress-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="ptl__progress-stat">
+              <strong>{doneCount}</strong> of {total} Done
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlaybookTimelineCss() {
+  return (
+    <style>{`
+.ptl { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,41,0.04), 0 1px 3px rgba(15,23,41,0.06); }
+.ptl__head { padding: 14px 18px 12px; border-bottom: 1px solid #e5e7eb; background: #fafbfc; border-radius: 10px 10px 0 0; cursor: pointer; transition: background 0.12s ease; outline: none; }
+.ptl__head:hover { background: #f3f4f6; }
+.ptl__head:focus-visible { box-shadow: inset 0 0 0 2px #0d4b3a; }
+.ptl__head-row1 { display: flex; align-items: center; gap: 14px; }
+.ptl__head-row2 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-left: 50px; margin-top: 10px; }
+.ptl__head-meta { display: flex; align-items: baseline; gap: 14px; flex: none; }
+.ptl__avatar { width: 36px; height: 36px; border-radius: 50%; background: #0d4b3a; color: #fff; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: none; }
+.ptl__meta { flex: 1; min-width: 0; }
+.ptl__lead-name { font-size: 14px; font-weight: 600; color: #0f1729; }
+.ptl__lead-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
+.ptl__lead-sep { color: #d1d5db; padding: 0 4px; }
+.ptl__collapse-pill { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: #fff; border: 1px solid #e5e7eb; color: #0f1729; font-size: 11.5px; font-weight: 600; }
+.ptl__head:hover .ptl__collapse-pill { border-color: #0d4b3a; color: #0d4b3a; }
+.ptl__lead-x { flex: none; background: transparent; border: 0; color: #9ca3af; padding: 4px; border-radius: 4px; cursor: pointer; }
+.ptl__lead-x:hover { background: #fff; color: #b91c1c; }
+
+.ptl__title { font-size: 15px; font-weight: 600; color: #0f1729; letter-spacing: -0.005em; }
+.ptl__title-sep { color: #9ca3af; padding: 0 4px; font-weight: 400; }
+.ptl__view { font-size: 11.5px; color: #0d4b3a; font-weight: 600; }
+.ptl__view:hover { text-decoration: underline; }
+.ptl__top-meta { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; }
+
+.ptl__body { padding: 18px 22px 22px; }
+.ptl__node { position: relative; padding-left: 32px; padding-bottom: 20px; }
+.ptl__node.is-last { padding-bottom: 0; }
+.ptl__trunk { position: absolute; left: 9px; top: 22px; bottom: -2px; width: 2px; background: #e5e7eb; }
+.ptl__node.is-last .ptl__trunk { display: none; }
+.ptl__node.is-done .ptl__trunk { background: #0d4b3a; }
+.ptl__dot { position: absolute; left: 3px; top: 4px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #d1d5db; background: #fff; display: flex; align-items: center; justify-content: center; }
+.ptl__node.is-done .ptl__dot { background: #0d4b3a; border-color: #0d4b3a; }
+.ptl__node.is-done .ptl__dot svg { display: block; }
+
+.ptl__group-head { display: flex; align-items: baseline; gap: 10px; }
+.ptl__group-name { font-size: 14px; font-weight: 600; color: #0f1729; letter-spacing: -0.005em; }
+.ptl__group-prog { font-size: 11.5px; color: #6b7280; margin-left: auto; font-variant-numeric: tabular-nums; }
+.ptl__group-prog strong { color: #0f1729; font-weight: 600; }
+.ptl__branch { margin-top: 6px; display: flex; flex-direction: column; }
+.ptl__group-show { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 4px 0; background: transparent; border: 0; color: #6b7280; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; line-height: 1; }
+.ptl__group-show:hover { color: #0d4b3a; }
+.ptl__group-show svg { display: block; }
+
+.ptl__leaf { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; transition: background .12s ease; }
+.ptl__leaf:hover { background: #fafbfc; }
+.ptl__check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #d1d5db; background: #fff; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.ptl__leaf:hover .ptl__check { border-color: #0f1729; }
+.ptl__leaf.is-done .ptl__check { background: #0d4b3a; border-color: #0d4b3a; }
+.ptl__leaf.is-done .ptl__check svg { display: block; }
+.ptl__leaf.is-current .ptl__check { border-color: #0d4b3a; box-shadow: 0 0 0 3px rgba(13,75,58,0.15); }
+.ptl__leaf-body { display: flex; align-items: center; gap: 10px; background: transparent; border: 0; padding: 0; color: #0f1729; font-family: inherit; font-size: 13px; cursor: pointer; text-align: left; min-width: 0; }
+.ptl__leaf-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptl__leaf.is-done .ptl__leaf-label { color: #6b7280; text-decoration: line-through; text-decoration-color: #d1d5db; }
+.ptl__leaf.is-current .ptl__leaf-label { font-weight: 600; }
+.ptl__leaf-here { font-size: 10px; color: #0d4b3a; letter-spacing: 0.08em; font-weight: 700; text-transform: uppercase; flex: none; }
+.ptl__leaf-noted { font-size: 10px; color: #374151; background: #fafbfc; border: 1px solid #e5e7eb; padding: 2px 6px; border-radius: 3px; font-weight: 600; flex: none; letter-spacing: 0.04em; }
+
+.ptl__detail-lblrow { display: flex; align-items: center; justify-content: space-between; }
+.ptl__detail-saved { font-size: 10.5px; color: #0d4b3a; font-weight: 600; letter-spacing: 0.04em; }
+.ptl__detail-hint { font-size: 10.5px; color: #9ca3af; margin-top: 4px; }
+
+.ptl__detail { margin: 0 -8px 6px; padding: 12px 16px 14px 36px; background: #fafbfc; border-left: 3px solid #0d4b3a; border-radius: 0 6px 6px 0; }
+.ptl__detail-lbl { font-size: 10.5px; color: #6b7280; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+.ptl__detail-lbl + .ptl__detail-lbl { margin-top: 10px; }
+.ptl__detail-body { font-size: 13px; line-height: 1.55; color: #374151; margin-bottom: 8px; }
+.ptl__detail-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #0d4b3a; text-decoration: underline; margin-bottom: 8px; word-break: break-all; }
+.ptl__detail-link:hover { color: #13644e; }
+.ptl__detail-input { width: 100%; border: 1px solid #e5e7eb; border-radius: 5px; background: #fff; padding: 8px 10px; font-family: inherit; font-size: 12.5px; resize: vertical; min-height: 56px; margin-top: 4px; }
+.ptl__detail-input:focus { outline: 0; border-color: #0d4b3a; }
+
+.ptl__progress { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e5e7eb; display: flex; align-items: center; gap: 14px; }
+.ptl__progress-lbl { font-size: 12px; color: #6b7280; white-space: nowrap; }
+.ptl__progress-bar { flex: 1; height: 9px; background: #f3f4f6; border-radius: 999px; overflow: hidden; }
+.ptl__progress-fill { height: 100%; background: #0d4b3a; transition: width .25s ease; }
+.ptl__progress-stat { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ptl__progress-stat strong { color: #0f1729; font-weight: 600; }
+    `}</style>
   );
 }

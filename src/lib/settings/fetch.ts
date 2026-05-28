@@ -525,18 +525,33 @@ export async function fetchStatePhoneNumbers(): Promise<StatePhoneRow[]> {
 
 // -- Research templates (Fix 36) ---------------------------------------------
 
+// A research step is either a single checkbox or a parent holding nested
+// sub-steps. The shape is the same recursively, so the editor and the
+// per-lead view can render either level uniformly. Empty `children`
+// means a single-step parent (no nesting).
 export type ResearchStep = {
   name: string;
   url: string | null;
   instructions: string | null;
+  children: ResearchStep[];
 };
+
+// How a playbook auto-attaches to imported leads.
+//   manual = reps add it themselves from the lead page
+//   all    = every newly imported lead gets it, no filter
+//   match  = only leads whose state is in apply_states
+export type PlaybookApplyMode = "manual" | "all" | "match";
 
 export type ResearchTemplateRow = {
   id: string;
   name: string;
   description: string | null;
+  // Legacy single-state field. New code reads apply_states. Kept for
+  // back-compat with playbook board queries that still filter on it.
   state: string | null;
   sale_type: "TAX" | "MTG" | null;
+  apply_mode: PlaybookApplyMode;
+  apply_states: string[];
   steps: ResearchStep[];
 };
 
@@ -551,15 +566,28 @@ function normalizeSteps(raw: unknown): ResearchStep[] {
         typeof obj.instructions === "string" && obj.instructions
           ? obj.instructions
           : null,
+      children: normalizeSteps(obj.children),
     };
   });
+}
+
+function normalizeApplyMode(raw: unknown): PlaybookApplyMode {
+  return raw === "all" || raw === "manual" || raw === "match" ? raw : "match";
+}
+
+function normalizeApplyStates(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((s): s is string => typeof s === "string")
+    .map((s) => s.toUpperCase())
+    .filter((s) => /^[A-Z]{2}$/.test(s));
 }
 
 export async function fetchResearchTemplates(): Promise<ResearchTemplateRow[]> {
   const sb = await createClient();
   const { data, error } = await sb
     .from("research_templates")
-    .select("id, name, description, state, sale_type, steps")
+    .select("id, name, description, state, sale_type, apply_mode, apply_states, steps")
     .order("name", { ascending: true });
   if (error) throw error;
   return (data ?? []).map((r) => ({
@@ -573,6 +601,8 @@ export async function fetchResearchTemplates(): Promise<ResearchTemplateRow[]> {
         : (r.sale_type as string) === "MTG"
           ? "MTG"
           : null,
+    apply_mode: normalizeApplyMode(r.apply_mode),
+    apply_states: normalizeApplyStates(r.apply_states),
     steps: normalizeSteps(r.steps),
   }));
 }

@@ -5,9 +5,8 @@
 // component that Settings does so the create / edit experience is identical
 // in both places (no separate forms to maintain).
 
-import { useState } from "react";
 import Link from "next/link";
-import { TemplateEditorDrawer, type TemplateEditorState } from "@/app/(app)/settings/_components/TemplateEditorDrawer";
+import { useRouter } from "next/navigation";
 import type { PlaybookListItem } from "@/lib/playbooks/types";
 
 export function PlaybooksClient({
@@ -15,13 +14,10 @@ export function PlaybooksClient({
 }: {
   playbooks: PlaybookListItem[];
 }) {
-  const [editor, setEditor] = useState<TemplateEditorState>({ kind: "closed" });
+  const router = useRouter();
 
   function openCreate() {
-    setEditor({ kind: "new", channel: "research" });
-  }
-  function closeEditor() {
-    setEditor({ kind: "closed" });
+    router.push("/settings/playbooks/new");
   }
 
   return (
@@ -103,7 +99,6 @@ export function PlaybooksClient({
         </div>
       )}
 
-      <TemplateEditorDrawer state={editor} onClose={closeEditor} />
     </div>
   );
 }

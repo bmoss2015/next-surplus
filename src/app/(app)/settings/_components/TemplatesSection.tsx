@@ -3,10 +3,9 @@
 // Settings clone · Phase D.4 — Templates with editor drawer.
 //
 // Three internal tabs share a single panel state: Email, SMS, Research.
-// Email and SMS pull from TemplateRow[] (channel filter), Research pulls
-// from ResearchTemplateRow[]. Add Template + per-row Edit pencil both open
-// <TemplateEditorDrawer /> which routes to the right editor based on the
-// active tab (or the row's channel for edits).
+// Email and SMS still open the drawer in-place; Playbooks navigate to
+// /settings/playbooks/[id] (or /new) for the full-page editor with the
+// SettingsSaveBar.
 
 import { useMemo, useState } from "react";
 import type {
@@ -18,11 +17,10 @@ import {
   type TemplateEditorState,
 } from "./TemplateEditorDrawer";
 
-type Tab = "email" | "sms" | "research";
+type Tab = "email" | "sms";
 
 export function TemplatesSection({
   templates,
-  research,
   canEdit,
 }: {
   templates: TemplateRow[];
@@ -31,6 +29,7 @@ export function TemplatesSection({
 }) {
   const [tab, setTab] = useState<Tab>("email");
   const [editor, setEditor] = useState<TemplateEditorState>({ kind: "closed" });
+  const openCreate = () => setEditor({ kind: "new", channel: tab });
 
   const email = useMemo(
     () => templates.filter((t) => t.channel.toLowerCase() === "email"),
@@ -44,17 +43,10 @@ export function TemplatesSection({
   const counts = {
     email: email.length,
     sms: sms.length,
-    research: research.length,
   };
 
-  const crumbLabel =
-    tab === "email" ? "Email" : tab === "sms" ? "SMS" : "Playbooks";
-  const addLabel =
-    tab === "email"
-      ? "Add Email Template"
-      : tab === "sms"
-        ? "Add SMS Template"
-        : "Add Playbook";
+  const crumbLabel = tab === "email" ? "Email" : "SMS";
+  const addLabel = tab === "email" ? "Add Email Template" : "Add SMS Template";
 
   return (
     <section id="panel-templates" className="panel active">
@@ -67,17 +59,17 @@ export function TemplatesSection({
       </div>
       <div className="page-head">
         <div>
-          <h1 className="section-h1">Templates</h1>
+          <h1 className="section-h1">Message Templates</h1>
           <p className="section-desc">
-            Reusable email bodies, SMS messages, and playbook checklists with
-            merge fields.
+            Reusable email bodies and SMS messages with merge fields.
+            Playbooks moved to their own section in the rail on the left.
           </p>
         </div>
         {canEdit && (
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            onClick={() => setEditor({ kind: "new", channel: tab })}
+            onClick={openCreate}
           >
             <i className="icon icon-plus" /> {addLabel}
           </button>
@@ -99,13 +91,6 @@ export function TemplatesSection({
         >
           SMS<span className="tpl-tab-count">{counts.sms}</span>
         </button>
-        <button
-          type="button"
-          className={"tpl-tab" + (tab === "research" ? " active" : "")}
-          onClick={() => setTab("research")}
-        >
-          Playbooks<span className="tpl-tab-count">{counts.research}</span>
-        </button>
       </div>
 
       {tab === "email" && (
@@ -118,12 +103,6 @@ export function TemplatesSection({
         <SmsList
           rows={sms}
           onEdit={canEdit ? (row) => setEditor({ kind: "edit-template", row }) : null}
-        />
-      )}
-      {tab === "research" && (
-        <ResearchList
-          rows={research}
-          onEdit={canEdit ? (row) => setEditor({ kind: "edit-research", row }) : null}
         />
       )}
 

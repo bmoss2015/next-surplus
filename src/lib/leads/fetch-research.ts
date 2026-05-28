@@ -42,6 +42,8 @@ type RawTemplateRow = {
   name: string;
   state: string | null;
   sale_type: string | null;
+  apply_mode: "manual" | "all" | "match" | null;
+  apply_states: string[] | null;
   steps: unknown;
   created_at: string;
 };
@@ -59,13 +61,44 @@ function normalizeSteps(steps: unknown): LeadResearchStep[] {
 
 function freshStepsFromTemplate(steps: unknown): LeadResearchStep[] {
   if (!Array.isArray(steps)) return [];
-  return (steps as Array<Record<string, unknown>>).map((s) => ({
-    name: String(s.name ?? ""),
-    url: (s.url as string | null) ?? null,
-    instructions: (s.instructions as string | null) ?? null,
-    done: false,
-    findings: null,
-  }));
+  const out: LeadResearchStep[] = [];
+  for (const raw of steps as Array<Record<string, unknown>>) {
+    const parentName = String(raw.name ?? "");
+    const children = Array.isArray(raw.children) ? raw.children : [];
+    if (children.length === 0) {
+      out.push({
+        name: parentName,
+        url: (raw.url as string | null) ?? null,
+        instructions: (raw.instructions as string | null) ?? null,
+        done: false,
+        findings: null,
+      });
+      continue;
+    }
+    // Flatten: parent + N children become N rows named "Parent · Child" so the
+    // existing flat per-lead checklist surfaces every sub-step. The fancy
+    // monochrome timeline view ships in a follow-up; this keeps reps unblocked
+    // on nested playbooks today.
+    for (const childRaw of children as Array<Record<string, unknown>>) {
+      const childName = String(childRaw.name ?? "");
+      const compositeName = childName
+        ? parentName
+          ? `${parentName} · ${childName}`
+          : childName
+        : parentName;
+      out.push({
+        name: compositeName,
+        url: (childRaw.url as string | null) ?? null,
+        instructions:
+          (childRaw.instructions as string | null) ??
+          (raw.instructions as string | null) ??
+          null,
+        done: false,
+        findings: null,
+      });
+    }
+  }
+  return out;
 }
 
 export async function fetchResearch(
@@ -88,19 +121,27 @@ export async function fetchResearch(
   // the one-time snapshot when the Research tab is first opened.
   const { data: allTemplatesRaw } = await sb
     .from("research_templates")
-    .select("id, name, state, sale_type, steps, created_at")
+    .select("id, name, state, sale_type, apply_mode, apply_states, steps, created_at")
     .order("created_at", { ascending: true });
   const allTemplates = (allTemplatesRaw ?? []) as RawTemplateRow[];
 
-  // First open for this lead: snapshot every template that matches the lead's
-  // state / sale type (or is universal). Brand new leads start from the current
-  // templates; older leads keep whatever was already migrated onto them.
+  // First open for this lead: snapshot every template that the new apply rules
+  // attach to this lead. apply_mode='manual' never auto-attaches; 'all' always
+  // attaches; 'match' attaches when the lead's state is in apply_states. For
+  // templates predating migration 0138 the apply_mode column was backfilled
+  // from the legacy single-state column, so existing single-state and
+  // all-states templates behave the same as before.
   if (!initialized) {
-    const matching = allTemplates.filter(
-      (t) =>
-        (t.state == null || t.state === state) &&
-        (t.sale_type == null || t.sale_type === saleType)
-    );
+    const matching = allTemplates.filter((t) => {
+      const mode = t.apply_mode ?? "match";
+      if (mode === "manual") return false;
+      if (mode === "all") return true;
+      const states = Array.isArray(t.apply_states) ? t.apply_states : [];
+      if (states.length > 0) return state ? states.includes(state) : false;
+      // Fall back to legacy single-state column when apply_states is empty.
+      return t.state == null || t.state === state;
+    });
+    void saleType;
     if (matching.length > 0) {
       await sb.from("lead_research_templates").insert(
         matching.map((t, idx) => ({
