@@ -27,6 +27,23 @@ The text AFTER the slash command is the content the user wants added.
 
 ## How to handle a slash command
 
+### Step 0 (REQUIRED): Ground in current build state
+
+Before classifying the user's input or generating any preview, read these files in order so the proposal reflects what is actually shipped:
+
+1. `PROJECT-INVENTORY.md` — factual inventory of what exists in the product today (routes, features, settings sections, integrations, partials)
+2. `product-build-status-roadmap-content.md` — what is currently on the roadmap by quarter
+3. `ARCHITECTURE.md` — vendor and tech-stack decisions
+4. The most recent 30 lines of `CHANGELOG.md` — what shipped most recently
+
+**Conflict-flagging rules (apply during Step 2 preview generation, but driven by what you read in Step 0):**
+
+- If the user's input references a feature that is NOT in `PROJECT-INVENTORY.md` AND NOT in the current roadmap, flag it in the preview: "I don't see X in the inventory or on the roadmap, is this a new initiative or did I miss something?" Do not silently invent wording.
+- If the user's input describes something already listed in `PROJECT-INVENTORY.md` as built, point that out before treating it as a roadmap addition: "X is already shipped per the inventory, did you mean to refine the feature or remove the roadmap mention?"
+- If a roadmap line you are reading or proposing references a vendor or feature that conflicts with the inventory (e.g., "replaces GoHighLevel" when GoHighLevel is not in the stack), flag the conflict and propose corrected wording.
+- Never propose vendor names the user has not already chosen. Default to "(provider to be determined)" for unresolved choices.
+- If `PROJECT-INVENTORY.md` looks stale (a Fix LABEL in recent CHANGELOG ships a user-visible feature that is not reflected in the inventory), say so in the preview and offer to refresh the inventory before continuing.
+
 ### Step 1: Parse the user's intent
 
 Read the text after the slash command. Determine what they're describing:
