@@ -1351,7 +1351,15 @@ export async function saveLeadResearchStepFindings(
     .eq("id", leadResearchTemplateId);
   if (error) return { ok: false, error: error.message };
   const stepName = String(steps[stepIndex].name ?? "Step");
-  await logResearchUpdate(sb, loaded.lead_id, `${stepName} findings updated`);
+  const clean = findings.trim();
+  const snippet = clean.length > 140 ? clean.slice(0, 137) + "…" : clean;
+  await logResearchUpdate(
+    sb,
+    loaded.lead_id,
+    clean
+      ? `${stepName} note saved: ${snippet}`
+      : `${stepName} note cleared`
+  );
   revalidatePath(`/leads/${loaded.lead_id}`);
   return { ok: true };
 }

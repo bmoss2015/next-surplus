@@ -109,6 +109,9 @@ export function ResearchTabClient({
   const [pickerOpen, setPickerOpen] = useState(false);
   // Step keys (`${tIdx}:${sIdx}`) whose findings editor the user has opened.
   const [openFindings, setOpenFindings] = useState<Set<string>>(new Set());
+  // Step keys that just successfully saved their findings — drives the
+  // inline "Saved" badge so reps see the commit landed.
+  const [savedFlashes, setSavedFlashes] = useState<Set<string>>(new Set());
   // Index of the checklist pending removal confirmation, or null.
   const [confirmRemoveIdx, setConfirmRemoveIdx] = useState<number | null>(null);
 
@@ -143,8 +146,17 @@ export function ResearchTabClient({
 
   function commitStepFindings(tIdx: number, sIdx: number, lrtId: string) {
     const findings = templates[tIdx].steps[sIdx].findings ?? "";
+    const key = `${tIdx}:${sIdx}`;
     startTransition(async () => {
       await saveLeadResearchStepFindings(lrtId, sIdx, findings);
+      setSavedFlashes((prev) => new Set(prev).add(key));
+      setTimeout(() => {
+        setSavedFlashes((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }, 2200);
     });
   }
 
@@ -245,6 +257,7 @@ export function ResearchTabClient({
               leadInfo={leadInfo}
               openFindings={openFindings}
               setOpenFindings={setOpenFindings}
+              savedFlashes={savedFlashes}
               onToggleDone={toggleDone}
               onUpdateStep={updateStep}
               onCommitFindings={commitStepFindings}
@@ -380,6 +393,7 @@ function PlaybookTimeline({
   leadInfo,
   openFindings,
   setOpenFindings,
+  savedFlashes,
   onToggleDone,
   onUpdateStep,
   onCommitFindings,
@@ -391,6 +405,7 @@ function PlaybookTimeline({
   leadInfo: LeadInfo;
   openFindings: Set<string>;
   setOpenFindings: React.Dispatch<React.SetStateAction<Set<string>>>;
+  savedFlashes: Set<string>;
   onToggleDone: (tIdx: number, sIdx: number, lrtId: string) => void;
   onUpdateStep: (
     tIdx: number,
@@ -571,6 +586,11 @@ function PlaybookTimeline({
                             className="ptl__leaf-body"
                           >
                             <span className="ptl__leaf-label">{labelText}</span>
+                            {hasFindings && (
+                              <span className="ptl__leaf-noted" title="Has a note">
+                                Note
+                              </span>
+                            )}
                             {isCurrent && (
                               <span className="ptl__leaf-here">Here</span>
                             )}
@@ -600,7 +620,14 @@ function PlaybookTimeline({
                                 </a>
                               </>
                             )}
-                            <div className="ptl__detail-lbl">Your Notes</div>
+                            <div className="ptl__detail-lblrow">
+                              <span className="ptl__detail-lbl">Your Notes</span>
+                              {savedFlashes.has(key) && (
+                                <span className="ptl__detail-saved">
+                                  Saved Just Now
+                                </span>
+                              )}
+                            </div>
                             <textarea
                               value={step.findings ?? ""}
                               onChange={(e) =>
@@ -612,10 +639,14 @@ function PlaybookTimeline({
                                 onCommitFindings(tIdx, leaf.idx, t.id)
                               }
                               rows={3}
-                              placeholder="What happened on this step?"
+                              placeholder="What happened on this step? Saves when you click out."
                               autoFocus={!hasFindings}
                               className="ptl__detail-input"
                             />
+                            <div className="ptl__detail-hint">
+                              Saves automatically when you click out. Notes also
+                              appear in the lead Activity feed.
+                            </div>
                           </div>
                         )}
                       </div>
@@ -692,6 +723,11 @@ function PlaybookTimelineCss() {
 .ptl__leaf.is-done .ptl__leaf-label { color: #6b7280; text-decoration: line-through; text-decoration-color: #d1d5db; }
 .ptl__leaf.is-current .ptl__leaf-label { font-weight: 600; }
 .ptl__leaf-here { font-size: 10px; color: #0d4b3a; letter-spacing: 0.08em; font-weight: 700; text-transform: uppercase; flex: none; }
+.ptl__leaf-noted { font-size: 10px; color: #374151; background: #fafbfc; border: 1px solid #e5e7eb; padding: 2px 6px; border-radius: 3px; font-weight: 600; flex: none; letter-spacing: 0.04em; }
+
+.ptl__detail-lblrow { display: flex; align-items: center; justify-content: space-between; }
+.ptl__detail-saved { font-size: 10.5px; color: #0d4b3a; font-weight: 600; letter-spacing: 0.04em; }
+.ptl__detail-hint { font-size: 10.5px; color: #9ca3af; margin-top: 4px; }
 
 .ptl__detail { margin: 0 -8px 6px; padding: 12px 16px 14px 36px; background: #fafbfc; border-left: 3px solid #0d4b3a; border-radius: 0 6px 6px 0; }
 .ptl__detail-lbl { font-size: 10.5px; color: #6b7280; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
