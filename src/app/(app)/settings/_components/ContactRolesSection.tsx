@@ -111,7 +111,7 @@ export function ContactRolesSection({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-4" style={{ maxWidth: 480, marginTop: 8 }}>
+      <div className="flex items-center gap-2 mb-4" style={{ maxWidth: 480, marginTop: 24 }}>
         <input
           className="input"
           style={{ flex: 1 }}

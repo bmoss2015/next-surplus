@@ -183,7 +183,7 @@
       }
       .page-head > div:first-child > .section-desc {
         grid-column: 1 / -1;
-        margin-top: 10px;
+        margin-top: 16px;
         max-width: 100%;
       }
       .page-head > button,
