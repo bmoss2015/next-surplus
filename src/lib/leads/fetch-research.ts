@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { countTemplateLeafSteps } from "@/lib/playbooks/template-shape";
 
 // Fix JJJJ: a lead carries its own copy of one or more research checklists.
 // Each step is { name, url, instructions, done, findings } in display order.
@@ -190,7 +191,9 @@ export async function fetchResearch(
     name: t.name,
     state: t.state,
     saleType: t.sale_type,
-    stepCount: Array.isArray(t.steps) ? t.steps.length : 0,
+    // Count every checkbox the lead will get (sub-steps included), not the
+    // number of top-level stages — matches the lead's flattened checklist.
+    stepCount: countTemplateLeafSteps(t.steps),
     alreadyAdded: addedSourceIds.has(t.id),
   }));
 
