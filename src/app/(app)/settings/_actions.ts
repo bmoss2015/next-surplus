@@ -1684,6 +1684,44 @@ export async function deleteResearchTemplate(
   return { ok: true };
 }
 
+// Duplicate an existing playbook. Name gets " (Copy)" appended and apply_mode
+// is forced back to "manual" so the copy doesn't silently start auto-attaching
+// to the same leads as the original — the user almost always wants to tweak
+// the duplicate (state set, copy variant, etc.) before turning auto-apply
+// back on. Steps, description, and sale_type are copied verbatim.
+export async function duplicateResearchTemplate(
+  id: string
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { data: row, error: readErr } = await sb
+    .from("research_templates")
+    .select("name, description, sale_type, steps")
+    .eq("id", id)
+    .single();
+  if (readErr || !row) {
+    return { ok: false, error: readErr?.message ?? "Playbook not found" };
+  }
+  const { data, error } = await sb
+    .from("research_templates")
+    .insert({
+      name: `${row.name as string} (Copy)`,
+      description: (row.description as string | null) ?? null,
+      state: null,
+      sale_type: (row.sale_type as "TAX" | "MTG" | null) ?? null,
+      apply_mode: "manual",
+      apply_states: [],
+      steps: row.steps ?? [],
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  revalidatePath("/playbooks");
+  return { ok: true, id: data.id as string };
+}
+
 // -- Phone validation backfill (Billing section) ----------------------------
 
 // Admin-only one-shot: validates every phone in the org with status='untested'
