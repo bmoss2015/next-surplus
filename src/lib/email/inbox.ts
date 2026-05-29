@@ -8,6 +8,13 @@ import type {
   ThreadMessage,
 } from "./types";
 
+type Supa = Awaited<ReturnType<typeof createClient>>;
+
+async function fetchOwnChannelAccountIds(sb: Supa): Promise<string[]> {
+  const { data } = await sb.from("channel_accounts").select("id");
+  return ((data ?? []) as { id: string }[]).map((r) => r.id);
+}
+
 // Re-export so existing server-side imports keep working.
 export type {
   InboxThreadRow,
@@ -26,7 +33,6 @@ export async function fetchInboxThreads(opts: {
   const sb = await createClient();
   const limit = opts.limit ?? 100;
 
-  // We pull the conversation rows and the linked lead label in one round-trip.
   let query = sb
     .from("conversations")
     .select(
@@ -43,7 +49,17 @@ export async function fetchInboxThreads(opts: {
   else if (opts.filter === "unread") query = query.gt("unread_count", 0);
   else if (opts.filter === "unlinked") query = query.is("lead_id", null);
 
-  if (opts.leadId) query = query.eq("lead_id", opts.leadId);
+  if (opts.leadId) {
+    query = query.eq("lead_id", opts.leadId);
+  } else {
+    // Personal inbox: restrict to conversations owned by the caller's own
+    // channel_accounts. RLS otherwise permits org-wide read on lead-linked
+    // threads, which is correct on the lead's Conversations tab but wrong
+    // for the global Inbox view ("My Inbox" must mean MY messages).
+    const ownAccountIds = await fetchOwnChannelAccountIds(sb);
+    if (ownAccountIds.length === 0) return [];
+    query = query.in("channel_account_id", ownAccountIds);
+  }
 
   // Two-tier search: first the cheap subject/preview ILIKE, plus a Postgres
   // FTS pass on message body text. We union the matched conversation ids
@@ -252,9 +268,14 @@ export async function markThreadRead(threadId: string): Promise<void> {
 
 export async function fetchInboxFilterCounts(): Promise<InboxFilterCounts> {
   const sb = await createClient();
+  const ownAccountIds = await fetchOwnChannelAccountIds(sb);
+  if (ownAccountIds.length === 0) {
+    return { all: 0, unread: 0, email: 0, sms: 0, unlinked: 0 };
+  }
   const { data } = await sb
     .from("conversations")
-    .select("channel, unread_count, lead_id, is_archived");
+    .select("channel, unread_count, lead_id, is_archived")
+    .in("channel_account_id", ownAccountIds);
   const rows = (data ?? []) as {
     channel: string;
     unread_count: number;

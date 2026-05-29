@@ -13,3 +13,4 @@
 2026-05-28T14:00Z | Fix ZZZZ4: Bank account delete now propagates to Lob (DELETE /v1/bank_accounts/{id}); prevents orphan accounts in Lob after add/delete cycles | Mail Module
 2026-05-28T15:00Z | Fix YYYY4 part 9: Dashboard Pipeline Funnel narrowing-trapezoid (Option C); Won/Lost split out as outcome cards | Dashboard / Custom Stages
 2026-05-28T16:00Z | Fix YYYY4 part 12: Pipeline Funnel section removed from dashboard, will revisit. Funnel-options.html mockup retained | Dashboard / Custom Stages
+2026-05-28T20:00Z | Fix AAAA5: /inbox now scoped to caller's own channel_accounts. Rik's lead-linked threads no longer pile into Bree's Inbox. Lead Conversations tab unchanged, still shows the full org thread per the hybrid RLS design. Also resolves silent click-no-op for threads owned by another user (ThreadReader fell through because accountForReader couldn't match). | Inbox
