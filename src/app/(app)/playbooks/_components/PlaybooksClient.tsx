@@ -1,9 +1,9 @@
 "use client";
 
 // Client wrapper for the /playbooks index page. Renders the list of playbooks
-// and owns the create-drawer open state. Uses the same TemplateEditorDrawer
-// component that Settings does so the create / edit experience is identical
-// in both places (no separate forms to maintain).
+// and routes to the in-namespace create/edit pages under /playbooks/*.
+// The shared PlaybookEditPage component still powers both /playbooks and
+// /settings flows, so there's only one form implementation to maintain.
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
@@ -14,15 +14,17 @@ import { duplicateResearchTemplate } from "@/app/(app)/settings/_actions";
 
 export function PlaybooksClient({
   playbooks,
+  canCreate,
 }: {
   playbooks: PlaybookListItem[];
+  canCreate: boolean;
 }) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function openCreate() {
-    router.push("/settings/playbooks/new");
+    router.push("/playbooks/new");
   }
 
   async function onDuplicate(id: string) {
@@ -32,7 +34,7 @@ export function PlaybooksClient({
     setPendingId(null);
     if (res.ok) {
       startTransition(() => {
-        router.push(`/settings/playbooks/${res.id}`);
+        router.push(`/playbooks/${res.id}/edit`);
       });
     } else {
       alert(res.error);
@@ -51,18 +53,22 @@ export function PlaybooksClient({
             grouped by which step they&apos;re currently on.
           </div>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="btn-primary shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-white"
-        >
-          + Create Playbook
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={openCreate}
+            className="btn-primary shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-white"
+          >
+            + Create Playbook
+          </button>
+        )}
       </div>
 
       {playbooks.length === 0 ? (
         <div className="max-w-4xl rounded-lg border border-gray-200 bg-surface p-8 text-center text-sm text-gray-500">
-          No playbooks yet. Click + Create Playbook to add one.
+          {canCreate
+            ? "No playbooks yet. Click + Create Playbook to add one."
+            : "No playbooks yet. Ask an admin to create one."}
         </div>
       ) : (
         <div className="max-w-4xl space-y-2">
@@ -73,7 +79,9 @@ export function PlaybooksClient({
               key={p.id}
               className="grid items-center gap-4 rounded-md border border-gray-200 bg-surface px-4 py-3 transition-colors hover:border-petrol-300"
               style={{
-                gridTemplateColumns: "minmax(0, 1fr) 90px 130px auto auto",
+                gridTemplateColumns: canCreate
+                  ? "minmax(0, 1fr) 90px 130px auto auto"
+                  : "minmax(0, 1fr) 90px 130px auto",
               }}
             >
               <div className="min-w-0">
@@ -107,16 +115,18 @@ export function PlaybooksClient({
                   {p.completedLast30Days}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => onDuplicate(p.id)}
-                disabled={pendingId === p.id}
-                title="Duplicate Playbook"
-                aria-label="Duplicate Playbook"
-                className="cursor-pointer rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-petrol-700 disabled:cursor-wait disabled:opacity-60"
-              >
-                <IconCopy size={16} stroke={1.75} />
-              </button>
+              {canCreate && (
+                <button
+                  type="button"
+                  onClick={() => onDuplicate(p.id)}
+                  disabled={pendingId === p.id}
+                  title="Duplicate Playbook"
+                  aria-label="Duplicate Playbook"
+                  className="cursor-pointer rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-petrol-700 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <IconCopy size={16} stroke={1.75} />
+                </button>
+              )}
               <Link
                 href={`/playbooks/${p.id}`}
                 className="text-xs font-medium text-petrol-700 hover:underline"
