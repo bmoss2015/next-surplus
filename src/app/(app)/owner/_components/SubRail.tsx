@@ -20,6 +20,7 @@ export const GROUPS: RailGroup[] = [
     name: "Mail",
     items: [
       { key: "customer-pricing", label: "Customer Pricing" },
+      { key: "provider-costs", label: "Provider Costs" },
       { key: "reports", label: "Reports" },
     ],
   },
