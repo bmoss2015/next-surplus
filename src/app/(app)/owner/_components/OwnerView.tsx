@@ -8,12 +8,17 @@ import { useState } from "react";
 import { SubRail, GROUPS } from "./SubRail";
 import { CustomerPricingSection } from "./CustomerPricingSection";
 import { OwnerReportsSection } from "./OwnerReportsSection";
+import { ProviderCostsSection } from "./ProviderCostsSection";
 import { SettingsSaveProvider } from "@/components/SettingsSaveBar";
-import type { CustomerPricingData } from "@/lib/owner/fetch";
+import type {
+  CustomerPricingData,
+  ProviderCostsData,
+} from "@/lib/owner/fetch";
 import type { MailReportData, MailReportRange } from "@/lib/mail/reports";
 
 export type OwnerData = {
   customerPricing: CustomerPricingData;
+  providerCosts: ProviderCostsData;
   report: MailReportData & { range: MailReportRange };
 };
 
@@ -27,6 +32,9 @@ export function OwnerView({ data }: { data: OwnerData }) {
         <div className="min-w-0 flex-1">
           {active === "customer-pricing" && (
             <CustomerPricingSection data={data.customerPricing} />
+          )}
+          {active === "provider-costs" && (
+            <ProviderCostsSection data={data.providerCosts} />
           )}
           {active === "reports" && (
             <OwnerReportsSection data={data.report} />
