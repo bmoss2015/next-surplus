@@ -1887,6 +1887,7 @@ function AddressFixPanel({
   original,
   result,
   onApply,
+  onAcceptOriginal,
   onClose,
   testMode,
 }: {
@@ -1905,9 +1906,11 @@ function AddressFixPanel({
     state: string;
     postal_code: string;
   }) => void;
+  onAcceptOriginal?: () => void;
   onClose: () => void;
   testMode?: boolean;
 }) {
+  void onAcceptOriginal;
   const suggested = result.normalized;
   const fmt = (a: typeof original) =>
     `${a.line1}${a.line2 ? ", " + a.line2 : ""}, ${a.city}, ${a.state} ${a.postal_code}`;

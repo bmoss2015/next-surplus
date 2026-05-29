@@ -196,7 +196,7 @@ function coerceLobPricing(raw: unknown): LobPricingCents {
 
 export type CustomerPricingViewData = {
   subscription_monthly_cents: number;
-  customer_mail_pricing_cents: LobPricing;
+  customer_mail_pricing_cents: LobPricingCents;
 };
 
 // Customer-facing pricing read. Available to any authenticated user via

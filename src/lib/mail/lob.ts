@@ -464,8 +464,14 @@ export async function lobSendLetter(
 // reconciliation cron to self-heal mail_jobs rows whose webhook never
 // arrived (Lob webhook delivery is reliable but not guaranteed). Maps
 // Lob's status values to our internal MailStatus enum.
+export type LobPieceStatusValue =
+  | "queued"
+  | "in_transit"
+  | "delivered"
+  | "returned"
+  | "failed";
 export type LobPieceStatus =
-  | { ok: true; status: "queued" | "in_transit" | "delivered" | "returned" | "failed"; tracking_number: string | null; tracking_url: string | null }
+  | { ok: true; status: LobPieceStatusValue; tracking_number: string | null; tracking_url: string | null }
   | { ok: false; error: string };
 
 export async function lobGetPiece(opts: {
@@ -504,7 +510,7 @@ export async function lobGetPiece(opts: {
     // "Processed for Delivery", "Re-Routed", "Returned to Sender",
     // "Delivered", "Failed". We collapse anything in-flight to
     // "in_transit", anything terminal to its specific status.
-    let status: LobPieceStatus["status"] = "queued";
+    let status: LobPieceStatusValue = "queued";
     if (json.delivered || /delivered/.test(lastName)) status = "delivered";
     else if (/return/.test(lastName)) status = "returned";
     else if (/failed/.test(lastName)) status = "failed";
