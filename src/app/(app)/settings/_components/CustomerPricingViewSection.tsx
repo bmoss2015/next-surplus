@@ -27,9 +27,23 @@ export function CustomerPricingViewSection({
 }) {
   if (!data) {
     return (
-      <div className="mx-auto max-w-[760px] px-8 py-8 text-[13px] text-gray-600">
-        Pricing has not been configured yet.
-      </div>
+      <section id="panel-mail-customer-pricing" className="panel active">
+        <div className="breadcrumb">
+          <a>Settings</a>
+          <i className="icon icon-chevron-right" />
+          <a>Mail</a>
+          <i className="icon icon-chevron-right" />
+          <span>Pricing</span>
+        </div>
+        <div className="page-head">
+          <div>
+            <h1 className="section-h1">Pricing</h1>
+            <p className="section-desc">
+              Pricing has not been configured yet.
+            </p>
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -40,13 +54,22 @@ export function CustomerPricingViewSection({
   ];
 
   return (
-    <div className="mx-auto max-w-[860px] px-8 py-8">
-      <div className="mb-6">
-        <h1 className="text-[22px] font-semibold text-ink">Pricing</h1>
-        <p className="mt-1 text-[13px] text-gray-600">
-          What you pay per piece of mail sent through the platform. All
-          rates include printing, postage, and envelope.
-        </p>
+    <section id="panel-mail-customer-pricing" className="panel active">
+      <div className="breadcrumb">
+        <a>Settings</a>
+        <i className="icon icon-chevron-right" />
+        <a>Mail</a>
+        <i className="icon icon-chevron-right" />
+        <span>Pricing</span>
+      </div>
+      <div className="page-head">
+        <div>
+          <h1 className="section-h1">Pricing</h1>
+          <p className="section-desc">
+            What you pay per piece of mail sent through the platform. All
+            rates include printing, postage, and envelope.
+          </p>
+        </div>
       </div>
 
       <section
@@ -120,7 +143,7 @@ export function CustomerPricingViewSection({
           ]}
         />
       </section>
-    </div>
+    </section>
   );
 }
 
