@@ -1672,6 +1672,36 @@ export async function reassignAndDeleteOrgCustomRole(
   return { ok: true, reassigned: reassignCount ?? 0 };
 }
 
+export async function duplicateResearchTemplate(
+  id: string
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { data: orig, error: fetchErr } = await sb
+    .from("research_templates")
+    .select("name, description, state, sale_type, apply_mode, apply_states, steps")
+    .eq("id", id)
+    .single();
+  if (fetchErr || !orig) return { ok: false, error: fetchErr?.message ?? "Playbook not found" };
+  const { data, error } = await sb
+    .from("research_templates")
+    .insert({
+      name: `Copy of ${orig.name}`,
+      description: orig.description,
+      state: orig.state,
+      sale_type: orig.sale_type,
+      apply_mode: orig.apply_mode,
+      apply_states: orig.apply_states,
+      steps: orig.steps,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true, id: data.id as string };
+}
+
 export async function deleteResearchTemplate(
   id: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {

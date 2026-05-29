@@ -5,10 +5,12 @@
 // This panel sits in its own SubRail group ("Playbooks") so playbooks aren't
 // buried under Templates.
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconChevronRight, IconPencil } from "@tabler/icons-react";
+import { IconChevronRight, IconCopy, IconPencil } from "@tabler/icons-react";
 import type { ResearchTemplateRow } from "@/lib/settings/fetch";
 import { US_STATES } from "@/components/StatesPicker";
+import { duplicateResearchTemplate } from "../_actions";
 
 export function PlaybooksSection({
   research,
@@ -18,6 +20,17 @@ export function PlaybooksSection({
   canEdit: boolean;
 }) {
   const router = useRouter();
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+
+  async function handleDuplicate(e: React.MouseEvent, id: string) {
+    e.stopPropagation();
+    setDuplicatingId(id);
+    const res = await duplicateResearchTemplate(id);
+    setDuplicatingId(null);
+    if (res.ok) {
+      router.push(`/settings/playbooks/${res.id}`);
+    }
+  }
 
   return (
     <section id="panel-playbooks" className="panel active">
@@ -91,6 +104,16 @@ export function PlaybooksSection({
                 </div>
                 {canEdit && (
                   <div className="ml-2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={(e) => handleDuplicate(e, p.id)}
+                      title="Duplicate playbook"
+                      aria-label="Duplicate playbook"
+                      disabled={duplicatingId === p.id}
+                    >
+                      <IconCopy size={13} stroke={1.75} />
+                    </button>
                     <button
                       type="button"
                       className="icon-btn"
