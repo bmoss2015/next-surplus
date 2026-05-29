@@ -106,13 +106,30 @@ Confirm? (yes / edit / cancel)
 
 ### Step 3: Handle the user's response
 
-- **"yes"** → make the edits, stage both files, commit with the proposed message, push if user requests, report what was done
-- **"edit [their corrections]"** → revise the preview based on feedback, show new preview, wait for confirmation again
-- **"cancel"** → do nothing, report cancelled
+When the user confirms with **"yes"** (or "confirm"), run the full ship flow end-to-end with no further prompts. The merge step is pre-authorized for branches matching `chore/docs-roadmap-*` via `.claude/settings.json` (`permissions.allow` + `autoMode.allow`).
 
-### Step 4: After committing
+1. **Verify clean tree.** `git status --short`. If dirty, stop and ask whether to stash or abort.
+2. **Capture the current branch** for return at the end.
+3. **Switch to main, pull latest.** `git checkout main && git pull --ff-only origin main`.
+4. **Create a fresh branch** named `chore/docs-roadmap-<short-slug>` derived from the commit message (e.g. `chore/docs-roadmap-ss-grounding-lob-cert`). NEVER reuse an existing branch name; NEVER apply edits on a long-lived branch.
+5. **Apply the edits** previewed in Step 2.
+6. **Commit** with the proposed `chore(docs): …` message.
+7. **Push.** `git push -u origin chore/docs-roadmap-<short-slug>`.
+8. **Open PR** via `gh pr create --base main --head <branch> --title "..." --body "..."`. Body should include a Summary section listing what changed and a Test plan line for the Worker rebuild.
+9. **Merge PR.** `gh pr merge <number> --merge --delete-branch`.
+10. **Return to original branch.** `git checkout <original-branch>`.
+11. **Report** PR URL, merge commit SHA, and a one-line confirmation that main now reflects the change.
 
-Always ask: "Trigger Worker rebuild now to see the Roadmap in Drive? (yes / wait for Monday)"
+**Why the fresh-branch pattern matters:** the `chore/docs-roadmap-*` naming is the safety boundary. Permission rules only pre-authorize merges on this naming convention. Merging from any other branch will still trigger the normal main-merge safety pause.
+
+- **"edit [their corrections]"** → revise the preview based on feedback, show new preview, wait for confirmation again.
+- **"cancel"** → do nothing, report cancelled.
+
+### Step 4: After merging
+
+Default behavior: **do not** trigger the Worker rebuild. The Monday 14:00 UTC auto-run will pick the change up.
+
+Ask once: "Trigger Worker rebuild now to see the Roadmap in Drive? (yes / wait for Monday)"
 
 If yes:
 ```
@@ -197,7 +214,7 @@ Open questions to answer before building:
   - `chore(docs): move billing from Later to This Quarter`
   - `chore(docs): add ADR-014 for shared Twilio number pooling decision`
 
-Do NOT push automatically. After committing, ask the user whether to push and trigger the Worker rebuild.
+After committing, push the branch, open a PR, and merge with `gh pr merge <number> --merge --delete-branch`. The Worker rebuild remains opt-in (see Step 4).
 
 ## Edge cases
 
@@ -225,8 +242,10 @@ Preview two distinct updates:
 
 - Do NOT edit CHANGELOG.md from this skill. The git post-commit hook handles CHANGELOG automatically.
 - Do NOT edit CLAUDE.md from this skill. That file has its own purpose.
-- Do NOT auto-trigger a Worker rebuild without asking.
-- Do NOT push to remote without asking.
-- Do NOT skip the preview step. Always show what will be written before committing.
+- Do NOT auto-trigger a Worker rebuild without asking (Step 4).
+- Do NOT skip the preview step. Always show what will be written before editing files.
+- Do NOT apply edits on a long-lived branch — always cut a fresh `chore/docs-roadmap-<slug>` off main (Step 3).
+- Do NOT reuse an existing branch name when creating the docs branch — pick a fresh slug derived from the commit message.
+- Do NOT skip the PR step (no direct commits to main). The PR is the audit trail even when auto-merged.
 - Do NOT invent ADR or RFC numbers — always check existing files for the highest used number.
 - Do NOT reference Mossy Land LLC. The product is Moss Equity Partners - Web App, owned by Moss Equity Partners LLC.
