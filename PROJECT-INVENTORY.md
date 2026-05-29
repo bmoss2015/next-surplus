@@ -75,6 +75,7 @@ Surplus calc: Est. Net To You = (estimated surplus × recovery fee percent) − 
 
 - Gmail OAuth (per-user, connected in Settings → Email Accounts)
 - Gmail thread fetch and threading in `/inbox`
+- `/inbox` is per-user. Each teammate sees only conversations from their own connected accounts. Threads linked to a lead are still visible to every teammate on that lead's Conversations tab.
 - Send / receive via Gmail API
 - Vercel cron `/api/cron/email-sync`, pinged externally by Cloudflare worker "Moss Equity Email Poller" every 2 minutes for near-real-time updates
 - SMS — Inbox UI scaffolded (channel exists, send path wired against an internal-only QUO/OpenPhone test setup the owner used to prototype). The production customer-facing SMS provider has not been chosen yet and will NOT be QUO. Likely Twilio or Telnyx; A2P 10DLC registration is the long pole regardless of provider.
