@@ -1,8 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { PlaybookBoard, PlaybookBoardLead, PlaybookStep } from "./types";
+import { templateStages, stageIndexForLeaf } from "./template-shape";
 
-type StepDef = { name: string };
 type SnapshotStep = { name?: string; done?: boolean };
 
 function readSteps(raw: unknown): SnapshotStep[] {
@@ -29,12 +29,10 @@ export async function fetchPlaybookBoard(
     .maybeSingle();
   if (!template) return null;
 
-  const stepDefs = (Array.isArray(template.steps) ? template.steps : []) as Array<{
-    name?: string;
-  }>;
-  const stepNames: StepDef[] = stepDefs.map((s) => ({
-    name: String(s.name ?? ""),
-  }));
+  // One board column per STAGE (top-level template entry), not per checkbox.
+  // The lead's checklist is the flattened list of every sub-step; we map a
+  // lead's progress back to the stage it currently sits in below.
+  const stages = templateStages(template.steps);
 
   // Pull every lead snapshot that traces back to this template, joined to lead
   // fields needed by the card.
@@ -73,9 +71,9 @@ export async function fetchPlaybookBoard(
     leads: LeadJoin[] | LeadJoin | null;
   }>;
 
-  const steps: PlaybookStep[] = stepNames.map((s, i) => ({
+  const steps: PlaybookStep[] = stages.map((s, i) => ({
     index: i,
-    name: s.name || `Step ${i + 1}`,
+    name: s.name || `Stage ${i + 1}`,
     leads: [],
   }));
   const completed: PlaybookBoardLead[] = [];
@@ -86,7 +84,11 @@ export async function fetchPlaybookBoard(
       : row.leads;
     if (!leadObj || leadObj.archived) continue;
     const snapSteps = readSteps(row.steps);
-    const idx = firstIncomplete(snapSteps);
+    // The lead advances to the next stage only once EVERY checkbox in its
+    // current stage is done: find the first incomplete checkbox, then the stage
+    // that owns it. A stage whose checkboxes are all done is "passed".
+    const leafIdx = firstIncomplete(snapSteps);
+    const idx = stageIndexForLeaf(stages, leafIdx);
     const primary =
       leadObj.owners.find((o) => o.is_primary) ?? leadObj.owners[0];
     const surplus =
@@ -110,13 +112,15 @@ export async function fetchPlaybookBoard(
       surplusConfirmed: leadObj.confirmed_surplus != null,
       stage: leadObj.stage,
       currentStepIndex: idx,
-      totalSteps: snapSteps.length,
+      totalSteps: stages.length,
       daysInStep,
     };
 
-    if (idx >= snapSteps.length) {
+    // idx === stages.length means every checkbox is done -> the lead is past
+    // the last stage and counts as completed.
+    if (idx >= stages.length) {
       completed.push(lead);
-    } else if (idx < steps.length) {
+    } else {
       steps[idx].leads.push(lead);
     }
   }

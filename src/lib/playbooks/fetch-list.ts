@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { PlaybookListItem } from "./types";
+import { countTemplateLeafSteps } from "./template-shape";
 
 // Lists every research template in the org, with the count of leads whose
 // snapshotted checklist points back to it. Powers /playbooks (the index page).
@@ -64,7 +65,7 @@ export async function fetchPlaybooks(): Promise<PlaybookListItem[]> {
     name: r.name,
     state: r.state,
     saleType: r.sale_type,
-    stepCount: Array.isArray(r.steps) ? r.steps.length : 0,
+    stepCount: countTemplateLeafSteps(r.steps),
     activeLeads: active.get(r.id) ?? 0,
     completedLast30Days: completed30.get(r.id) ?? 0,
   }));
