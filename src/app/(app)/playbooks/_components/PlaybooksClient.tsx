@@ -1,24 +1,18 @@
 "use client";
 
-// Client wrapper for the /playbooks index page. Renders the list of playbooks
-// and owns the create-drawer open state. Uses the same TemplateEditorDrawer
-// component that Settings does so the create / edit experience is identical
-// in both places (no separate forms to maintain).
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { IconPencil } from "@tabler/icons-react";
 import type { PlaybookListItem } from "@/lib/playbooks/types";
 
 export function PlaybooksClient({
   playbooks,
+  isAdmin,
 }: {
   playbooks: PlaybookListItem[];
+  isAdmin: boolean;
 }) {
   const router = useRouter();
-
-  function openCreate() {
-    router.push("/settings/playbooks/new");
-  }
 
   return (
     <div className="px-7 py-6">
@@ -32,29 +26,31 @@ export function PlaybooksClient({
             grouped by which step they&apos;re currently on.
           </div>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="btn-primary shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-white"
-        >
-          + Create Playbook
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => router.push("/settings/playbooks/new")}
+            className="btn-primary shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-white"
+          >
+            + Create Playbook
+          </button>
+        )}
       </div>
 
       {playbooks.length === 0 ? (
         <div className="max-w-4xl rounded-lg border border-gray-200 bg-surface p-8 text-center text-sm text-gray-500">
-          No playbooks yet. Click + Create Playbook to add one.
+          {isAdmin
+            ? "No playbooks yet. Click + Create Playbook to add one."
+            : "No playbooks yet."}
         </div>
       ) : (
         <div className="max-w-4xl space-y-2">
-          {/* Fixed grid template across every row so the Active / Completed
-              columns line up vertically regardless of playbook name length. */}
           {playbooks.map((p) => (
             <div
               key={p.id}
               className="grid items-center gap-4 rounded-md border border-gray-200 bg-surface px-4 py-3 transition-colors hover:border-petrol-300"
               style={{
-                gridTemplateColumns: "minmax(0, 1fr) 90px 130px auto",
+                gridTemplateColumns: `minmax(0, 1fr) 90px 130px${isAdmin ? " 28px" : ""} auto`,
               }}
             >
               <div className="min-w-0">
@@ -88,6 +84,17 @@ export function PlaybooksClient({
                   {p.completedLast30Days}
                 </div>
               </div>
+              {isAdmin && (
+                <button
+                  type="button"
+                  title="Edit playbook"
+                  aria-label="Edit playbook"
+                  onClick={() => router.push(`/settings/playbooks/${p.id}`)}
+                  className="flex cursor-pointer items-center justify-center rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-petrol-700"
+                >
+                  <IconPencil size={14} stroke={1.75} />
+                </button>
+              )}
               <Link
                 href={`/playbooks/${p.id}`}
                 className="text-xs font-medium text-petrol-700 hover:underline"

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fetchPlaybooks } from "@/lib/playbooks/fetch-list";
+import { getCurrentProfile } from "@/lib/auth/current-user";
 import { PlaybooksClient } from "./_components/PlaybooksClient";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,10 @@ export const dynamic = "force-dynamic";
 // preview.css that Settings uses so the shared TemplateEditorDrawer
 // component renders with its drawer chrome on this page too.
 export default async function PlaybooksPage() {
-  const playbooks = await fetchPlaybooks();
+  const [playbooks, profile] = await Promise.all([
+    fetchPlaybooks(),
+    getCurrentProfile(),
+  ]);
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "(app)", "settings", "preview.css"),
     "utf8"
@@ -27,7 +31,7 @@ export default async function PlaybooksPage() {
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: cssText }}
       />
-      <PlaybooksClient playbooks={playbooks} />
+      <PlaybooksClient playbooks={playbooks} isAdmin={profile?.isAdmin ?? false} />
     </>
   );
 }
