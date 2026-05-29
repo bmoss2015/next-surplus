@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { IconPencil } from "@tabler/icons-react";
+import { getCurrentProfile } from "@/lib/auth/current-user";
 import { fetchPlaybookBoard } from "@/lib/playbooks/fetch-board";
 import { PlaybookViewSwitcher } from "./_components/PlaybookViewSwitcher";
 
@@ -10,6 +12,8 @@ export default async function PlaybookBoardPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
   const { id } = await params;
   const board = await fetchPlaybookBoard(id);
   if (!board) notFound();
@@ -38,6 +42,15 @@ export default async function PlaybookBoardPage({
               : ""}
           </div>
         </div>
+        {profile.isAdmin && (
+          <Link
+            href={`/playbooks/${id}/edit`}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-[12px] font-medium text-ink transition-colors hover:border-petrol-300 hover:text-petrol-700"
+          >
+            <IconPencil size={14} stroke={1.75} />
+            Edit Playbook
+          </Link>
+        )}
       </div>
 
       <PlaybookViewSwitcher board={board} />

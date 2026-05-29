@@ -24,16 +24,24 @@ import type {
   ResearchTemplateRow,
 } from "@/lib/settings/fetch";
 
+// `returnTo` controls which namespace the editor lives under. "settings" keeps
+// the existing Settings -> Playbooks editor URLs; "playbooks" routes back into
+// the Playbooks tab so users who clicked "+ Create Playbook" from /playbooks
+// stay there instead of being yanked into Settings.
+type ReturnTo = "settings" | "playbooks";
+
 export function PlaybookEditPage({
   row,
   canEdit,
+  returnTo = "settings",
 }: {
   row: ResearchTemplateRow | null;
   canEdit: boolean;
+  returnTo?: ReturnTo;
 }) {
   return (
     <SettingsSaveProvider>
-      <Editor row={row} canEdit={canEdit} />
+      <Editor row={row} canEdit={canEdit} returnTo={returnTo} />
       <PageCss />
     </SettingsSaveProvider>
   );
@@ -46,9 +54,11 @@ function emptyStep(): ResearchStep {
 function Editor({
   row,
   canEdit,
+  returnTo,
 }: {
   row: ResearchTemplateRow | null;
   canEdit: boolean;
+  returnTo: ReturnTo;
 }) {
   const router = useRouter();
   const initialSteps: ResearchStep[] = row?.steps?.length
@@ -139,7 +149,11 @@ function Editor({
     setSavedFlash("saved");
     setTimeout(() => setSavedFlash(null), 2200);
     if (!row) {
-      router.replace(`/settings/playbooks/${res.id}`);
+      const dest =
+        returnTo === "playbooks"
+          ? `/playbooks/${res.id}/edit`
+          : `/settings/playbooks/${res.id}`;
+      router.replace(dest);
     } else {
       router.refresh();
     }
@@ -152,6 +166,7 @@ function Editor({
     steps,
     row,
     router,
+    returnTo,
   ]);
 
   const discard = useCallback(() => {
@@ -233,7 +248,9 @@ function Editor({
     setPendingDelete(true);
     const res = await deleteResearchTemplate(row.id);
     setPendingDelete(false);
-    if (res.ok) router.push("/settings");
+    if (res.ok) {
+      router.push(returnTo === "playbooks" ? "/playbooks" : "/settings");
+    }
   };
 
   const totalSteps = useMemo(
