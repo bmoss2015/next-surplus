@@ -229,6 +229,7 @@ export function MailDashboardV6({
     recipientName: string;
     bodyHtml: string | null;
     trackingUrl: string | null;
+    color: boolean;
   } | null>(null);
   const onViewLetter = useCallback<LetterOpener>(async (piece) => {
     // Optimistic open with the row's data (body_html isn't on the row).
@@ -237,6 +238,7 @@ export function MailDashboardV6({
       recipientName: displayRecipientName(piece.recipient_name),
       bodyHtml: null,
       trackingUrl: piece.tracking_url ?? null,
+      color: piece.color,
     });
     // Fetch the full body and merge it in so LetterPreviewModal's
     // bodyHtml short-circuit fires for HTML-body sends.

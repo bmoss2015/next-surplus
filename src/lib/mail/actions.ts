@@ -289,8 +289,8 @@ export async function previewMailMergeDocx(input: {
 export async function previewMailJob(input: {
   mail_job_id: string;
 }): Promise<
-  | { ok: true; kind: "html"; html: string; recipient_name: string }
-  | { ok: true; kind: "pdf"; base64: string; recipient_name: string }
+  | { ok: true; kind: "html"; html: string; recipient_name: string; color: boolean }
+  | { ok: true; kind: "pdf"; base64: string; recipient_name: string; color: boolean }
   | { ok: false; error: string }
 > {
   const profile = await getCurrentProfile();
@@ -307,7 +307,7 @@ export async function previewMailJob(input: {
   const withCache = await sb
     .from("mail_jobs")
     .select(
-      "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html, rendered_pdf_path"
+      "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html, color, rendered_pdf_path"
     )
     .eq("id", input.mail_job_id)
     .maybeSingle();
@@ -315,7 +315,7 @@ export async function previewMailJob(input: {
     const fallback = await sb
       .from("mail_jobs")
       .select(
-        "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html"
+        "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html, color"
       )
       .eq("id", input.mail_job_id)
       .maybeSingle();
@@ -324,6 +324,7 @@ export async function previewMailJob(input: {
     job = withCache.data;
   }
   if (!job) return { ok: false, error: "Mail job not found" };
+  const jobColor = Boolean(job.color);
 
   // Cache hit: rendered PDF already sits in storage from send time.
   // Skipped when the column isn't there yet (migration 0131 pending).
@@ -338,6 +339,7 @@ export async function previewMailJob(input: {
         kind: "pdf",
         base64: buf.toString("base64"),
         recipient_name: (job.recipient_name as string | null) ?? "",
+        color: jobColor,
       };
     }
   }
@@ -351,6 +353,7 @@ export async function previewMailJob(input: {
       kind: "html",
       html: storedBody,
       recipient_name: (job.recipient_name as string | null) ?? "",
+      color: jobColor,
     };
   }
 
@@ -416,9 +419,10 @@ export async function previewMailJob(input: {
         ? Buffer.from(preview.base64, "base64").toString("utf-8")
         : "",
     recipient_name: recipientName,
+    color: jobColor,
   } as
-    | { ok: true; kind: "html"; html: string; recipient_name: string }
-    | { ok: true; kind: "pdf"; base64: string; recipient_name: string };
+    | { ok: true; kind: "html"; html: string; recipient_name: string; color: boolean }
+    | { ok: true; kind: "pdf"; base64: string; recipient_name: string; color: boolean };
 }
 
 // Fetches the rendered check PDF for a mail_job from Lob and returns
@@ -1172,6 +1176,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         // stays empty; previewMailJob re-renders via Gotenberg on demand.
         body_html: isFileTemplate ? "" : wrapBodyHtml(rendered),
         mail_class: input.mail_class,
+        color: input.color === true,
         include_check: input.include_check ?? false,
         check_amount_cents: input.check_amount_cents ?? null,
         check_memo: input.check_memo ?? null,
