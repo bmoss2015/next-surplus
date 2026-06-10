@@ -601,82 +601,134 @@ export async function removeSignatureImage(): Promise<
 
 import {
   lobCreateBankAccount,
-  lobVerifyBankAccount,
   lobDeleteBankAccount,
 } from "@/lib/mail";
+import {
+  plaidClient,
+  isPlaidConfigured,
+  formatPlaidError,
+} from "@/lib/plaid/client";
+import { CountryCode, Products } from "plaid";
 
-export async function createMailBankAccount(input: {
-  routing_number: string;
-  account_number: string;
+// Fix 6: bank account verification flows through Plaid Link. Lob no
+// longer accepts Plaid processor tokens, so Lob still requires its
+// own micro-deposit verification. We use Plaid for two things:
+//   1. Bank login (so the operator never types routing/account numbers).
+//      Plaid Auth returns the verified numbers, which we pass to Lob's
+//      normal /bank_accounts create.
+//   2. Auto-verification of the Lob micro-deposits (1-2 business days
+//      later) by polling the Plaid Transactions API for the two small
+//      ACH credits Lob sends. When we detect them we call Lob's verify
+//      endpoint on the operator's behalf. From the operator's POV they
+//      click Connect Bank once and the account flips to verified on
+//      its own.
+
+export async function createPlaidLinkToken(): Promise<
+  { ok: true; link_token: string } | { ok: false; error: string }
+> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  if (!isPlaidConfigured()) {
+    return {
+      ok: false,
+      error:
+        "Plaid is not configured yet. Add PLAID_CLIENT_ID and PLAID_SECRET to Vercel env vars.",
+    };
+  }
+  try {
+    const profile = await getCurrentProfile();
+    if (!profile) return { ok: false, error: "Not signed in" };
+    const res = await plaidClient().linkTokenCreate({
+      user: { client_user_id: profile.id },
+      client_name: "Moss Equity Portal",
+      // Auth = routing/account numbers; Transactions = polling for
+      // micro-deposit auto-verify.
+      products: [Products.Auth, Products.Transactions],
+      country_codes: [CountryCode.Us],
+      language: "en",
+    });
+    return { ok: true, link_token: res.data.link_token };
+  } catch (err) {
+    return { ok: false, error: formatPlaidError(err) };
+  }
+}
+
+export async function exchangePlaidPublicTokenForBankAccount(input: {
+  public_token: string;
+  account_id: string;
   account_holder_name: string;
   account_type: "company" | "individual";
+  institution_name?: string | null;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
-  const routing = input.routing_number.replace(/\D/g, "");
-  const account = input.account_number.replace(/\D/g, "");
+  if (!isPlaidConfigured()) {
+    return { ok: false, error: "Plaid is not configured" };
+  }
   const holder = input.account_holder_name.trim();
-  if (!routing || routing.length !== 9) {
-    return { ok: false, error: "Routing number must be 9 digits" };
-  }
-  if (!account || account.length < 4) {
-    return { ok: false, error: "Enter a valid account number" };
-  }
-  if (!holder) {
-    return { ok: false, error: "Account holder name is required" };
+  if (!holder) return { ok: false, error: "Account holder name is required" };
+
+  let accessToken: string;
+  let itemId: string;
+  let routing: string;
+  let accountNumber: string;
+  try {
+    const exchange = await plaidClient().itemPublicTokenExchange({
+      public_token: input.public_token,
+    });
+    accessToken = exchange.data.access_token;
+    itemId = exchange.data.item_id;
+
+    // Plaid Auth returns the verified routing + account numbers for the
+    // chosen account. Lob takes them as if we'd typed them ourselves.
+    const auth = await plaidClient().authGet({
+      access_token: accessToken,
+      options: { account_ids: [input.account_id] },
+    });
+    const ach = auth.data.numbers.ach.find(
+      (n) => n.account_id === input.account_id
+    );
+    if (!ach) {
+      return {
+        ok: false,
+        error:
+          "Plaid did not return ACH numbers for that account — pick a checking account that supports ACH.",
+      };
+    }
+    routing = ach.routing;
+    accountNumber = ach.account;
+  } catch (err) {
+    return { ok: false, error: formatPlaidError(err) };
   }
 
   const lobRes = await lobCreateBankAccount({
     routing_number: routing,
-    account_number: account,
+    account_number: accountNumber,
     account_holder_name: holder,
     account_type: input.account_type === "individual" ? "individual" : "company",
   });
   if (!lobRes.ok) return { ok: false, error: lobRes.error };
 
+  // Inserted as 'unverified' — the cron polls Plaid Transactions for
+  // Lob's micro-deposits and auto-verifies once they land.
   const sb = await createClient();
   const { data, error } = await sb
     .from("mail_bank_accounts")
     .insert({
       lob_bank_account_id: lobRes.lob_bank_account_id,
-      bank_name: lobRes.bank_name,
+      bank_name: lobRes.bank_name ?? input.institution_name ?? null,
       account_holder_name: holder,
       routing_last_four: lobRes.routing_last_four,
       account_last_four: lobRes.account_last_four,
+      verified_via: "plaid",
+      plaid_access_token: accessToken,
+      plaid_item_id: itemId,
     })
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
   return { ok: true, id: data.id as string };
-}
-
-export async function verifyMailBankAccount(input: {
-  id: string;
-  amount_1_cents: number;
-  amount_2_cents: number;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard;
-  const sb = await createClient();
-  const { data: row } = await sb
-    .from("mail_bank_accounts")
-    .select("lob_bank_account_id")
-    .eq("id", input.id)
-    .single();
-  const bnk = (row?.lob_bank_account_id as string | null) ?? null;
-  if (!bnk) return { ok: false, error: "Bank account not found" };
-  const lobRes = await lobVerifyBankAccount(bnk, [
-    input.amount_1_cents,
-    input.amount_2_cents,
-  ]);
-  if (!lobRes.ok) return { ok: false, error: lobRes.error };
-  await sb
-    .from("mail_bank_accounts")
-    .update({ status: "verified", verified_at: new Date().toISOString() })
-    .eq("id", input.id);
-  revalidatePath("/settings");
-  return { ok: true };
 }
 
 export async function deleteMailBankAccount(

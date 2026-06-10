@@ -9,6 +9,10 @@
     {
       "path": "/api/cron/reconcile-mail",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/plaid-microdeposit-poll",
+      "schedule": "0 */4 * * *"
     }
   ]
 }

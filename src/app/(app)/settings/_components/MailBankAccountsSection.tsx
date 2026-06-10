@@ -1,11 +1,12 @@
 "use client";
 
-// Settings clone · Phase D.3 — Bank Accounts with add + verify + delete.
+// Settings · Bank Accounts — Plaid Link add + delete.
 //
-// Two-column bank-grid of bank-card panels. Add Bank Account opens
-// BankAccountDrawer in "add" mode. The Enter Test Deposits button on each
-// unverified card opens the drawer in "verify" mode. Per-card delete opens
-// a styled in-app confirm modal and calls deleteMailBankAccount.
+// Add Bank Account opens BankAccountDrawer which launches Plaid Link;
+// the bank account lands already verified, so there's no separate
+// verify step. Legacy rows added via the old Lob micro-deposit flow
+// may still display as unverified — they're read-only and should be
+// removed if their micro-deposits never landed.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -100,7 +101,6 @@ export function MailBankAccountsSection({
               key={b.id}
               bank={b}
               isFirst={idx === 0}
-              onVerify={() => setDrawer({ kind: "verify", row: b })}
               onRemove={() => setConfirmRow(b)}
             />
           ))}
@@ -159,12 +159,10 @@ export function MailBankAccountsSection({
 function BankCard({
   bank,
   isFirst,
-  onVerify,
   onRemove,
 }: {
   bank: MailBankAccountRow;
   isFirst: boolean;
-  onVerify: () => void;
   onRemove: () => void;
 }) {
   const isVerified = bank.status === "verified";
@@ -200,8 +198,9 @@ function BankCard({
               border: "1px solid var(--brand)",
               minWidth: 0,
             }}
+            title="Waiting for Lob's test deposits to land in your bank. We'll auto-verify via Plaid once they post (usually 1-2 business days). You don't need to do anything."
           >
-            VERIFY
+            VERIFYING
           </span>
         )}
       </div>
@@ -218,19 +217,9 @@ function BankCard({
         <span className="v">{formatDate(bank.verified_at)}</span>
       </div>
       <div className="bank-card-foot">
-        {isVerified ? (
-          <span className="text-[11px] text-3">
-            {isFirst ? "Default for outgoing checks" : ""}
-          </span>
-        ) : (
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={onVerify}
-          >
-            Enter Test Deposits
-          </button>
-        )}
+        <span className="text-[11px] text-3">
+          {isVerified && isFirst ? "Default for outgoing checks" : ""}
+        </span>
         <button
           type="button"
           className="icon-btn"
