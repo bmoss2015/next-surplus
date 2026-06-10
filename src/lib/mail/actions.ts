@@ -12,6 +12,7 @@ import {
   activeCheckProvider,
 } from ".";
 import { renderMerge, type MergeContext } from "./merge";
+import { formatAddressForStorage } from "./address";
 
 // Server action — returns the total page count across a template's
 // attachment PDFs so the modal can show a real "N pages per piece"
@@ -1260,9 +1261,32 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     // call sites that didn't.
     if (recipient.contact_id) {
       const now = new Date().toISOString();
+      // Fix 5: persist the address that was actually sent (Lob-normalized
+      // or user-accepted override) back to contacts.value. Without this,
+      // a subsequent Send Mail re-prompts the auto-correct UI because the
+      // stored value still differs from the USPS-deliverable version.
+      // The address cache invalidation trigger fires on value change; the
+      // next verify will return deliverable + no_suggestion and skip the
+      // prompt.
+      const sentValue = formatAddressForStorage({
+        line1: recipient.line1,
+        line2: recipient.line2 ?? null,
+        city: recipient.city,
+        state: recipient.state,
+        postal_code: recipient.postal_code,
+      });
+      const { data: existingContact } = await sb
+        .from("contacts")
+        .select("value")
+        .eq("id", recipient.contact_id)
+        .maybeSingle();
+      const valuePatch =
+        existingContact && existingContact.value !== sentValue
+          ? { value: sentValue }
+          : {};
       await sb
         .from("contacts")
-        .update({ mailed: true, mailed_at: now })
+        .update({ mailed: true, mailed_at: now, ...valuePatch })
         .eq("id", recipient.contact_id);
       try {
         const { count: priorCount } = await sb
