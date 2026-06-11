@@ -710,7 +710,7 @@ export function ConversationTabClient({
         </aside>
 
         {/* RIGHT — selected thread reader. Full-bleed editorial typography. */}
-        <section className="flex min-h-0 flex-col bg-surface">
+        <section className="flex h-full flex-col overflow-hidden bg-surface">
           <div ref={readerRef} className="min-h-0 flex-1 overflow-y-auto">
           {selectedThread ? (
             <ThreadReader
