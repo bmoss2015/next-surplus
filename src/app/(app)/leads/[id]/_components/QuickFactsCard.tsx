@@ -12,10 +12,6 @@ function fmtDate(d: string | null): string {
   });
 }
 
-// Fix 13: Quick Facts rows use a 2-col grid (label auto, value minmax(0,1fr))
-// so the value column is bounded and `truncate` reliably fires on long
-// strings — flex+justify-between let the value grow until it kissed the
-// label. Title attr still exposes the full value on hover.
 function Row({
   label,
   value,
@@ -26,17 +22,14 @@ function Row({
   muted?: boolean;
 }) {
   return (
-    <div
-      className="grid items-baseline gap-2 leading-[1.9]"
-      style={{ gridTemplateColumns: "auto minmax(0, 1fr)" }}
-    >
-      <span className="text-[11px] text-[#6b7280]">{label}</span>
+    <div className="flex items-baseline gap-2 leading-[1.9]">
+      <span className="shrink-0 text-[11px] text-[#6b7280]">{label}</span>
       <span
         title={value}
         className={
           muted
-            ? "min-w-0 truncate text-right text-[11px] italic text-[#9ca3af]"
-            : "min-w-0 truncate text-right text-[11px] font-medium text-[#111827]"
+            ? "ml-auto min-w-0 flex-1 truncate text-right text-[11px] italic text-[#9ca3af]"
+            : "ml-auto min-w-0 flex-1 truncate text-right text-[11px] font-medium text-[#111827]"
         }
       >
         {value}
