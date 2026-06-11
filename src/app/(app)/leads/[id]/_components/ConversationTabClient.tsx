@@ -153,12 +153,14 @@ export function ConversationTabClient({
   messages,
   accounts,
   people,
+  sendEmailButton,
 }: {
   leadId: string;
   threads: LeadConversationThread[];
   messages: LeadConversationMessage[];
   accounts: { id: string; address: string; display_name: string | null }[];
   people: LeadPerson[];
+  sendEmailButton?: React.ReactNode;
 }) {
   void threads;
 
@@ -643,15 +645,17 @@ export function ConversationTabClient({
             Connect Gmail to Send
           </a>
         ) : (
-          <button
-            type="button"
-            onClick={() => openComposeTo(null)}
-            className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
-            title="Compose a new message"
-          >
-            <IconPencil size={13} stroke={2} />
-            New Message
-          </button>
+          sendEmailButton ?? (
+            <button
+              type="button"
+              onClick={() => openComposeTo(null)}
+              className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+              title="Compose a new message"
+            >
+              <IconPencil size={13} stroke={2} />
+              Send Email
+            </button>
+          )
         )}
       </div>
 

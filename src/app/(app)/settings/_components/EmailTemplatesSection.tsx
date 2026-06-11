@@ -214,38 +214,34 @@ export function EmailTemplatesSection({
   }
 
   return (
-    <section id="panel-email-templates" className="panel active">
-      <div className="breadcrumb">
-        <a>Settings</a>
-        <i className="icon icon-chevron-right" />
-        <a>Templates</a>
-        <i className="icon icon-chevron-right" />
-        <span>Emails</span>
-      </div>
-      <div className="page-head">
+    <div className="mx-auto max-w-[1080px] py-8" style={{ fontFamily: "Inter, sans-serif", color: "#0f1729" }}>
+      <header className="mb-6 flex items-end justify-between gap-6">
         <div>
-          <h1 className="section-h1">Email Templates</h1>
-          <p className="section-desc">
-            Reusable email bodies with merge fields. Use from any lead&apos;s compose modal.
+          <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
+            Settings · Templates
+          </div>
+          <h1 className="mt-1 text-[22px] font-medium tracking-tight">Email Templates</h1>
+          <p className="mt-1.5 max-w-[60ch] text-[13px] text-gray-500">
+            Reusable email bodies with merge fields. Drop into any lead&apos;s Send Email modal.
           </p>
         </div>
         <button
           type="button"
-          className="btn btn-primary btn-sm"
           onClick={() => setEditing("new")}
+          className="btn-primary cursor-pointer rounded-md px-3.5 py-2 text-[12px] font-medium text-white"
         >
           <IconPlus size={11} stroke={2} className="mr-1 inline -translate-y-px" />
           New Template
         </button>
-      </div>
+      </header>
 
       {errMsg && (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
           {errMsg}
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap items-center gap-1 border-b border-gray-150">
+      <div className="flex flex-wrap items-center gap-1 border-b border-gray-200">
         <FolderTab
           label="All"
           active={filterFolder === "All"}
@@ -337,7 +333,7 @@ export function EmailTemplatesSection({
           ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 

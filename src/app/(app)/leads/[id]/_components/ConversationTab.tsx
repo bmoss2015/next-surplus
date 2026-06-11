@@ -6,6 +6,7 @@ import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchLeadParties, LEAD_PARTY_ROLE_LABELS } from "@/lib/leads/lead-parties";
 import { createClient } from "@/lib/supabase/server";
 import { ConversationTabClient } from "./ConversationTabClient";
+import { SendEmailButtonServer } from "@/components/email/SendEmailButtonServer";
 
 export type LeadConversationMessage = {
   id: string;
@@ -219,6 +220,13 @@ export async function ConversationTab({ leadId }: { leadId: string }) {
         display_name: a.display_name,
       }))}
       people={people}
+      sendEmailButton={
+        <SendEmailButtonServer
+          leadId={leadId}
+          label="Send Email"
+          className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+        />
+      }
     />
   );
 }
