@@ -61,9 +61,37 @@ C:\\Users\\info\\moss-equity-portal
 
 \- URL: moss-equity-portal.vercel.app
 
-\- DB changes: npx supabase db push --linked
+\- DB changes: `npm run db:push:prod` (uses SUPABASE_PAT, no relinking, no DB password drama)
 
 \- Only after Bree confirms fix on localhost:3000
+
+\#### One-time prod migration setup (do this once, never again)
+
+The `npm run db:push:prod` script talks to the Supabase Management API with a Personal Access Token. It bypasses the DB password entirely and does NOT relink the local supabase CLI — the project ref stays pinned to staging.
+
+1. Create a PAT at https://supabase.com/dashboard/account/tokens. Name it `cli-prod-migrations`. Copy the `sbp_...` token.
+
+2. Save it persistently. Either:
+
+   - PowerShell (preferred — survives terminal restarts):
+
+     `[System.Environment]::SetEnvironmentVariable("SUPABASE_PAT","sbp_PASTE_HERE","User")`
+
+     Then open a fresh terminal.
+
+   - OR add this line to `.env.local`:
+
+     `SUPABASE_PAT=sbp_PASTE_HERE`
+
+3. From now on, after a PR merges, the prod deploy flow is just:
+
+   `npm run db:push:prod`
+
+   The script reads every file in `supabase/migrations/`, queries prod's `schema_migrations`, applies only what's missing, and records each apply so future runs stay in sync. Safe to re-run; it's a no-op when nothing's pending.
+
+\#### Why the old `npx supabase db push --linked` path is fragile
+
+It requires (a) the staging-locked link to be temporarily switched to prod, (b) the prod DB password to be loaded into `SUPABASE_DB_PASSWORD`, (c) the link to be switched back to staging afterward. Three places to mess up, two of which are credential lookups. The PAT-based script collapses all three into one command.
 
 \#### Deploy flow — GitHub first, never `vercel --prod` from local
 

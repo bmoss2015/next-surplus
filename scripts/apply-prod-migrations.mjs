@@ -19,21 +19,53 @@
 //   - Stops on first failure with the exact error from Supabase
 
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 
-const PAT = process.env.SUPABASE_PAT;
-const PROJECT_REF = "qvyhdexoicoppgrvvtov";
-const MIGRATIONS_DIR = path.join(
+const REPO_ROOT = path.join(
   path.dirname(new URL(import.meta.url).pathname).replace(/^\/(\w):/, "$1:"),
-  "..",
-  "supabase",
-  "migrations"
+  ".."
 );
+
+function readEnvLocalValue(key) {
+  const envPath = path.join(REPO_ROOT, ".env.local");
+  if (!fsSync.existsSync(envPath)) return null;
+  const text = fsSync.readFileSync(envPath, "utf-8");
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/i);
+    if (!m) continue;
+    if (m[1] !== key) continue;
+    let v = m[2];
+    if ((v.startsWith("'") && v.endsWith("'")) || (v.startsWith('"') && v.endsWith('"'))) {
+      v = v.slice(1, -1);
+    }
+    return v;
+  }
+  return null;
+}
+
+const PAT = process.env.SUPABASE_PAT || readEnvLocalValue("SUPABASE_PAT");
+const PROJECT_REF = "qvyhdexoicoppgrvvtov";
+const MIGRATIONS_DIR = path.join(REPO_ROOT, "supabase", "migrations");
 const API = `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`;
 
 if (!PAT) {
-  console.error("Set SUPABASE_PAT env var first.");
-  console.error("Create one at https://supabase.com/dashboard/account/tokens");
+  console.error("SUPABASE_PAT is not set.");
+  console.error("");
+  console.error("ONE-TIME SETUP (then you never deal with passwords again):");
+  console.error("");
+  console.error("  1. Create a PAT at https://supabase.com/dashboard/account/tokens");
+  console.error("     (Name it 'cli-prod-migrations'. Copy the sbp_... token.)");
+  console.error("");
+  console.error("  2. Save it persistently — in PowerShell run:");
+  console.error("     [System.Environment]::SetEnvironmentVariable(\"SUPABASE_PAT\",\"sbp_PASTE_HERE\",\"User\")");
+  console.error("");
+  console.error("     OR add this line to .env.local:");
+  console.error("     SUPABASE_PAT=sbp_PASTE_HERE");
+  console.error("");
+  console.error("  3. Open a fresh terminal and rerun: npm run db:push:prod");
   process.exit(1);
 }
 
