@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:push:prod": "node scripts/apply-prod-migrations.mjs",
     "db:push:staging": "node scripts/apply-staging-migrations.mjs",
+    "seed:test-emails": "node scripts/seed-test-emails.mjs",
     "postinstall": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
     "prepare": "node scripts/install-git-hooks.mjs"
   },
