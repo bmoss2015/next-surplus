@@ -159,7 +159,7 @@ function VariantA() {
         {visible.map((t) => (
           <article
             key={t.id}
-            className="group flex h-full cursor-pointer flex-col rounded-[10px] border border-gray-200 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_4px_16px_-4px_rgba(15,23,41,0.08)]"
+            className="group flex h-full cursor-pointer flex-col rounded-[10px] border border-gray-200 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-[#0d4b3a]/40 hover:shadow-[0_4px_16px_-4px_rgba(15,23,41,0.08)]"
           >
             <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
               {t.folder}
