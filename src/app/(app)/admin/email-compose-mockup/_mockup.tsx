@@ -656,7 +656,7 @@ function LeadHeaderBar() {
         </div>
         <div className="flex items-center gap-2">
           <button className="cursor-pointer rounded-md border border-gray-200 bg-white px-3.5 py-2 text-[12px] font-medium text-[#0f1729] hover:border-gray-300">
-            Send Mail
+            Send Letter
           </button>
           <button className="btn-primary cursor-pointer rounded-md px-3.5 py-2 text-[12px] font-medium text-white">
             Send Email
@@ -719,13 +719,8 @@ function EmailAccountSettings() {
         </div>
 
         <div className="space-y-2 px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
-              Signature
-            </div>
-            <button className="cursor-pointer text-[11px] text-gray-500 hover:text-[#0d4b3a]">
-              Source view
-            </button>
+          <div className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
+            Signature
           </div>
           <div className="rounded-md border border-gray-200 bg-white">
             <div className="flex items-center gap-0.5 border-b border-gray-100 px-2 py-1.5">
@@ -779,14 +774,41 @@ function EmailTemplatesPanel() {
       </div>
 
       <FolderCard name="Outreach" count={3}>
-        <TemplateRow name="Opening Outreach — Tax Sale" updated="2 days ago" used={14} />
-        <TemplateRow name="Opening Outreach — Mortgage Foreclosure" updated="1 week ago" used={6} />
-        <TemplateRow name="Soft Follow-up (Day 3)" updated="2 weeks ago" used={22} />
+        <TemplateRow
+          name="Opening Outreach — Tax Sale"
+          preview="Hi {{contact.first_name}}, I&apos;m following up on the surplus funds from your tax sale at..."
+          updated="2 days ago"
+          used={14}
+          mostUsed
+        />
+        <TemplateRow
+          name="Opening Outreach — Mortgage Foreclosure"
+          preview="Hi {{contact.first_name}}, our research shows you may be entitled to surplus funds from the recent..."
+          updated="1 week ago"
+          used={6}
+        />
+        <TemplateRow
+          name="Soft Follow-up (Day 3)"
+          preview="Just checking in to see if you had a chance to review my note from earlier this week..."
+          updated="2 weeks ago"
+          used={22}
+          mostUsed
+        />
       </FolderCard>
 
       <FolderCard name="Closing" count={2}>
-        <TemplateRow name="Send Contract For Signature" updated="3 days ago" used={9} />
-        <TemplateRow name="Welcome — Onboarding" updated="last month" used={4} />
+        <TemplateRow
+          name="Send Contract For Signature"
+          preview="Attached is the contract for your review. Once signed we&apos;ll file the claim with..."
+          updated="3 days ago"
+          used={9}
+        />
+        <TemplateRow
+          name="Welcome — Onboarding"
+          preview="Welcome aboard! Here&apos;s what to expect over the next 90 days as we work your claim..."
+          updated="last month"
+          used={4}
+        />
       </FolderCard>
     </div>
   );
@@ -802,7 +824,10 @@ function FolderCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-md border border-gray-200 bg-gray-50/50">
+    <div
+      className="overflow-hidden rounded-md border border-gray-200 bg-gray-50/50"
+      style={{ borderLeft: "3px solid #0d4b3a" }}
+    >
       <div className="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3.5 py-2.5">
         <div className="flex flex-1 items-center gap-2">
           <IconFolder size={14} stroke={1.75} style={{ color: "#0d4b3a" }} />
@@ -821,21 +846,34 @@ function FolderCard({
 
 function TemplateRow({
   name,
+  preview,
   updated,
   used,
+  mostUsed,
 }: {
   name: string;
+  preview: string;
   updated: string;
   used: number;
+  mostUsed?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3.5 py-2.5">
+    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-3.5 py-3">
       <div className="min-w-0">
-        <div className="truncate text-[13px] font-medium">{name}</div>
-        <div className="text-[11px] text-gray-500">
-          Updated {updated} · Used {used} times
+        <div className="flex items-center gap-2">
+          <span className="truncate text-[13px] font-medium">{name}</span>
+          {mostUsed && (
+            <span className="inline-flex items-center rounded-full bg-[#0d4b3a]/10 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-[#0d4b3a]">
+              Most Used
+            </span>
+          )}
         </div>
+        <div className="mt-0.5 truncate text-[11.5px] text-gray-500">{preview}</div>
+        <div className="mt-1 text-[10.5px] text-gray-400">Updated {updated}</div>
       </div>
+      <span className="inline-flex items-center rounded-full bg-[#0d4b3a]/10 px-2 py-0.5 text-[11px] font-medium tabular-nums text-[#0d4b3a]">
+        {used}× used
+      </span>
       <button title="Edit" aria-label="Edit" className="cursor-pointer text-gray-400 hover:text-[#0d4b3a]">
         <IconPencil size={14} stroke={1.75} />
       </button>
