@@ -46,14 +46,25 @@ export const MERGE_FIELDS: MergeField[] = [
 
   // Lead — the surplus funds case itself (property, court case, sale).
   { key: "lead.id", label: "Lead ID", example: "L-2026-0042", group: "lead" },
-  { key: "lead.property_address", label: "Property Address", example: "456 Oak Ave, Dallas, TX 75201", group: "lead" },
+  // Property address comes in three flavors: full one-liner, just the
+  // street, and just the city/state/zip block. Templates can pick the
+  // shape they need (e.g., street on one line, city/state/zip below).
+  { key: "lead.property_address", label: "Property Address (Full)", example: "456 Oak Ave, Dallas, TX 75201", group: "lead" },
+  { key: "lead.property_street_address", label: "Property Street Address", example: "456 Oak Ave", group: "lead" },
+  { key: "lead.property_city_state_zip", label: "Property City, State ZIP", example: "Dallas, TX 75201", group: "lead" },
+  { key: "lead.property_city", label: "Property City", example: "Dallas", group: "lead" },
+  { key: "lead.property_state", label: "Property State", example: "TX", group: "lead" },
+  { key: "lead.property_zip", label: "Property ZIP", example: "75201", group: "lead" },
   { key: "lead.county", label: "County", example: "Dallas", group: "lead" },
-  { key: "lead.state", label: "Property State", example: "TX", group: "lead" },
   { key: "lead.case_number", label: "Case Number", example: "DC-25-04321", group: "lead" },
   { key: "lead.parcel_number", label: "Parcel Number", example: "00000123456", group: "lead" },
   { key: "lead.sale_date", label: "Sale Date", example: "March 15, 2025", group: "lead" },
   { key: "lead.closing_bid", label: "Sale Price (Closing Bid)", example: "$185,000.00", group: "lead" },
-  { key: "lead.estimated_surplus", label: "Estimated Surplus", example: "$42,500.00", group: "lead" },
+  // Estimated Surplus = the "active surplus" the lead page uses
+  // (confirmed > source > computed). Use Confirmed Surplus when you
+  // need strictly the court-confirmed number.
+  { key: "lead.estimated_surplus", label: "Estimated Surplus", example: "$42,500", group: "lead" },
+  { key: "lead.confirmed_surplus", label: "Confirmed Surplus", example: "$42,500", group: "lead" },
   { key: "lead.owner_range", label: "Estimated Range To Owner", example: "$18,000 – $24,000", group: "lead" },
 
   // Sender — from org settings

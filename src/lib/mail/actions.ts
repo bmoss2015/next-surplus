@@ -12,6 +12,8 @@ import {
   activeCheckProvider,
 } from ".";
 import { renderMerge, type MergeContext } from "./merge";
+import { activeSurplus } from "@/lib/leads/active-surplus";
+import { formatAddressForStorage } from "./address";
 
 // Server action — returns the total page count across a template's
 // attachment PDFs so the modal can show a real "N pages per piece"
@@ -289,8 +291,8 @@ export async function previewMailMergeDocx(input: {
 export async function previewMailJob(input: {
   mail_job_id: string;
 }): Promise<
-  | { ok: true; kind: "html"; html: string; recipient_name: string }
-  | { ok: true; kind: "pdf"; base64: string; recipient_name: string }
+  | { ok: true; kind: "html"; html: string; recipient_name: string; color: boolean }
+  | { ok: true; kind: "pdf"; base64: string; recipient_name: string; color: boolean }
   | { ok: false; error: string }
 > {
   const profile = await getCurrentProfile();
@@ -307,7 +309,7 @@ export async function previewMailJob(input: {
   const withCache = await sb
     .from("mail_jobs")
     .select(
-      "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html, rendered_pdf_path"
+      "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html, color, rendered_pdf_path"
     )
     .eq("id", input.mail_job_id)
     .maybeSingle();
@@ -315,7 +317,7 @@ export async function previewMailJob(input: {
     const fallback = await sb
       .from("mail_jobs")
       .select(
-        "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html"
+        "id, lead_id, template_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, body_html, color"
       )
       .eq("id", input.mail_job_id)
       .maybeSingle();
@@ -324,6 +326,7 @@ export async function previewMailJob(input: {
     job = withCache.data;
   }
   if (!job) return { ok: false, error: "Mail job not found" };
+  const jobColor = Boolean(job.color);
 
   // Cache hit: rendered PDF already sits in storage from send time.
   // Skipped when the column isn't there yet (migration 0131 pending).
@@ -338,6 +341,7 @@ export async function previewMailJob(input: {
         kind: "pdf",
         base64: buf.toString("base64"),
         recipient_name: (job.recipient_name as string | null) ?? "",
+        color: jobColor,
       };
     }
   }
@@ -351,6 +355,7 @@ export async function previewMailJob(input: {
       kind: "html",
       html: storedBody,
       recipient_name: (job.recipient_name as string | null) ?? "",
+      color: jobColor,
     };
   }
 
@@ -367,22 +372,63 @@ export async function previewMailJob(input: {
 
   // Pull a fresh lead context so case-specific merge tokens have values.
   let leadContext: MergeContext = {};
+  // Fix 11: this preview path used to invent its own merge-key shape
+  // (lead.address, lead.postal_code, lead.attorney) that didn't match
+  // the canonical keys templates are authored against, so View Letter
+  // surfaced "[Missing: lead.property_address]" etc. Rebuild against
+  // the same key namespace the live send uses.
   const leadId = job.lead_id as string | null;
   if (leadId) {
     const { data: lead } = await sb
       .from("leads")
-      .select("lead_id, address, city, state, postal_code, estimated_surplus, attorney_name")
+      .select(
+        "lead_id, county, state, address, city, zip, parcel_number, case_number, sale_date, estimated_surplus, confirmed_surplus, source_surplus, closing_bid"
+      )
       .eq("id", leadId)
       .maybeSingle();
     if (lead) {
+      const street = ((lead.address as string | null) ?? "").trim() || null;
+      const city = ((lead.city as string | null) ?? "").trim() || null;
+      const region = ((lead.state as string | null) ?? "").trim() || null;
+      const zip = ((lead.zip as string | null) ?? "").trim() || null;
+      const cityStateZip =
+        city && region && zip ? `${city}, ${region} ${zip}` : null;
+      const fullPropertyAddress =
+        street && cityStateZip ? `${street}, ${cityStateZip}` : street;
+      const surplus = activeSurplus({
+        confirmed_surplus: (lead.confirmed_surplus as number | null) ?? null,
+        estimated_surplus: (lead.estimated_surplus as number | null) ?? null,
+        closing_bid: (lead.closing_bid as number | null) ?? null,
+        source_surplus: (lead.source_surplus as number | null) ?? null,
+      });
+      const activeSurplusValue = surplus.basis !== "none" ? surplus.value : null;
       leadContext = {
+        "lead.id": (lead.lead_id as string | null) ?? "",
         "lead.case_id": (lead.lead_id as string | null) ?? "",
-        "lead.address": (lead.address as string | null) ?? "",
-        "lead.city": (lead.city as string | null) ?? "",
-        "lead.state": (lead.state as string | null) ?? "",
-        "lead.postal_code": (lead.postal_code as string | null) ?? "",
-        "lead.estimated_surplus": (lead.estimated_surplus as number | null) ?? "",
-        "lead.attorney": (lead.attorney_name as string | null) ?? "",
+        "lead.property_address": fullPropertyAddress ?? "",
+        "lead.property_full_address": fullPropertyAddress ?? "",
+        "lead.property_street_address": street ?? "",
+        "lead.property_city": city ?? "",
+        "lead.property_state": region ?? "",
+        "lead.property_zip": zip ?? "",
+        "lead.property_city_state_zip": cityStateZip ?? "",
+        "lead.county": (lead.county as string | null) ?? "",
+        "lead.state": region ?? "",
+        "lead.case_number": (lead.case_number as string | null) ?? "",
+        "lead.parcel_number": (lead.parcel_number as string | null) ?? "",
+        "lead.sale_date": (lead.sale_date as string | null) ?? "",
+        "lead.closing_bid":
+          lead.closing_bid != null
+            ? `$${Number(lead.closing_bid).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : "",
+        "lead.estimated_surplus":
+          activeSurplusValue != null
+            ? `$${Math.round(activeSurplusValue).toLocaleString()}`
+            : "",
+        "lead.confirmed_surplus":
+          lead.confirmed_surplus != null
+            ? `$${Math.round(Number(lead.confirmed_surplus)).toLocaleString()}`
+            : "",
       };
     }
   }
@@ -416,9 +462,10 @@ export async function previewMailJob(input: {
         ? Buffer.from(preview.base64, "base64").toString("utf-8")
         : "",
     recipient_name: recipientName,
+    color: jobColor,
   } as
-    | { ok: true; kind: "html"; html: string; recipient_name: string }
-    | { ok: true; kind: "pdf"; base64: string; recipient_name: string };
+    | { ok: true; kind: "html"; html: string; recipient_name: string; color: boolean }
+    | { ok: true; kind: "pdf"; base64: string; recipient_name: string; color: boolean };
 }
 
 // Fetches the rendered check PDF for a mail_job from Lob and returns
@@ -1172,6 +1219,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         // stays empty; previewMailJob re-renders via Gotenberg on demand.
         body_html: isFileTemplate ? "" : wrapBodyHtml(rendered),
         mail_class: input.mail_class,
+        color: input.color === true,
         include_check: input.include_check ?? false,
         check_amount_cents: input.check_amount_cents ?? null,
         check_memo: input.check_memo ?? null,
@@ -1260,9 +1308,32 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     // call sites that didn't.
     if (recipient.contact_id) {
       const now = new Date().toISOString();
+      // Fix 5: persist the address that was actually sent (Lob-normalized
+      // or user-accepted override) back to contacts.value. Without this,
+      // a subsequent Send Mail re-prompts the auto-correct UI because the
+      // stored value still differs from the USPS-deliverable version.
+      // The address cache invalidation trigger fires on value change; the
+      // next verify will return deliverable + no_suggestion and skip the
+      // prompt.
+      const sentValue = formatAddressForStorage({
+        line1: recipient.line1,
+        line2: recipient.line2 ?? null,
+        city: recipient.city,
+        state: recipient.state,
+        postal_code: recipient.postal_code,
+      });
+      const { data: existingContact } = await sb
+        .from("contacts")
+        .select("value")
+        .eq("id", recipient.contact_id)
+        .maybeSingle();
+      const valuePatch =
+        existingContact && existingContact.value !== sentValue
+          ? { value: sentValue }
+          : {};
       await sb
         .from("contacts")
-        .update({ mailed: true, mailed_at: now })
+        .update({ mailed: true, mailed_at: now, ...valuePatch })
         .eq("id", recipient.contact_id);
       try {
         const { count: priorCount } = await sb

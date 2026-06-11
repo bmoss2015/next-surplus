@@ -29,6 +29,7 @@ export function MailCardClient({ rows }: { rows: MailJobListRow[] }) {
       recipientName: displayRecipientName(row.recipient_name),
       bodyHtml: detail?.body_html ?? null,
       trackingUrl: row.tracking_url,
+      color: row.color,
     });
   };
 

@@ -31,6 +31,7 @@ export type MailJobListRow = {
   status: MailStatus;
   include_check: boolean;
   check_amount_cents: number | null;
+  color: boolean;
   cost_cents: number | null;
   error_message: string | null;
   sent_at: string | null;
@@ -140,7 +141,7 @@ export async function fetchMailDashboard(
   let q = sb
     .from("mail_jobs")
     .select(
-      "id, batch_id, lead_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, mail_class, provider, tracking_url, tracking_number, status, include_check, check_amount_cents, cost_cents, error_message, sent_at, delivered_at, returned_at, created_at"
+      "id, batch_id, lead_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, mail_class, provider, tracking_url, tracking_number, status, include_check, check_amount_cents, color, cost_cents, error_message, sent_at, delivered_at, returned_at, created_at"
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -237,7 +238,7 @@ export async function fetchMailJob(
   const { data } = await sb
     .from("mail_jobs")
     .select(
-      "id, batch_id, lead_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, mail_class, provider, tracking_url, tracking_number, status, include_check, check_amount_cents, check_memo, bank_account_id, cost_cents, error_message, sent_at, delivered_at, returned_at, created_at, body_html, from_name, from_address_line1, from_address_line2, from_city, from_state, from_postal_code"
+      "id, batch_id, lead_id, recipient_name, recipient_address_line1, recipient_address_line2, recipient_city, recipient_state, recipient_postal_code, mail_class, provider, tracking_url, tracking_number, status, include_check, check_amount_cents, color, check_memo, bank_account_id, cost_cents, error_message, sent_at, delivered_at, returned_at, created_at, body_html, from_name, from_address_line1, from_address_line2, from_city, from_state, from_postal_code"
     )
     .eq("id", id)
     .maybeSingle();
@@ -274,6 +275,7 @@ function mapRow(r: Record<string, unknown>): MailJobListRow {
     status: r.status as MailStatus,
     include_check: Boolean(r.include_check),
     check_amount_cents: (r.check_amount_cents as number | null) ?? null,
+    color: Boolean(r.color),
     cost_cents: (r.cost_cents as number | null) ?? null,
     error_message: (r.error_message as string | null) ?? null,
     sent_at: (r.sent_at as string | null) ?? null,

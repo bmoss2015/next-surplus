@@ -16,6 +16,9 @@ export type LetterPreviewData = {
   recipientName: string;
   bodyHtml: string | null;
   trackingUrl: string | null;
+  // Sent in color? When false the preview is rendered with a grayscale
+  // CSS filter so the operator sees what the recipient actually received.
+  color: boolean;
 };
 
 type RenderedPreview =
@@ -126,6 +129,7 @@ export function LetterPreviewModal({
               sandbox=""
               srcDoc={rendered.html}
               className="h-full w-full"
+              style={data.color ? undefined : { filter: "grayscale(100%)" }}
             />
           )}
           {rendered.kind === "pdf" && (
@@ -133,6 +137,7 @@ export function LetterPreviewModal({
               title="Letter preview"
               src={rendered.blobUrl}
               className="h-full w-full"
+              style={data.color ? undefined : { filter: "grayscale(100%)" }}
             />
           )}
         </div>
