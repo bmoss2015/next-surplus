@@ -29,6 +29,16 @@ import type {
 
 const UNFILED_KEY = "__unfiled__";
 
+function toProperCase(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/(^|\s|-|\/)(\w)/g, (_m, sep, ch: string) => `${sep}${ch.toUpperCase()}`);
+}
+
+const FOLDER_INPUT_CLASS =
+  "rounded-md border border-gray-200 bg-gray-50/60 px-2.5 py-1 text-[12px] text-[#0f1729] outline-none transition-colors transition-shadow focus:border-[#0d4b3a] focus:bg-white focus:shadow-[0_0_0_3px_rgba(13,75,58,0.12)]";
+
 export function EmailTemplatesSection({
   initialTemplates,
   initialFolders,
@@ -138,7 +148,7 @@ export function EmailTemplatesSection({
   }
 
   function addFolder() {
-    const name = newFolderName.trim();
+    const name = toProperCase(newFolderName);
     if (!name) return;
     setErrMsg(null);
     startTransition(async () => {
@@ -165,7 +175,7 @@ export function EmailTemplatesSection({
 
   function saveRename() {
     if (!renamingFolderId) return;
-    const name = renameValue.trim();
+    const name = toProperCase(renameValue);
     if (!name) return;
     const id = renamingFolderId;
     setErrMsg(null);
@@ -213,7 +223,9 @@ export function EmailTemplatesSection({
           setErrMsg(null);
         }}
         onSave={save}
-        onAddFolder={async (name) => {
+        onAddFolder={async (rawName) => {
+          const name = toProperCase(rawName);
+          if (!name) return { ok: false as const, error: "Folder name required" };
           const res = await createEmailTemplateFolder(name);
           if (res.ok) {
             setFolders((prev) =>
@@ -295,7 +307,7 @@ export function EmailTemplatesSection({
                 }
               }}
               placeholder="Folder name"
-              className="rounded-md border border-gray-200 px-2 py-1 text-[12px] outline-none focus:border-[#0d4b3a]"
+              className={FOLDER_INPUT_CLASS}
             />
             <button
               type="button"
@@ -384,7 +396,7 @@ function FolderTab({
             if (e.key === "Enter") onRenameSave?.();
             if (e.key === "Escape") onRenameCancel?.();
           }}
-          className="rounded border border-gray-200 px-1.5 py-0.5 text-[12px] outline-none"
+          className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-0.5 text-[12px] text-[#0f1729] outline-none transition-colors transition-shadow focus:border-[#0d4b3a] focus:bg-white focus:shadow-[0_0_0_3px_rgba(13,75,58,0.12)]"
         />
         <button
           type="button"
@@ -784,7 +796,7 @@ function EditForm({
                               }
                             }}
                             placeholder="Folder name"
-                            className="flex-1 rounded border border-gray-200 px-2 py-1 text-[12px] outline-none focus:border-[#0d4b3a]"
+                            className="min-w-0 flex-1 rounded-md border border-gray-200 bg-gray-50/60 px-2 py-1 text-[12px] text-[#0f1729] outline-none transition-colors transition-shadow focus:border-[#0d4b3a] focus:bg-white focus:shadow-[0_0_0_3px_rgba(13,75,58,0.12)]"
                           />
                           <button
                             type="button"
