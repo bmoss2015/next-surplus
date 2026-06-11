@@ -229,7 +229,7 @@ function ComposeModal() {
             <div className="relative">
               <button
                 onClick={() => setTemplateMenu((v) => !v)}
-                title="Template actions"
+                title="Template Actions"
                 className="cursor-pointer rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
               >
                 <IconDots size={14} stroke={1.75} />
@@ -358,9 +358,6 @@ function ComposeModal() {
           <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-400">
             <IconSignature size={10} stroke={1.75} />
             Signature
-            <span className="ml-1 normal-case tracking-normal text-gray-400/80">
-              — auto appended, edit in Settings
-            </span>
           </div>
           <div className="text-[12.5px] leading-[1.55] text-[#0f1729]">
             <strong>Bree Moss</strong>
@@ -372,19 +369,13 @@ function ComposeModal() {
         </div>
       </div>
 
-      <footer className="flex items-center justify-between border-t border-gray-150 px-6 py-3">
-        <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
-          <IconMailForward size={11} stroke={1.75} />
-          Sends via your Gmail. Opens tracked on the lead.
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="cursor-pointer text-[12px] font-medium text-gray-500 hover:text-gray-700">
-            Cancel
-          </button>
-          <button className="btn-primary cursor-pointer rounded-md px-4 py-1.5 text-[12px] font-medium text-white">
-            Send Email
-          </button>
-        </div>
+      <footer className="flex items-center justify-end gap-2 border-t border-gray-150 px-6 py-3">
+        <button className="cursor-pointer text-[12px] font-medium text-gray-500 hover:text-gray-700">
+          Cancel
+        </button>
+        <button className="btn-primary cursor-pointer rounded-md px-4 py-1.5 text-[12px] font-medium text-white">
+          Send Email
+        </button>
       </footer>
     </div>
   );
@@ -423,7 +414,26 @@ function ContactPickerRow({
   const orgMatches = ORG_CONTACTS.filter(
     (c) => !selected.find((s) => s.id === c.id) && (q === "" || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
   );
-  const isEmailish = q.includes("@") && q.includes(".") && !leadMatches.length && !orgMatches.length;
+
+  function looksLikeEmail(s: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+  }
+
+  function commitRawEmail() {
+    const raw = query.trim();
+    if (!looksLikeEmail(raw)) return false;
+    onAdd({ id: `raw-${raw}`, name: raw, email: raw, source: "lead" });
+    setQuery("");
+    return true;
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === "Tab" || e.key === " " || e.key === ",") {
+      if (commitRawEmail()) e.preventDefault();
+    } else if (e.key === "Backspace" && query === "" && selected.length > 0) {
+      onRemove(selected[selected.length - 1]);
+    }
+  }
 
   return (
     <Row label={label} right={right}>
@@ -435,8 +445,10 @@ function ContactPickerRow({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onKeyDown}
+            onBlur={() => commitRawEmail()}
             onFocus={() => setOpen(true)}
-            placeholder={selected.length === 0 ? "Search contacts on this lead..." : ""}
+            placeholder={selected.length === 0 ? "Search contacts or type an email..." : ""}
             className="flex-1 min-w-[180px] border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
           />
         </div>
@@ -471,29 +483,12 @@ function ContactPickerRow({
                 ))}
               </Group>
             )}
-            {isEmailish && (
-              <Group label="One-off email">
-                <button
-                  onClick={() => {
-                    onAdd({
-                      id: `raw-${q}`,
-                      name: q,
-                      email: q,
-                      source: "lead",
-                    });
-                    setQuery("");
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[12.5px] hover:bg-gray-50"
-                >
-                  <IconPlus size={12} stroke={2} className="text-gray-400" />
-                  Add <strong>{q}</strong> as a one-off recipient
-                </button>
-              </Group>
-            )}
-            {leadMatches.length === 0 && orgMatches.length === 0 && !isEmailish && (
+            {leadMatches.length === 0 && orgMatches.length === 0 && (
               <div className="flex items-center gap-2 px-3 py-3 text-[12px] text-gray-500">
                 <IconSearch size={12} stroke={1.75} />
-                Type to search contacts, or paste an email address.
+                {looksLikeEmail(query)
+                  ? "Press Enter, Tab, or comma to add."
+                  : "Type to search contacts, or paste an email."}
               </div>
             )}
           </div>
@@ -719,7 +714,7 @@ function EmailAccountSettings() {
               <span>On for every send</span>
             </div>
             <p className="mt-1.5 text-[11px] text-gray-500">
-              We don&apos;t distinguish opens by mail client. An &ldquo;Email Opened&rdquo; row means our pixel fired — same approach as HubSpot, Salesforce, Apollo, Outreach.
+              Apple Mail pre-fetches images server-side, so a pixel fire there doesn&apos;t mean a human looked. We show those as &ldquo;Email Delivered&rdquo; in muted gray. Real opens (Gmail, Outlook, etc.) show as &ldquo;Email Opened.&rdquo;
             </p>
           </div>
         </div>
@@ -874,19 +869,20 @@ function ActivityFeed() {
         <ActivityRow
           icon={IconEye}
           title="Email Opened"
-          body={<>Roberta Mendes opened the email.</>}
+          body={<>Carlos Mendes opened the email.</>}
           meta="18 min ago · Houston, TX"
         />
         <ActivityRow
-          icon={IconEye}
-          title="Email Opened"
-          body={<>Roberta Mendes opened it again.</>}
-          meta="2 hours ago · Houston, TX"
+          icon={IconCircleCheck}
+          title="Email Delivered"
+          body={<>Roberta Mendes — delivered to her mail client.</>}
+          meta="2 min ago · Apple Mail"
+          appleDelivered
         />
         <ActivityRow
           icon={IconEye}
           title="Email Opened"
-          body={<>Carlos Mendes opened the email.</>}
+          body={<>Carlos Mendes opened it again.</>}
           meta="3 hours ago · Houston, TX"
         />
       </div>
@@ -900,23 +896,28 @@ function ActivityRow({
   body,
   meta,
   link,
+  appleDelivered,
 }: {
   icon: React.ComponentType<{ size: number; stroke: number; className?: string }>;
   title: string;
   body: React.ReactNode;
   meta: string;
   link?: string;
+  appleDelivered?: boolean;
 }) {
   return (
     <div className="flex items-start gap-3 px-6 py-3.5">
-      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white">
-        <Icon size={13} stroke={1.75} className="text-gray-600" />
+      <div className={
+        "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-white " +
+        (appleDelivered ? "border-gray-200" : "border-gray-200")
+      }>
+        <Icon size={13} stroke={1.75} className={appleDelivered ? "text-gray-400" : "text-gray-600"} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[13px]">
-          <span className="font-medium">{title}</span>
+          <span className={"font-medium " + (appleDelivered ? "text-gray-500" : "text-[#0f1729]")}>{title}</span>
           <span className="mx-2 text-gray-300">·</span>
-          <span className="text-[#0f1729]">{body}</span>
+          <span className={appleDelivered ? "text-gray-500" : "text-[#0f1729]"}>{body}</span>
         </div>
         <div className="mt-0.5 text-[11px] text-gray-500">
           {meta}
@@ -940,7 +941,7 @@ function BuildNotes() {
       </h3>
       <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
         <NoteItem term="To / Cc / Bcc input">
-          Typeahead dropdown opens on focus. Two groups: contacts on this lead first, then contacts across the org. Type to filter. If you paste a raw email that doesn&apos;t match anyone, you get a &ldquo;Add as one-off recipient&rdquo; option. Cc and Bcc use the same picker. Same pattern as HubSpot, Salesforce, Apollo, Outreach.
+          Typeahead dropdown opens on focus. Two groups: contacts on this lead first, then contacts across the org. Type to filter. Type a valid email and press Enter, Tab, comma, or space — it auto-chips. Backspace on empty input removes the last chip. Same shortcuts as Gmail and HubSpot.
         </NoteItem>
         <NoteItem term="Recipient chips">
           Every selected recipient renders as a chip with avatar + name + relation. Consistent across To, Cc, Bcc. No mixing of chip and plaintext.
@@ -954,8 +955,8 @@ function BuildNotes() {
         <NoteItem term="Toolbar tooltips">
           Every toolbar icon now has a hover title (&ldquo;Bold&rdquo;, &ldquo;Italic&rdquo;, &ldquo;Bulleted list&rdquo;, etc). Accessibility + discoverability for new users.
         </NoteItem>
-        <NoteItem term="Open tracking">
-          Every &ldquo;Email Opened&rdquo; row means our pixel fired. No distinguishing between human opens and Apple Mail pre-fetch. Industry default — HubSpot, Salesforce, Apollo, Outreach all do this in their main views.
+        <NoteItem term="Open tracking — Apple Mail handling">
+          Real opens (Gmail, Outlook, Yahoo, mobile clients other than Apple Mail) show as &ldquo;Email Opened&rdquo; — pixel fired, human likely looked. Apple Mail (iOS 15.2+) pre-fetches all images server-side regardless of whether the user opened, so those show as &ldquo;Email Delivered&rdquo; in muted gray with the meta line noting Apple Mail. Honest about the uncertainty without hiding the signal. We detect Apple Mail by IP range and user agent. Anchor: HubSpot, Mailchimp, Salesforce Marketing Cloud, Apollo, Outreach all flag Apple opens — they didn&apos;t when MPP launched but added it over the next year because sales users complained about inflated open rates.
         </NoteItem>
         <NoteItem term="Signature toolbar">
           Richer than the compose body: bold / italic / underline / font size / color / link / image / list / align. Plus a Source view link for paste-raw-HTML power users. Anchor: Gmail, HubSpot, Salesforce, Outlook all give signatures a richer editor than the compose body — because signatures often have logos and structured layout.
