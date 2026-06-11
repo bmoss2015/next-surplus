@@ -354,12 +354,9 @@ function ComposeModal() {
           </div>
         )}
 
-        <div className="border-t border-dashed border-gray-200 bg-gray-50/50 px-6 py-4">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-400">
-            <IconSignature size={10} stroke={1.75} />
-            Signature
-          </div>
-          <div className="text-[12.5px] leading-[1.55] text-[#0f1729]">
+        <div className="px-6 pb-5">
+          <hr className="my-3 border-t border-gray-100" />
+          <div className="text-[13.5px] leading-[1.55] text-[#0f1729]">
             <strong>Bree Moss</strong>
             <br />
             <span className="text-gray-500">Managing Partner · Moss Equity Partners</span>
