@@ -279,7 +279,7 @@ export async function GET(req: NextRequest) {
     const bodyParts: string[] = [];
     if (info.primary_owner_name) bodyParts.push(info.primary_owner_name);
     if (info.estimated_net_payout != null) {
-      bodyParts.push(`Est. Net Payout ${fmtMoneyShort(info.estimated_net_payout)}`);
+      bodyParts.push(`Estimated Net Payout ${fmtMoneyShort(info.estimated_net_payout)}`);
     }
     const badge = info.stage ? STAGE_LABELS[info.stage as Stage] ?? null : null;
     results.push({
@@ -638,9 +638,9 @@ export async function GET(req: NextRequest) {
     // of these, the hint reads e.g. "Est. Net Payout: $96,668" so the user
     // can see which financial value brought this lead up.
     const CURRENCY_COLS: Array<[string, keyof LeadRow]> = [
-      ["Est. Net Payout", "estimated_net_payout"],
+      ["Estimated Net Payout", "estimated_net_payout"],
       ["Confirmed Surplus", "confirmed_surplus"],
-      ["Est. Surplus", "estimated_surplus"],
+      ["Estimated Surplus", "estimated_surplus"],
       ["Source Surplus", "source_surplus"],
       ["Closing Bid", "closing_bid"],
       ["Attorney Cost", "attorney_cost"],

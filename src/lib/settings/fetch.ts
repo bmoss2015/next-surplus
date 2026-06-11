@@ -412,18 +412,64 @@ export async function fetchEmailTemplates(): Promise<EmailTemplateRow[]> {
     .select("id, name, folder_id, subject, body_html, updated_at")
     .order("name", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map((r) => ({
+  const baseRows = (data ?? []).map((r) => ({
     id: r.id as string,
     name: (r.name as string | null) ?? "",
     folder_id: (r.folder_id as string | null) ?? null,
     subject: (r.subject as string | null) ?? "",
     body_html: (r.body_html as string | null) ?? "",
     updated_at: (r.updated_at as string) ?? new Date().toISOString(),
-    used: 0,
-    open_rate: null,
-    reply_rate: null,
-    last_used: null,
   }));
+
+  const ids = baseRows.map((r) => r.id);
+  if (ids.length === 0) {
+    return baseRows.map((r) => ({
+      ...r,
+      used: 0,
+      open_rate: null,
+      reply_rate: null,
+      last_used: null,
+    }));
+  }
+
+  const { data: tokenRows } = await sb
+    .from("email_send_tokens")
+    .select("template_id, sent_at, first_opened_at, open_classifications")
+    .in("template_id", ids);
+
+  type Stats = { sends: number; humanOpens: number; lastUsed: string | null };
+  const statsById = new Map<string, Stats>();
+  for (const t of tokenRows ?? []) {
+    const id = (t.template_id as string | null) ?? null;
+    if (!id) continue;
+    const prev = statsById.get(id) ?? { sends: 0, humanOpens: 0, lastUsed: null };
+    prev.sends += 1;
+    const sentAt = (t.sent_at as string | null) ?? null;
+    if (sentAt && (!prev.lastUsed || sentAt > prev.lastUsed)) {
+      prev.lastUsed = sentAt;
+    }
+    if (t.first_opened_at) {
+      const cls = Array.isArray(t.open_classifications)
+        ? (t.open_classifications as string[])
+        : [];
+      const hasHumanOpen = cls.some((c) => c !== "apple_mail_proxy");
+      if (hasHumanOpen) prev.humanOpens += 1;
+    }
+    statsById.set(id, prev);
+  }
+
+  return baseRows.map((r) => {
+    const s = statsById.get(r.id);
+    const sends = s?.sends ?? 0;
+    const humanOpens = s?.humanOpens ?? 0;
+    return {
+      ...r,
+      used: sends,
+      open_rate: sends > 0 ? Math.round((humanOpens / sends) * 100) : null,
+      reply_rate: null,
+      last_used: s?.lastUsed ?? null,
+    };
+  });
 }
 
 export type AppSettings = {
