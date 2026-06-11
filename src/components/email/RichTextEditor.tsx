@@ -168,6 +168,27 @@ export function RichTextEditor({
     setImageOpen(false);
   }
 
+  function onPickImageFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+    const MAX_BYTES = 1_500_000;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = String(reader.result || "");
+      if (!src) return;
+      if (src.length > MAX_BYTES * 1.4) {
+        window.alert(
+          "That image is large (>1.5MB). It will work but bloats every email. Consider compressing first."
+        );
+      }
+      editor!.chain().focus().setImage({ src }).run();
+      setImageOpen(false);
+    };
+    reader.readAsDataURL(file);
+  }
+
   function applySize(size: string) {
     editor!
       .chain()
@@ -327,10 +348,28 @@ export function RichTextEditor({
             onClick={() => setImageOpen((v) => !v)}
           />
           {imageOpen && (
-            <div className="absolute left-0 top-full z-40 mt-1 w-[300px] rounded-md border border-gray-200 bg-white p-2 shadow-lg">
-              <label className="text-[10.5px] uppercase tracking-[0.08em] text-gray-500">Image URL</label>
+            <div className="absolute left-0 top-full z-40 mt-1 w-[320px] rounded-md border border-gray-200 bg-white p-3 shadow-[0_16px_40px_-8px_rgba(15,23,41,0.18)]">
+              <label className="block cursor-pointer rounded-md border-2 border-dashed border-gray-200 px-3 py-4 text-center transition-colors hover:border-[#0d4b3a]/40 hover:bg-gray-50/60">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                  onChange={onPickImageFile}
+                  className="hidden"
+                />
+                <IconPhoto size={18} stroke={1.5} className="mx-auto text-gray-400" />
+                <div className="mt-1.5 text-[12px] font-medium text-[#0f1729]">
+                  Choose an image from your computer
+                </div>
+                <div className="mt-0.5 text-[10.5px] text-gray-500">
+                  PNG, JPG, GIF, WebP or SVG — embedded in the email
+                </div>
+              </label>
+              <div className="my-2.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-gray-400">
+                <span className="h-px flex-1 bg-gray-200" />
+                or paste a URL
+                <span className="h-px flex-1 bg-gray-200" />
+              </div>
               <input
-                autoFocus
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 onKeyDown={(e) => {
@@ -341,7 +380,7 @@ export function RichTextEditor({
                   if (e.key === "Escape") setImageOpen(false);
                 }}
                 placeholder="https://example.com/logo.png"
-                className="mt-1 w-full rounded-md border border-gray-200 px-2 py-1 text-[12.5px] outline-none focus:border-[#0d4b3a]"
+                className="w-full rounded-md border border-gray-200 px-2 py-1 text-[12.5px] outline-none focus:border-[#0d4b3a]"
               />
               <div className="mt-2 flex items-center justify-end gap-1">
                 <button
@@ -354,9 +393,10 @@ export function RichTextEditor({
                 <button
                   type="button"
                   onClick={applyImage}
-                  className="cursor-pointer rounded-md bg-[#0d4b3a] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#0f5544]"
+                  disabled={!imageUrl.trim()}
+                  className="cursor-pointer rounded-md bg-[#0d4b3a] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#0f5544] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Insert
+                  Insert URL
                 </button>
               </div>
             </div>
