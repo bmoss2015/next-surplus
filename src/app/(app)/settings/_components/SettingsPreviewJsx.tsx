@@ -27,12 +27,15 @@ import { MailBankAccountsSection } from "./MailBankAccountsSection";
 import { LobPricingSection } from "./LobPricingSection";
 import { CustomerPricingViewSection } from "./CustomerPricingViewSection";
 import { TemplatesSection } from "./TemplatesSection";
+import { EmailTemplatesSection } from "./EmailTemplatesSection";
 import { PlaybooksSection } from "./PlaybooksSection";
 
 import type {
   AppSettings,
   AttorneyRow,
   CustomerPricingViewData,
+  EmailTemplateFolderRow,
+  EmailTemplateRow,
   LobPricingSettings,
   LostReasonAdminRow,
   MailBankAccountRow,
@@ -69,6 +72,8 @@ export type SettingsData = {
   lobPricing: LobPricingSettings | null;
   customerPricing: CustomerPricingViewData | null;
   templates: TemplateRow[];
+  emailTemplates: EmailTemplateRow[];
+  emailTemplateFolders: EmailTemplateFolderRow[];
   research: ResearchTemplateRow[];
   phoneUsage: PhoneValidationUsage | null;
   phoneValidationEnabled: boolean;
@@ -227,6 +232,13 @@ function renderPanel(
           canEdit={currentUser.isAdmin}
         />
       );
+    case "email-templates":
+      return (
+        <EmailTemplatesSection
+          initialTemplates={data.emailTemplates}
+          initialFolders={data.emailTemplateFolders}
+        />
+      );
     case "playbooks":
       return (
         <PlaybooksSection
@@ -242,7 +254,7 @@ function renderPanel(
 function AdminGate() {
   return (
     <section className="panel active">
-      <h1 className="section-h1">Admin only</h1>
+      <h1 className="section-h1">Admin Only</h1>
       <p className="section-desc">
         This panel is restricted to org admins. Ask your admin for access.
       </p>

@@ -177,17 +177,29 @@ export default async function DashboardPage() {
               </div>
             ) : (
               data.upcomingDeadlines.map((d, idx) => {
-                const tone =
-                  d.daysAway <= 7
+                const tone = d.pastDue
+                  ? "text-danger"
+                  : d.daysAway <= 7
                     ? "text-danger"
                     : d.daysAway <= 30
                       ? "text-warn"
                       : "text-gray-500";
+                const label = d.pastDue
+                  ? d.daysAway === -1
+                    ? "1 day past due"
+                    : `${Math.abs(d.daysAway)} days past due`
+                  : d.daysAway === 0
+                    ? "Today"
+                    : d.daysAway === 1
+                      ? "1 day"
+                      : `${d.daysAway} days`;
                 return (
                   <Link
                     key={`${d.leadId}-${idx}`}
                     href={`/leads/${d.leadId}`}
-                    className="flex items-center justify-between border-b border-gray-150 px-[18px] py-[13px] last:border-b-0 hover:bg-gray-50"
+                    className={`flex items-center justify-between border-b border-gray-150 px-[18px] py-[13px] last:border-b-0 hover:bg-gray-50 ${
+                      d.pastDue ? "bg-[#fef2f2]" : ""
+                    }`}
                   >
                     <div>
                       <div className="text-[13px] font-medium text-ink">
@@ -197,11 +209,7 @@ export default async function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <div className={`text-[12px] font-medium ${tone}`}>
-                        {d.daysAway === 0
-                          ? "Today"
-                          : d.daysAway === 1
-                            ? "1 day"
-                            : `${d.daysAway} days`}
+                        {label}
                       </div>
                       <div className="text-[11px] text-gray-500">
                         {d.formattedDate}

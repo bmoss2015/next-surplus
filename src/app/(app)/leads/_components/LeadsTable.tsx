@@ -116,7 +116,7 @@ export function LeadsTable({
                   ) : (
                     <div className="font-medium text-gray-500">
                       <span className="text-[10px] uppercase tracking-wide text-gray-400">
-                        Est.{" "}
+                        Estimated{" "}
                       </span>
                       {formatCurrency(surplus.value)}
                     </div>
@@ -127,7 +127,7 @@ export function LeadsTable({
                     </div>
                   ) : (
                     <div className="text-[11px] text-gray-500">
-                      Est. Net Payout {formatCurrency(activeNetPayout(lead))}
+                      Estimated Net Payout {formatCurrency(activeNetPayout(lead))}
                     </div>
                   )}
                 </td>

@@ -13,12 +13,16 @@ export function AppShell({
   userEmail,
   isAdmin,
   isOwner,
+  urgentOverdue,
+  urgentDueToday,
 }: {
   children: React.ReactNode;
   userName: string;
   userEmail: string | null;
   isAdmin: boolean;
   isOwner: boolean;
+  urgentOverdue?: number;
+  urgentDueToday?: number;
 }) {
   return (
     <RoleProvider isAdmin={isAdmin} isOwner={isOwner}>
@@ -30,7 +34,7 @@ export function AppShell({
           isOwner={isOwner}
         />
         <div className="flex flex-1 flex-col overflow-hidden bg-surface-muted">
-          <Topbar />
+          <Topbar urgentOverdue={urgentOverdue ?? 0} urgentDueToday={urgentDueToday ?? 0} />
           <main className="flex-1 overflow-auto">{children}</main>
         </div>
       </div>

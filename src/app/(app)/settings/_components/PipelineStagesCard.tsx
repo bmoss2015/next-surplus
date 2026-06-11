@@ -89,6 +89,24 @@ export function PipelineStagesCard({
     });
   }
 
+  function onChangeRotDays(id: string, raw: string) {
+    setErrMsg(null);
+    const trimmed = raw.trim();
+    const next = trimmed === "" ? null : Number(trimmed);
+    if (next !== null && (!Number.isInteger(next) || next < 1)) {
+      setErrMsg("Rot After must be a whole number of days, or blank to disable.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await updateStage({ id, rotDays: next });
+      if (!res.ok) {
+        setErrMsg(res.error);
+        return;
+      }
+      refresh();
+    });
+  }
+
   function moveLocal(from: number, to: number) {
     if (from === to) return;
     const next = [...stages];
@@ -311,6 +329,31 @@ export function PipelineStagesCard({
                 )}
               </div>
               <div className="overflow flex items-center gap-2 ml-2">
+                {s.kind === "open" && (
+                  <div
+                    title="Days idle in this stage before the card is flagged as rotting. Blank to disable."
+                    style={{ display: "flex", alignItems: "center", gap: 4 }}
+                  >
+                    <span style={{ fontSize: 10.5, color: "var(--text-3)" }}>Rot After</span>
+                    <input
+                      type="number"
+                      min={1}
+                      className="input"
+                      disabled={!canEdit}
+                      defaultValue={s.rotDays ?? ""}
+                      placeholder="—"
+                      onBlur={(e) => {
+                        const current = s.rotDays;
+                        const raw = e.target.value.trim();
+                        const next = raw === "" ? null : Number(raw);
+                        if (next === current) return;
+                        onChangeRotDays(s.id, raw);
+                      }}
+                      style={{ fontSize: 12, padding: "4px 6px", width: 60 }}
+                    />
+                    <span style={{ fontSize: 10.5, color: "var(--text-3)" }}>Days</span>
+                  </div>
+                )}
                 <select
                   className="input"
                   value={s.kind}

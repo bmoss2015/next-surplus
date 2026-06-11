@@ -135,7 +135,7 @@ function PlaybookCard({ lead }: { lead: PlaybookBoardLead }) {
               lead.surplusConfirmed ? "text-ink" : "text-gray-500"
             )}
           >
-            {lead.surplusConfirmed ? "" : "Est. "}
+            {lead.surplusConfirmed ? "" : "Estimated "}
             {formatCurrency(lead.surplus)}
           </span>
         </div>

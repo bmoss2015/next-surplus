@@ -154,6 +154,32 @@ export function formatActivity(
         icon: "default",
       };
     }
+    case "email_sent": {
+      const name = ((p.recipient_name as string | null) ?? "").trim();
+      const subject = ((p.subject as string | null) ?? "").trim();
+      const subj = subject ? `: "${truncate(subject, 50)}"` : "";
+      return {
+        text: name ? `Sent Email To ${name}${subj}` : `Email Sent${subj}`,
+        icon: "default",
+      };
+    }
+    case "email_opened": {
+      const name = ((p.recipient_name as string | null) ?? "").trim();
+      const classification = (p.classification as string | null) ?? "unknown";
+      const isApple = classification === "apple_mail_proxy";
+      if (isApple) {
+        return {
+          text: name ? `Email Delivered To ${name}` : "Email Delivered",
+          icon: "default",
+        };
+      }
+      const priorCount = (p.prior_open_count as number | null) ?? 0;
+      const again = priorCount > 0 ? " Again" : "";
+      return {
+        text: name ? `${name} Opened Your Email${again}` : `Email Opened${again}`,
+        icon: "default",
+      };
+    }
     default:
       return { text: toTitleish(row.activity_type.replace(/_/g, " ")), icon: "default" };
   }
@@ -161,6 +187,11 @@ export function formatActivity(
 
 function toTitleish(s: string): string {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function truncate(s: string, n: number): string {
+  if (s.length <= n) return s;
+  return s.slice(0, n - 1).trimEnd() + "…";
 }
 
 // Exact note byline, e.g. "Bree · May 11, 2026 · 2:34 PM".

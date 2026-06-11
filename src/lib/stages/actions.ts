@@ -48,6 +48,7 @@ export async function updateStage(input: {
   id: string;
   name?: string;
   kind?: StageKind;
+  rotDays?: number | null;
 }): Promise<ActionResult> {
   const gate = await requireAdmin();
   if (!gate.ok) return gate;
@@ -59,6 +60,12 @@ export async function updateStage(input: {
     patch.name = trimmed;
   }
   if (input.kind !== undefined) patch.kind = input.kind;
+  if (input.rotDays !== undefined) {
+    if (input.rotDays !== null && (!Number.isInteger(input.rotDays) || input.rotDays < 1)) {
+      return { ok: false, error: "Rot days must be a whole number of 1 or more, or blank" };
+    }
+    patch.rot_days = input.rotDays;
+  }
   if (Object.keys(patch).length === 0) return { ok: true };
 
   const sb = await createClient();

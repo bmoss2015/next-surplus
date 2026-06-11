@@ -4,6 +4,7 @@ import { stateName, type LeadRow } from "./types";
 import { fetchOrgStages } from "@/lib/stages/fetch";
 import type { StageKind } from "@/lib/stages/types";
 import { primaryOwner } from "./format";
+import { fetchNeedsActionLeads } from "./fetch-needs-action";
 
 export type DashboardFunnelStage = {
   id: string;
@@ -47,6 +48,7 @@ export type DashboardData = {
     title: string;
     sub: string;
     daysAway: number;
+    pastDue: boolean;
     formattedDate: string;
     leadId: string;
   }>;
@@ -59,7 +61,6 @@ function daysBetween(a: Date, b: Date): number {
 export async function fetchDashboard(): Promise<DashboardData> {
   const sb = await createClient();
   const stages = await fetchOrgStages();
-  const stageById = new Map(stages.map((s) => [s.id, s]));
   const openStageIds = new Set(stages.filter((s) => s.kind === "open").map((s) => s.id));
   const wonStageIds = new Set(stages.filter((s) => s.kind === "won").map((s) => s.id));
   const lostStageIds = new Set(stages.filter((s) => s.kind === "lost").map((s) => s.id));
@@ -100,8 +101,6 @@ export async function fetchDashboard(): Promise<DashboardData> {
     { count: number; pipeline: number; inProgress: number }
   >();
 
-  const openLeads: LeadRow[] = [];
-
   for (const lead of allLeads) {
     const stageId = lead.stage_id;
     const isOpen = stageId ? openStageIds.has(stageId) : false;
@@ -124,7 +123,6 @@ export async function fetchDashboard(): Promise<DashboardData> {
     if (isOpen) {
       activeLeadsCount += 1;
       pipelineValue += lead.estimated_surplus ?? 0;
-      openLeads.push(lead);
 
       const agg = stateAgg.get(lead.state) ?? {
         count: 0,
@@ -152,9 +150,6 @@ export async function fetchDashboard(): Promise<DashboardData> {
       ? wonLast30Count / (wonLast30Count + lostLast30Count)
       : null;
 
-  // Funnel order: Open first (by position), then Won, then Lost. This is
-  // independent of how customers arranged the stages in Settings so that a
-  // new Open stage added late (high position) still appears before Won/Lost.
   const kindOrder: Record<StageKind, number> = { open: 0, won: 1, lost: 2 };
   const orderedStages = [...stages].sort((a, b) => {
     const k = kindOrder[a.kind] - kindOrder[b.kind];
@@ -172,13 +167,6 @@ export async function fetchDashboard(): Promise<DashboardData> {
     };
   });
 
-  const { data: vCounts } = await sb
-    .from("verification_items")
-    .select("lead_id")
-    .eq("checked", false);
-  const verifyByLead = new Set<string>();
-  for (const v of vCounts ?? []) verifyByLead.add(v.lead_id as string);
-
   const todayStr = new Date().toISOString().slice(0, 10);
   const { count: overdueTasksRaw } = await sb
     .from("tasks")
@@ -187,44 +175,22 @@ export async function fetchDashboard(): Promise<DashboardData> {
     .lt("due_date", todayStr);
   const overdueTasksCount = overdueTasksRaw ?? 0;
 
-  const now = new Date();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const firstOpen = stages.find((s) => s.kind === "open");
-  const firstOpenId = firstOpen?.id ?? null;
-
-  const candidates = openLeads
-    .filter(
-      (l) =>
-        l.needs_action_flag ||
-        verifyByLead.has(l.id) ||
-        (firstOpenId && l.stage_id === firstOpenId)
-    )
-    .sort((a, b) => (b.estimated_surplus ?? 0) - (a.estimated_surplus ?? 0))
-    .slice(0, 5);
-
-  const leadsNeedingAction = candidates.map((l) => {
-    const days = Math.max(0, daysBetween(now, new Date(l.stage_changed_at)));
-    let reason = "";
-    if (l.needs_action_flag) reason = "Manually flagged";
-    else if (verifyByLead.has(l.id)) reason = "Items unchecked";
-    else if (firstOpenId && l.stage_id === firstOpenId) reason = "New lead";
-    else reason = "Stale in stage";
-    const stg = l.stage_id ? stageById.get(l.stage_id) : null;
-    return {
-      id: l.id,
-      lead_id: l.lead_id,
-      address: l.address,
-      city: l.city,
-      state: l.state,
-      stageName: stg?.name ?? "",
-      estimated_surplus: l.estimated_surplus,
-      days_in_stage: days,
-      primary_owner: primaryOwner(l),
-      reason,
-    };
-  });
+  const { needsAction } = await fetchNeedsActionLeads({ limit: 5 });
+  const leadsNeedingAction = needsAction.map((l) => ({
+    id: l.id,
+    lead_id: l.lead_id,
+    address: l.address,
+    city: l.city,
+    state: l.state,
+    stageName: l.stageName,
+    estimated_surplus: l.estimated_surplus,
+    days_in_stage: l.days_in_stage,
+    primary_owner: primaryOwner(l),
+    reason: l.reasonDetail,
+  }));
 
   const totalPipelineByState = Math.max(
     ...Array.from(stateAgg.values()).map((a) => a.pipeline),
@@ -246,15 +212,18 @@ export async function fetchDashboard(): Promise<DashboardData> {
   horizon.setDate(horizon.getDate() + 60);
   const deadlines: DashboardData["upcomingDeadlines"] = [];
   for (const lead of allLeads) {
+    if (lead.stage_id && lostStageIds.has(lead.stage_id)) continue;
+    if (lead.stage_id && wonStageIds.has(lead.stage_id)) continue;
     if (lead.redemption_ends) {
       const d = new Date(lead.redemption_ends + "T00:00:00");
       const days = daysBetween(d, today);
-      if (days >= 0 && d <= horizon) {
+      if (days >= -30 && d <= horizon) {
         deadlines.push({
           type: "redemption",
           title: "Redemption Period Ends",
           sub: `${lead.lead_id} · ${lead.city}, ${lead.state}`,
           daysAway: days,
+          pastDue: days < 0,
           formattedDate: d.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -266,12 +235,13 @@ export async function fetchDashboard(): Promise<DashboardData> {
     if (lead.filing_deadline) {
       const d = new Date(lead.filing_deadline + "T00:00:00");
       const days = daysBetween(d, today);
-      if (days >= 0 && d <= horizon) {
+      if (days >= -30 && d <= horizon) {
         deadlines.push({
           type: "filing",
           title: "Filing Deadline",
           sub: `${lead.lead_id} · ${lead.city}, ${lead.state}`,
           daysAway: days,
+          pastDue: days < 0,
           formattedDate: d.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -281,7 +251,12 @@ export async function fetchDashboard(): Promise<DashboardData> {
       }
     }
   }
-  deadlines.sort((a, b) => a.daysAway - b.daysAway);
+  deadlines.sort((a, b) => {
+    if (a.pastDue && !b.pastDue) return -1;
+    if (b.pastDue && !a.pastDue) return 1;
+    if (a.pastDue && b.pastDue) return a.daysAway - b.daysAway;
+    return a.daysAway - b.daysAway;
+  });
 
   return {
     pipelineValue,

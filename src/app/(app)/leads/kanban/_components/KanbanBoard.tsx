@@ -2,13 +2,12 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { IconCircleCheck } from "@tabler/icons-react";
-import { type LeadRow } from "@/lib/leads/types";
-import type { KanbanData } from "@/lib/leads/fetch-kanban";
+import { IconCircleCheck, IconFlag, IconClockHour4, IconGavel } from "@tabler/icons-react";
+import type { KanbanData, KanbanLead } from "@/lib/leads/fetch-kanban";
 import type { OrgStage, StageKind } from "@/lib/stages/types";
 import { advanceStage } from "@/app/(app)/leads/[id]/_actions";
 import { formatCurrency, primaryOwner, toTitleCase } from "@/lib/leads/format";
-import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
+import { activeSurplus } from "@/lib/leads/active-surplus";
 import { LeadActionsMenu } from "@/app/(app)/leads/[id]/_components/LeadActionsMenu";
 import { cn } from "@/lib/cn";
 
@@ -57,7 +56,7 @@ export function KanbanBoard({ initialData }: { initialData: KanbanData }) {
 
   function removeLead(leadId: string) {
     setGrouped((prev) => {
-      const next: Record<string, LeadRow[]> = {};
+      const next: Record<string, KanbanLead[]> = {};
       for (const s of stages) {
         next[s.id] = (prev[s.id] ?? []).filter((l) => l.id !== leadId);
       }
@@ -108,7 +107,12 @@ export function KanbanBoard({ initialData }: { initialData: KanbanData }) {
       if (!lead) return prev;
       const next = { ...prev };
       next[fromStageId] = (prev[fromStageId] ?? []).filter((l) => l.id !== leadId);
-      next[toStageId] = [{ ...lead, stage_id: toStageId }, ...(prev[toStageId] ?? [])];
+      const moved: KanbanLead = {
+        ...lead,
+        stage_id: toStageId,
+        days_in_stage: 0,
+      };
+      next[toStageId] = [moved, ...(prev[toStageId] ?? [])];
       return next;
     });
 
@@ -184,7 +188,7 @@ function KanbanColumn({
   onCardRemoved,
 }: {
   stage: OrgStage;
-  leads: LeadRow[];
+  leads: KanbanLead[];
   isHover: boolean;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
@@ -228,6 +232,7 @@ function KanbanColumn({
           <KanbanCard
             key={lead.id}
             lead={lead}
+            stage={stage}
             isDragging={draggingLeadId === lead.id}
             onDragStart={(e) => onCardDragStart(e, lead.id)}
             onDragEnd={onCardDragEnd}
@@ -241,12 +246,14 @@ function KanbanColumn({
 
 function KanbanCard({
   lead,
+  stage,
   isDragging,
   onDragStart,
   onDragEnd,
   onRemoved,
 }: {
-  lead: LeadRow;
+  lead: KanbanLead;
+  stage: OrgStage;
   isDragging: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
@@ -256,29 +263,37 @@ function KanbanCard({
     .filter(Boolean)
     .join(", ");
   const surplus = activeSurplus(lead);
-  const tags: Array<{ key: string; label: string; cls: string }> = [];
-  if (lead.below_floor)
-    tags.push({
-      key: "below_floor",
-      label: "Below Minimum",
-      cls: "border-warn-border bg-warn-bg text-warn-strong",
-    });
-  if (lead.needs_action_flag)
-    tags.push({
-      key: "needs_action",
-      label: "Needs Action",
-      cls: "border-petrol-200 bg-[#f3f4f6] text-[#0d4b3a]",
-    });
-  const visibleTags = tags.slice(0, 2);
-  const hiddenTagCount = tags.length - visibleTags.length;
+
+  const rotting =
+    stage.kind === "open" &&
+    stage.rotDays != null &&
+    lead.days_idle >= stage.rotDays;
+
+  const nextDeadline = computeNextDeadline(lead);
+
+  const initials = lead.assignedName ? deriveInitials(lead.assignedName) : null;
+
+  const stageChipTone =
+    stage.rotDays != null && lead.days_in_stage >= stage.rotDays
+      ? "bg-[#fef2f2] text-danger"
+      : stage.rotDays != null && lead.days_in_stage >= stage.rotDays * 0.75
+        ? "bg-warn-bg text-warn-strong"
+        : "bg-gray-100 text-gray-500";
 
   return (
     <div
       className={cn(
-        "group relative rounded-md border border-gray-200 bg-surface shadow-card transition-opacity",
+        "group relative rounded-md border bg-surface shadow-card transition-opacity",
+        rotting ? "border-danger" : "border-gray-200",
         isDragging && "opacity-40"
       )}
     >
+      {rotting && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-0 h-full w-[3px] rounded-l-md bg-danger"
+        />
+      )}
       <div className="absolute right-1.5 top-1.5 z-10">
         <LeadActionsMenu
           leadId={lead.id}
@@ -299,64 +314,161 @@ function KanbanCard({
         className="block cursor-grab px-[11px] pb-[10px] pt-[10px] active:cursor-grabbing"
       >
         <div className="min-w-0">
-          <div className="truncate pr-6 text-[12px] font-medium text-ink">
-            {lead.address}
-          </div>
-          <div className="mt-[2px] truncate text-[11px] text-gray-500">
-            {primaryOwner(lead)}
-          </div>
-          {locationLine && (
-            <div className="mt-[1px] truncate text-[10.5px] text-gray-400">
-              {locationLine}
+          <div className="flex items-start justify-between gap-2 pr-6">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1">
+                {lead.needs_action_flag && (
+                  <IconFlag
+                    size={11}
+                    className="shrink-0 text-danger"
+                    aria-label="Manually flagged"
+                  />
+                )}
+                {lead.below_floor && (
+                  <IconGavel
+                    size={11}
+                    className="shrink-0 text-warn-strong"
+                    aria-label="Below minimum surplus floor"
+                  />
+                )}
+                <div className="truncate text-[12px] font-medium text-ink">
+                  {lead.address}
+                </div>
+              </div>
+              <div className="mt-[2px] truncate text-[11px] text-gray-500">
+                {primaryOwner(lead)}
+              </div>
+              {locationLine && (
+                <div className="mt-[1px] truncate text-[10.5px] text-gray-400">
+                  {locationLine}
+                </div>
+              )}
             </div>
-          )}
-          <div className="mt-[7px] whitespace-nowrap text-[11px]">
-            <span className="text-gray-400">Total Surplus: </span>
-            {surplus.basis === "confirmed" ? (
-              <span className="font-medium text-ink">
-                {formatCurrency(surplus.value)}
-                <IconCircleCheck
-                  size={11}
-                  className="ml-0.5 inline-block align-text-bottom text-petrol-700"
-                  aria-label="Confirmed surplus"
-                />
-              </span>
-            ) : (
-              <span className="font-medium text-gray-500">
-                Est. {formatCurrency(surplus.value)}
+            {initials && (
+              <span
+                title={`Assigned to ${lead.assignedName}`}
+                className="mt-[1px] inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-petrol-100 text-[9.5px] font-semibold text-petrol-700"
+              >
+                {initials}
               </span>
             )}
           </div>
-          <div className="mt-[1px] whitespace-nowrap text-[10px]">
-            <span className="text-gray-400">Est. Net Payout: </span>
-            <span className="text-gray-400">
-              {formatCurrency(activeNetPayout(lead))}
-            </span>
-          </div>
-          {tags.length > 0 && (
-            <div className="mt-[9px] flex flex-wrap items-center gap-1.5">
-              {visibleTags.map((t) => (
-                <span key={t.key} className={cn(KANBAN_TAG_PILL, t.cls)}>
-                  {t.label}
-                </span>
-              ))}
-              {hiddenTagCount > 0 && (
-                <span
-                  className={cn(
-                    KANBAN_TAG_PILL,
-                    "border-gray-200 bg-gray-100 text-gray-500"
-                  )}
-                >
-                  +{hiddenTagCount} more
-                </span>
+
+          <div className="mt-[8px] flex items-baseline justify-between">
+            <div className="text-[14px] font-semibold text-ink">
+              {formatCurrency(surplus.value)}
+              {surplus.basis === "confirmed" && (
+                <IconCircleCheck
+                  size={12}
+                  className="ml-0.5 inline-block align-text-bottom text-petrol-700"
+                  aria-label="Confirmed surplus"
+                />
               )}
             </div>
-          )}
+            <div className="text-[10px] text-gray-400">
+              {surplus.basis === "confirmed" ? "Confirmed" : "Estimated"}
+            </div>
+          </div>
+
+          <div className="mt-[8px] flex flex-wrap items-center gap-[6px]">
+            <span
+              className={cn(
+                "inline-flex items-center gap-[3px] rounded-md px-[6px] py-[2px] text-[10px] font-medium",
+                stageChipTone
+              )}
+              title={
+                stage.rotDays != null
+                  ? `Stage threshold: ${stage.rotDays} days`
+                  : "No idle threshold set for this stage"
+              }
+            >
+              <IconClockHour4 size={10} stroke={1.8} />
+              {lead.days_in_stage === 1
+                ? "1 Day"
+                : `${lead.days_in_stage} Days`}
+            </span>
+            {nextDeadline && (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-md px-[6px] py-[2px] text-[10px] font-medium",
+                  nextDeadline.tone === "danger"
+                    ? "bg-[#fef2f2] text-danger"
+                    : nextDeadline.tone === "warn"
+                      ? "bg-warn-bg text-warn-strong"
+                      : "bg-gray-100 text-gray-500"
+                )}
+                title={`${nextDeadline.label} · ${nextDeadline.formattedDate}`}
+              >
+                {nextDeadline.shortLabel}
+              </span>
+            )}
+            {lead.overdueTaskCount > 0 && (
+              <span
+                title={
+                  lead.overdueTaskCount === 1
+                    ? "1 overdue task"
+                    : `${lead.overdueTaskCount} overdue tasks`
+                }
+                className="inline-flex items-center rounded-md bg-[#fef2f2] px-[6px] py-[2px] text-[10px] font-medium text-danger"
+              >
+                {lead.overdueTaskCount === 1
+                  ? "1 Overdue"
+                  : `${lead.overdueTaskCount} Overdue`}
+              </span>
+            )}
+          </div>
         </div>
       </a>
     </div>
   );
 }
 
-const KANBAN_TAG_PILL =
-  "rounded-md border px-2 py-[2px] text-[10px] font-medium leading-none";
+function deriveInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function computeNextDeadline(lead: KanbanLead): {
+  label: string;
+  shortLabel: string;
+  formattedDate: string;
+  daysAway: number;
+  tone: "danger" | "warn" | "neutral";
+} | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const r = lead.redemption_ends
+    ? new Date(lead.redemption_ends + "T00:00:00")
+    : null;
+  const f = lead.filing_deadline
+    ? new Date(lead.filing_deadline + "T00:00:00")
+    : null;
+  let pick: { d: Date; label: string } | null = null;
+  if (r && f) {
+    pick = r.getTime() <= f.getTime()
+      ? { d: r, label: "Redemption" }
+      : { d: f, label: "Filing" };
+  } else if (r) {
+    pick = { d: r, label: "Redemption" };
+  } else if (f) {
+    pick = { d: f, label: "Filing" };
+  }
+  if (!pick) return null;
+  const daysAway = Math.floor((pick.d.getTime() - today.getTime()) / 86_400_000);
+  const tone: "danger" | "warn" | "neutral" =
+    daysAway < 0 ? "danger" : daysAway <= 14 ? "danger" : daysAway <= 30 ? "warn" : "neutral";
+  const shortLabel =
+    daysAway < 0
+      ? `${pick.label} ${Math.abs(daysAway)}d Past Due`
+      : daysAway === 0
+        ? `${pick.label} Today`
+        : `${pick.label} ${daysAway}d`;
+  const formattedDate = pick.d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return { label: pick.label, shortLabel, formattedDate, daysAway, tone };
+}

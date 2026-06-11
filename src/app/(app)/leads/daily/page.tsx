@@ -77,12 +77,12 @@ function Section({
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-[120px_1fr_140px_150px_120px] items-center gap-[14px] border-b border-gray-200 bg-gray-50 px-[18px] py-[9px] text-[11px] tracking-[0.4px] text-gray-500">
+            <div className="grid grid-cols-[120px_1fr_140px_150px_120px] items-center gap-[14px] border-b border-gray-200 bg-gray-50 px-[18px] py-[9px] pr-[44px] text-[11px] tracking-[0.4px] text-gray-500">
               <span>Lead ID</span>
               <span>Address</span>
               <span>Stage</span>
               <span>Awaiting</span>
-              <span className="text-right">Est. Surplus</span>
+              <span className="text-right">Estimated Surplus</span>
             </div>
             {leads.map((lead) => (
               <div
@@ -123,7 +123,7 @@ function Section({
                         />
                       </span>
                     ) : (
-                      <span className="text-gray-500">Est. {formatCurrency(lead.estimated_surplus)}</span>
+                      <span className="text-gray-500">Estimated {formatCurrency(lead.estimated_surplus)}</span>
                     )}
                   </div>
                 </Link>

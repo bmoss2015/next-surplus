@@ -179,8 +179,8 @@ export function AttorneyDrawer({
       <div className="drawer-field">
         <label className="drawer-label">Default Cost</label>
         <div className="drawer-hint">
-          Per claim. Subtracted from the recovery fee when computing Est. Net
-          To You. Leave blank if it varies.
+          Per claim. Subtracted from the recovery fee when computing Estimated
+          Net To You. Leave blank if it varies.
         </div>
         <div className="field" style={{ width: 180 }}>
           <span className="prefix">$</span>

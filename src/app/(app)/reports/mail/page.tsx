@@ -126,7 +126,7 @@ export default async function MailActivityReportPage({
       {months.length > 0 && (
         <section className="mb-5 rounded-lg border border-gray-200 bg-surface p-5 shadow-card">
           <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-[15px] font-medium text-ink">Spend by Month</h2>
+            <h2 className="text-[15px] font-medium text-ink">Spend By Month</h2>
             <div className="text-[11px] text-gray-500">Bar = month spend</div>
           </div>
           <div

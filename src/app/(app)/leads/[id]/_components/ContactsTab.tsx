@@ -11,6 +11,7 @@ import { AttorneyAssignment } from "./AttorneyAssignment";
 import { MailingAddresses } from "./Overview/MailingAddresses";
 import { OtherContactsSection } from "./OtherContactsSection";
 import { SendMailButtonServer } from "@/components/mail/SendMailButtonServer";
+import { SendEmailButtonServer } from "@/components/email/SendEmailButtonServer";
 import { buildLeadSendMailCandidates } from "@/lib/mail/lead-candidates";
 
 export async function ContactsTab({ leadId }: { leadId: string }) {
@@ -104,8 +105,9 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
         contacts={contacts}
       />
       <div className="mt-4 flex flex-col gap-3">
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-2">
           <SendMailButtonServer candidates={sendMailCandidates} />
+          <SendEmailButtonServer leadId={leadId} />
         </div>
         <MailingAddresses
           leadId={leadId}
