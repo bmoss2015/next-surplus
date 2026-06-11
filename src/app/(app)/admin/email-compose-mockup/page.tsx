@@ -21,8 +21,8 @@ import {
   IconTrash,
   IconFile,
   IconCircleCheck,
-  IconArrowBackUp,
   IconFolder,
+  IconEye,
 } from "@tabler/icons-react";
 
 export default async function EmailComposeMockupPage() {
@@ -74,10 +74,10 @@ export default async function EmailComposeMockupPage() {
 
         <Section
           tag="On A Lead"
-          title="5. After a reply lands"
-          desc="We poll your Gmail every hour for replies to emails we sent. Free, runs in the background. Reply also shows in your normal Gmail inbox — this is just so it's visible on the lead too."
+          title="5. After the recipient opens it"
+          desc="A 1x1 tracking pixel embedded in the email pings our server when their mail client loads images. Each open lands as an Activity row. Free, runs in our existing infrastructure."
         >
-          <ReplyEntry />
+          <OpenEntry />
         </Section>
 
         <BuildNotes />
@@ -272,7 +272,7 @@ function ComposeModal() {
       <footer className="flex items-center justify-between border-t border-gray-200 px-5 py-3">
         <div className="text-[11px] text-gray-500">
           <IconMailForward size={11} stroke={1.75} className="mr-1 inline" />
-          Sends via your Gmail. Replies arrive in your normal inbox and on this lead.
+          Sends via your Gmail. Opens tracked on the lead. Replies arrive in your normal inbox.
         </div>
         <div className="flex items-center gap-2">
           <button className="cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:border-gray-300">
@@ -438,27 +438,32 @@ function ActivityEntry() {
   );
 }
 
-function ReplyEntry() {
+function OpenEntry() {
   return (
     <div className="rounded-[10px] border border-gray-200 bg-white p-4 shadow-card">
       <div className="mb-3 text-[11px] font-medium uppercase tracking-wide text-gray-500">
-        Activity Tab Excerpt — 6 hours later
+        Activity Tab Excerpt — over the next few hours
       </div>
-      <ActivityRow
-        icon={IconArrowBackUp}
-        title="Email Reply Received"
-        body={
-          <>
-            Roberta Mendes replied: <em>&ldquo;Thanks Bree, this is interesting. Can we do a call Thursday at 2pm CT?&rdquo;</em>
-          </>
-        }
-        meta="6 hours ago · "
-        extra={
-          <button className="cursor-pointer text-[11.5px] font-medium text-[#0d4b3a] underline hover:no-underline">
-            View Full Reply
-          </button>
-        }
-      />
+      <div className="space-y-3">
+        <ActivityRow
+          icon={IconEye}
+          title="Email Opened"
+          body={<>Roberta Mendes opened &ldquo;Following up on your tax sale surplus claim&rdquo;.</>}
+          meta="18 min ago · iPhone (Houston, TX)"
+        />
+        <ActivityRow
+          icon={IconEye}
+          title="Email Opened"
+          body={<>Roberta Mendes opened it again.</>}
+          meta="2 hours ago · MacBook (Houston, TX)"
+        />
+        <ActivityRow
+          icon={IconEye}
+          title="Email Opened"
+          body={<>Carlos Mendes opened &ldquo;Following up on your tax sale surplus claim&rdquo;.</>}
+          meta="3 hours ago · Windows (Houston, TX)"
+        />
+      </div>
     </div>
   );
 }
@@ -589,7 +594,7 @@ function BuildNotes() {
           <strong>Provider.</strong> Operator&apos;s connected Gmail or Outlook via OAuth (Settings → Email Account). Replies land in their normal inbox naturally. No Resend involvement here.
         </li>
         <li>
-          <strong>Reply tracking.</strong> Free. A cron polls Gmail / Outlook every hour for threads referencing emails we sent (matching <code className="rounded bg-gray-100 px-1 py-0.5">In-Reply-To</code> header). Any new reply gets surfaced as an Activity row. Standard approach.
+          <strong>Open tracking.</strong> Free, on our own infrastructure. Each outbound email gets a 1x1 transparent pixel embedded in the HTML pointing at <code className="rounded bg-gray-100 px-1 py-0.5">/api/email/open/[token]</code>. When the recipient&apos;s mail client loads images, the pixel fires and we log an Activity row. Caveat: Apple Mail Privacy Protection (iOS 15.2+) pre-fetches all images server-side, so Apple Mail recipients show as &ldquo;opened&rdquo; almost instantly whether they actually read it or not. Industry-wide problem — every CRM has the same limitation. We&apos;ll mark Apple Mail opens differently in the activity row so you know which to trust.
         </li>
         <li>
           <strong>CC and BCC.</strong> Added. Every major CRM has them — HubSpot, Salesforce, Pipedrive, Apollo, Close, Outreach, Salesloft. Standard expectation. Collapsed by default; Cc / Bcc text links expand.
