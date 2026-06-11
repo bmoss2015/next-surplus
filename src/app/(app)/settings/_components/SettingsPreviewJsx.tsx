@@ -27,12 +27,15 @@ import { MailBankAccountsSection } from "./MailBankAccountsSection";
 import { LobPricingSection } from "./LobPricingSection";
 import { CustomerPricingViewSection } from "./CustomerPricingViewSection";
 import { TemplatesSection } from "./TemplatesSection";
+import { EmailTemplatesSection } from "./EmailTemplatesSection";
 import { PlaybooksSection } from "./PlaybooksSection";
 
 import type {
   AppSettings,
   AttorneyRow,
   CustomerPricingViewData,
+  EmailTemplateFolderRow,
+  EmailTemplateRow,
   LobPricingSettings,
   LostReasonAdminRow,
   MailBankAccountRow,
@@ -69,6 +72,8 @@ export type SettingsData = {
   lobPricing: LobPricingSettings | null;
   customerPricing: CustomerPricingViewData | null;
   templates: TemplateRow[];
+  emailTemplates: EmailTemplateRow[];
+  emailTemplateFolders: EmailTemplateFolderRow[];
   research: ResearchTemplateRow[];
   phoneUsage: PhoneValidationUsage | null;
   phoneValidationEnabled: boolean;
@@ -225,6 +230,13 @@ function renderPanel(
           templates={data.templates}
           research={data.research}
           canEdit={currentUser.isAdmin}
+        />
+      );
+    case "email-templates":
+      return (
+        <EmailTemplatesSection
+          initialTemplates={data.emailTemplates}
+          initialFolders={data.emailTemplateFolders}
         />
       );
     case "playbooks":

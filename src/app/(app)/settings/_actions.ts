@@ -1095,6 +1095,139 @@ export async function deleteMailTemplateFolder(
   return { ok: true };
 }
 
+// -- Email templates ---------------------------------------------------------
+
+export async function upsertEmailTemplate(input: {
+  id?: string | null;
+  name: string;
+  folder_id?: string | null;
+  subject: string;
+  body_html: string;
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const name = (input.name ?? "").trim();
+  if (!name) return { ok: false, error: "Name is required" };
+  const sb = await createClient();
+  if (input.id) {
+    const { error } = await sb
+      .from("email_templates")
+      .update({
+        name,
+        folder_id: input.folder_id ?? null,
+        subject: (input.subject ?? "").trim(),
+        body_html: input.body_html ?? "",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/settings");
+    return { ok: true, id: input.id };
+  }
+  const { data, error } = await sb
+    .from("email_templates")
+    .insert({
+      name,
+      folder_id: input.folder_id ?? null,
+      subject: (input.subject ?? "").trim(),
+      body_html: input.body_html ?? "",
+      created_by: profile.id,
+    })
+    .select("id")
+    .single();
+  if (error || !data) return { ok: false, error: error?.message ?? "Insert failed" };
+  revalidatePath("/settings");
+  return { ok: true, id: data.id as string };
+}
+
+export async function deleteEmailTemplate(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { error } = await sb.from("email_templates").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function duplicateEmailTemplate(
+  id: string
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+  const { data: src, error: fetchErr } = await sb
+    .from("email_templates")
+    .select("name, folder_id, subject, body_html")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchErr || !src) return { ok: false, error: "Template not found" };
+  const { data, error } = await sb
+    .from("email_templates")
+    .insert({
+      name: `${src.name} (Copy)`,
+      folder_id: src.folder_id ?? null,
+      subject: src.subject ?? "",
+      body_html: src.body_html ?? "",
+      created_by: profile.id,
+    })
+    .select("id")
+    .single();
+  if (error || !data) return { ok: false, error: error?.message ?? "Insert failed" };
+  revalidatePath("/settings");
+  return { ok: true, id: data.id as string };
+}
+
+export async function createEmailTemplateFolder(
+  name: string
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const clean = (name ?? "").trim();
+  if (!clean) return { ok: false, error: "Folder name is required" };
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("email_template_folders")
+    .insert({ name: clean })
+    .select("id")
+    .single();
+  if (error || !data) return { ok: false, error: error?.message ?? "Insert failed" };
+  revalidatePath("/settings");
+  return { ok: true, id: data.id as string };
+}
+
+export async function renameEmailTemplateFolder(
+  id: string,
+  name: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const clean = (name ?? "").trim();
+  if (!clean) return { ok: false, error: "Folder name is required" };
+  const sb = await createClient();
+  const { error } = await sb
+    .from("email_template_folders")
+    .update({ name: clean, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function deleteEmailTemplateFolder(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { error } = await sb.from("email_template_folders").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 // -- App settings ------------------------------------------------------------
 
 export async function updateAppSetting(

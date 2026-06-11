@@ -62,7 +62,10 @@ export const GROUPS: RailGroup[] = [
   },
   {
     name: "Templates",
-    items: [{ key: "templates", label: "Messages" }],
+    items: [
+      { key: "templates", label: "Letters" },
+      { key: "email-templates", label: "Emails" },
+    ],
   },
   {
     name: "Playbooks",

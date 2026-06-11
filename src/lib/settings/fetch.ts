@@ -371,6 +371,61 @@ export async function fetchMailTemplates(): Promise<MailTemplateRow[]> {
   });
 }
 
+export type EmailTemplateFolderRow = {
+  id: string;
+  name: string;
+  sort_order: number;
+};
+
+export type EmailTemplateRow = {
+  id: string;
+  name: string;
+  folder_id: string | null;
+  subject: string;
+  body_html: string;
+  updated_at: string;
+  used: number;
+  open_rate: number | null;
+  reply_rate: number | null;
+  last_used: string | null;
+};
+
+export async function fetchEmailTemplateFolders(): Promise<EmailTemplateFolderRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("email_template_folders")
+    .select("id, name, sort_order")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    name: (r.name as string | null) ?? "",
+    sort_order: Number(r.sort_order ?? 0),
+  }));
+}
+
+export async function fetchEmailTemplates(): Promise<EmailTemplateRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("email_templates")
+    .select("id, name, folder_id, subject, body_html, updated_at")
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    name: (r.name as string | null) ?? "",
+    folder_id: (r.folder_id as string | null) ?? null,
+    subject: (r.subject as string | null) ?? "",
+    body_html: (r.body_html as string | null) ?? "",
+    updated_at: (r.updated_at as string) ?? new Date().toISOString(),
+    used: 0,
+    open_rate: null,
+    reply_rate: null,
+    last_used: null,
+  }));
+}
+
 export type AppSettings = {
   default_recovery_fee_percent: number;
   default_attorney_cost: number;
