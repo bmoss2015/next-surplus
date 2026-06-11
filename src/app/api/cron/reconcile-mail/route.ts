@@ -41,7 +41,7 @@ export async function GET(req: Request) {
   const { data: candidates, error } = await admin
     .from("mail_jobs")
     .select("id, provider, provider_id, include_check, sent_at, status")
-    .eq("status", "queued")
+    .in("status", ["processing", "queued"])
     .eq("provider", "lob")
     .lte("sent_at", stuckSince)
     .not("provider_id", "is", null)
