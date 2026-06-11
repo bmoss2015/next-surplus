@@ -124,6 +124,7 @@ export function MailDetailDrawer({
                 recipientName: displayRecipientName(job.recipient_name),
                 bodyHtml: job.body_html,
                 trackingUrl: job.tracking_url,
+                color: job.color,
               })
             }
             onResent={onResent}
@@ -216,7 +217,11 @@ function DetailContent({
                 // top of the letter (date / address block / greeting) is
                 // visible, not pushed off-screen.
                 className="absolute left-0 top-0 origin-top-left scale-[0.46] bg-white"
-                style={{ width: "612px", height: "792px" }}
+                style={{
+                  width: "612px",
+                  height: "792px",
+                  filter: job.color ? undefined : "grayscale(100%)",
+                }}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-[12px] text-gray-500">

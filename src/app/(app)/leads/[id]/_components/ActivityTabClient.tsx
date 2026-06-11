@@ -84,6 +84,7 @@ export function ActivityTabClient({
       recipientName,
       bodyHtml: detail?.body_html ?? null,
       trackingUrl: detail?.tracking_url ?? trackingUrl,
+      color: detail?.color ?? false,
     });
   }
 

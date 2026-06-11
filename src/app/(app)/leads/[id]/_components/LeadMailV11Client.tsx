@@ -391,6 +391,7 @@ export function LeadMailV11Client({
                 recipientName: displayRecipientName(selected.recipient_name),
                 bodyHtml: detail?.body_html ?? null,
                 trackingUrl: selected.tracking_url ?? null,
+                color: selected.color,
               }
             : null
         }
