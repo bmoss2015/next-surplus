@@ -717,7 +717,7 @@ function EditForm({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-[12px] border border-gray-200 bg-white shadow-[0_1px_2px_rgba(15,23,41,0.04),0_8px_24px_-8px_rgba(15,23,41,0.08)]">
+      <div className="rounded-[12px] border border-gray-200 bg-white shadow-[0_1px_2px_rgba(15,23,41,0.04),0_8px_24px_-8px_rgba(15,23,41,0.08)]">
         <div className="divide-y divide-gray-200">
           <CompactRow label="Name">
             <input
@@ -897,7 +897,7 @@ function EditForm({
           {mergeOpen && (
             <div
               ref={mergeOpen === "subject" ? subjectMergeMenuRef : bodyMergeMenuRef}
-              className="absolute right-4 top-[52px] z-20 w-[320px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+              className="absolute right-4 top-[44px] z-50 w-[340px] rounded-md border border-gray-200 bg-white shadow-[0_20px_50px_-12px_rgba(15,23,41,0.25)]"
             >
               {(["Recipient", "Property", "Sender"] as const).map((group) => (
                 <div key={group}>
@@ -909,10 +909,10 @@ function EditForm({
                       key={t.token}
                       type="button"
                       onClick={() => insertMerge(t.token)}
-                      className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-left text-[12px] hover:bg-gray-50"
+                      className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-left text-[11.5px] hover:bg-gray-50"
                     >
                       <span className="text-[#0d4b3a]">{`{{${t.token}}}`}</span>
-                      <span className="ml-2 truncate text-gray-500">{t.sample}</span>
+                      <span className="ml-2 truncate text-[10.5px] text-gray-500">{t.sample}</span>
                     </button>
                   ))}
                 </div>

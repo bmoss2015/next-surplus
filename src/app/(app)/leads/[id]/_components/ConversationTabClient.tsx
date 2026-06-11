@@ -710,10 +710,8 @@ export function ConversationTabClient({
         </aside>
 
         {/* RIGHT — selected thread reader. Full-bleed editorial typography. */}
-        <section
-          ref={readerRef}
-          className="flex flex-col overflow-y-auto bg-surface"
-        >
+        <section className="flex min-h-0 flex-col bg-surface">
+          <div ref={readerRef} className="min-h-0 flex-1 overflow-y-auto">
           {selectedThread ? (
             <ThreadReader
               thread={selectedThread}
@@ -790,6 +788,46 @@ export function ConversationTabClient({
               {!noAccount && " Use New Message to start one, or click a contact above to email them."}
             </div>
           )}
+          </div>
+          {selectedThread && !noAccount && (() => {
+            const last = selectedThread.messages[selectedThread.messages.length - 1];
+            const replyName = last.direction === "inbound"
+              ? (last.from_name || last.from_address)
+              : (last.to_addresses[0] ?? "this thread");
+            const hasMultiple = last.to_addresses.length + last.cc_addresses.length > 1;
+            return (
+              <div className="flex shrink-0 items-center gap-2 border-t border-gray-200 bg-white px-4 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => startReply("reply", last)}
+                  className="flex flex-1 cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-gray-50/50 px-3 py-1.5 text-left text-[12.5px] text-gray-500 hover:border-[#0d4b3a]/40 hover:bg-white hover:text-[#0f1729]"
+                >
+                  <IconArrowBackUp size={13} stroke={1.75} />
+                  <span className="truncate">Reply to {replyName}…</span>
+                </button>
+                {hasMultiple && (
+                  <button
+                    type="button"
+                    onClick={() => startReply("replyAll", last)}
+                    title="Reply all"
+                    aria-label="Reply all"
+                    className="cursor-pointer rounded-md border border-gray-200 p-1.5 text-gray-500 hover:border-[#0d4b3a]/40 hover:text-[#0f1729]"
+                  >
+                    <IconArrowBackUpDouble size={14} stroke={1.75} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => startReply("forward", last)}
+                  title="Forward"
+                  aria-label="Forward"
+                  className="cursor-pointer rounded-md border border-gray-200 p-1.5 text-gray-500 hover:border-[#0d4b3a]/40 hover:text-[#0f1729]"
+                >
+                  <IconArrowForwardUp size={14} stroke={1.75} />
+                </button>
+              </div>
+            );
+          })()}
         </section>
       </div>
 

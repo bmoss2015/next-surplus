@@ -29,6 +29,22 @@ import {
 import { useState, useEffect, useRef } from "react";
 import type { Editor } from "@tiptap/react";
 
+const FontSize = TextStyle.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      fontSize: {
+        default: null as string | null,
+        parseHTML: (el: HTMLElement) => el.style.fontSize || null,
+        renderHTML: (attrs: { fontSize?: string | null }) => {
+          if (!attrs.fontSize) return {};
+          return { style: `font-size: ${attrs.fontSize}` };
+        },
+      },
+    };
+  },
+});
+
 const COLORS = [
   "#0f1729", "#374151", "#6b7280", "#9ca3af",
   "#0d4b3a", "#13644e", "#1a8a9c", "#0a3d4a",
@@ -60,10 +76,13 @@ export function RichTextEditor({
   const [sizeOpen, setSizeOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
-  const [customColor, setCustomColor] = useState("");
+  const [customColor, setCustomColor] = useState("#0d4b3a");
+  const [imageOpen, setImageOpen] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
   const colorRef = useRef<HTMLDivElement | null>(null);
   const sizeRef = useRef<HTMLDivElement | null>(null);
   const linkRef = useRef<HTMLDivElement | null>(null);
+  const imageRefEl = useRef<HTMLDivElement | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -77,7 +96,7 @@ export function RichTextEditor({
         openOnClick: false,
         HTMLAttributes: { class: "text-[#0d4b3a] underline" },
       }),
-      TextStyle,
+      FontSize,
       Color,
       Underline,
       TextAlign.configure({ types: ["paragraph"] }),
@@ -103,6 +122,7 @@ export function RichTextEditor({
       if (colorRef.current && !colorRef.current.contains(t)) setColorOpen(false);
       if (sizeRef.current && !sizeRef.current.contains(t)) setSizeOpen(false);
       if (linkRef.current && !linkRef.current.contains(t)) setLinkOpen(false);
+      if (imageRefEl.current && !imageRefEl.current.contains(t)) setImageOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -139,29 +159,26 @@ export function RichTextEditor({
     setLinkOpen(false);
   }
 
-  function setImage() {
-    const url = window.prompt("Image URL");
+  function applyImage() {
+    const url = imageUrl.trim();
     if (!url) return;
-    editor!.chain().focus().setImage({ src: url }).run();
+    const normalized = /^(https?:|data:)/i.test(url) ? url : `https://${url}`;
+    editor!.chain().focus().setImage({ src: normalized }).run();
+    setImageUrl("");
+    setImageOpen(false);
   }
 
   function applySize(size: string) {
-    editor!.chain().focus().setMark("textStyle", { ...editor!.getAttributes("textStyle"), fontSize: size }).run();
-    if (typeof document !== "undefined") {
-      const { from, to } = editor!.state.selection;
-      const dom = document.querySelectorAll(".ProseMirror span[style*='font-size']");
-      dom.forEach((el) => {
-        const html = el as HTMLElement;
-        if (!html.style.fontSize) html.style.fontSize = size;
-      });
-      void from;
-      void to;
-    }
+    editor!
+      .chain()
+      .focus()
+      .setMark("textStyle", { fontSize: size })
+      .run();
     setSizeOpen(false);
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
+    <div className="rounded-md border border-gray-200 bg-white">
       <div className="flex flex-wrap items-center gap-0.5 border-b border-gray-200 bg-gray-50/40 px-2 py-1.5">
         <div ref={sizeRef} className="relative">
           <button
@@ -302,11 +319,53 @@ export function RichTextEditor({
             </div>
           )}
         </div>
-        <ToolBtn icon={IconPhoto} label="Insert image" onClick={setImage} />
+        <div ref={imageRefEl} className="relative">
+          <ToolBtn
+            icon={IconPhoto}
+            label="Insert image"
+            active={imageOpen}
+            onClick={() => setImageOpen((v) => !v)}
+          />
+          {imageOpen && (
+            <div className="absolute left-0 top-full z-40 mt-1 w-[300px] rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+              <label className="text-[10.5px] uppercase tracking-[0.08em] text-gray-500">Image URL</label>
+              <input
+                autoFocus
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyImage();
+                  }
+                  if (e.key === "Escape") setImageOpen(false);
+                }}
+                placeholder="https://example.com/logo.png"
+                className="mt-1 w-full rounded-md border border-gray-200 px-2 py-1 text-[12.5px] outline-none focus:border-[#0d4b3a]"
+              />
+              <div className="mt-2 flex items-center justify-end gap-1">
+                <button
+                  type="button"
+                  onClick={() => setImageOpen(false)}
+                  className="cursor-pointer rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={applyImage}
+                  className="cursor-pointer rounded-md bg-[#0d4b3a] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#0f5544]"
+                >
+                  Insert
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         <div ref={colorRef} className="relative">
           <ToolBtn icon={IconPalette} label="Text color" active={colorOpen} onClick={() => setColorOpen((v) => !v)} />
           {colorOpen && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-[220px] rounded-md border border-gray-200 bg-white p-2.5 shadow-lg">
+            <div className="absolute left-0 top-full z-40 mt-1 w-[240px] rounded-md border border-gray-200 bg-white p-3 shadow-[0_16px_40px_-8px_rgba(15,23,41,0.18)]">
               <div className="grid grid-cols-8 gap-1.5">
                 {COLORS.map((c) => (
                   <button
@@ -322,20 +381,26 @@ export function RichTextEditor({
                   />
                 ))}
               </div>
-              <div className="mt-2.5 border-t border-gray-200 pt-2">
-                <label className="text-[10px] uppercase tracking-[0.08em] text-gray-500">Custom</label>
-                <div className="mt-1 flex items-center gap-1.5">
-                  <input
-                    type="color"
-                    value={customColor || "#0d4b3a"}
-                    onChange={(e) => setCustomColor(e.target.value)}
-                    className="h-6 w-8 cursor-pointer rounded border border-gray-200 bg-transparent"
-                  />
+              <div className="mt-3 border-t border-gray-200 pt-2.5">
+                <label className="text-[10px] uppercase tracking-[0.08em] text-gray-500">Custom hex</label>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <label
+                    className="relative inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-gray-200"
+                    style={{ background: customColor }}
+                    title="Pick a color"
+                  >
+                    <input
+                      type="color"
+                      value={customColor}
+                      onChange={(e) => setCustomColor(e.target.value)}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    />
+                  </label>
                   <input
                     value={customColor}
                     onChange={(e) => setCustomColor(e.target.value)}
                     placeholder="#0d4b3a"
-                    className="flex-1 rounded-md border border-gray-200 px-2 py-1 text-[11.5px] outline-none focus:border-[#0d4b3a]"
+                    className="min-w-0 flex-1 rounded-md border border-gray-200 px-2 py-1 text-[11.5px] outline-none focus:border-[#0d4b3a]"
                   />
                   <button
                     type="button"
@@ -345,7 +410,7 @@ export function RichTextEditor({
                       editor.chain().focus().setColor(c).run();
                       setColorOpen(false);
                     }}
-                    className="cursor-pointer rounded-md bg-[#0d4b3a] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#0f5544]"
+                    className="shrink-0 cursor-pointer rounded-md bg-[#0d4b3a] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#0f5544]"
                   >
                     Set
                   </button>
