@@ -675,6 +675,7 @@ export function ConversationTabClient({
         style={{
           height: "min(82vh, 920px)",
           gridTemplateColumns: "320px 1fr",
+          gridTemplateRows: "1fr",
         }}
       >
         {/* LEFT — thread list. Pure type, no avatars, no chrome. */}
