@@ -48,7 +48,7 @@ const NAV: NavItem[] = [
   { label: "Playbooks", href: "/playbooks",Icon: BookOpen },
   { label: "Tasks",     href: "/tasks",    Icon: CheckSquare },
   { label: "Inbox",     href: "/inbox",    Icon: Inbox },
-  { label: "Mail",      href: "/mail",     Icon: Mail },
+  { label: "Letters",   href: "/mail",     Icon: Mail },
   { label: "Claims",    href: "/claims",   Icon: Scale },
   { label: "Imports",   href: "/imports",  Icon: FileUp },
   { label: "Reports",   href: "/reports",  Icon: BarChart3 },

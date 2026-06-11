@@ -741,7 +741,7 @@ export function SendMailModal({
             ? () => setShowPreview(false)
             : onClose
       }
-      title={showPreview ? "Letter Preview" : "Send Mail"}
+      title={showPreview ? "Letter Preview" : "Send Letter"}
       description={
         showPreview
           ? "Close to return to the send form"

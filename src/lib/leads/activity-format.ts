@@ -136,21 +136,21 @@ export function formatActivity(
           ? ` with check $${((p.check_amount_cents as number) / 100).toFixed(2)}`
           : "";
       const text = name
-        ? `Mailed ${mcLabel} Letter To ${name}${withCheck}`
-        : `Mail Sent (${mcLabel})${withCheck}`;
+        ? `Sent ${mcLabel} Letter To ${name}${withCheck}`
+        : `Letter Sent (${mcLabel})${withCheck}`;
       return { text, icon: "default" };
     }
     case "mail_delivered": {
       const name = ((p.recipient_name as string | null) ?? "").trim();
       return {
-        text: name ? `Mail Delivered To ${name}` : "Mail Delivered",
+        text: name ? `Letter Delivered To ${name}` : "Letter Delivered",
         icon: "default",
       };
     }
     case "mail_returned": {
       const name = ((p.recipient_name as string | null) ?? "").trim();
       return {
-        text: name ? `Mail Returned From ${name}` : "Mail Returned",
+        text: name ? `Letter Returned From ${name}` : "Letter Returned",
         icon: "default",
       };
     }

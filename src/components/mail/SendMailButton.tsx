@@ -42,7 +42,7 @@ export type SendMailButtonProps = {
 };
 
 export function SendMailButton({
-  label = "Send Mail",
+  label = "Send Letter",
   candidates,
   templates,
   bankAccounts,
