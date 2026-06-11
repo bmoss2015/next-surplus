@@ -2,12 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import {
   IconPlus,
   IconPencil,
   IconCopy,
   IconTrash,
   IconArrowLeft,
+  IconSparkles,
+  IconChevronDown,
+  IconFolder,
 } from "@tabler/icons-react";
 import {
   upsertEmailTemplate,
@@ -542,6 +546,21 @@ function IconBtn({
   );
 }
 
+const MERGE_TOKENS = [
+  { token: "contact.first_name", sample: "Roberta", group: "Recipient" },
+  { token: "contact.full_name", sample: "Roberta Mendes", group: "Recipient" },
+  { token: "contact.last_name", sample: "Mendes", group: "Recipient" },
+  { token: "lead.property_address", sample: "456 Oak Ave, Dallas, TX 75201", group: "Property" },
+  { token: "lead.property_street_address", sample: "456 Oak Ave", group: "Property" },
+  { token: "lead.property_city_state_zip", sample: "Dallas, TX 75201", group: "Property" },
+  { token: "lead.county", sample: "Dallas", group: "Property" },
+  { token: "lead.estimated_surplus", sample: "$42,500", group: "Property" },
+  { token: "lead.confirmed_surplus", sample: "$42,500", group: "Property" },
+  { token: "lead.case_number", sample: "DC-25-04321", group: "Property" },
+  { token: "sender.signer_name", sample: "Bree Moss", group: "Sender" },
+  { token: "system.today_long", sample: "June 11, 2026", group: "Sender" },
+] as const;
+
 function EditForm({
   initial,
   folders,
@@ -565,130 +584,282 @@ function EditForm({
   const [folderId, setFolderId] = useState<string | null>(initial?.folder_id ?? null);
   const [subject, setSubject] = useState(initial?.subject ?? "");
   const [bodyHtml, setBodyHtml] = useState(initial?.body_html ?? "");
+  const [mergeOpen, setMergeOpen] = useState<null | "subject" | "body">(null);
+  const [folderOpen, setFolderOpen] = useState(false);
+  const subjectRef = useRef<HTMLInputElement | null>(null);
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const folderRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (!folderRef.current) return;
+      if (!folderRef.current.contains(e.target as Node)) setFolderOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
   const canSave = name.trim().length > 0 && subject.trim().length > 0;
 
+  function insertMerge(token: string) {
+    const placeholder = `{{${token}}}`;
+    if (mergeOpen === "subject") {
+      const el = subjectRef.current;
+      const start = el?.selectionStart ?? subject.length;
+      const end = el?.selectionEnd ?? subject.length;
+      setSubject(subject.slice(0, start) + placeholder + subject.slice(end));
+      setMergeOpen(null);
+      setTimeout(() => el?.focus(), 0);
+      return;
+    }
+    if (mergeOpen === "body") {
+      const el = bodyRef.current;
+      const start = el?.selectionStart ?? bodyHtml.length;
+      const end = el?.selectionEnd ?? bodyHtml.length;
+      setBodyHtml(bodyHtml.slice(0, start) + placeholder + bodyHtml.slice(end));
+      setMergeOpen(null);
+      setTimeout(() => el?.focus(), 0);
+      return;
+    }
+  }
+
+  const selectedFolder = folders.find((f) => f.id === folderId) ?? null;
+
   return (
-    <section className="panel active">
-      <div className="page-head">
+    <div className="mx-auto max-w-[1080px] py-8" style={{ fontFamily: "Inter, sans-serif", color: "#0f1729" }}>
+      <header className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="cursor-pointer rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+            title="Back to templates"
+            aria-label="Back to templates"
+          >
+            <IconArrowLeft size={15} stroke={1.75} />
+          </button>
+          <div>
+            <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
+              {initial ? "Edit Template" : "New Template"}
+            </div>
+            <div className="mt-0.5 text-[18px] font-medium tracking-tight">
+              {initial?.name || "Untitled Template"}
+            </div>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            title="Back to templates"
+            className="cursor-pointer rounded-md border border-gray-200 bg-white px-3.5 py-2 text-[12px] font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800"
           >
-            <IconArrowLeft size={16} stroke={1.75} />
+            Cancel
           </button>
-          <div>
-            <h1 className="section-h1">
-              {initial ? "Edit Email Template" : "New Email Template"}
-            </h1>
-            <p className="section-desc">
-              Use {`{{merge_fields}}`} for personalization. Same registry as Letter merge fields.
-            </p>
-          </div>
+          <button
+            type="button"
+            disabled={!canSave}
+            onClick={() =>
+              onSave({
+                id: initial?.id ?? null,
+                name: name.trim(),
+                folder_id: folderId,
+                subject: subject.trim(),
+                body_html: bodyHtml,
+              })
+            }
+            className="btn-primary cursor-pointer rounded-md px-3.5 py-2 text-[12px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {initial ? "Save Changes" : "Create Template"}
+          </button>
         </div>
-      </div>
+      </header>
 
       {errMsg && (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
           {errMsg}
         </div>
       )}
 
-      <div className="mt-5 grid gap-4 md:grid-cols-[1fr_240px]">
-        <div className="space-y-4">
-          <Field label="Template Name">
+      <div className="overflow-hidden rounded-[12px] border border-gray-200 bg-white shadow-[0_1px_2px_rgba(15,23,41,0.04),0_8px_24px_-8px_rgba(15,23,41,0.08)]">
+        <div className="divide-y divide-gray-100">
+          <CompactRow label="Name">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Opening Outreach — Tax Sale"
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] outline-none focus:border-[#0d4b3a]"
+              className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
             />
-          </Field>
+          </CompactRow>
 
-          <Field label="Subject">
+          <CompactRow
+            label="Folder"
+            right={
+              <div ref={folderRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setFolderOpen((v) => !v)}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[12px] text-gray-600 hover:bg-gray-100 hover:text-[#0f1729]"
+                >
+                  <IconFolder size={12} stroke={1.75} className="text-gray-400" />
+                  {selectedFolder?.name ?? "Unfiled"}
+                  <IconChevronDown size={10} stroke={2} className="text-gray-400" />
+                </button>
+                {folderOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-[200px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFolderId(null);
+                        setFolderOpen(false);
+                      }}
+                      className="block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] text-gray-700 hover:bg-gray-50"
+                    >
+                      Unfiled
+                    </button>
+                    {folders.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => {
+                          setFolderId(f.id);
+                          setFolderOpen(false);
+                        }}
+                        className="block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] text-gray-700 hover:bg-gray-50"
+                      >
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            }
+          >
+            <span className="text-[11.5px] text-gray-500">
+              Where this template lives in the list.
+            </span>
+          </CompactRow>
+
+          <CompactRow
+            label="Subject"
+            right={
+              <button
+                type="button"
+                onClick={() => setMergeOpen(mergeOpen === "subject" ? null : "subject")}
+                className={
+                  "inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium " +
+                  (mergeOpen === "subject"
+                    ? "bg-gray-100 text-[#0f1729]"
+                    : "text-gray-600 hover:bg-gray-100")
+                }
+                title="Insert merge field"
+              >
+                <IconSparkles size={11} stroke={1.75} />
+                Merge field
+                <IconChevronDown size={10} stroke={2} className="text-gray-400" />
+              </button>
+            }
+          >
             <input
+              ref={subjectRef}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Following up on your tax sale surplus claim, {{contact.first_name}}"
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] outline-none focus:border-[#0d4b3a]"
+              placeholder="Following up on your tax sale surplus claim, Roberta"
+              className="w-full border-0 bg-transparent text-[15px] font-semibold tracking-tight outline-none placeholder:font-normal placeholder:text-gray-400"
             />
-          </Field>
-
-          <Field label="Body">
-            <textarea
-              value={bodyHtml}
-              onChange={(e) => setBodyHtml(e.target.value)}
-              rows={16}
-              placeholder="Hi {{contact.first_name}},
-
-I'm following up on the surplus funds from your tax sale at {{lead.property_address}}..."
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] leading-relaxed outline-none focus:border-[#0d4b3a]"
-              style={{ fontFamily: "ui-monospace, SFMono-Regular, monospace" }}
-            />
-            <p className="mt-1 text-[11px] text-gray-500">
-              Plain text or HTML. Rich-text editor coming in a follow-up.
-            </p>
-          </Field>
+          </CompactRow>
         </div>
 
-        <aside className="space-y-4">
-          <Field label="Folder">
-            <select
-              value={folderId ?? ""}
-              onChange={(e) => setFolderId(e.target.value || null)}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-[#0d4b3a]"
-            >
-              <option value="">Unfiled</option>
-              {folders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <div className="flex flex-col gap-2">
+        <div className="relative">
+          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-2">
+            <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
+              Body
+            </div>
             <button
               type="button"
-              className="btn btn-primary btn-sm"
-              disabled={!canSave}
-              onClick={() =>
-                onSave({
-                  id: initial?.id ?? null,
-                  name: name.trim(),
-                  folder_id: folderId,
-                  subject: subject.trim(),
-                  body_html: bodyHtml,
-                })
+              onClick={() => setMergeOpen(mergeOpen === "body" ? null : "body")}
+              className={
+                "inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium " +
+                (mergeOpen === "body"
+                  ? "bg-gray-100 text-[#0f1729]"
+                  : "text-gray-600 hover:bg-gray-100")
               }
+              title="Insert merge field"
             >
-              {initial ? "Save Changes" : "Create Template"}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={onCancel}
-            >
-              Cancel
+              <IconSparkles size={11} stroke={1.75} />
+              Merge field
+              <IconChevronDown size={10} stroke={2} className="text-gray-400" />
             </button>
           </div>
-        </aside>
+          <textarea
+            ref={bodyRef}
+            value={bodyHtml}
+            onChange={(e) => setBodyHtml(e.target.value)}
+            rows={18}
+            placeholder={`Hi {{contact.first_name}},
+
+I'm following up on the surplus funds from your tax sale at {{lead.property_address}}. Based on our research, we estimate the surplus available to you at {{lead.estimated_surplus}}.
+
+Here's what happens next if you'd like to move forward:
+
+- We file the claim with {{lead.county}} County on your behalf.
+- You receive a portion of the recovered funds after attorney costs.
+- Most claims resolve within 90 to 180 days.
+
+Reply to this email if you'd like to talk.
+
+{{sender.signer_name}}`}
+            className="w-full resize-none border-0 bg-transparent px-6 py-5 text-[13.5px] leading-[1.7] text-[#0f1729] outline-none placeholder:text-gray-400"
+            style={{ fontFamily: "Inter, sans-serif" }}
+          />
+          {mergeOpen && (
+            <div className="absolute right-4 top-[52px] z-20 w-[300px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+              {(["Recipient", "Property", "Sender"] as const).map((group) => (
+                <div key={group}>
+                  <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
+                    {group}
+                  </div>
+                  {MERGE_TOKENS.filter((t) => t.group === group).map((t) => (
+                    <button
+                      key={t.token}
+                      type="button"
+                      onClick={() => insertMerge(t.token)}
+                      className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-left text-[12px] hover:bg-gray-50"
+                    >
+                      <span className="text-[#0d4b3a]">{`{{${t.token}}}`}</span>
+                      <span className="ml-2 truncate text-gray-500">{t.sample}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-dashed border-gray-200 bg-gray-50/50 px-6 py-3 text-[11.5px] text-gray-500">
+          Merge tokens like <span className="rounded-sm bg-[#0d4b3a]/10 px-1 text-[#0d4b3a]">{`{{contact.first_name}}`}</span> get rendered per recipient at send time. Same registry as Letter merge fields.
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function CompactRow({
+  label,
+  right,
+  children,
+}: {
+  label: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-[11px] uppercase tracking-[0.08em] text-gray-500">
+    <div className="grid grid-cols-[88px_1fr_auto] items-center gap-4 px-6 py-3">
+      <label className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
         {label}
-      </span>
-      {children}
-    </label>
+      </label>
+      <div className="min-w-0">{children}</div>
+      <div>{right}</div>
+    </div>
   );
 }
 
