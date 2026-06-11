@@ -837,6 +837,7 @@ function RecipientRow({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -900,11 +901,19 @@ function RecipientRow({
   return (
     <Row label={label} right={right}>
       <div ref={wrapRef} className="relative">
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div
+          className="flex cursor-text flex-wrap items-center gap-1.5"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              inputRef.current?.focus();
+            }
+          }}
+        >
           {selected.map((s) => (
             <Chip key={s.email} sel={s} onRemove={() => remove(s)} />
           ))}
           <input
+            ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setOpen(true)}
@@ -918,18 +927,21 @@ function RecipientRow({
             className="flex-1 min-w-[140px] border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
           />
         </div>
-        {open && (matches.length > 0 || looksLikeEmail(query)) && (
-          <div className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-[300px] overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+        {open && (
+          <div className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-[300px] overflow-auto rounded-md border border-gray-200 bg-white shadow-[0_16px_40px_-8px_rgba(15,23,41,0.18)]">
             {matches.length > 0 && (
               <>
-                <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1 text-[10px] uppercase tracking-[0.08em] text-gray-500">
+                <div className="border-b border-gray-200 bg-gray-50/60 px-3 py-1 text-[10px] uppercase tracking-[0.08em] text-gray-500">
                   On this lead
                 </div>
                 {matches.map((c) => (
                   <button
                     key={c.contact_id}
                     type="button"
-                    onClick={() => add(c)}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      add(c);
+                    }}
                     className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left hover:bg-gray-50"
                   >
                     <Avatar initials={initialsOf(c.name)} />
@@ -953,9 +965,25 @@ function RecipientRow({
               </div>
             )}
             {matches.length === 0 && !looksLikeEmail(query) && (
-              <div className="flex items-center gap-2 px-3 py-3 text-[12px] text-gray-500">
-                <IconSearch size={12} stroke={1.75} />
-                No matches. Paste a full email to add.
+              <div className="px-3 py-3 text-[12px] text-gray-500">
+                {selected.length === 0 ? (
+                  <div className="flex items-center gap-2">
+                    <IconSearch size={12} stroke={1.75} />
+                    No contacts on this lead. Type an email to add.
+                  </div>
+                ) : candidates.every((c) =>
+                    selected.find((s) => s.contactId === c.contact_id || s.email === c.email)
+                  ) ? (
+                  <div className="flex items-center gap-2">
+                    <IconSearch size={12} stroke={1.75} />
+                    All lead contacts added. Type an email to add another.
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <IconSearch size={12} stroke={1.75} />
+                    No matches. Keep typing or paste a full email.
+                  </div>
+                )}
               </div>
             )}
           </div>
