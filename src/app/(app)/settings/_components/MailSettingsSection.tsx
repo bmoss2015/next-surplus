@@ -130,13 +130,13 @@ export function MailSettingsSection({
       <div className="breadcrumb">
         <a>Settings</a>
         <i className="icon icon-chevron-right" />
-        <a>Mail</a>
+        <a>Letters</a>
         <i className="icon icon-chevron-right" />
         <span>Configuration</span>
       </div>
       <div className="page-head">
         <div>
-          <h1 className="section-h1">Mail Configuration</h1>
+          <h1 className="section-h1">Letter Configuration</h1>
           <p className="section-desc">
             Signer, signature, and default postal class applied to every
             outgoing letter.

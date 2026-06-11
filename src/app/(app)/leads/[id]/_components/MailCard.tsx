@@ -18,7 +18,7 @@ export async function MailCard({ leadId }: { leadId: string }) {
   return (
     <div className="rounded-[10px] border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="section-subheader">Mail</h3>
+        <h3 className="section-subheader">Letters</h3>
         <Link
           href={`/leads/${leadId}?tab=mail`}
           className="inline-flex items-center gap-1 text-[11.5px] font-medium text-petrol-500 hover:text-petrol-700"
@@ -30,7 +30,7 @@ export async function MailCard({ leadId }: { leadId: string }) {
       {rows.length === 0 ? (
         <div className="flex items-center gap-2 rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-[12px] text-gray-500">
           <IconMail size={16} stroke={1.5} className="text-gray-400" />
-          No Mail Sent To This Lead Yet
+          No Letters Sent To This Lead Yet
         </div>
       ) : (
         <MailCardClient rows={rows} />

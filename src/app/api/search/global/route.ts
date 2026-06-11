@@ -958,7 +958,7 @@ export async function GET(req: NextRequest) {
     for (const t of mailTplsR.value.data as Array<{ id: string; name: string; description: string | null }>) {
       results.push({
         group: "mail_templates",
-        groupLabel: "Mail Templates",
+        groupLabel: "Letter Templates",
         id: t.id,
         title: t.name,
         subtitle: t.description ?? null,

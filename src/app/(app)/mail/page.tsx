@@ -16,7 +16,7 @@ export default async function MailDashboardPage() {
       <MailSectionTabs />
       <div className="mb-4">
         <h1 className="m-0 text-[28px] font-semibold tracking-tight text-ink">
-          Sent Mail
+          Sent Letters
         </h1>
       </div>
       <MailDashboardV6 rows={rows} stats={stats} />

@@ -209,9 +209,9 @@ export function MailTemplatesSection({
     <div className="col-span-2 rounded-lg border border-gray-200 bg-surface p-5 shadow-card">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="section-subheader">Mail Templates</h2>
+          <h2 className="section-subheader">Letter Templates</h2>
           <div className="mt-1 text-[12px] font-normal text-[#94a3b8]">
-            Physical mail letter templates organized by folder. Use{" "}
+            Letter templates organized by folder. Use{" "}
             {"{{merge_fields}}"} to personalize per recipient.
           </div>
         </div>

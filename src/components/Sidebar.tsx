@@ -20,7 +20,7 @@ const NAV: NavItem[] = [
   { label: "Playbooks", href: "/playbooks", divider: true },
   { label: "Tasks", href: "/tasks" },
   { label: "Inbox", href: "/inbox" },
-  { label: "Mail", href: "/mail" },
+  { label: "Letters", href: "/mail" },
   { label: "Claims", href: "/claims" },
   { label: "Imports", href: "/imports", divider: true },
   { label: "Reports", href: "/reports", divider: true },

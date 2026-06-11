@@ -22,7 +22,7 @@ export default async function MailTemplatesPage() {
     <div className="mx-auto max-w-6xl p-6">
       <MailSectionTabs />
       <div className="mb-4">
-        <h1 className="text-[20px] font-semibold text-ink">Mail Templates</h1>
+        <h1 className="text-[20px] font-semibold text-ink">Letter Templates</h1>
         <p className="text-[12px] text-gray-500">
           Letter templates and attachments used at send time.
         </p>

@@ -17,7 +17,7 @@ export type RailGroup = {
 
 export const GROUPS: RailGroup[] = [
   {
-    name: "Mail",
+    name: "Letters",
     items: [
       { key: "customer-pricing", label: "Customer Pricing" },
       { key: "provider-costs", label: "Provider Costs" },

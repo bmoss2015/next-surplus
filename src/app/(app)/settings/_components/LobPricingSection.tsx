@@ -215,7 +215,7 @@ export function LobPricingSection({
       <div className="breadcrumb">
         <a>Settings</a>
         <i className="icon icon-chevron-right" />
-        <a>Mail</a>
+        <a>Letters</a>
         <i className="icon icon-chevron-right" />
         <span>Lob Pricing</span>
       </div>

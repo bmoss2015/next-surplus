@@ -55,7 +55,7 @@ export function MailBankAccountsSection({
       <div className="breadcrumb">
         <a>Settings</a>
         <i className="icon icon-chevron-right" />
-        <a>Mail</a>
+        <a>Letters</a>
         <i className="icon icon-chevron-right" />
         <span>Bank Accounts</span>
       </div>
