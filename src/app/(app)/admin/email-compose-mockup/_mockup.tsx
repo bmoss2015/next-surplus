@@ -596,8 +596,7 @@ function Row({
 
 function Chip({ contact, onRemove }: { contact: Contact; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 py-0.5 pl-1 pr-1 text-[12px]">
-      <Avatar initials={initialsOf(contact.name)} />
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 py-1 pl-3 pr-1 text-[12px]">
       <span className="font-medium text-[#0f1729]">{contact.name}</span>
       {contact.relation && (
         <>
@@ -607,7 +606,7 @@ function Chip({ contact, onRemove }: { contact: Contact; onRemove: () => void })
       )}
       <button
         onClick={onRemove}
-        className="cursor-pointer rounded-full p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
+        className="ml-0.5 cursor-pointer rounded-full p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
       >
         <IconX size={10} stroke={2} />
       </button>
