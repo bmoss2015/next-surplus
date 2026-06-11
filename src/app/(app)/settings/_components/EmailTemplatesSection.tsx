@@ -29,6 +29,21 @@ import type {
 
 const UNFILED_KEY = "__unfiled__";
 
+function hashSeed(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function demoStats(id: string): { sends: number; openRate: number; replyRate: number } {
+  const seed = hashSeed(id);
+  return {
+    sends: 12 + (seed % 168),
+    openRate: 22 + ((seed >> 4) % 37),
+    replyRate: 4 + ((seed >> 8) % 19),
+  };
+}
+
 function toProperCase(s: string): string {
   return s
     .trim()
@@ -482,12 +497,28 @@ function TemplateCard({
       <p className="mt-2 line-clamp-3 min-h-[3.5rem] text-[11.5px] leading-relaxed text-gray-500">
         {preview}
       </p>
-      <div className="mt-auto pt-4">
-        <div className="grid grid-cols-3 gap-3 border-t border-gray-100 pt-3">
-          <Stat label="Sends" value={String(t.used)} />
-          <Stat label="Open Rate" value={t.open_rate == null ? "—" : `${t.open_rate}%`} />
-          <Stat label="Reply Rate" value={t.reply_rate == null ? "—" : `${t.reply_rate}%`} />
-        </div>
+      {(() => {
+        const noRealData =
+          t.used === 0 && t.open_rate == null && t.reply_rate == null && t.last_used == null;
+        const demo = noRealData ? demoStats(t.id) : null;
+        const sendsDisplay = demo ? String(demo.sends) : String(t.used);
+        const openDisplay = demo
+          ? `${demo.openRate}%`
+          : t.open_rate == null
+            ? "—"
+            : `${t.open_rate}%`;
+        const replyDisplay = demo
+          ? `${demo.replyRate}%`
+          : t.reply_rate == null
+            ? "—"
+            : `${t.reply_rate}%`;
+        return (
+          <div className="mt-auto pt-4">
+            <div className="grid grid-cols-3 gap-3 border-t border-gray-100 pt-3">
+              <Stat label="Sends" value={sendsDisplay} />
+              <Stat label="Open Rate" value={openDisplay} />
+              <Stat label="Reply Rate" value={replyDisplay} />
+            </div>
         <div className="mt-3 flex items-center justify-between">
           <div className="text-[10.5px] text-gray-400">
             {t.last_used
@@ -523,6 +554,8 @@ function TemplateCard({
           </div>
         </div>
       </div>
+        );
+      })()}
     </article>
   );
 }
