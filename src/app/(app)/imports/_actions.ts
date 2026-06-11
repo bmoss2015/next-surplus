@@ -336,6 +336,22 @@ export async function importLeads(
 
   const recoveryLookup = await loadRecoveryTypeLookup(sb);
 
+  // Fix 3/4: every freshly imported lead needs a stage_id so it shows up
+  // in the Kanban view and can be moved between columns. Look up the org's
+  // first active stage once and reuse it on every insert. Migration 0139
+  // also installs a trigger as a backstop.
+  let defaultStageId: string | null = null;
+  {
+    const { data: firstStage } = await sb
+      .from("org_stages")
+      .select("id")
+      .eq("is_active", true)
+      .order("position", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    defaultStageId = firstStage?.id ?? null;
+  }
+
   // Create the import row
   const { data: importRow, error: importErr } = await sb
     .from("imports")
@@ -821,9 +837,11 @@ export async function importLeads(
     if (decision.action === "insert") {
       // NOTE: deliberately do NOT touch the liens column (junior_liens /
       // total_liens) — leave it to its default.
+      const insertPayload: Record<string, unknown> = { ...fields, assigned_to: actorId };
+      if (defaultStageId) insertPayload.stage_id = defaultStageId;
       const { data: leadRow, error: leadErr } = await sb
         .from("leads")
-        .insert({ ...fields, assigned_to: actorId })
+        .insert(insertPayload)
         .select("id")
         .single();
 
