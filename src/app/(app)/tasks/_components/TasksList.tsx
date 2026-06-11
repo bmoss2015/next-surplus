@@ -127,9 +127,11 @@ function fmtDue(date: string | null, time: string | null): string {
 export function TasksList({
   initialTasks,
   overdueOnly = false,
+  urgentOnly = false,
 }: {
   initialTasks: TaskRow[];
   overdueOnly?: boolean;
+  urgentOnly?: boolean;
 }) {
   const { isAdmin } = useRole();
   const [tasks, setTasks] = useState(initialTasks);
@@ -137,6 +139,7 @@ export function TasksList({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<TaskRow | null>(null);
   const [showOverdueOnly, setShowOverdueOnly] = useState(overdueOnly);
+  const [showUrgentOnly, setShowUrgentOnly] = useState(urgentOnly);
   const [, startTransition] = useTransition();
 
   // Fix CCCCC PART 2: the auto-created "Needs Review" tasks are pinned in their
@@ -146,9 +149,11 @@ export function TasksList({
   }
   const needsReviewTasks = tasks.filter(isNeedsReview);
   const allSections = buildSections(tasks.filter((t) => !isNeedsReview(t)));
-  const sections = showOverdueOnly
-    ? allSections.filter((s) => s.key === "overdue")
-    : allSections;
+  const sections = showUrgentOnly
+    ? allSections.filter((s) => s.key === "overdue" || s.key === "today")
+    : showOverdueOnly
+      ? allSections.filter((s) => s.key === "overdue")
+      : allSections;
   const completedCount = tasks.filter((t) => t.completed).length;
   const completed = tasks.filter((t) => t.completed).slice(0, 20); // cap completed list
 
@@ -255,6 +260,22 @@ export function TasksList({
         </div>
       )}
 
+      {showUrgentOnly && (
+        <div className="mb-3 flex items-center justify-between rounded-md border-l-4 border-l-[#13644e] border border-[#13644e] bg-[#f3f4f6] px-3 py-2 text-[#0d4b3a]">
+          <div className="text-[12px] font-medium">
+            Showing Overdue And Due Today
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowUrgentOnly(false)}
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#13644e] bg-surface px-2 py-[3px] text-[11px] text-[#0d4b3a] hover:bg-[#f3f4f6]"
+          >
+            <IconX size={11} stroke={2} />
+            Show All Tasks
+          </button>
+        </div>
+      )}
+
       {selected.size > 0 && (
         <div className="mb-3 flex items-center justify-between rounded-md border border-petrol-200 bg-petrol-50 px-3 py-2">
           <div className="text-[12px] text-petrol-700">
@@ -313,6 +334,11 @@ export function TasksList({
         {showOverdueOnly && sections.length === 0 && (
           <div className="rounded-lg border border-gray-200 bg-surface px-4 py-6 text-center text-[12px] text-gray-500 shadow-card">
             Nothing Overdue.
+          </div>
+        )}
+        {showUrgentOnly && sections.length === 0 && (
+          <div className="rounded-lg border border-gray-200 bg-surface px-4 py-6 text-center text-[12px] text-gray-500 shadow-card">
+            Nothing Overdue Or Due Today.
           </div>
         )}
         {sections.map((section) => (
@@ -379,7 +405,7 @@ export function TasksList({
           </div>
         ))}
 
-        {!showOverdueOnly && completed.length > 0 && (
+        {!showOverdueOnly && !showUrgentOnly && completed.length > 0 && (
           <div>
             <div className="mb-2 flex items-baseline justify-between">
               <h2 className="m-0 text-[13px] font-medium text-gray-500">

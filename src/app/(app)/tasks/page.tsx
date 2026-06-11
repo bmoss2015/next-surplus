@@ -15,7 +15,11 @@ export default async function TasksPage({
 
   return (
     <div className="px-7 py-6">
-      <TasksList initialTasks={visible} overdueOnly={filter === "overdue"} />
+      <TasksList
+        initialTasks={visible}
+        overdueOnly={filter === "overdue"}
+        urgentOnly={filter === "urgent"}
+      />
     </div>
   );
 }
