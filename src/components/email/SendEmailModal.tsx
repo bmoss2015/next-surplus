@@ -471,7 +471,7 @@ export function SendEmailModal({
                   <IconChevronDown size={10} stroke={2} className="text-gray-400" />
                 </button>
                 {mergeOpen && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-[320px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                  <div className="absolute right-0 bottom-full z-50 mb-1 w-[340px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-[0_20px_50px_-12px_rgba(15,23,41,0.25)]">
                     {(["Recipient", "Property", "Sender"] as const).map((group) => (
                       <div key={group}>
                         <div className="border-b border-gray-200 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
@@ -482,10 +482,10 @@ export function SendEmailModal({
                             key={t.token}
                             type="button"
                             onClick={() => insertMergeToken(t.token)}
-                            className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-left text-[12px] hover:bg-gray-50"
+                            className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-left text-[11.5px] hover:bg-gray-50"
                           >
                             <span className="text-[#0d4b3a]">{`{{${t.token}}}`}</span>
-                            <span className="ml-2 truncate text-gray-500">{t.sample}</span>
+                            <span className="ml-2 truncate text-[10.5px] text-gray-500">{t.sample}</span>
                           </button>
                         ))}
                       </div>
@@ -524,7 +524,26 @@ export function SendEmailModal({
               <IconDots size={14} stroke={1.75} />
             </button>
             {saveTplOpen && (
-              <div className="absolute bottom-full left-0 z-20 mb-1 w-[220px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+              <div className="absolute bottom-full left-0 z-20 mb-1 w-[260px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                {templateId && (() => {
+                  const t = templates.find((x) => x.id === templateId);
+                  if (!t) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSaveTplOpen(false);
+                        saveTemplate({ id: t.id, name: t.name });
+                      }}
+                      className="block w-full cursor-pointer border-b border-gray-100 px-3 py-2 text-left text-[12px] hover:bg-gray-50"
+                    >
+                      <div className="font-medium text-[#0f1729]">Save changes to this template</div>
+                      <div className="mt-0.5 truncate text-[10.5px] text-gray-500">
+                        Overwrites &ldquo;{t.name}&rdquo;
+                      </div>
+                    </button>
+                  );
+                })()}
                 <button
                   type="button"
                   onClick={() => {
@@ -544,9 +563,9 @@ export function SendEmailModal({
                     setSaveTplTargetId(templateId);
                   }}
                   disabled={templates.length === 0}
-                  className="block w-full cursor-pointer px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
+                  className="block w-full cursor-pointer border-t border-gray-100 px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
                 >
-                  Update existing template
+                  Overwrite a different template…
                 </button>
               </div>
             )}

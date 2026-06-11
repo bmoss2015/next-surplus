@@ -29,7 +29,12 @@ import {
 import { useState, useEffect, useRef } from "react";
 import type { Editor } from "@tiptap/react";
 
-const COLORS = ["#0f1729", "#0d4b3a", "#13644e", "#dc2626", "#2563eb", "#6b7280", "#000000", "#ffffff"];
+const COLORS = [
+  "#0f1729", "#374151", "#6b7280", "#9ca3af",
+  "#0d4b3a", "#13644e", "#1a8a9c", "#0a3d4a",
+  "#dc2626", "#ea580c", "#ca8a04", "#16a34a",
+  "#2563eb", "#7c3aed", "#9d174d", "#000000",
+];
 const SIZES: { label: string; value: string }[] = [
   { label: "Small", value: "12px" },
   { label: "Normal", value: "14px" },
@@ -53,8 +58,12 @@ export function RichTextEditor({
 }) {
   const [colorOpen, setColorOpen] = useState(false);
   const [sizeOpen, setSizeOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [customColor, setCustomColor] = useState("");
   const colorRef = useRef<HTMLDivElement | null>(null);
   const sizeRef = useRef<HTMLDivElement | null>(null);
+  const linkRef = useRef<HTMLDivElement | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -93,6 +102,7 @@ export function RichTextEditor({
       const t = e.target as Node;
       if (colorRef.current && !colorRef.current.contains(t)) setColorOpen(false);
       if (sizeRef.current && !sizeRef.current.contains(t)) setSizeOpen(false);
+      if (linkRef.current && !linkRef.current.contains(t)) setLinkOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -107,15 +117,26 @@ export function RichTextEditor({
 
   if (!editor) return null;
 
-  function setLink() {
+  function openLinkPopover() {
     const prior = editor!.getAttributes("link").href as string | undefined;
-    const url = window.prompt("Link URL", prior ?? "https://");
-    if (url === null) return;
-    if (url === "") {
+    setLinkUrl(prior ?? "");
+    setLinkOpen((v) => !v);
+  }
+
+  function applyLink() {
+    const url = linkUrl.trim();
+    if (!url) {
       editor!.chain().focus().extendMarkRange("link").unsetLink().run();
-      return;
+    } else {
+      const normalized = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+      editor!.chain().focus().extendMarkRange("link").setLink({ href: normalized }).run();
     }
-    editor!.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+    setLinkOpen(false);
+  }
+
+  function removeLink() {
+    editor!.chain().focus().extendMarkRange("link").unsetLink().run();
+    setLinkOpen(false);
   }
 
   function setImage() {
@@ -229,25 +250,117 @@ export function RichTextEditor({
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
         />
         <Sep />
-        <ToolBtn icon={IconLink} label="Insert link" active={editor.isActive("link")} onClick={setLink} />
+        <div ref={linkRef} className="relative">
+          <ToolBtn
+            icon={IconLink}
+            label="Insert link"
+            active={linkOpen || editor.isActive("link")}
+            onClick={openLinkPopover}
+          />
+          {linkOpen && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-[280px] rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+              <label className="text-[10.5px] uppercase tracking-[0.08em] text-gray-500">URL</label>
+              <input
+                autoFocus
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyLink();
+                  }
+                  if (e.key === "Escape") setLinkOpen(false);
+                }}
+                placeholder="paste or type a URL"
+                className="mt-1 w-full rounded-md border border-gray-200 px-2 py-1 text-[12.5px] outline-none focus:border-[#0d4b3a]"
+              />
+              <div className="mt-2 flex items-center justify-end gap-1">
+                {editor.isActive("link") && (
+                  <button
+                    type="button"
+                    onClick={removeLink}
+                    className="mr-auto cursor-pointer rounded-md px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setLinkOpen(false)}
+                  className="cursor-pointer rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={applyLink}
+                  className="cursor-pointer rounded-md bg-[#0d4b3a] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#0f5544]"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         <ToolBtn icon={IconPhoto} label="Insert image" onClick={setImage} />
         <div ref={colorRef} className="relative">
           <ToolBtn icon={IconPalette} label="Text color" active={colorOpen} onClick={() => setColorOpen((v) => !v)} />
           {colorOpen && (
-            <div className="absolute left-0 top-full z-20 mt-1 grid grid-cols-4 gap-1.5 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => {
-                    editor.chain().focus().setColor(c).run();
-                    setColorOpen(false);
-                  }}
-                  className="h-5 w-5 cursor-pointer rounded-full border border-gray-200"
-                  style={{ background: c }}
-                  title={c}
-                />
-              ))}
+            <div className="absolute left-0 top-full z-30 mt-1 w-[220px] rounded-md border border-gray-200 bg-white p-2.5 shadow-lg">
+              <div className="grid grid-cols-8 gap-1.5">
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      editor.chain().focus().setColor(c).run();
+                      setColorOpen(false);
+                    }}
+                    className="h-5 w-5 cursor-pointer rounded-full border border-gray-200 transition-transform hover:scale-110"
+                    style={{ background: c }}
+                    title={c}
+                  />
+                ))}
+              </div>
+              <div className="mt-2.5 border-t border-gray-200 pt-2">
+                <label className="text-[10px] uppercase tracking-[0.08em] text-gray-500">Custom</label>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <input
+                    type="color"
+                    value={customColor || "#0d4b3a"}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    className="h-6 w-8 cursor-pointer rounded border border-gray-200 bg-transparent"
+                  />
+                  <input
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    placeholder="#0d4b3a"
+                    className="flex-1 rounded-md border border-gray-200 px-2 py-1 text-[11.5px] outline-none focus:border-[#0d4b3a]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const c = customColor.trim();
+                      if (!/^#[0-9a-f]{3,8}$/i.test(c)) return;
+                      editor.chain().focus().setColor(c).run();
+                      setColorOpen(false);
+                    }}
+                    className="cursor-pointer rounded-md bg-[#0d4b3a] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#0f5544]"
+                  >
+                    Set
+                  </button>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  editor.chain().focus().unsetColor().run();
+                  setColorOpen(false);
+                }}
+                className="mt-2 w-full cursor-pointer rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Reset color
+              </button>
             </div>
           )}
         </div>
