@@ -6,7 +6,7 @@ export async function fetchOrgStages(): Promise<OrgStage[]> {
   const sb = await createClient();
   const { data, error } = await sb
     .from("org_stages")
-    .select("id, name, position, kind, is_active")
+    .select("id, name, position, kind, is_active, rot_days")
     .eq("is_active", true)
     .order("position", { ascending: true });
   if (error) throw error;
@@ -16,6 +16,7 @@ export async function fetchOrgStages(): Promise<OrgStage[]> {
     position: number;
     kind: StageKind;
     is_active: boolean;
+    rot_days: number | null;
   }>;
 
   const ids = rows.map((r) => r.id);
@@ -38,5 +39,6 @@ export async function fetchOrgStages(): Promise<OrgStage[]> {
     kind: r.kind,
     isActive: r.is_active,
     activeLeadCount: counts.get(r.id) ?? 0,
+    rotDays: r.rot_days,
   }));
 }
