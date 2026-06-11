@@ -36,3 +36,17 @@ export async function setEmailAccountReadSync(
   revalidatePath("/settings");
   return { ok: true };
 }
+
+export async function updateEmailAccountSignature(
+  accountId: string,
+  signatureHtml: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { error } = await sb
+    .from("channel_accounts")
+    .update({ signature_html: signatureHtml })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}

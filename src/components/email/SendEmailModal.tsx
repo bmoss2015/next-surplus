@@ -4,16 +4,33 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import {
   IconX,
   IconChevronDown,
-  IconMailForward,
   IconSearch,
   IconPlus,
   IconBrandGmail,
+  IconSparkles,
+  IconDots,
 } from "@tabler/icons-react";
 import { sendLeadEmail } from "@/app/(app)/leads/[id]/_email-send-action";
+import { upsertEmailTemplate } from "@/app/(app)/settings/_actions";
 import { renderMerge, type MergeContext } from "@/lib/mail/merge";
 import type { EmailRecipientCandidate } from "@/lib/email/lead-recipients";
 import type { EmailTemplateRow } from "@/lib/settings/fetch";
 import type { EmailAccountRow } from "@/lib/email/types";
+
+const MERGE_TOKENS = [
+  { token: "contact.first_name", sample: "Roberta", group: "Recipient" },
+  { token: "contact.full_name", sample: "Roberta Mendes", group: "Recipient" },
+  { token: "contact.last_name", sample: "Mendes", group: "Recipient" },
+  { token: "lead.property_address", sample: "456 Oak Ave, Dallas, TX 75201", group: "Property" },
+  { token: "lead.property_street_address", sample: "456 Oak Ave", group: "Property" },
+  { token: "lead.property_city_state_zip", sample: "Dallas, TX 75201", group: "Property" },
+  { token: "lead.county", sample: "Dallas", group: "Property" },
+  { token: "lead.estimated_surplus", sample: "$42,500", group: "Property" },
+  { token: "lead.confirmed_surplus", sample: "$42,500", group: "Property" },
+  { token: "lead.case_number", sample: "DC-25-04321", group: "Property" },
+  { token: "sender.signer_name", sample: "Bree Moss", group: "Sender" },
+  { token: "system.today_long", sample: "June 11, 2026", group: "Sender" },
+] as const;
 
 export type SendEmailReplyContext = {
   mode: "reply" | "replyAll" | "forward";
@@ -89,6 +106,9 @@ export function SendEmailModal({
     });
   }
 
+  const accountSignature = (defaultAccount as EmailAccountRow | null)?.signature_html ?? signatureHtml ?? "";
+  const initialSignatureBlock = accountSignature ? `\n\n${accountSignature}` : "";
+
   const [accountId, setAccountId] = useState<string | null>(defaultAccount?.id ?? null);
   const [to, setTo] = useState<Selected[]>(
     replyContext
@@ -115,12 +135,33 @@ export function SendEmailModal({
   const [subject, setSubject] = useState(
     replyContext ? buildReplySubject(replyContext.baseSubject, replyContext.mode) : ""
   );
-  const [body, setBody] = useState(
-    replyContext && replyContext.mode === "forward" ? replyContext.quotedHtml : ""
-  );
+  const [body, setBody] = useState(() => {
+    if (replyContext && replyContext.mode === "forward") {
+      return `${initialSignatureBlock}\n\n${replyContext.quotedHtml}`;
+    }
+    return initialSignatureBlock;
+  });
   const [err, setErr] = useState<string | null>(null);
   const [accountPickerOpen, setAccountPickerOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const mergeRef = useRef<HTMLDivElement | null>(null);
+  const saveTplRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (mergeRef.current && !mergeRef.current.contains(e.target as Node)) {
+        setMergeOpen(false);
+      }
+      if (saveTplRef.current && !saveTplRef.current.contains(e.target as Node)) {
+        setSaveTplOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -134,13 +175,57 @@ export function SendEmailModal({
     setTemplateId(id);
     if (!id) {
       setSubject("");
-      setBody("");
+      setBody(initialSignatureBlock);
       return;
     }
     const t = templates.find((x) => x.id === id);
     if (!t) return;
     setSubject(t.subject);
-    setBody(t.body_html);
+    setBody(`${t.body_html}${initialSignatureBlock}`);
+  }
+
+  function insertMergeToken(token: string) {
+    const el = bodyRef.current;
+    const placeholder = `{{${token}}}`;
+    if (!el) {
+      setBody((b) => b + placeholder);
+    } else {
+      const start = el.selectionStart ?? body.length;
+      const end = el.selectionEnd ?? body.length;
+      const next = body.slice(0, start) + placeholder + body.slice(end);
+      setBody(next);
+      setTimeout(() => {
+        el.focus();
+        const pos = start + placeholder.length;
+        el.setSelectionRange(pos, pos);
+      }, 0);
+    }
+    setMergeOpen(false);
+  }
+
+  function saveAsTemplate(asNew: boolean) {
+    setErr(null);
+    if (!subject.trim() || !body.trim()) {
+      setErr("Subject and body required to save as template");
+      return;
+    }
+    const name = window.prompt(
+      asNew ? "New template name?" : "Update which template? Type its exact name",
+      asNew ? subject.trim().slice(0, 60) : ""
+    );
+    if (!name) return;
+    const existing = templates.find((t) => t.name === name);
+    startTransition(async () => {
+      const res = await upsertEmailTemplate({
+        id: asNew ? null : (existing?.id ?? null),
+        name,
+        folder_id: existing?.folder_id ?? null,
+        subject: subject.trim(),
+        body_html: body,
+      });
+      if (!res.ok) setErr(res.error);
+      else setSaveTplOpen(false);
+    });
   }
 
   function send() {
@@ -169,9 +254,6 @@ export function SendEmailModal({
         };
         const renderedSubject = renderMerge(subject, ctx);
         const renderedBody = renderMerge(body, ctx);
-        const bodyWithSignature = signatureHtml
-          ? `${renderedBody}\n\n${signatureHtml}`
-          : renderedBody;
         const res = await sendLeadEmail({
           leadId,
           accountId,
@@ -179,7 +261,7 @@ export function SendEmailModal({
           cc: cc.length > 0 ? cc.map((x) => x.email) : undefined,
           bcc: bcc.length > 0 ? bcc.map((x) => x.email) : undefined,
           subject: renderedSubject,
-          bodyHtml: bodyWithSignature,
+          bodyHtml: renderedBody,
           templateId,
           threadId: replyContext?.threadId,
           inReplyTo: replyContext?.inReplyTo ?? null,
@@ -378,23 +460,56 @@ export function SendEmailModal({
             </Row>
           </div>
 
-          <div className="px-6 py-5">
+          <div className="relative">
+            <div className="flex items-center justify-end gap-1 border-b border-gray-100 px-4 py-2">
+              <div ref={mergeRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMergeOpen((v) => !v)}
+                  className={
+                    "inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium " +
+                    (mergeOpen
+                      ? "bg-gray-100 text-[#0f1729]"
+                      : "text-gray-600 hover:bg-gray-100")
+                  }
+                  title="Insert merge field"
+                >
+                  <IconSparkles size={11} stroke={1.75} />
+                  Merge field
+                  <IconChevronDown size={10} stroke={2} className="text-gray-400" />
+                </button>
+                {mergeOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-[300px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                    {(["Recipient", "Property", "Sender"] as const).map((group) => (
+                      <div key={group}>
+                        <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
+                          {group}
+                        </div>
+                        {MERGE_TOKENS.filter((t) => t.group === group).map((t) => (
+                          <button
+                            key={t.token}
+                            type="button"
+                            onClick={() => insertMergeToken(t.token)}
+                            className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-left text-[12px] hover:bg-gray-50"
+                          >
+                            <span className="text-[#0d4b3a]">{`{{${t.token}}}`}</span>
+                            <span className="ml-2 truncate text-gray-500">{t.sample}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             <textarea
+              ref={bodyRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={14}
-              placeholder="Write your email. Use {{contact.first_name}}, {{lead.property_address}}, etc."
-              className="w-full resize-none border-0 bg-transparent text-[13.5px] leading-[1.7] text-[#0f1729] outline-none placeholder:text-gray-400"
+              placeholder="Write your email..."
+              className="w-full resize-none border-0 bg-transparent px-6 py-5 text-[13.5px] leading-[1.7] text-[#0f1729] outline-none placeholder:text-gray-400"
             />
-            {signatureHtml && (
-              <>
-                <hr className="my-3 border-t border-gray-100" />
-                <div
-                  className="text-[12.5px] leading-[1.55] text-[#0f1729]"
-                  dangerouslySetInnerHTML={{ __html: signatureHtml }}
-                />
-              </>
-            )}
           </div>
         </div>
 
@@ -405,11 +520,34 @@ export function SendEmailModal({
         )}
 
         <footer className="flex items-center justify-between border-t border-gray-150 px-6 py-3">
-          <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
-            <IconMailForward size={11} stroke={1.75} />
-            {selectedAccount
-              ? `Sending via ${selectedAccount.address}`
-              : "No account selected"}
+          <div ref={saveTplRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setSaveTplOpen((v) => !v)}
+              className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              title="More options"
+              aria-label="More options"
+            >
+              <IconDots size={14} stroke={1.75} />
+            </button>
+            {saveTplOpen && (
+              <div className="absolute bottom-full left-0 z-20 mb-1 w-[220px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => saveAsTemplate(true)}
+                  className="block w-full cursor-pointer px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50"
+                >
+                  Save as new template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveAsTemplate(false)}
+                  className="block w-full cursor-pointer px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50"
+                >
+                  Update existing template
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button

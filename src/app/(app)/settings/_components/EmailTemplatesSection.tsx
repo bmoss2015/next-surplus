@@ -589,15 +589,30 @@ function EditForm({
   const subjectRef = useRef<HTMLInputElement | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
   const folderRef = useRef<HTMLDivElement | null>(null);
+  const subjectMergeRef = useRef<HTMLButtonElement | null>(null);
+  const bodyMergeRef = useRef<HTMLButtonElement | null>(null);
+  const subjectMergeMenuRef = useRef<HTMLDivElement | null>(null);
+  const bodyMergeMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!folderRef.current) return;
-      if (!folderRef.current.contains(e.target as Node)) setFolderOpen(false);
+      const target = e.target as Node;
+      if (folderRef.current && !folderRef.current.contains(target)) {
+        setFolderOpen(false);
+      }
+      if (mergeOpen === "subject") {
+        const insideBtn = subjectMergeRef.current?.contains(target);
+        const insideMenu = subjectMergeMenuRef.current?.contains(target);
+        if (!insideBtn && !insideMenu) setMergeOpen(null);
+      } else if (mergeOpen === "body") {
+        const insideBtn = bodyMergeRef.current?.contains(target);
+        const insideMenu = bodyMergeMenuRef.current?.contains(target);
+        if (!insideBtn && !insideMenu) setMergeOpen(null);
+      }
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  }, [mergeOpen]);
 
   const canSave = name.trim().length > 0 && subject.trim().length > 0;
 
@@ -743,6 +758,7 @@ function EditForm({
             label="Subject"
             right={
               <button
+                ref={subjectMergeRef}
                 type="button"
                 onClick={() => setMergeOpen(mergeOpen === "subject" ? null : "subject")}
                 className={
@@ -775,6 +791,7 @@ function EditForm({
               Body
             </div>
             <button
+              ref={bodyMergeRef}
               type="button"
               onClick={() => setMergeOpen(mergeOpen === "body" ? null : "body")}
               className={
@@ -812,7 +829,10 @@ Reply to this email if you'd like to talk.
             style={{ fontFamily: "Inter, sans-serif" }}
           />
           {mergeOpen && (
-            <div className="absolute right-4 top-[52px] z-20 w-[300px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+            <div
+              ref={mergeOpen === "subject" ? subjectMergeMenuRef : bodyMergeMenuRef}
+              className="absolute right-4 top-[52px] z-20 w-[300px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+            >
               {(["Recipient", "Property", "Sender"] as const).map((group) => (
                 <div key={group}>
                   <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
