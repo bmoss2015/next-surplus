@@ -537,7 +537,7 @@ export function SendEmailModal({
                       }}
                       className="block w-full cursor-pointer border-b border-gray-100 px-3 py-2 text-left text-[12px] hover:bg-gray-50"
                     >
-                      <div className="font-medium text-[#0f1729]">Save changes to this template</div>
+                      <div className="font-medium text-[#0f1729]">Save Changes</div>
                       <div className="mt-0.5 truncate text-[10.5px] text-gray-500">
                         Overwrites &ldquo;{t.name}&rdquo;
                       </div>
@@ -553,7 +553,7 @@ export function SendEmailModal({
                   }}
                   className="block w-full cursor-pointer px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50"
                 >
-                  Save as new template
+                  Save As New Template
                 </button>
                 <button
                   type="button"
@@ -565,7 +565,7 @@ export function SendEmailModal({
                   disabled={templates.length === 0}
                   className="block w-full cursor-pointer border-t border-gray-100 px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
                 >
-                  Overwrite a different template…
+                  Overwrite Existing Template
                 </button>
               </div>
             )}
@@ -574,7 +574,7 @@ export function SendEmailModal({
                 <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
                   <div>
                     <div className="text-[13px] font-medium text-[#0f1729]">
-                      {saveTplPanel === "new" ? "Save as new template" : "Update existing template"}
+                      {saveTplPanel === "new" ? "Save As New Template" : "Overwrite Existing Template"}
                     </div>
                     <div className="mt-0.5 text-[11px] text-gray-500">
                       {saveTplPanel === "new"
@@ -910,8 +910,12 @@ function RecipientRow({
             onFocus={() => setOpen(true)}
             onBlur={() => commitRawEmail()}
             onKeyDown={onKeyDown}
-            placeholder={selected.length === 0 ? "Search contacts or type an email..." : ""}
-            className="flex-1 min-w-[180px] border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
+            placeholder={
+              selected.length === 0
+                ? "Search contacts or type an email…"
+                : "Add another…"
+            }
+            className="flex-1 min-w-[140px] border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
           />
         </div>
         {open && (matches.length > 0 || looksLikeEmail(query)) && (

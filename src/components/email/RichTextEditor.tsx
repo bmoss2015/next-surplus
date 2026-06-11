@@ -135,6 +135,14 @@ export function RichTextEditor({
     };
   }, [editor, editorRef]);
 
+  useEffect(() => {
+    if (!editor) return;
+    const current = editor.getHTML();
+    if ((value || "") !== current) {
+      editor.commands.setContent(value || "", { emitUpdate: false });
+    }
+  }, [value, editor]);
+
   if (!editor) return null;
 
   function openLinkPopover() {

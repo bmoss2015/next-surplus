@@ -485,8 +485,8 @@ function TemplateCard({
       <div className="mt-auto pt-4">
         <div className="grid grid-cols-3 gap-3 border-t border-gray-100 pt-3">
           <Stat label="Sends" value={String(t.used)} />
-          <Stat label="Opens" value={t.open_rate == null ? "—" : `${t.open_rate}%`} />
-          <Stat label="Replies" value={t.reply_rate == null ? "—" : `${t.reply_rate}%`} />
+          <Stat label="Open Rate" value={t.open_rate == null ? "—" : `${t.open_rate}%`} />
+          <Stat label="Reply Rate" value={t.reply_rate == null ? "—" : `${t.reply_rate}%`} />
         </div>
         <div className="mt-3 flex items-center justify-between">
           <div className="text-[10.5px] text-gray-400">
@@ -530,7 +530,7 @@ function TemplateCard({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="truncate whitespace-nowrap text-[10px] uppercase tracking-[0.06em] text-gray-400">{label}</div>
+      <div className="whitespace-nowrap text-[9.5px] uppercase tracking-[0.04em] text-gray-400">{label}</div>
       <div className="mt-0.5 text-[14px] font-medium tabular-nums tracking-tight text-gray-700">
         {value}
       </div>
