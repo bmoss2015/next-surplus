@@ -27,7 +27,7 @@ export async function buildLeadSendMailCandidates(
     sb
       .from("leads")
       .select(
-        "id, county, state, address, parcel_number, case_number, sale_date, estimated_surplus, confirmed_surplus, source_surplus, closing_bid"
+        "id, lead_id, county, state, address, city, zip, parcel_number, case_number, sale_date, estimated_surplus, confirmed_surplus, source_surplus, closing_bid"
       )
       .eq("id", leadId)
       .maybeSingle(),
@@ -81,11 +81,39 @@ export async function buildLeadSendMailCandidates(
     surplus && surplus.basis !== "none" && surplus.value > 0
       ? `$${Math.round(surplus.value * 0.65).toLocaleString()} – $${Math.round(surplus.value * 0.8).toLocaleString()}`
       : null;
+
+  // Compose property-address strings up front so every flavor of the
+  // merge field stays consistent. Empty when fields are missing — the
+  // renderer surfaces "[Missing: ...]" instead of half-built strings.
+  const street = ((lead?.address as string | null) ?? "").trim() || null;
+  const city = ((lead?.city as string | null) ?? "").trim() || null;
+  const region = ((lead?.state as string | null) ?? "").trim() || null;
+  const zip = ((lead?.zip as string | null) ?? "").trim() || null;
+  const cityStateZip =
+    city && region && zip ? `${city}, ${region} ${zip}` : null;
+  const fullPropertyAddress =
+    street && cityStateZip ? `${street}, ${cityStateZip}` : street;
+
+  // Fix 11: every dollar merge field uses the same "active surplus"
+  // (confirmed > source > computed > 0) the rest of the UI displays,
+  // so what the operator sees on the lead page is what lands in the
+  // letter. lead.confirmed_surplus stays separate for cases that need
+  // strictly the confirmed amount.
+  const activeSurplusValue = surplus && surplus.basis !== "none" ? surplus.value : null;
+
   const leadContext: Record<string, string | number | null | undefined> = {
-    "lead.id": (lead?.id as string | null) ?? null,
-    "lead.property_address": (lead?.address as string | null) ?? null,
+    // Backward-compat key — was the UUID, now the human-readable text ID.
+    "lead.id": (lead?.lead_id as string | null) ?? null,
+    "lead.case_id": (lead?.lead_id as string | null) ?? null,
+    "lead.property_address": fullPropertyAddress,
+    "lead.property_full_address": fullPropertyAddress,
+    "lead.property_street_address": street,
+    "lead.property_city": city,
+    "lead.property_state": region,
+    "lead.property_zip": zip,
+    "lead.property_city_state_zip": cityStateZip,
     "lead.county": (lead?.county as string | null) ?? null,
-    "lead.state": (lead?.state as string | null) ?? null,
+    "lead.state": region,
     "lead.case_number": (lead?.case_number as string | null) ?? null,
     "lead.parcel_number": (lead?.parcel_number as string | null) ?? null,
     "lead.sale_date": (lead?.sale_date as string | null) ?? null,
@@ -94,8 +122,12 @@ export async function buildLeadSendMailCandidates(
         ? `$${Number(lead.closing_bid).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : null,
     "lead.estimated_surplus":
-      lead?.estimated_surplus != null
-        ? `$${Number(lead.estimated_surplus).toLocaleString()}`
+      activeSurplusValue != null
+        ? `$${Math.round(activeSurplusValue).toLocaleString()}`
+        : null,
+    "lead.confirmed_surplus":
+      lead?.confirmed_surplus != null
+        ? `$${Math.round(Number(lead.confirmed_surplus)).toLocaleString()}`
         : null,
     "lead.owner_range": ownerRange,
   };

@@ -12,6 +12,7 @@ import {
   activeCheckProvider,
 } from ".";
 import { renderMerge, type MergeContext } from "./merge";
+import { activeSurplus } from "@/lib/leads/active-surplus";
 import { formatAddressForStorage } from "./address";
 
 // Server action — returns the total page count across a template's
@@ -368,22 +369,63 @@ export async function previewMailJob(input: {
 
   // Pull a fresh lead context so case-specific merge tokens have values.
   let leadContext: MergeContext = {};
+  // Fix 11: this preview path used to invent its own merge-key shape
+  // (lead.address, lead.postal_code, lead.attorney) that didn't match
+  // the canonical keys templates are authored against, so View Letter
+  // surfaced "[Missing: lead.property_address]" etc. Rebuild against
+  // the same key namespace the live send uses.
   const leadId = job.lead_id as string | null;
   if (leadId) {
     const { data: lead } = await sb
       .from("leads")
-      .select("lead_id, address, city, state, postal_code, estimated_surplus, attorney_name")
+      .select(
+        "lead_id, county, state, address, city, zip, parcel_number, case_number, sale_date, estimated_surplus, confirmed_surplus, source_surplus, closing_bid"
+      )
       .eq("id", leadId)
       .maybeSingle();
     if (lead) {
+      const street = ((lead.address as string | null) ?? "").trim() || null;
+      const city = ((lead.city as string | null) ?? "").trim() || null;
+      const region = ((lead.state as string | null) ?? "").trim() || null;
+      const zip = ((lead.zip as string | null) ?? "").trim() || null;
+      const cityStateZip =
+        city && region && zip ? `${city}, ${region} ${zip}` : null;
+      const fullPropertyAddress =
+        street && cityStateZip ? `${street}, ${cityStateZip}` : street;
+      const surplus = activeSurplus({
+        confirmed_surplus: (lead.confirmed_surplus as number | null) ?? null,
+        estimated_surplus: (lead.estimated_surplus as number | null) ?? null,
+        closing_bid: (lead.closing_bid as number | null) ?? null,
+        source_surplus: (lead.source_surplus as number | null) ?? null,
+      });
+      const activeSurplusValue = surplus.basis !== "none" ? surplus.value : null;
       leadContext = {
+        "lead.id": (lead.lead_id as string | null) ?? "",
         "lead.case_id": (lead.lead_id as string | null) ?? "",
-        "lead.address": (lead.address as string | null) ?? "",
-        "lead.city": (lead.city as string | null) ?? "",
-        "lead.state": (lead.state as string | null) ?? "",
-        "lead.postal_code": (lead.postal_code as string | null) ?? "",
-        "lead.estimated_surplus": (lead.estimated_surplus as number | null) ?? "",
-        "lead.attorney": (lead.attorney_name as string | null) ?? "",
+        "lead.property_address": fullPropertyAddress ?? "",
+        "lead.property_full_address": fullPropertyAddress ?? "",
+        "lead.property_street_address": street ?? "",
+        "lead.property_city": city ?? "",
+        "lead.property_state": region ?? "",
+        "lead.property_zip": zip ?? "",
+        "lead.property_city_state_zip": cityStateZip ?? "",
+        "lead.county": (lead.county as string | null) ?? "",
+        "lead.state": region ?? "",
+        "lead.case_number": (lead.case_number as string | null) ?? "",
+        "lead.parcel_number": (lead.parcel_number as string | null) ?? "",
+        "lead.sale_date": (lead.sale_date as string | null) ?? "",
+        "lead.closing_bid":
+          lead.closing_bid != null
+            ? `$${Number(lead.closing_bid).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : "",
+        "lead.estimated_surplus":
+          activeSurplusValue != null
+            ? `$${Math.round(activeSurplusValue).toLocaleString()}`
+            : "",
+        "lead.confirmed_surplus":
+          lead.confirmed_surplus != null
+            ? `$${Math.round(Number(lead.confirmed_surplus)).toLocaleString()}`
+            : "",
       };
     }
   }
