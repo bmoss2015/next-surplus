@@ -79,6 +79,9 @@ function Editor({
   const [pendingDelete, setPendingDelete] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [stateFilter, setStateFilter] = useState("");
+  const [stepDragFrom, setStepDragFrom] = useState<number | null>(null);
+  const [stepDragOver, setStepDragOver] = useState<number | null>(null);
+  const [childDrag, setChildDrag] = useState<{ stepIdx: number; from: number; over: number | null } | null>(null);
 
   const [savedSnap, setSavedSnap] = useState({
     name: row?.name ?? "",
@@ -241,6 +244,36 @@ function Editor({
   const removeStep = (idx: number) => {
     setSteps((prev) => prev.filter((_, i) => i !== idx));
     setOpenStepIdx(null);
+  };
+
+  const moveStep = (from: number, to: number) => {
+    if (from === to) return;
+    setSteps((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setOpenStepIdx((cur) => {
+      if (cur === null) return cur;
+      if (cur === from) return to;
+      if (from < cur && to >= cur) return cur - 1;
+      if (from > cur && to <= cur) return cur + 1;
+      return cur;
+    });
+  };
+
+  const moveChild = (stepIdx: number, from: number, to: number) => {
+    if (from === to) return;
+    setSteps((prev) =>
+      prev.map((s, i) => {
+        if (i !== stepIdx) return s;
+        const next = [...(s.children ?? [])];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        return { ...s, children: next };
+      })
+    );
   };
 
   const onDelete = async () => {
@@ -521,10 +554,49 @@ function Editor({
               const subLabel = hasChildren
                 ? `${s.children!.length} Sub-Steps`
                 : "Single Step";
+              const isDragging = stepDragFrom === idx;
+              const isDragOver =
+                stepDragOver === idx &&
+                stepDragFrom !== null &&
+                stepDragFrom !== idx;
               return (
                 <div
                   key={idx}
+                  draggable={canEdit && !isOpen}
+                  onDragStart={(e) => {
+                    if (!canEdit || isOpen) return;
+                    setStepDragFrom(idx);
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", String(idx));
+                  }}
+                  onDragOver={(e) => {
+                    if (!canEdit || stepDragFrom === null) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (stepDragOver !== idx) setStepDragOver(idx);
+                  }}
+                  onDragLeave={() => {
+                    if (stepDragOver === idx) setStepDragOver(null);
+                  }}
+                  onDrop={(e) => {
+                    if (!canEdit) return;
+                    e.preventDefault();
+                    if (stepDragFrom !== null) moveStep(stepDragFrom, idx);
+                    setStepDragFrom(null);
+                    setStepDragOver(null);
+                  }}
+                  onDragEnd={() => {
+                    setStepDragFrom(null);
+                    setStepDragOver(null);
+                  }}
                   className={"pe-step" + (isOpen ? " is-open" : "")}
+                  style={{
+                    opacity: isDragging ? 0.4 : 1,
+                    borderTop: isDragOver
+                      ? "2px solid var(--pe-petrol)"
+                      : undefined,
+                    cursor: canEdit && !isOpen ? "grab" : undefined,
+                  }}
                 >
                   <button
                     type="button"
@@ -598,8 +670,49 @@ function Editor({
                             <span>Description</span>
                             <span />
                           </div>
-                          {(s.children ?? []).map((c, ci) => (
-                            <div key={ci} className="pe-sstable__row">
+                          {(s.children ?? []).map((c, ci) => {
+                            const cDragging =
+                              childDrag &&
+                              childDrag.stepIdx === idx &&
+                              childDrag.from === ci;
+                            const cDragOver =
+                              childDrag &&
+                              childDrag.stepIdx === idx &&
+                              childDrag.over === ci &&
+                              childDrag.from !== ci;
+                            return (
+                            <div
+                              key={ci}
+                              draggable={canEdit}
+                              onDragStart={(e) => {
+                                if (!canEdit) return;
+                                setChildDrag({ stepIdx: idx, from: ci, over: null });
+                                e.dataTransfer.effectAllowed = "move";
+                                e.dataTransfer.setData("text/plain", String(ci));
+                              }}
+                              onDragOver={(e) => {
+                                if (!canEdit || !childDrag || childDrag.stepIdx !== idx) return;
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = "move";
+                                if (childDrag.over !== ci) setChildDrag({ ...childDrag, over: ci });
+                              }}
+                              onDragLeave={() => {
+                                if (childDrag && childDrag.over === ci) setChildDrag({ ...childDrag, over: null });
+                              }}
+                              onDrop={(e) => {
+                                if (!canEdit) return;
+                                e.preventDefault();
+                                if (childDrag && childDrag.stepIdx === idx) moveChild(idx, childDrag.from, ci);
+                                setChildDrag(null);
+                              }}
+                              onDragEnd={() => setChildDrag(null)}
+                              className="pe-sstable__row"
+                              style={{
+                                opacity: cDragging ? 0.4 : 1,
+                                borderTop: cDragOver ? "2px solid var(--pe-petrol)" : undefined,
+                                cursor: canEdit ? "grab" : undefined,
+                              }}
+                            >
                               <span className="pe-sstable__grip">⋮⋮</span>
                               <span className="pe-sstable__num">
                                 {idx + 1}.{ci + 1}
@@ -632,7 +745,8 @@ function Editor({
                                 Remove
                               </button>
                             </div>
-                          ))}
+                            );
+                          })}
                           <button
                             type="button"
                             onClick={() => addChild(idx)}
