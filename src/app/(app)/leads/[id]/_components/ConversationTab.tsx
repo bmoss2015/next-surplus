@@ -7,6 +7,8 @@ import { fetchLeadParties, LEAD_PARTY_ROLE_LABELS } from "@/lib/leads/lead-parti
 import { createClient } from "@/lib/supabase/server";
 import { ConversationTabClient } from "./ConversationTabClient";
 import { SendEmailButtonServer } from "@/components/email/SendEmailButtonServer";
+import { buildLeadEmailCandidates } from "@/lib/email/lead-recipients";
+import { fetchEmailTemplates } from "@/lib/settings/fetch";
 
 export type LeadConversationMessage = {
   id: string;
@@ -52,7 +54,7 @@ export type LeadPerson = {
 export async function ConversationTab({ leadId }: { leadId: string }) {
   const sb = await createClient();
 
-  const [threads, accounts, messagesRaw, owners, relatives, parties, attorneyRow] =
+  const [threads, accounts, messagesRaw, owners, relatives, parties, attorneyRow, leadEmail, emailTemplates] =
     await Promise.all([
       fetchInboxThreads({ leadId, limit: 50 }),
       fetchMyEmailAccounts(),
@@ -85,6 +87,8 @@ export async function ConversationTab({ leadId }: { leadId: string }) {
         .select("attorney_id, attorneys ( name, email )")
         .eq("id", leadId)
         .maybeSingle(),
+      buildLeadEmailCandidates(leadId),
+      fetchEmailTemplates(),
     ]);
 
   const messages: LeadConversationMessage[] = ((messagesRaw.data ?? []) as unknown[]).map(
@@ -227,6 +231,9 @@ export async function ConversationTab({ leadId }: { leadId: string }) {
           className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
         />
       }
+      emailCandidates={leadEmail.candidates}
+      emailTemplates={emailTemplates}
+      emailAccounts={accounts}
     />
   );
 }

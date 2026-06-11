@@ -15,6 +15,20 @@ import type { EmailRecipientCandidate } from "@/lib/email/lead-recipients";
 import type { EmailTemplateRow } from "@/lib/settings/fetch";
 import type { EmailAccountRow } from "@/lib/email/types";
 
+export type SendEmailReplyContext = {
+  mode: "reply" | "replyAll" | "forward";
+  threadId: string;
+  inReplyTo: string | null;
+  referencesChain: string[];
+  accountId: string;
+  defaultTo: { name: string; email: string }[];
+  defaultCc: { name: string; email: string }[];
+  baseSubject: string;
+  quotedHtml: string;
+  originalFrom: { name: string | null; address: string };
+  originalSentAt: string;
+};
+
 export type SendEmailModalProps = {
   open: boolean;
   onClose: () => void;
@@ -23,6 +37,7 @@ export type SendEmailModalProps = {
   templates: EmailTemplateRow[];
   accounts: EmailAccountRow[];
   signatureHtml?: string | null;
+  replyContext?: SendEmailReplyContext | null;
 };
 
 type Selected = {
@@ -41,31 +56,68 @@ export function SendEmailModal({
   templates,
   accounts,
   signatureHtml,
+  replyContext,
 }: SendEmailModalProps) {
   const activeAccounts = accounts.filter((a) => a.status === "active");
-  const defaultAccount = activeAccounts[0] ?? null;
+  const defaultAccount =
+    (replyContext &&
+      activeAccounts.find((a) => a.id === replyContext.accountId)) ??
+    activeAccounts[0] ??
+    null;
+
+  function buildReplySubject(base: string, mode: "reply" | "replyAll" | "forward"): string {
+    const prefix = mode === "forward" ? "Fwd:" : "Re:";
+    if (!base) return prefix;
+    if (base.toLowerCase().startsWith(prefix.toLowerCase())) return base;
+    return `${prefix} ${base}`;
+  }
+
+  function selectedFromAddrList(list: { name: string; email: string }[]): Selected[] {
+    return list.map((r) => {
+      const match = candidates.find(
+        (c) => c.email.toLowerCase() === r.email.toLowerCase()
+      );
+      return match
+        ? {
+            contactId: match.contact_id,
+            email: match.email,
+            name: match.name,
+            relation: match.relation,
+            mergeContext: match.merge_context,
+          }
+        : { contactId: null, email: r.email, name: r.name || r.email };
+    });
+  }
 
   const [accountId, setAccountId] = useState<string | null>(defaultAccount?.id ?? null);
   const [to, setTo] = useState<Selected[]>(
-    candidates.length > 0
-      ? [
-          {
-            contactId: candidates[0].contact_id,
-            email: candidates[0].email,
-            name: candidates[0].name,
-            relation: candidates[0].relation,
-            mergeContext: candidates[0].merge_context,
-          },
-        ]
-      : []
+    replyContext
+      ? selectedFromAddrList(replyContext.defaultTo)
+      : candidates.length > 0
+        ? [
+            {
+              contactId: candidates[0].contact_id,
+              email: candidates[0].email,
+              name: candidates[0].name,
+              relation: candidates[0].relation,
+              mergeContext: candidates[0].merge_context,
+            },
+          ]
+        : []
   );
-  const [cc, setCc] = useState<Selected[]>([]);
+  const [cc, setCc] = useState<Selected[]>(
+    replyContext ? selectedFromAddrList(replyContext.defaultCc) : []
+  );
   const [bcc, setBcc] = useState<Selected[]>([]);
-  const [ccOpen, setCcOpen] = useState(false);
+  const [ccOpen, setCcOpen] = useState(replyContext ? replyContext.defaultCc.length > 0 : false);
   const [bccOpen, setBccOpen] = useState(false);
   const [templateId, setTemplateId] = useState<string | null>(null);
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [subject, setSubject] = useState(
+    replyContext ? buildReplySubject(replyContext.baseSubject, replyContext.mode) : ""
+  );
+  const [body, setBody] = useState(
+    replyContext && replyContext.mode === "forward" ? replyContext.quotedHtml : ""
+  );
   const [err, setErr] = useState<string | null>(null);
   const [accountPickerOpen, setAccountPickerOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -129,6 +181,9 @@ export function SendEmailModal({
           subject: renderedSubject,
           bodyHtml: bodyWithSignature,
           templateId,
+          threadId: replyContext?.threadId,
+          inReplyTo: replyContext?.inReplyTo ?? null,
+          referencesChain: replyContext?.referencesChain,
         });
         if (!res.ok) {
           setErr(res.error);

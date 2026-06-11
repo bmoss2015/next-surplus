@@ -23,6 +23,7 @@ import { ComposeBox } from "@/app/(app)/inbox/_components/ComposeBox";
 import { HtmlMessage } from "@/app/(app)/inbox/_components/HtmlMessage";
 import { markThreadRead } from "@/app/(app)/inbox/_actions";
 import { upsertLeadParty } from "../_lead-parties-actions";
+import { SendEmailModal } from "@/components/email/SendEmailModal";
 import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
 import type {
   LeadConversationMessage,
@@ -154,6 +155,9 @@ export function ConversationTabClient({
   accounts,
   people,
   sendEmailButton,
+  emailCandidates,
+  emailTemplates,
+  emailAccounts,
 }: {
   leadId: string;
   threads: LeadConversationThread[];
@@ -161,6 +165,9 @@ export function ConversationTabClient({
   accounts: { id: string; address: string; display_name: string | null }[];
   people: LeadPerson[];
   sendEmailButton?: React.ReactNode;
+  emailCandidates?: import("@/lib/email/lead-recipients").EmailRecipientCandidate[];
+  emailTemplates?: import("@/lib/settings/fetch").EmailTemplateRow[];
+  emailAccounts?: import("@/lib/email/types").EmailAccountRow[];
 }) {
   void threads;
 
@@ -874,8 +881,65 @@ export function ConversationTabClient({
         />
       )}
 
-      {/* Floating reply pop-out */}
-      {replyTo && (() => {
+      {/* Floating reply pop-out — use the new SendEmailModal when email
+          data is available so reply/replyAll/forward picks up the same
+          template + merge-field tooling as Send Email. Falls back to the
+          legacy ComposeBox if the email data wasn't passed in. */}
+      {replyTo && emailCandidates && emailTemplates && emailAccounts && (() => {
+        const m = replyTo.message;
+        const accountForReply = accounts.find((a) => a.id === m.channel_account_id) ?? primaryAccount;
+        if (!accountForReply) return null;
+        const accountLc = accountForReply.address.toLowerCase();
+        const isInbound = m.direction === "inbound";
+        const replyAllRecipients = new Set<string>([...m.to_addresses, ...m.cc_addresses]);
+        if (isInbound) replyAllRecipients.delete(accountLc);
+        const primaryTo = isInbound ? m.from_address : (m.to_addresses[0] ?? "");
+        const replyAllCcEmails = Array.from(replyAllRecipients).filter(
+          (a) => a.toLowerCase() !== primaryTo.toLowerCase()
+        );
+        const toList =
+          replyTo.mode === "forward"
+            ? []
+            : [{ name: m.from_name ?? primaryTo, email: primaryTo }];
+        const ccList =
+          replyTo.mode === "replyAll"
+            ? replyAllCcEmails.map((e) => ({ name: e, email: e }))
+            : [];
+        const quotedHtml = m.body_html
+          ? `<br/><br/><blockquote style="margin:0 0 0 0.8ex;border-left:1px solid #ccc;padding-left:1ex;">${m.body_html}</blockquote>`
+          : `<br/><br/>> ${(m.body_text ?? m.snippet ?? "").replace(/\n/g, "\n> ")}`;
+        return (
+          <SendEmailModal
+            open
+            onClose={() => setReplyTo(null)}
+            leadId={leadId}
+            candidates={emailCandidates}
+            templates={emailTemplates}
+            accounts={emailAccounts}
+            replyContext={{
+              mode: replyTo.mode,
+              threadId: m.provider_thread_key,
+              inReplyTo: m.provider_message_id ? `<${m.provider_message_id}>` : null,
+              referencesChain: [
+                ...(m.references_chain ?? []),
+                ...(m.provider_message_id ? [`<${m.provider_message_id}>`] : []),
+              ],
+              accountId: accountForReply.id,
+              defaultTo: toList,
+              defaultCc: ccList,
+              baseSubject: m.conversation_subject ?? "",
+              quotedHtml,
+              originalFrom: { name: m.from_name, address: m.from_address },
+              originalSentAt: m.sent_at,
+            }}
+          />
+        );
+      })()}
+
+      {/* Legacy reply pop-out — only renders if the new SendEmailModal
+          data wasn't provided. Kept for parity until every entry path
+          passes the email data. */}
+      {replyTo && (!emailCandidates || !emailTemplates || !emailAccounts) && (() => {
         const m = replyTo.message;
         const accountForReply = accounts.find((a) => a.id === m.channel_account_id) ?? primaryAccount;
         if (!accountForReply) return null;

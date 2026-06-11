@@ -15,6 +15,9 @@ export type SendLeadEmailInput = {
   subject: string;
   bodyHtml: string;
   templateId?: string | null;
+  threadId?: string;
+  inReplyTo?: string | null;
+  referencesChain?: string[];
 };
 
 function publicOrigin(): string {
@@ -65,6 +68,9 @@ export async function sendLeadEmail(
       subject,
       body: bodyWithPixel,
       leadId: input.leadId,
+      threadId: input.threadId,
+      inReplyTo: input.inReplyTo ?? null,
+      referencesChain: input.referencesChain,
     });
 
     if (!sendRes.ok) {
