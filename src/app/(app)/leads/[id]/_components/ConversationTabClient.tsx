@@ -709,9 +709,16 @@ export function ConversationTabClient({
           </div>
         </aside>
 
-        {/* RIGHT — selected thread reader. Full-bleed editorial typography. */}
-        <section className="flex h-full flex-col overflow-hidden bg-surface">
-          <div ref={readerRef} className="min-h-0 flex-1 overflow-y-auto">
+        {/* RIGHT — selected thread reader. Full-bleed editorial typography.
+            grid-rows [scroll area, pinned bar] is more reliable than flex
+            for keeping the reply bar visible — flex-1 + overflow-y-auto
+            collapses in some browsers when the parent's height isn't
+            explicitly set, which the 82vh grid row was not always providing. */}
+        <section
+          className="grid h-full grid-rows-[1fr_auto] overflow-hidden bg-surface"
+          style={{ minHeight: 0 }}
+        >
+          <div ref={readerRef} className="min-h-0 overflow-y-auto">
           {selectedThread ? (
             <ThreadReader
               thread={selectedThread}
