@@ -9,6 +9,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { disconnectEmailAccount, updateEmailAccountSignature } from "@/app/(app)/settings/_email-actions";
+import { RichTextEditor } from "@/components/email/RichTextEditor";
 import type { EmailAccountRow } from "@/lib/email/types";
 
 function formatSyncedAt(ts: string | null): string {
@@ -211,13 +212,11 @@ function SignatureEditor({ acct }: { acct: EmailAccountRow }) {
           <span className="text-[11px] font-medium text-green-700">Saved</span>
         )}
       </div>
-      <textarea
+      <RichTextEditor
         value={value}
-        onChange={(e) => setValue(e.target.value)}
-        rows={6}
-        placeholder={"Bree Moss\nManaging Partner · Moss Equity Partners\n713-555-0184"}
-        className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-[13px] leading-[1.55] outline-none focus:border-[#0d4b3a]"
-        style={{ fontFamily: "Inter, sans-serif" }}
+        onChange={setValue}
+        placeholder="Bree Moss · Managing Partner · 713-555-0184"
+        minRows={5}
       />
       <div className="mt-2 flex items-center justify-end gap-2">
         {err && <span className="mr-auto text-[11px] text-red-600">{err}</span>}

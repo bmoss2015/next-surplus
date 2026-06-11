@@ -212,6 +212,18 @@ export function EmailTemplatesSection({
           setErrMsg(null);
         }}
         onSave={save}
+        onAddFolder={async (name) => {
+          const res = await createEmailTemplateFolder(name);
+          if (res.ok) {
+            setFolders((prev) =>
+              [...prev, { id: res.id, name, sort_order: 0 }].sort((a, b) =>
+                a.name.localeCompare(b.name)
+              )
+            );
+            router.refresh();
+          }
+          return res;
+        }}
         errMsg={errMsg}
       />
     );
@@ -566,6 +578,7 @@ function EditForm({
   folders,
   onCancel,
   onSave,
+  onAddFolder,
   errMsg,
 }: {
   initial: EmailTemplateRow | null;
@@ -578,8 +591,12 @@ function EditForm({
     subject: string;
     body_html: string;
   }) => void;
+  onAddFolder: (name: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>;
   errMsg: string | null;
 }) {
+  const [addingFolderInline, setAddingFolderInline] = useState(false);
+  const [inlineFolderName, setInlineFolderName] = useState("");
+  const [inlinePending, setInlinePending] = useState(false);
   const [name, setName] = useState(initial?.name ?? "");
   const [folderId, setFolderId] = useState<string | null>(initial?.folder_id ?? null);
   const [subject, setSubject] = useState(initial?.subject ?? "");
@@ -720,7 +737,7 @@ function EditForm({
                   <IconChevronDown size={10} stroke={2} className="text-gray-400" />
                 </button>
                 {folderOpen && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-[200px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                  <div className="absolute right-0 top-full z-20 mt-1 w-[240px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
                     <button
                       type="button"
                       onClick={() => {
@@ -744,6 +761,62 @@ function EditForm({
                         {f.name}
                       </button>
                     ))}
+                    <div className="border-t border-gray-150">
+                      {addingFolderInline ? (
+                        <div className="flex items-center gap-1 px-2 py-1.5">
+                          <input
+                            autoFocus
+                            value={inlineFolderName}
+                            onChange={(e) => setInlineFolderName(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === "Enter" && inlineFolderName.trim() && !inlinePending) {
+                                setInlinePending(true);
+                                const res = await onAddFolder(inlineFolderName.trim());
+                                setInlinePending(false);
+                                if (res.ok) {
+                                  setFolderId(res.id);
+                                  setAddingFolderInline(false);
+                                  setInlineFolderName("");
+                                  setFolderOpen(false);
+                                }
+                              } else if (e.key === "Escape") {
+                                setAddingFolderInline(false);
+                                setInlineFolderName("");
+                              }
+                            }}
+                            placeholder="Folder name"
+                            className="flex-1 rounded border border-gray-200 px-2 py-1 text-[12px] outline-none focus:border-[#0d4b3a]"
+                          />
+                          <button
+                            type="button"
+                            disabled={inlinePending || !inlineFolderName.trim()}
+                            onClick={async () => {
+                              setInlinePending(true);
+                              const res = await onAddFolder(inlineFolderName.trim());
+                              setInlinePending(false);
+                              if (res.ok) {
+                                setFolderId(res.id);
+                                setAddingFolderInline(false);
+                                setInlineFolderName("");
+                                setFolderOpen(false);
+                              }
+                            }}
+                            className="cursor-pointer rounded-md px-2 py-1 text-[11px] font-medium text-[#0d4b3a] hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setAddingFolderInline(true)}
+                          className="flex w-full cursor-pointer items-center gap-1.5 px-3 py-2 text-left text-[12px] font-medium text-[#0d4b3a] hover:bg-gray-50"
+                        >
+                          <IconPlus size={11} stroke={2} />
+                          New folder
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

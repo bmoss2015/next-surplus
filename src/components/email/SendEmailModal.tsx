@@ -145,6 +145,9 @@ export function SendEmailModal({
   const [accountPickerOpen, setAccountPickerOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [saveTplOpen, setSaveTplOpen] = useState(false);
+  const [saveTplPanel, setSaveTplPanel] = useState<null | "new" | "update">(null);
+  const [saveTplName, setSaveTplName] = useState("");
+  const [saveTplTargetId, setSaveTplTargetId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
   const mergeRef = useRef<HTMLDivElement | null>(null);
@@ -203,28 +206,26 @@ export function SendEmailModal({
     setMergeOpen(false);
   }
 
-  function saveAsTemplate(asNew: boolean) {
+  function saveTemplate(opts: { id: string | null; name: string }) {
     setErr(null);
     if (!subject.trim() || !body.trim()) {
       setErr("Subject and body required to save as template");
       return;
     }
-    const name = window.prompt(
-      asNew ? "New template name?" : "Update which template? Type its exact name",
-      asNew ? subject.trim().slice(0, 60) : ""
-    );
-    if (!name) return;
-    const existing = templates.find((t) => t.name === name);
+    const existing = templates.find((t) => t.id === opts.id);
     startTransition(async () => {
       const res = await upsertEmailTemplate({
-        id: asNew ? null : (existing?.id ?? null),
-        name,
+        id: opts.id,
+        name: opts.name,
         folder_id: existing?.folder_id ?? null,
         subject: subject.trim(),
         body_html: body,
       });
       if (!res.ok) setErr(res.error);
-      else setSaveTplOpen(false);
+      else {
+        setSaveTplOpen(false);
+        setSaveTplPanel(null);
+      }
     });
   }
 
@@ -436,18 +437,11 @@ export function SendEmailModal({
             )}
 
             <Row label="Template">
-              <select
-                value={templateId ?? ""}
-                onChange={(e) => pickTemplate(e.target.value || null)}
-                className="w-full border-0 bg-transparent text-[13px] outline-none"
-              >
-                <option value="">— No template —</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              <TemplatePicker
+                templates={templates}
+                value={templateId}
+                onChange={(id) => pickTemplate(id)}
+              />
             </Row>
 
             <Row label="Subject">
@@ -534,18 +528,93 @@ export function SendEmailModal({
               <div className="absolute bottom-full left-0 z-20 mb-1 w-[220px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
                 <button
                   type="button"
-                  onClick={() => saveAsTemplate(true)}
+                  onClick={() => {
+                    setSaveTplOpen(false);
+                    setSaveTplPanel("new");
+                    setSaveTplName(subject.trim().slice(0, 60));
+                  }}
                   className="block w-full cursor-pointer px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50"
                 >
                   Save as new template
                 </button>
                 <button
                   type="button"
-                  onClick={() => saveAsTemplate(false)}
-                  className="block w-full cursor-pointer px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50"
+                  onClick={() => {
+                    setSaveTplOpen(false);
+                    setSaveTplPanel("update");
+                    setSaveTplTargetId(templateId);
+                  }}
+                  disabled={templates.length === 0}
+                  className="block w-full cursor-pointer px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
                 >
                   Update existing template
                 </button>
+              </div>
+            )}
+            {saveTplPanel && (
+              <div className="absolute bottom-full left-0 z-30 mb-1 w-[320px] overflow-hidden rounded-md border border-gray-200 bg-white p-3 shadow-lg">
+                <div className="text-[11px] uppercase tracking-[0.08em] text-gray-500">
+                  {saveTplPanel === "new" ? "Save as New Template" : "Update Existing Template"}
+                </div>
+                {saveTplPanel === "new" ? (
+                  <input
+                    autoFocus
+                    value={saveTplName}
+                    onChange={(e) => setSaveTplName(e.target.value)}
+                    placeholder="Template name"
+                    className="mt-2 w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-[13px] outline-none focus:border-[#0d4b3a]"
+                  />
+                ) : (
+                  <div className="mt-2 max-h-[180px] overflow-auto rounded-md border border-gray-200">
+                    {templates.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSaveTplTargetId(t.id)}
+                        className={
+                          "block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] hover:bg-gray-50 " +
+                          (saveTplTargetId === t.id ? "bg-gray-50 text-[#0f1729]" : "text-[#0f1729]")
+                        }
+                      >
+                        <div className="truncate font-medium">{t.name}</div>
+                        {t.subject && (
+                          <div className="truncate text-[11px] text-gray-500">{t.subject}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaveTplPanel(null);
+                      setSaveTplTargetId(null);
+                    }}
+                    className="cursor-pointer text-[12px] font-medium text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      pending ||
+                      (saveTplPanel === "new" && saveTplName.trim() === "") ||
+                      (saveTplPanel === "update" && !saveTplTargetId)
+                    }
+                    onClick={() => {
+                      if (saveTplPanel === "new") {
+                        saveTemplate({ id: null, name: saveTplName.trim() });
+                      } else if (saveTplTargetId) {
+                        const t = templates.find((x) => x.id === saveTplTargetId);
+                        if (t) saveTemplate({ id: t.id, name: t.name });
+                      }
+                    }}
+                    className="btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[11.5px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {pending ? "Saving…" : saveTplPanel === "new" ? "Save Template" : "Update Template"}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -569,6 +638,76 @@ export function SendEmailModal({
           </div>
         </footer>
       </div>
+    </div>
+  );
+}
+
+function TemplatePicker({
+  templates,
+  value,
+  onChange,
+}: {
+  templates: EmailTemplateRow[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const selected = templates.find((t) => t.id === value);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-left text-[13px] hover:border-gray-300"
+      >
+        <span className={selected ? "text-[#0f1729]" : "text-gray-400"}>
+          {selected?.name ?? "No template"}
+        </span>
+        <IconChevronDown size={12} stroke={2} className="text-gray-400" />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[260px] overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onChange(null);
+              setOpen(false);
+            }}
+            className="block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] text-gray-500 hover:bg-gray-50"
+          >
+            No template
+          </button>
+          {templates.length > 0 && <div className="border-t border-gray-100" />}
+          {templates.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                onChange(t.id);
+                setOpen(false);
+              }}
+              className={
+                "block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] hover:bg-gray-50 " +
+                (t.id === value ? "bg-gray-50 text-[#0f1729]" : "text-[#0f1729]")
+              }
+            >
+              <div className="truncate font-medium">{t.name}</div>
+              {t.subject && (
+                <div className="truncate text-[11px] text-gray-500">{t.subject}</div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -48,5 +48,6 @@ export async function updateEmailAccountSignature(
     .eq("id", accountId);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
+  revalidatePath("/leads", "layout");
   return { ok: true };
 }
