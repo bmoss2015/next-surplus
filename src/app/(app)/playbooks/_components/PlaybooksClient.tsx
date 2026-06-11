@@ -8,7 +8,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { IconCopy } from "@tabler/icons-react";
+import { IconCopy, IconPencil } from "@tabler/icons-react";
 import type { PlaybookListItem } from "@/lib/playbooks/types";
 import { duplicateResearchTemplate } from "@/app/(app)/settings/_actions";
 
@@ -80,7 +80,7 @@ export function PlaybooksClient({
               className="grid items-center gap-4 rounded-md border border-gray-200 bg-surface px-4 py-3 transition-colors hover:border-petrol-300"
               style={{
                 gridTemplateColumns: canCreate
-                  ? "minmax(0, 1fr) 90px 130px auto auto"
+                  ? "minmax(0, 1fr) 90px 130px auto auto auto"
                   : "minmax(0, 1fr) 90px 130px auto",
               }}
             >
@@ -116,16 +116,26 @@ export function PlaybooksClient({
                 </div>
               </div>
               {canCreate && (
-                <button
-                  type="button"
-                  onClick={() => onDuplicate(p.id)}
-                  disabled={pendingId === p.id}
-                  title="Duplicate Playbook"
-                  aria-label="Duplicate Playbook"
-                  className="cursor-pointer rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-petrol-700 disabled:cursor-wait disabled:opacity-60"
-                >
-                  <IconCopy size={16} stroke={1.75} />
-                </button>
+                <>
+                  <Link
+                    href={`/playbooks/${p.id}/edit`}
+                    title="Edit Playbook"
+                    aria-label="Edit Playbook"
+                    className="cursor-pointer rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-petrol-700"
+                  >
+                    <IconPencil size={16} stroke={1.75} />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => onDuplicate(p.id)}
+                    disabled={pendingId === p.id}
+                    title="Duplicate Playbook"
+                    aria-label="Duplicate Playbook"
+                    className="cursor-pointer rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-petrol-700 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <IconCopy size={16} stroke={1.75} />
+                  </button>
+                </>
               )}
               <Link
                 href={`/playbooks/${p.id}`}
