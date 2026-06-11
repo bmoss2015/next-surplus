@@ -16,6 +16,8 @@ import { renderMerge, type MergeContext } from "@/lib/mail/merge";
 import type { EmailRecipientCandidate } from "@/lib/email/lead-recipients";
 import type { EmailTemplateRow } from "@/lib/settings/fetch";
 import type { EmailAccountRow } from "@/lib/email/types";
+import { RichTextEditor } from "@/components/email/RichTextEditor";
+import type { Editor } from "@tiptap/react";
 
 const MERGE_TOKENS = [
   { token: "contact.first_name", sample: "Roberta", group: "Recipient" },
@@ -27,6 +29,9 @@ const MERGE_TOKENS = [
   { token: "lead.county", sample: "Dallas", group: "Property" },
   { token: "lead.estimated_surplus", sample: "$42,500", group: "Property" },
   { token: "lead.confirmed_surplus", sample: "$42,500", group: "Property" },
+  { token: "lead.recovery_fee_pct", sample: "30%", group: "Property" },
+  { token: "lead.recovery_fee_amount", sample: "$12,750", group: "Property" },
+  { token: "lead.est_net_to_owner", sample: "$11,250", group: "Property" },
   { token: "lead.case_number", sample: "DC-25-04321", group: "Property" },
   { token: "sender.signer_name", sample: "Bree Moss", group: "Sender" },
   { token: "system.today_long", sample: "June 11, 2026", group: "Sender" },
@@ -149,9 +154,10 @@ export function SendEmailModal({
   const [saveTplName, setSaveTplName] = useState("");
   const [saveTplTargetId, setSaveTplTargetId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const bodyEditorRef = useRef<Editor | null>(null);
   const mergeRef = useRef<HTMLDivElement | null>(null);
   const saveTplRef = useRef<HTMLDivElement | null>(null);
+  const [updateSearch, setUpdateSearch] = useState("");
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -188,20 +194,12 @@ export function SendEmailModal({
   }
 
   function insertMergeToken(token: string) {
-    const el = bodyRef.current;
     const placeholder = `{{${token}}}`;
-    if (!el) {
-      setBody((b) => b + placeholder);
+    const ed = bodyEditorRef.current;
+    if (ed) {
+      ed.chain().focus().insertContent(placeholder).run();
     } else {
-      const start = el.selectionStart ?? body.length;
-      const end = el.selectionEnd ?? body.length;
-      const next = body.slice(0, start) + placeholder + body.slice(end);
-      setBody(next);
-      setTimeout(() => {
-        el.focus();
-        const pos = start + placeholder.length;
-        el.setSelectionRange(pos, pos);
-      }, 0);
+      setBody((b) => b + placeholder);
     }
     setMergeOpen(false);
   }
@@ -288,7 +286,7 @@ export function SendEmailModal({
         className="relative z-10 flex max-h-[92vh] w-[820px] max-w-[95vw] flex-col overflow-hidden rounded-[12px] border border-gray-200 bg-white shadow-[0_24px_64px_-16px_rgba(15,23,41,0.20)]"
         style={{ fontFamily: "Inter, sans-serif" }}
       >
-        <header className="flex items-center justify-between border-b border-gray-150 px-6 py-3.5">
+        <header className="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-3.5">
           <div className="min-w-0">
             <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
               Compose Email
@@ -307,8 +305,8 @@ export function SendEmailModal({
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="divide-y divide-gray-100">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 divide-y divide-gray-200">
             <Row label="From">
               {selectedAccount ? (
                 <div className="relative flex items-center gap-2 text-[13px]">
@@ -454,8 +452,8 @@ export function SendEmailModal({
             </Row>
           </div>
 
-          <div className="relative">
-            <div className="flex items-center justify-end gap-1 border-b border-gray-100 px-4 py-2">
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <div className="flex shrink-0 items-center justify-end gap-1 border-b border-gray-200 px-4 py-2">
               <div ref={mergeRef} className="relative">
                 <button
                   type="button"
@@ -473,10 +471,10 @@ export function SendEmailModal({
                   <IconChevronDown size={10} stroke={2} className="text-gray-400" />
                 </button>
                 {mergeOpen && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-[300px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                  <div className="absolute right-0 top-full z-20 mt-1 w-[320px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
                     {(["Recipient", "Property", "Sender"] as const).map((group) => (
                       <div key={group}>
-                        <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
+                        <div className="border-b border-gray-200 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
                           {group}
                         </div>
                         {MERGE_TOKENS.filter((t) => t.group === group).map((t) => (
@@ -496,14 +494,15 @@ export function SendEmailModal({
                 )}
               </div>
             </div>
-            <textarea
-              ref={bodyRef}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={14}
-              placeholder="Write your email..."
-              className="w-full resize-none border-0 bg-transparent px-6 py-5 text-[13.5px] leading-[1.7] text-[#0f1729] outline-none placeholder:text-gray-400"
-            />
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <RichTextEditor
+                value={body}
+                onChange={setBody}
+                editorRef={bodyEditorRef}
+                minRows={12}
+                placeholder="Write your email..."
+              />
+            </div>
           </div>
         </div>
 
@@ -513,7 +512,7 @@ export function SendEmailModal({
           </div>
         )}
 
-        <footer className="flex items-center justify-between border-t border-gray-150 px-6 py-3">
+        <footer className="flex shrink-0 items-center justify-between border-t border-gray-200 px-6 py-3">
           <div ref={saveTplRef} className="relative">
             <button
               type="button"
@@ -552,46 +551,117 @@ export function SendEmailModal({
               </div>
             )}
             {saveTplPanel && (
-              <div className="absolute bottom-full left-0 z-30 mb-1 w-[320px] overflow-hidden rounded-md border border-gray-200 bg-white p-3 shadow-lg">
-                <div className="text-[11px] uppercase tracking-[0.08em] text-gray-500">
-                  {saveTplPanel === "new" ? "Save as New Template" : "Update Existing Template"}
-                </div>
-                {saveTplPanel === "new" ? (
-                  <input
-                    autoFocus
-                    value={saveTplName}
-                    onChange={(e) => setSaveTplName(e.target.value)}
-                    placeholder="Template name"
-                    className="mt-2 w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-[13px] outline-none focus:border-[#0d4b3a]"
-                  />
-                ) : (
-                  <div className="mt-2 max-h-[180px] overflow-auto rounded-md border border-gray-200">
-                    {templates.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setSaveTplTargetId(t.id)}
-                        className={
-                          "block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] hover:bg-gray-50 " +
-                          (saveTplTargetId === t.id ? "bg-gray-50 text-[#0f1729]" : "text-[#0f1729]")
-                        }
-                      >
-                        <div className="truncate font-medium">{t.name}</div>
-                        {t.subject && (
-                          <div className="truncate text-[11px] text-gray-500">{t.subject}</div>
-                        )}
-                      </button>
-                    ))}
+              <div className="absolute bottom-full left-0 z-30 mb-2 w-[420px] overflow-hidden rounded-[10px] border border-gray-200 bg-white shadow-[0_16px_40px_-8px_rgba(15,23,41,0.18)]">
+                <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+                  <div>
+                    <div className="text-[13px] font-medium text-[#0f1729]">
+                      {saveTplPanel === "new" ? "Save as new template" : "Update existing template"}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-gray-500">
+                      {saveTplPanel === "new"
+                        ? "Reuse this email from any lead's Send Email modal."
+                        : "Overwrite an existing template with this subject and body."}
+                    </div>
                   </div>
-                )}
-                <div className="mt-3 flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setSaveTplPanel(null);
                       setSaveTplTargetId(null);
+                      setUpdateSearch("");
                     }}
-                    className="cursor-pointer text-[12px] font-medium text-gray-500 hover:text-gray-700"
+                    className="cursor-pointer rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    aria-label="Close"
+                  >
+                    <IconX size={14} stroke={1.75} />
+                  </button>
+                </div>
+                <div className="px-4 py-3">
+                  {saveTplPanel === "new" ? (
+                    <div>
+                      <label className="text-[10.5px] uppercase tracking-[0.08em] text-gray-500">
+                        Template Name
+                      </label>
+                      <input
+                        autoFocus
+                        value={saveTplName}
+                        onChange={(e) => setSaveTplName(e.target.value)}
+                        placeholder="Opening Outreach — Tax Sale"
+                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[#0d4b3a]"
+                      />
+                      <div className="mt-3 rounded-md border border-gray-200 bg-gray-50/60 px-3 py-2 text-[11.5px] text-gray-500">
+                        Subject: <span className="text-[#0f1729]">{subject.trim() || "—"}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="relative">
+                        <IconSearch size={12} stroke={1.75} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          autoFocus
+                          value={updateSearch}
+                          onChange={(e) => setUpdateSearch(e.target.value)}
+                          placeholder="Search templates by name or subject..."
+                          className="w-full rounded-md border border-gray-200 bg-white py-1.5 pl-7 pr-2.5 text-[12.5px] outline-none focus:border-[#0d4b3a]"
+                        />
+                      </div>
+                      <div className="mt-2 max-h-[220px] overflow-auto rounded-md border border-gray-200">
+                        {templates
+                          .filter(
+                            (t) =>
+                              updateSearch.trim() === "" ||
+                              t.name.toLowerCase().includes(updateSearch.toLowerCase()) ||
+                              t.subject.toLowerCase().includes(updateSearch.toLowerCase())
+                          )
+                          .map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setSaveTplTargetId(t.id)}
+                              className={
+                                "flex w-full cursor-pointer items-start gap-2.5 border-b border-gray-100 px-3 py-2 text-left last:border-0 hover:bg-gray-50 " +
+                                (saveTplTargetId === t.id ? "bg-[#0d4b3a]/[0.04]" : "")
+                              }
+                            >
+                              <span
+                                className={
+                                  "mt-1 h-2.5 w-2.5 shrink-0 rounded-full border " +
+                                  (saveTplTargetId === t.id
+                                    ? "border-[#0d4b3a] bg-[#0d4b3a]"
+                                    : "border-gray-300")
+                                }
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-[12.5px] font-medium text-[#0f1729]">
+                                  {t.name}
+                                </div>
+                                {t.subject && (
+                                  <div className="truncate text-[11px] text-gray-500">{t.subject}</div>
+                                )}
+                                <div className="mt-0.5 text-[10.5px] text-gray-400">
+                                  Updated {new Date(t.updated_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        {templates.length === 0 && (
+                          <div className="px-3 py-4 text-center text-[11.5px] text-gray-500">
+                            No templates yet. Use Save as new instead.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-2 border-t border-gray-200 bg-gray-50/40 px-4 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaveTplPanel(null);
+                      setSaveTplTargetId(null);
+                      setUpdateSearch("");
+                    }}
+                    className="cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-gray-500 hover:text-gray-700"
                   >
                     Cancel
                   </button>
@@ -610,7 +680,7 @@ export function SendEmailModal({
                         if (t) saveTemplate({ id: t.id, name: t.name });
                       }
                     }}
-                    className="btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[11.5px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {pending ? "Saving…" : saveTplPanel === "new" ? "Save Template" : "Update Template"}
                   </button>

@@ -21,6 +21,7 @@ import {
   renameEmailTemplateFolder,
   deleteEmailTemplateFolder,
 } from "../_actions";
+import { RichTextEditor } from "@/components/email/RichTextEditor";
 import type {
   EmailTemplateRow,
   EmailTemplateFolderRow,
@@ -568,6 +569,9 @@ const MERGE_TOKENS = [
   { token: "lead.county", sample: "Dallas", group: "Property" },
   { token: "lead.estimated_surplus", sample: "$42,500", group: "Property" },
   { token: "lead.confirmed_surplus", sample: "$42,500", group: "Property" },
+  { token: "lead.recovery_fee_pct", sample: "30%", group: "Property" },
+  { token: "lead.recovery_fee_amount", sample: "$12,750", group: "Property" },
+  { token: "lead.est_net_to_owner", sample: "$11,250", group: "Property" },
   { token: "lead.case_number", sample: "DC-25-04321", group: "Property" },
   { token: "sender.signer_name", sample: "Bree Moss", group: "Sender" },
   { token: "system.today_long", sample: "June 11, 2026", group: "Sender" },
@@ -604,7 +608,7 @@ function EditForm({
   const [mergeOpen, setMergeOpen] = useState<null | "subject" | "body">(null);
   const [folderOpen, setFolderOpen] = useState(false);
   const subjectRef = useRef<HTMLInputElement | null>(null);
-  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const bodyEditorRef = useRef<import("@tiptap/react").Editor | null>(null);
   const folderRef = useRef<HTMLDivElement | null>(null);
   const subjectMergeRef = useRef<HTMLButtonElement | null>(null);
   const bodyMergeRef = useRef<HTMLButtonElement | null>(null);
@@ -645,12 +649,13 @@ function EditForm({
       return;
     }
     if (mergeOpen === "body") {
-      const el = bodyRef.current;
-      const start = el?.selectionStart ?? bodyHtml.length;
-      const end = el?.selectionEnd ?? bodyHtml.length;
-      setBodyHtml(bodyHtml.slice(0, start) + placeholder + bodyHtml.slice(end));
+      const ed = bodyEditorRef.current;
+      if (ed) {
+        ed.chain().focus().insertContent(placeholder).run();
+      } else {
+        setBodyHtml(bodyHtml + placeholder);
+      }
       setMergeOpen(null);
-      setTimeout(() => el?.focus(), 0);
       return;
     }
   }
@@ -658,7 +663,7 @@ function EditForm({
   const selectedFolder = folders.find((f) => f.id === folderId) ?? null;
 
   return (
-    <div className="mx-auto max-w-[1080px] py-8" style={{ fontFamily: "Inter, sans-serif", color: "#0f1729" }}>
+    <div className="mx-auto max-w-[1200px] py-8" style={{ fontFamily: "Inter, sans-serif", color: "#0f1729" }}>
       <header className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
@@ -674,7 +679,7 @@ function EditForm({
             <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
               {initial ? "Edit Template" : "New Template"}
             </div>
-            <div className="mt-0.5 text-[18px] font-medium tracking-tight">
+            <div className="mt-0.5 text-[18px] font-medium tracking-tight text-[#0f1729]">
               {initial?.name || "Untitled Template"}
             </div>
           </div>
@@ -683,7 +688,7 @@ function EditForm({
           <button
             type="button"
             onClick={onCancel}
-            className="cursor-pointer rounded-md border border-gray-200 bg-white px-3.5 py-2 text-[12px] font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800"
+            className="cursor-pointer rounded-md px-3.5 py-2 text-[12.5px] font-medium text-gray-500 hover:text-gray-800"
           >
             Cancel
           </button>
@@ -699,7 +704,7 @@ function EditForm({
                 body_html: bodyHtml,
               })
             }
-            className="btn-primary cursor-pointer rounded-md px-3.5 py-2 text-[12px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-primary cursor-pointer rounded-md px-4 py-2 text-[12.5px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {initial ? "Save Changes" : "Create Template"}
           </button>
@@ -713,13 +718,13 @@ function EditForm({
       )}
 
       <div className="overflow-hidden rounded-[12px] border border-gray-200 bg-white shadow-[0_1px_2px_rgba(15,23,41,0.04),0_8px_24px_-8px_rgba(15,23,41,0.08)]">
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-gray-200">
           <CompactRow label="Name">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Opening Outreach — Tax Sale"
-              className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
+              placeholder="Opening Outreach — Tax Sale"
+              className="w-full border-0 bg-transparent text-[13.5px] font-medium text-[#0f1729] outline-none placeholder:font-normal placeholder:text-gray-400"
             />
           </CompactRow>
 
@@ -761,7 +766,7 @@ function EditForm({
                         {f.name}
                       </button>
                     ))}
-                    <div className="border-t border-gray-150">
+                    <div className="border-t border-gray-200">
                       {addingFolderInline ? (
                         <div className="flex items-center gap-1 px-2 py-1.5">
                           <input
@@ -852,14 +857,14 @@ function EditForm({
               ref={subjectRef}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Following up on your tax sale surplus claim, Roberta"
-              className="w-full border-0 bg-transparent text-[15px] font-semibold tracking-tight outline-none placeholder:font-normal placeholder:text-gray-400"
+              placeholder="Following up on your tax sale surplus, {{contact.first_name}}"
+              className="w-full border-0 bg-transparent text-[13.5px] font-medium text-[#0f1729] outline-none placeholder:font-normal placeholder:text-gray-400"
             />
           </CompactRow>
         </div>
 
         <div className="relative">
-          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-2">
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-2">
             <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
               Body
             </div>
@@ -880,35 +885,23 @@ function EditForm({
               <IconChevronDown size={10} stroke={2} className="text-gray-400" />
             </button>
           </div>
-          <textarea
-            ref={bodyRef}
-            value={bodyHtml}
-            onChange={(e) => setBodyHtml(e.target.value)}
-            rows={18}
-            placeholder={`Hi {{contact.first_name}},
-
-I'm following up on the surplus funds from your tax sale at {{lead.property_address}}. Based on our research, we estimate the surplus available to you at {{lead.estimated_surplus}}.
-
-Here's what happens next if you'd like to move forward:
-
-- We file the claim with {{lead.county}} County on your behalf.
-- You receive a portion of the recovered funds after attorney costs.
-- Most claims resolve within 90 to 180 days.
-
-Reply to this email if you'd like to talk.
-
-{{sender.signer_name}}`}
-            className="w-full resize-none border-0 bg-transparent px-6 py-5 text-[13.5px] leading-[1.7] text-[#0f1729] outline-none placeholder:text-gray-400"
-            style={{ fontFamily: "Inter, sans-serif" }}
-          />
+          <div className="px-6 py-4">
+            <RichTextEditor
+              value={bodyHtml}
+              onChange={setBodyHtml}
+              editorRef={bodyEditorRef}
+              minRows={14}
+              placeholder="Hi {{contact.first_name}}, I'm reaching out about the surplus funds from your tax sale at {{lead.property_address}}..."
+            />
+          </div>
           {mergeOpen && (
             <div
               ref={mergeOpen === "subject" ? subjectMergeMenuRef : bodyMergeMenuRef}
-              className="absolute right-4 top-[52px] z-20 w-[300px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+              className="absolute right-4 top-[52px] z-20 w-[320px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
             >
               {(["Recipient", "Property", "Sender"] as const).map((group) => (
                 <div key={group}>
-                  <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
+                  <div className="border-b border-gray-200 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
                     {group}
                   </div>
                   {MERGE_TOKENS.filter((t) => t.group === group).map((t) => (
@@ -926,10 +919,6 @@ Reply to this email if you'd like to talk.
               ))}
             </div>
           )}
-        </div>
-
-        <div className="border-t border-dashed border-gray-200 bg-gray-50/50 px-6 py-3 text-[11.5px] text-gray-500">
-          Merge tokens like <span className="rounded-sm bg-[#0d4b3a]/10 px-1 text-[#0d4b3a]">{`{{contact.first_name}}`}</span> get rendered per recipient at send time. Same registry as Letter merge fields.
         </div>
       </div>
     </div>
