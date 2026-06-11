@@ -254,7 +254,7 @@ function renderPanel(
 function AdminGate() {
   return (
     <section className="panel active">
-      <h1 className="section-h1">Admin only</h1>
+      <h1 className="section-h1">Admin Only</h1>
       <p className="section-desc">
         This panel is restricted to org admins. Ask your admin for access.
       </p>

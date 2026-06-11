@@ -58,17 +58,30 @@ export async function fetchDailyWork(): Promise<{
   const leadIds = leads.map((l) => l.id);
   const safeIds = leadIds.length ? leadIds : ["00000000-0000-0000-0000-000000000000"];
 
-  // Latest activity timestamp per lead (rows arrive newest-first, so the first
-  // one we see for a lead wins). Falls back to imported_at when there's none.
-  const { data: acts } = await sb
-    .from("activities")
-    .select("lead_id, created_at")
-    .in("lead_id", safeIds)
-    .order("created_at", { ascending: false });
+  const [actsRes, commentsRes] = await Promise.all([
+    sb
+      .from("activities")
+      .select("lead_id, created_at")
+      .in("lead_id", safeIds)
+      .order("created_at", { ascending: false }),
+    sb
+      .from("discussion_comments")
+      .select("lead_id, created_at")
+      .in("lead_id", safeIds)
+      .order("created_at", { ascending: false }),
+  ]);
   const lastActivityByLead = new Map<string, string>();
-  for (const a of acts ?? []) {
+  for (const a of actsRes.data ?? []) {
     const id = a.lead_id as string;
-    if (!lastActivityByLead.has(id)) lastActivityByLead.set(id, a.created_at as string);
+    const ts = a.created_at as string;
+    const prev = lastActivityByLead.get(id);
+    if (!prev || prev < ts) lastActivityByLead.set(id, ts);
+  }
+  for (const c of commentsRes.data ?? []) {
+    const id = c.lead_id as string;
+    const ts = c.created_at as string;
+    const prev = lastActivityByLead.get(id);
+    if (!prev || prev < ts) lastActivityByLead.set(id, ts);
   }
 
   // Unchecked verification counts per lead

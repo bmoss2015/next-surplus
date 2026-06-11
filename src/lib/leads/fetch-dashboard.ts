@@ -207,10 +207,10 @@ export async function fetchDashboard(): Promise<DashboardData> {
   const leadsNeedingAction = candidates.map((l) => {
     const days = Math.max(0, daysBetween(now, new Date(l.stage_changed_at)));
     let reason = "";
-    if (l.needs_action_flag) reason = "Manually flagged";
-    else if (verifyByLead.has(l.id)) reason = "Items unchecked";
-    else if (firstOpenId && l.stage_id === firstOpenId) reason = "New lead";
-    else reason = "Stale in stage";
+    if (l.needs_action_flag) reason = "Manually Flagged";
+    else if (verifyByLead.has(l.id)) reason = "Items Unchecked";
+    else if (firstOpenId && l.stage_id === firstOpenId) reason = "New Lead";
+    else reason = "Stale In Stage";
     const stg = l.stage_id ? stageById.get(l.stage_id) : null;
     return {
       id: l.id,
