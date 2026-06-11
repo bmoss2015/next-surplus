@@ -22,6 +22,8 @@ type Template = {
   updated: string;
   used: number;
   lastUsed: string;
+  openRate: number;
+  replyRate: number;
 };
 
 const TEMPLATES: Template[] = [
@@ -34,6 +36,8 @@ const TEMPLATES: Template[] = [
     updated: "2 days ago",
     used: 14,
     lastUsed: "Yesterday",
+    openRate: 71,
+    replyRate: 14,
   },
   {
     id: "t2",
@@ -44,6 +48,8 @@ const TEMPLATES: Template[] = [
     updated: "1 week ago",
     used: 6,
     lastUsed: "5 days ago",
+    openRate: 50,
+    replyRate: 0,
   },
   {
     id: "t3",
@@ -54,6 +60,8 @@ const TEMPLATES: Template[] = [
     updated: "2 weeks ago",
     used: 22,
     lastUsed: "2 hours ago",
+    openRate: 86,
+    replyRate: 23,
   },
   {
     id: "t4",
@@ -64,6 +72,8 @@ const TEMPLATES: Template[] = [
     updated: "3 days ago",
     used: 9,
     lastUsed: "4 days ago",
+    openRate: 100,
+    replyRate: 78,
   },
   {
     id: "t5",
@@ -74,6 +84,8 @@ const TEMPLATES: Template[] = [
     updated: "last month",
     used: 4,
     lastUsed: "2 weeks ago",
+    openRate: 100,
+    replyRate: 50,
   },
 ];
 
@@ -202,22 +214,18 @@ function VariantA() {
             <p className="mt-2 line-clamp-3 text-[11.5px] leading-relaxed text-gray-500">
               {t.preview}
             </p>
-            <div className="mt-4 flex items-end justify-between border-t border-gray-100 pt-3">
-              <div>
-                <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">Used</div>
-                <div className="mt-0.5 text-[15px] font-semibold tabular-nums tracking-tight">
-                  {t.used}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">Updated</div>
-                <div className="mt-0.5 text-[11.5px] text-gray-600">{t.updated}</div>
-              </div>
+            <div className="mt-4 grid grid-cols-3 gap-3 border-t border-gray-100 pt-3">
+              <Stat label="Sends" value={String(t.used)} />
+              <Stat label="Open Rate" value={`${t.openRate}%`} />
+              <Stat label="Reply Rate" value={`${t.replyRate}%`} emphasize={t.replyRate >= 20} />
             </div>
-            <div className="mt-3 flex items-center justify-end gap-0 opacity-0 transition-opacity group-hover:opacity-100">
-              <IconBtn icon={IconPencil} label="Edit" />
-              <IconBtn icon={IconCopy} label="Duplicate" />
-              <IconBtn icon={IconTrash} label="Delete" danger />
+            <div className="mt-3 flex items-center justify-between">
+              <div className="text-[10.5px] text-gray-400">Last used {t.lastUsed.toLowerCase()}</div>
+              <div className="flex items-center gap-0 opacity-0 transition-opacity group-hover:opacity-100">
+                <IconBtn icon={IconPencil} label="Edit" />
+                <IconBtn icon={IconCopy} label="Duplicate" />
+                <IconBtn icon={IconTrash} label="Delete" danger />
+              </div>
             </div>
           </article>
         ))}
@@ -274,7 +282,6 @@ function VariantB() {
             <Th onClick={() => setSortBy("name")} active={sortBy === "name"}>
               Name
             </Th>
-            <Th>Subject</Th>
             <Th>Folder</Th>
             <Th onClick={() => setSortBy("lastUsed")} active={sortBy === "lastUsed"}>
               Last Used
@@ -282,6 +289,8 @@ function VariantB() {
             <Th onClick={() => setSortBy("used")} active={sortBy === "used"} align="right">
               Sends
             </Th>
+            <Th align="right">Open Rate</Th>
+            <Th align="right">Reply Rate</Th>
             <th className="w-[120px] px-3 py-2.5" />
           </tr>
         </thead>
@@ -290,14 +299,21 @@ function VariantB() {
             <tr key={t.id} className="group cursor-pointer hover:bg-gray-50/50">
               <td className="px-3 py-2.5">
                 <div className="text-[12.5px] font-medium text-[#0f1729]">{t.name}</div>
-              </td>
-              <td className="max-w-0 truncate px-3 py-2.5 text-[12px] text-gray-500">
-                {t.subject}
+                <div className="mt-0.5 truncate text-[11px] text-gray-500">{t.subject}</div>
               </td>
               <td className="px-3 py-2.5 text-[12px] text-gray-500">{t.folder}</td>
               <td className="px-3 py-2.5 text-[12px] text-gray-500">{t.lastUsed}</td>
               <td className="px-3 py-2.5 text-right text-[13px] font-medium tabular-nums">
                 {t.used}
+              </td>
+              <td className="px-3 py-2.5 text-right text-[13px] tabular-nums">
+                {t.openRate}%
+              </td>
+              <td className={
+                "px-3 py-2.5 text-right text-[13px] tabular-nums " +
+                (t.replyRate >= 20 ? "font-semibold text-[#0f1729]" : "text-gray-700")
+              }>
+                {t.replyRate}%
               </td>
               <td className="px-3 py-2.5">
                 <div className="flex items-center justify-end gap-0 opacity-0 transition-opacity group-hover:opacity-100">
@@ -403,12 +419,17 @@ function VariantC() {
                     <p className="mt-2 line-clamp-2 max-w-2xl text-[12px] leading-relaxed text-gray-400">
                       {t.preview}
                     </p>
-                    <div className="mt-3 flex items-center gap-4 text-[11px] text-gray-400">
-                      <span>Used <span className="font-medium tabular-nums text-gray-600">{t.used}</span> times</span>
-                      <span>·</span>
+                    <div className="mt-3 flex items-center gap-5 text-[11px] text-gray-400">
+                      <span>
+                        <span className="font-medium tabular-nums text-gray-600">{t.used}</span> sends
+                      </span>
+                      <span>
+                        <span className="font-medium tabular-nums text-gray-600">{t.openRate}%</span> open
+                      </span>
+                      <span className={t.replyRate >= 20 ? "text-[#0f1729]" : ""}>
+                        <span className={"font-medium tabular-nums " + (t.replyRate >= 20 ? "text-[#0f1729]" : "text-gray-600")}>{t.replyRate}%</span> reply
+                      </span>
                       <span>Last used {t.lastUsed.toLowerCase()}</span>
-                      <span>·</span>
-                      <span>Updated {t.updated}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-0 opacity-0 transition-opacity group-hover:opacity-100">
@@ -422,6 +443,30 @@ function VariantC() {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  emphasize,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.08em] text-gray-400">{label}</div>
+      <div
+        className={
+          "mt-0.5 text-[14px] tabular-nums tracking-tight " +
+          (emphasize ? "font-semibold text-[#0f1729]" : "font-medium text-gray-700")
+        }
+      >
+        {value}
+      </div>
     </div>
   );
 }
