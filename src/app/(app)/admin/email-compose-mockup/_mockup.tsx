@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   IconX,
   IconBold,
@@ -15,8 +15,6 @@ import {
   IconSparkles,
   IconMailForward,
   IconChevronDown,
-  IconChevronRight,
-  IconBrandGmail,
   IconPlus,
   IconPencil,
   IconCopy,
@@ -29,7 +27,27 @@ import {
   IconPhoto,
   IconLetterT,
   IconPalette,
+  IconSearch,
 } from "@tabler/icons-react";
+
+type Contact = {
+  id: string;
+  name: string;
+  email: string;
+  relation?: string;
+  source: "lead" | "org";
+};
+
+const LEAD_CONTACTS: Contact[] = [
+  { id: "c1", name: "Roberta Mendes", email: "roberta.mendes@example.com", relation: "Owner", source: "lead" },
+  { id: "c2", name: "Carlos Mendes", email: "carlos.mendes@example.com", relation: "Spouse", source: "lead" },
+  { id: "c3", name: "Maria Reyes", email: "mreyes@example.com", relation: "Sister", source: "lead" },
+];
+
+const ORG_CONTACTS: Contact[] = [
+  { id: "c4", name: "Daniel Kerr", email: "attorney@kerr-law.com", relation: "Attorney", source: "org" },
+  { id: "c5", name: "Title Co. — Stewart", email: "ops@stewarttitle.com", relation: "Vendor", source: "org" },
+];
 
 type MergeToken = {
   token: string;
@@ -45,7 +63,7 @@ const MERGE_TOKENS: MergeToken[] = [
   { token: "lead.estimated_surplus", sample: "$42,500", group: "Property" },
   { token: "lead.county", sample: "Dallas", group: "Property" },
   { token: "sender.signer_name", sample: "Bree Moss", group: "Sender" },
-  { token: "system.today_long", sample: "June 10, 2026" as string, group: "Sender" },
+  { token: "system.today_long", sample: "June 10, 2026", group: "Sender" },
 ];
 
 export function EmailMockup() {
@@ -55,11 +73,11 @@ export function EmailMockup() {
         <header>
           <h1 className="text-[22px] font-medium tracking-tight">Email Compose · Mockup</h1>
           <p className="mt-1.5 text-[13px] text-gray-500">
-            Five surfaces, top to bottom. Try clicking — the modal is interactive. Yellow boxes are mockup explanation, not UI.
+            Five surfaces, top to bottom. The modal is interactive — try Cc, Bcc, merge field, the typeahead on To.
           </p>
         </header>
 
-        <Section number="1" title="Compose Email" context="Click Cc, Bcc, the merge button, the template menu — they work.">
+        <Section number="1" title="Compose Email" context="Click into To, Cc, or Bcc — typeahead shows contacts on the lead first, then the org.">
           <ComposeModal />
         </Section>
 
@@ -71,7 +89,7 @@ export function EmailMockup() {
           <EmailAccountSettings />
         </Section>
 
-        <Section number="4" title="Settings — Email Templates" context="Folders, create, edit. Same shape as Mail Templates.">
+        <Section number="4" title="Settings — Email Templates" context="Folder-as-card pattern matching the existing Mail Templates section.">
           <EmailTemplatesPanel />
         </Section>
 
@@ -99,7 +117,7 @@ function Section({
   return (
     <section>
       <div className="mb-4 flex items-baseline gap-3">
-        <span className="font-mono text-[11px] text-gray-400">{number.padStart(2, "0")}</span>
+        <span className="text-[11px] tabular-nums text-gray-400">{number.padStart(2, "0")}</span>
         <h2 className="text-[15px] font-medium tracking-tight">{title}</h2>
         <span className="text-[12px] text-gray-500">— {context}</span>
       </div>
@@ -109,19 +127,35 @@ function Section({
 }
 
 function ComposeModal() {
+  const [toContacts, setToContacts] = useState<Contact[]>([LEAD_CONTACTS[0], LEAD_CONTACTS[1]]);
+  const [ccContacts, setCcContacts] = useState<Contact[]>([]);
+  const [bccContacts, setBccContacts] = useState<Contact[]>([]);
   const [ccOpen, setCcOpen] = useState(false);
   const [bccOpen, setBccOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [templateMenu, setTemplateMenu] = useState(false);
-  const [body, setBody] = useState<React.ReactNode>(defaultBody());
+  const [insertedTokens, setInsertedTokens] = useState<string[]>([]);
 
+  function addTo(c: Contact) {
+    if (!toContacts.find((x) => x.id === c.id)) setToContacts([...toContacts, c]);
+  }
+  function removeTo(c: Contact) {
+    setToContacts(toContacts.filter((x) => x.id !== c.id));
+  }
+  function addCc(c: Contact) {
+    if (!ccContacts.find((x) => x.id === c.id)) setCcContacts([...ccContacts, c]);
+  }
+  function removeCc(c: Contact) {
+    setCcContacts(ccContacts.filter((x) => x.id !== c.id));
+  }
+  function addBcc(c: Contact) {
+    if (!bccContacts.find((x) => x.id === c.id)) setBccContacts([...bccContacts, c]);
+  }
+  function removeBcc(c: Contact) {
+    setBccContacts(bccContacts.filter((x) => x.id !== c.id));
+  }
   function insertMerge(token: string) {
-    setBody(
-      <>
-        {defaultBody()}{" "}
-        <MergeInline>{token}</MergeInline>
-      </>
-    );
+    setInsertedTokens([...insertedTokens, token]);
     setMergeOpen(false);
   }
 
@@ -129,7 +163,7 @@ function ComposeModal() {
     <div className="overflow-hidden rounded-[12px] border border-gray-200 bg-white shadow-[0_1px_2px_rgba(15,23,41,0.04),0_8px_24px_-8px_rgba(15,23,41,0.10)]">
       <header className="flex items-center justify-between border-b border-gray-150 px-6 py-3.5">
         <div className="min-w-0">
-          <div className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
+          <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
             L-2026-0042 · Roberta Mendes
           </div>
           <div className="mt-0.5 text-[14px] font-medium">Compose Email</div>
@@ -142,14 +176,17 @@ function ComposeModal() {
       <div className="divide-y divide-gray-100">
         <Row label="From">
           <div className="flex items-center gap-2 text-[13px]">
-            <IconBrandGmail size={13} stroke={1.75} className="text-gray-500" />
+            <Avatar initials="BM" />
             <span className="font-medium">Bree Moss</span>
             <span className="text-gray-500">bree@mossequitypartners.com</span>
           </div>
         </Row>
 
-        <Row
+        <ContactPickerRow
           label="To"
+          selected={toContacts}
+          onAdd={addTo}
+          onRemove={removeTo}
           right={
             <div className="flex items-center gap-3 text-[11px]">
               {!ccOpen && (
@@ -164,35 +201,26 @@ function ComposeModal() {
               )}
             </div>
           }
-        >
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Chip name="Roberta Mendes" role="Owner" />
-            <Chip name="Carlos Mendes" role="Spouse" />
-            <input
-              className="flex-1 min-w-[160px] border-0 bg-transparent text-[13px] outline-none"
-              placeholder="Add another contact from this lead..."
-            />
-          </div>
-        </Row>
+        />
 
         {ccOpen && (
-          <Row label="Cc" right={<RemoveBtn onClick={() => setCcOpen(false)} />}>
-            <input
-              defaultValue="attorney@kerr-law.com"
-              autoFocus
-              className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
-            />
-          </Row>
+          <ContactPickerRow
+            label="Cc"
+            selected={ccContacts}
+            onAdd={addCc}
+            onRemove={removeCc}
+            right={<RemoveBtn onClick={() => setCcOpen(false)} />}
+          />
         )}
 
         {bccOpen && (
-          <Row label="Bcc" right={<RemoveBtn onClick={() => setBccOpen(false)} />}>
-            <input
-              defaultValue="archive@mossequitypartners.com"
-              autoFocus
-              className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
-            />
-          </Row>
+          <ContactPickerRow
+            label="Bcc"
+            selected={bccContacts}
+            onAdd={addBcc}
+            onRemove={removeBcc}
+            right={<RemoveBtn onClick={() => setBccOpen(false)} />}
+          />
         )}
 
         <Row
@@ -201,15 +229,15 @@ function ComposeModal() {
             <div className="relative">
               <button
                 onClick={() => setTemplateMenu((v) => !v)}
-                className="cursor-pointer rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
                 title="Template actions"
+                className="cursor-pointer rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
               >
                 <IconDots size={14} stroke={1.75} />
               </button>
               {templateMenu && (
                 <div
                   onMouseLeave={() => setTemplateMenu(false)}
-                  className="absolute right-0 top-full z-20 mt-1 w-[200px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+                  className="absolute right-0 top-full z-20 mt-1 w-[220px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
                 >
                   <MenuItem label="Save current as new template" />
                   <MenuItem label="Update this template" />
@@ -220,7 +248,7 @@ function ComposeModal() {
             </div>
           }
         >
-          <button className="flex flex-1 cursor-pointer items-center justify-between text-[13px] text-[#0f1729]">
+          <button className="flex flex-1 cursor-pointer items-center justify-between text-[13px]">
             <span>Opening Outreach — Tax Sale</span>
             <IconChevronDown size={12} stroke={2} className="text-gray-400" />
           </button>
@@ -236,18 +264,18 @@ function ComposeModal() {
 
       <div className="relative">
         <div className="flex items-center gap-1 border-b border-gray-100 px-4 py-2">
-          <Tool icon={IconBold} active />
-          <Tool icon={IconItalic} />
-          <Tool icon={IconUnderline} />
+          <Tool icon={IconBold} active label="Bold" />
+          <Tool icon={IconItalic} label="Italic" />
+          <Tool icon={IconUnderline} label="Underline" />
           <Sep />
-          <Tool icon={IconList} />
-          <Tool icon={IconListNumbers} />
+          <Tool icon={IconList} label="Bulleted list" />
+          <Tool icon={IconListNumbers} label="Numbered list" />
           <Sep />
-          <Tool icon={IconLink} />
+          <Tool icon={IconLink} label="Insert link" />
           <Sep />
-          <Tool icon={IconAlignLeft} />
-          <Tool icon={IconAlignCenter} />
-          <Tool icon={IconAlignRight} />
+          <Tool icon={IconAlignLeft} label="Align left" />
+          <Tool icon={IconAlignCenter} label="Align center" />
+          <Tool icon={IconAlignRight} label="Align right" />
           <div className="ml-auto">
             <button
               onClick={() => setMergeOpen((v) => !v)}
@@ -264,17 +292,51 @@ function ComposeModal() {
         </div>
 
         <div className="space-y-3 px-6 py-5 text-[13.5px] leading-[1.7] text-[#0f1729]">
-          {body}
+          <p>
+            Hi <MergeInline>contact.first_name</MergeInline>,
+          </p>
+          <p>
+            I&apos;m following up on the surplus funds from your{" "}
+            <strong>
+              tax sale at <MergeInline>lead.property_address</MergeInline>
+            </strong>
+            . Based on our research, we estimate the surplus available to you at{" "}
+            <strong>
+              <MergeInline>lead.estimated_surplus</MergeInline>
+            </strong>
+            .
+          </p>
+          <p>Here&apos;s what happens next if you&apos;d like to move forward:</p>
+          <ul className="ml-5 list-disc space-y-1">
+            <li>
+              We file the claim with <MergeInline>lead.county</MergeInline> County on your behalf.
+            </li>
+            <li>You receive a portion of the recovered funds after attorney costs.</li>
+            <li>Most claims resolve within 90 to 180 days.</li>
+          </ul>
+          <p>
+            You can review the case details at{" "}
+            <a className="text-[#0d4b3a] underline underline-offset-2">portal.mossequitypartners.com</a>.
+          </p>
+          {insertedTokens.length > 0 && (
+            <p>
+              {insertedTokens.map((t, i) => (
+                <span key={`${t}-${i}`} className="mr-1">
+                  <MergeInline>{t}</MergeInline>
+                </span>
+              ))}
+            </p>
+          )}
         </div>
 
         {mergeOpen && (
           <div
             onMouseLeave={() => setMergeOpen(false)}
-            className="absolute right-4 top-12 z-10 w-[280px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+            className="absolute right-4 top-12 z-10 w-[290px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
           >
             {(["Recipient", "Property", "Sender"] as const).map((group) => (
               <div key={group}>
-                <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-gray-500">
+                <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
                   {group}
                 </div>
                 {MERGE_TOKENS.filter((t) => t.group === group).map((t) => (
@@ -283,7 +345,7 @@ function ComposeModal() {
                     onClick={() => insertMerge(t.token)}
                     className="flex w-full cursor-pointer items-center justify-between px-3 py-1.5 text-left text-[12px] hover:bg-gray-50"
                   >
-                    <span className="font-mono text-[#0d4b3a]">{`{{${t.token}}}`}</span>
+                    <span className="text-[#0d4b3a]">{`{{${t.token}}}`}</span>
                     <span className="ml-2 truncate text-gray-500">{t.sample}</span>
                   </button>
                 ))}
@@ -293,7 +355,7 @@ function ComposeModal() {
         )}
 
         <div className="border-t border-dashed border-gray-200 bg-gray-50/50 px-6 py-4">
-          <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-gray-400">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-400">
             <IconSignature size={10} stroke={1.75} />
             Signature
             <span className="ml-1 normal-case tracking-normal text-gray-400/80">
@@ -301,7 +363,7 @@ function ComposeModal() {
             </span>
           </div>
           <div className="text-[12.5px] leading-[1.55] text-[#0f1729]">
-            Bree Moss
+            <strong>Bree Moss</strong>
             <br />
             <span className="text-gray-500">Managing Partner · Moss Equity Partners</span>
             <br />
@@ -328,36 +390,165 @@ function ComposeModal() {
   );
 }
 
-function defaultBody() {
+function ContactPickerRow({
+  label,
+  selected,
+  onAdd,
+  onRemove,
+  right,
+}: {
+  label: string;
+  selected: Contact[];
+  onAdd: (c: Contact) => void;
+  onRemove: (c: Contact) => void;
+  right?: React.ReactNode;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (!wrapRef.current) return;
+      if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const leadMatches = LEAD_CONTACTS.filter(
+    (c) => !selected.find((s) => s.id === c.id) && (q === "" || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
+  );
+  const orgMatches = ORG_CONTACTS.filter(
+    (c) => !selected.find((s) => s.id === c.id) && (q === "" || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
+  );
+  const isEmailish = q.includes("@") && q.includes(".") && !leadMatches.length && !orgMatches.length;
+
   return (
-    <>
-      <p>
-        Hi <MergeInline>contact.first_name</MergeInline>,
-      </p>
-      <p>
-        I&apos;m following up on the surplus funds from your{" "}
-        <strong>
-          tax sale at <MergeInline>lead.property_address</MergeInline>
-        </strong>
-        . Based on our research, we estimate the surplus available to you at{" "}
-        <strong>
-          <MergeInline>lead.estimated_surplus</MergeInline>
-        </strong>
-        .
-      </p>
-      <p>Here&apos;s what happens next if you&apos;d like to move forward:</p>
-      <ul className="ml-5 list-disc space-y-1">
-        <li>
-          We file the claim with <MergeInline>lead.county</MergeInline> County on your behalf.
-        </li>
-        <li>You receive a portion of the recovered funds after attorney costs.</li>
-        <li>Most claims resolve within 90 to 180 days.</li>
-      </ul>
-      <p>
-        You can review the case details at{" "}
-        <a className="text-[#0d4b3a] underline underline-offset-2">portal.mossequitypartners.com</a>.
-      </p>
-    </>
+    <Row label={label} right={right}>
+      <div ref={wrapRef} className="relative">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {selected.map((c) => (
+            <Chip key={c.id} contact={c} onRemove={() => onRemove(c)} />
+          ))}
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setOpen(true)}
+            placeholder={selected.length === 0 ? "Search contacts on this lead..." : ""}
+            className="flex-1 min-w-[180px] border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
+          />
+        </div>
+
+        {open && (
+          <div className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-[300px] overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+            {leadMatches.length > 0 && (
+              <Group label="On this lead">
+                {leadMatches.map((c) => (
+                  <ContactOption
+                    key={c.id}
+                    contact={c}
+                    onClick={() => {
+                      onAdd(c);
+                      setQuery("");
+                    }}
+                  />
+                ))}
+              </Group>
+            )}
+            {orgMatches.length > 0 && (
+              <Group label="Across the org">
+                {orgMatches.map((c) => (
+                  <ContactOption
+                    key={c.id}
+                    contact={c}
+                    onClick={() => {
+                      onAdd(c);
+                      setQuery("");
+                    }}
+                  />
+                ))}
+              </Group>
+            )}
+            {isEmailish && (
+              <Group label="One-off email">
+                <button
+                  onClick={() => {
+                    onAdd({
+                      id: `raw-${q}`,
+                      name: q,
+                      email: q,
+                      source: "lead",
+                    });
+                    setQuery("");
+                  }}
+                  className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[12.5px] hover:bg-gray-50"
+                >
+                  <IconPlus size={12} stroke={2} className="text-gray-400" />
+                  Add <strong>{q}</strong> as a one-off recipient
+                </button>
+              </Group>
+            )}
+            {leadMatches.length === 0 && orgMatches.length === 0 && !isEmailish && (
+              <div className="flex items-center gap-2 px-3 py-3 text-[12px] text-gray-500">
+                <IconSearch size={12} stroke={1.75} />
+                Type to search contacts, or paste an email address.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Row>
+  );
+}
+
+function ContactOption({ contact, onClick }: { contact: Contact; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left hover:bg-gray-50"
+    >
+      <Avatar initials={initialsOf(contact.name)} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[12.5px] font-medium">{contact.name}</div>
+        <div className="truncate text-[11px] text-gray-500">{contact.email}</div>
+      </div>
+      {contact.relation && (
+        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
+          {contact.relation}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1 text-[10px] uppercase tracking-[0.08em] text-gray-500">
+        {label}
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function initialsOf(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function Avatar({ initials }: { initials: string }) {
+  return (
+    <span
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+      style={{ background: "#0d4b3a" }}
+    >
+      {initials}
+    </span>
   );
 }
 
@@ -398,8 +589,8 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[80px_1fr_auto] items-center gap-4 px-6 py-2.5">
-      <label className="font-mono text-[11px] uppercase tracking-[0.08em] text-gray-400">
+    <div className="grid grid-cols-[72px_1fr_auto] items-center gap-4 px-6 py-2.5">
+      <label className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
         {label}
       </label>
       <div className="min-w-0">{children}</div>
@@ -408,13 +599,21 @@ function Row({
   );
 }
 
-function Chip({ name, role }: { name: string; role: string }) {
+function Chip({ contact, onRemove }: { contact: Contact; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 py-0.5 pl-2 pr-1 text-[12px]">
-      <span className="font-medium text-[#0f1729]">{name}</span>
-      <span className="text-gray-400">·</span>
-      <span className="text-[11px] text-gray-500">{role}</span>
-      <button className="cursor-pointer rounded-full p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 py-0.5 pl-1 pr-1 text-[12px]">
+      <Avatar initials={initialsOf(contact.name)} />
+      <span className="font-medium text-[#0f1729]">{contact.name}</span>
+      {contact.relation && (
+        <>
+          <span className="text-gray-400">·</span>
+          <span className="text-[11px] text-gray-500">{contact.relation}</span>
+        </>
+      )}
+      <button
+        onClick={onRemove}
+        className="cursor-pointer rounded-full p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
+      >
         <IconX size={10} stroke={2} />
       </button>
     </span>
@@ -424,12 +623,16 @@ function Chip({ name, role }: { name: string; role: string }) {
 function Tool({
   icon: Icon,
   active,
+  label,
 }: {
   icon: React.ComponentType<{ size: number; stroke: number }>;
   active?: boolean;
+  label: string;
 }) {
   return (
     <button
+      title={label}
+      aria-label={label}
       className={
         "cursor-pointer rounded-md p-1.5 transition-colors " +
         (active ? "bg-gray-100 text-[#0f1729]" : "text-gray-500 hover:bg-gray-100 hover:text-[#0f1729]")
@@ -449,7 +652,7 @@ function LeadHeaderBar() {
     <div className="rounded-[12px] border border-gray-200 bg-white px-6 py-5 shadow-[0_1px_2px_rgba(15,23,41,0.04)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
+          <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
             L-2026-0042
           </div>
           <div className="mt-1 text-[18px] font-medium tracking-tight">Roberta Mendes</div>
@@ -474,7 +677,7 @@ function EmailAccountSettings() {
   return (
     <div className="overflow-hidden rounded-[12px] border border-gray-200 bg-white shadow-[0_1px_2px_rgba(15,23,41,0.04)]">
       <div className="border-b border-gray-150 px-6 py-4">
-        <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-gray-400">
+        <div className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
           Email Account
         </div>
         <h3 className="mt-0.5 text-[15px] font-medium">Sending account &amp; signature</h3>
@@ -486,13 +689,16 @@ function EmailAccountSettings() {
       <div className="grid grid-cols-2 divide-x divide-gray-100">
         <div className="space-y-5 px-6 py-5">
           <div>
-            <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-gray-400">
+            <div className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
               Connected Account
             </div>
             <div className="mt-2 flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-[13px]">
-              <IconBrandGmail size={14} stroke={1.75} className="text-gray-500" />
-              <span className="font-medium">bree@mossequitypartners.com</span>
-              <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-green-700">
+              <Avatar initials="BM" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">Bree Moss</div>
+                <div className="truncate text-[11px] text-gray-500">bree@mossequitypartners.com</div>
+              </div>
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700">
                 <IconCircleCheck size={11} stroke={2} />
                 Connected
               </span>
@@ -503,7 +709,7 @@ function EmailAccountSettings() {
           </div>
 
           <div>
-            <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-gray-400">
+            <div className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
               Open Tracking
             </div>
             <div className="mt-2 flex items-center gap-3 text-[12.5px]">
@@ -512,12 +718,15 @@ function EmailAccountSettings() {
               </span>
               <span>On for every send</span>
             </div>
+            <p className="mt-1.5 text-[11px] text-gray-500">
+              We don&apos;t distinguish opens by mail client. An &ldquo;Email Opened&rdquo; row means our pixel fired — same approach as HubSpot, Salesforce, Apollo, Outreach.
+            </p>
           </div>
         </div>
 
         <div className="space-y-2 px-6 py-5">
           <div className="flex items-center justify-between">
-            <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-gray-400">
+            <div className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
               Signature
             </div>
             <button className="cursor-pointer text-[11px] text-gray-500 hover:text-[#0d4b3a]">
@@ -526,18 +735,18 @@ function EmailAccountSettings() {
           </div>
           <div className="rounded-md border border-gray-200 bg-white">
             <div className="flex items-center gap-0.5 border-b border-gray-100 px-2 py-1.5">
-              <Tool icon={IconBold} active />
-              <Tool icon={IconItalic} />
-              <Tool icon={IconUnderline} />
+              <Tool icon={IconBold} active label="Bold" />
+              <Tool icon={IconItalic} label="Italic" />
+              <Tool icon={IconUnderline} label="Underline" />
               <Sep />
-              <Tool icon={IconLetterT} />
-              <Tool icon={IconPalette} />
+              <Tool icon={IconLetterT} label="Font size" />
+              <Tool icon={IconPalette} label="Text color" />
               <Sep />
-              <Tool icon={IconLink} />
-              <Tool icon={IconPhoto} />
+              <Tool icon={IconLink} label="Insert link" />
+              <Tool icon={IconPhoto} label="Insert image" />
               <Sep />
-              <Tool icon={IconList} />
-              <Tool icon={IconAlignLeft} />
+              <Tool icon={IconList} label="Bulleted list" />
+              <Tool icon={IconAlignLeft} label="Align left" />
             </div>
             <div className="px-3 py-3 text-[12.5px] leading-[1.55] text-[#0f1729]">
               <strong>Bree Moss</strong>
@@ -548,7 +757,7 @@ function EmailAccountSettings() {
             </div>
           </div>
           <p className="text-[11px] text-gray-500">
-            Auto-appended to every outbound email. Same toolbar as Gmail / HubSpot signature editors.
+            Auto-appended to every outbound email. Same toolbar shape as Gmail and HubSpot signature editors.
           </p>
         </div>
       </div>
@@ -558,13 +767,16 @@ function EmailAccountSettings() {
 
 function EmailTemplatesPanel() {
   return (
-    <div className="overflow-hidden rounded-[12px] border border-gray-200 bg-white shadow-[0_1px_2px_rgba(15,23,41,0.04)]">
-      <div className="flex items-end justify-between border-b border-gray-150 px-6 py-4">
+    <div className="space-y-3">
+      <div className="flex items-end justify-between">
         <div>
-          <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-gray-400">
-            Email Templates
+          <div className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
+            Settings
           </div>
-          <h3 className="mt-0.5 text-[15px] font-medium">5 templates · 2 folders</h3>
+          <h3 className="mt-0.5 text-[15px] font-medium">Email Templates</h3>
+          <p className="mt-1 text-[12px] text-gray-500">
+            Reusable email bodies with merge fields. Organize by folder, use across leads.
+          </p>
         </div>
         <button className="btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[11.5px] font-medium text-white">
           <IconPlus size={11} stroke={2} className="mr-1 inline -translate-y-px" />
@@ -572,21 +784,21 @@ function EmailTemplatesPanel() {
         </button>
       </div>
 
-      <FolderGroup name="Outreach" count={3}>
+      <FolderCard name="Outreach" count={3}>
         <TemplateRow name="Opening Outreach — Tax Sale" updated="2 days ago" used={14} />
         <TemplateRow name="Opening Outreach — Mortgage Foreclosure" updated="1 week ago" used={6} />
         <TemplateRow name="Soft Follow-up (Day 3)" updated="2 weeks ago" used={22} />
-      </FolderGroup>
+      </FolderCard>
 
-      <FolderGroup name="Closing" count={2}>
+      <FolderCard name="Closing" count={2}>
         <TemplateRow name="Send Contract For Signature" updated="3 days ago" used={9} />
         <TemplateRow name="Welcome — Onboarding" updated="last month" used={4} />
-      </FolderGroup>
+      </FolderCard>
     </div>
   );
 }
 
-function FolderGroup({
+function FolderCard({
   name,
   count,
   children,
@@ -596,14 +808,19 @@ function FolderGroup({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <div className="flex items-center gap-2 border-b border-gray-150 bg-gray-100/70 px-6 py-2.5">
-        <IconChevronDown size={11} stroke={2.5} className="text-gray-500" />
-        <IconFolder size={13} stroke={1.75} className="text-gray-500" />
-        <span className="text-[12.5px] font-semibold text-[#0f1729]">{name}</span>
-        <span className="text-[11px] text-gray-500">· {count}</span>
+    <div className="overflow-hidden rounded-md border border-gray-200 bg-gray-50/50">
+      <div className="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3.5 py-2.5">
+        <div className="flex flex-1 items-center gap-2">
+          <IconFolder size={14} stroke={1.75} style={{ color: "#0d4b3a" }} />
+          <span className="text-[13px] font-medium">{name}</span>
+          <span className="text-[11px] text-gray-400">{count}</span>
+        </div>
+        <div className="flex items-center gap-3 text-[11px]">
+          <button className="cursor-pointer text-gray-500 hover:text-[#0d4b3a]">Rename</button>
+          <button className="cursor-pointer text-gray-400 hover:text-red-600">Delete</button>
+        </div>
       </div>
-      <div className="divide-y divide-gray-100 pl-3">{children}</div>
+      <div className="divide-y divide-gray-150 bg-white">{children}</div>
     </div>
   );
 }
@@ -618,24 +835,22 @@ function TemplateRow({
   used: number;
 }) {
   return (
-    <div className="flex items-center justify-between px-6 py-3 hover:bg-gray-50/40">
+    <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3.5 py-2.5">
       <div className="min-w-0">
         <div className="truncate text-[13px] font-medium">{name}</div>
-        <div className="mt-0.5 text-[11px] text-gray-500">
+        <div className="text-[11px] text-gray-500">
           Updated {updated} · Used {used} times
         </div>
       </div>
-      <div className="flex items-center gap-1">
-        <button title="Edit" aria-label="Edit" className="cursor-pointer rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#0d4b3a]">
-          <IconPencil size={13} stroke={1.75} />
-        </button>
-        <button title="Duplicate" aria-label="Duplicate" className="cursor-pointer rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#0d4b3a]">
-          <IconCopy size={13} stroke={1.75} />
-        </button>
-        <button title="Delete" aria-label="Delete" className="cursor-pointer rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600">
-          <IconTrash size={13} stroke={1.75} />
-        </button>
-      </div>
+      <button title="Edit" aria-label="Edit" className="cursor-pointer text-gray-400 hover:text-[#0d4b3a]">
+        <IconPencil size={14} stroke={1.75} />
+      </button>
+      <button title="Duplicate" aria-label="Duplicate" className="cursor-pointer text-gray-400 hover:text-[#0d4b3a]">
+        <IconCopy size={14} stroke={1.75} />
+      </button>
+      <button title="Delete" aria-label="Delete" className="cursor-pointer text-gray-400 hover:text-red-600">
+        <IconTrash size={14} stroke={1.75} />
+      </button>
     </div>
   );
 }
@@ -644,7 +859,7 @@ function ActivityFeed() {
   return (
     <div className="overflow-hidden rounded-[12px] border border-gray-200 bg-white shadow-[0_1px_2px_rgba(15,23,41,0.04)]">
       <div className="border-b border-gray-150 px-6 py-3">
-        <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-gray-400">
+        <div className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
           Activity
         </div>
       </div>
@@ -720,39 +935,39 @@ function ActivityRow({
 function BuildNotes() {
   return (
     <div className="rounded-[12px] border border-dashed border-gray-300 bg-white px-6 py-5">
-      <h3 className="font-mono text-[11px] uppercase tracking-[0.08em] text-gray-400">
+      <h3 className="text-[11px] uppercase tracking-[0.08em] text-gray-400">
         Build Notes — Why It Looks This Way
       </h3>
       <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
-        <NoteItem term="Cc and Bcc">
-          Collapsed by default. Tiny Cc / Bcc text links sit on the right of the To row. Click expands the field with autofocus, click Remove to collapse. Same pattern as Gmail, Outlook, HubSpot, Apollo.
+        <NoteItem term="To / Cc / Bcc input">
+          Typeahead dropdown opens on focus. Two groups: contacts on this lead first, then contacts across the org. Type to filter. If you paste a raw email that doesn&apos;t match anyone, you get a &ldquo;Add as one-off recipient&rdquo; option. Cc and Bcc use the same picker. Same pattern as HubSpot, Salesforce, Apollo, Outreach.
         </NoteItem>
-        <NoteItem term="Merge field color">
-          Inline tags use #0d4b3a at 10% opacity — same brand color as every other accent in the portal. (Earlier amber was a one-off mistake.)
+        <NoteItem term="Recipient chips">
+          Every selected recipient renders as a chip with avatar + name + relation. Consistent across To, Cc, Bcc. No mixing of chip and plaintext.
         </NoteItem>
-        <NoteItem term="Merge field picker">
-          Opens above the body. Grouped (Recipient / Property / Sender). Click a row, the token inserts at the end of the body. Same registry as Mail Merge — what works in Mail works here.
+        <NoteItem term="From row">
+          Small initials avatar instead of a Gmail brand mark. Doesn&apos;t shout about the provider — your name and email are the load-bearing info.
         </NoteItem>
-        <NoteItem term="To field — adding contacts">
-          Pre-populated from the lead&apos;s email contacts on open (contacts table where channel=email). The autocomplete searches the lead&apos;s contacts first, then any contact across the org. You can&apos;t send to someone who&apos;s not on the lead unless you add them as a contact first.
+        <NoteItem term="Field labels">
+          Sans-serif Inter, uppercase, low-contrast gray. Removed the monospace that read as &ldquo;old timer.&rdquo;
+        </NoteItem>
+        <NoteItem term="Toolbar tooltips">
+          Every toolbar icon now has a hover title (&ldquo;Bold&rdquo;, &ldquo;Italic&rdquo;, &ldquo;Bulleted list&rdquo;, etc). Accessibility + discoverability for new users.
+        </NoteItem>
+        <NoteItem term="Open tracking">
+          Every &ldquo;Email Opened&rdquo; row means our pixel fired. No distinguishing between human opens and Apple Mail pre-fetch. Industry default — HubSpot, Salesforce, Apollo, Outreach all do this in their main views.
         </NoteItem>
         <NoteItem term="Signature toolbar">
-          Richer than the compose body toolbar: bold / italic / underline / font size / color / link / image / list / align. Anchor: Gmail, HubSpot, Salesforce, Outlook, Pipedrive, Apollo all give signatures a richer editor than the compose body — because signatures often have logos, multiple links, structured layout.
+          Richer than the compose body: bold / italic / underline / font size / color / link / image / list / align. Plus a Source view link for paste-raw-HTML power users. Anchor: Gmail, HubSpot, Salesforce, Outlook all give signatures a richer editor than the compose body — because signatures often have logos and structured layout.
         </NoteItem>
-        <NoteItem term="HTML signatures">
-          WYSIWYG primary. A &ldquo;Source view&rdquo; link on the Settings signature card lets a power user paste raw HTML. Industry pattern (HubSpot, Salesforce, Gmail all do this) — most users never touch source mode.
+        <NoteItem term="Templates panel">
+          Matches the existing Mail Templates section: each folder is its own card with a header bar (folder icon in petrol, name, count) and template rows inside on white. Rename / Delete actions on the folder header, edit / duplicate / delete actions on each template row.
         </NoteItem>
         <NoteItem term="Save as Template">
-          Demoted to the ⋯ overflow menu on the Template row. Same weight as Gmail&apos;s &ldquo;Save as new template&rdquo; under the three-dot menu.
+          Demoted to the ⋯ overflow menu on the Template field. Same weight as Gmail&apos;s &ldquo;Save as new template&rdquo; under the three-dot menu.
         </NoteItem>
-        <NoteItem term="Open tracking — no Apple flag">
-          Every &ldquo;Email Opened&rdquo; row means our pixel fired. For real recipients that&apos;s an open. For Apple Mail pre-fetch (iOS 15.2+) it means Apple&apos;s server scanned the message. Industry default (HubSpot, Salesforce, Apollo, Outreach default view) is to not distinguish — adding a caveat dot makes the data look weaker than it is. Removed.
-        </NoteItem>
-        <NoteItem term="Subject prominence">
-          Bumped to 15px font-semibold. Anchor: HubSpot uses a slightly bigger / bolder subject than body; Gmail keeps both same size. We&apos;re on the slightly-bigger side because the subject row sits inside the field stack and needs to read as &ldquo;the email starts here.&rdquo;
-        </NoteItem>
-        <NoteItem term="Folders in Templates">
-          Folder bar is darker (gray-100) with a folder icon and chevron, separated by a real border line. Templates underneath are indented. Visual hierarchy now matches how Mail Templates renders in your existing Settings.
+        <NoteItem term="Merge field tags">
+          Brand green (#0d4b3a at 10% opacity), inline, line-height-safe. Same color as every accent in the portal.
         </NoteItem>
         <NoteItem term="Replies">
           Stay in your normal Gmail inbox. Not surfaced on the lead in v0. If you want them surfaced later, that&apos;s a separate hourly poll add.
