@@ -872,6 +872,8 @@ function RecipientRow({
       },
     ]);
     setQuery("");
+    setOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   function commitRawEmail(): boolean {
@@ -915,8 +917,12 @@ function RecipientRow({
           <input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+            }}
             onFocus={() => setOpen(true)}
+            onClick={() => setOpen(true)}
             onBlur={() => commitRawEmail()}
             onKeyDown={onKeyDown}
             placeholder={

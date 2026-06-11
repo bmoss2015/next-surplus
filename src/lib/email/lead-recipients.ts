@@ -44,7 +44,7 @@ export async function buildLeadEmailCandidates(
       .eq("lead_id", leadId),
     sb
       .from("lead_parties")
-      .select("id, name, role, custom_role_label")
+      .select("id, name, role, custom_role_label, email")
       .eq("lead_id", leadId),
   ]);
 
@@ -64,13 +64,14 @@ export async function buildLeadEmailCandidates(
   }
   const leadPartiesById = new Map<
     string,
-    { name: string; role: LeadPartyRole; custom_role_label: string | null }
+    { name: string; role: LeadPartyRole; custom_role_label: string | null; email: string | null }
   >();
   for (const lp of partyRes.data ?? []) {
     leadPartiesById.set(lp.id as string, {
       name: ((lp.name as string | null) ?? "").trim(),
       role: (lp.role as LeadPartyRole) ?? "other",
       custom_role_label: (lp.custom_role_label as string | null) ?? null,
+      email: ((lp.email as string | null) ?? "").trim() || null,
     });
   }
 
@@ -129,6 +130,7 @@ export async function buildLeadEmailCandidates(
   };
 
   const candidates: EmailRecipientCandidate[] = [];
+  const seenEmails = new Set<string>();
   for (const c of contactsRes.data ?? []) {
     const email = ((c.value as string | null) ?? "").trim();
     if (!email) continue;
@@ -165,11 +167,45 @@ export async function buildLeadEmailCandidates(
       "contact.full_name": fullName,
       "contact.email": email,
     };
+    const lcEmail = email.toLowerCase();
+    if (seenEmails.has(lcEmail)) continue;
+    seenEmails.add(lcEmail);
     candidates.push({
       id: c.id as string,
       contact_id: c.id as string,
       name: fullName,
       email,
+      relation,
+      merge_context,
+    });
+  }
+
+  // Backfill any lead_party with an email that wasn't already surfaced via
+  // a contacts row. The Contacts panel on the lead pulls these in, so the
+  // recipient picker should match what the user sees there.
+  for (const [partyId, lp] of leadPartiesById) {
+    if (!lp.email) continue;
+    const lcEmail = lp.email.toLowerCase();
+    if (seenEmails.has(lcEmail)) continue;
+    seenEmails.add(lcEmail);
+    const fullName = lp.name || "Recipient";
+    const { first_name, last_name } = splitFullName(fullName);
+    const relation =
+      lp.role === "other"
+        ? (lp.custom_role_label ?? "").trim() || "Other"
+        : LEAD_PARTY_ROLE_LABELS[lp.role];
+    const merge_context: MergeContext = {
+      ...baseLeadContext,
+      "contact.first_name": first_name,
+      "contact.last_name": last_name,
+      "contact.full_name": fullName,
+      "contact.email": lp.email,
+    };
+    candidates.push({
+      id: partyId,
+      contact_id: partyId,
+      name: fullName,
+      email: lp.email,
       relation,
       merge_context,
     });
