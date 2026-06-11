@@ -9,7 +9,7 @@ import {
   IconPlus,
   IconBrandGmail,
 } from "@tabler/icons-react";
-import { sendEmail } from "@/app/(app)/inbox/_send-actions";
+import { sendLeadEmail } from "@/app/(app)/leads/[id]/_email-send-action";
 import { renderMerge, type MergeContext } from "@/lib/mail/merge";
 import type { EmailRecipientCandidate } from "@/lib/email/lead-recipients";
 import type { EmailTemplateRow } from "@/lib/settings/fetch";
@@ -109,30 +109,31 @@ export function SendEmailModal({
       setErr("Email body is required.");
       return;
     }
-    const primary = to[0];
-    const ctx: MergeContext = primary.mergeContext ?? {
-      "contact.first_name": primary.name.split(/\s+/)[0] ?? "",
-      "contact.full_name": primary.name,
-    };
-    const renderedSubject = renderMerge(subject, ctx);
-    const renderedBody = renderMerge(body, ctx);
-    const bodyWithSignature = signatureHtml
-      ? `${renderedBody}\n\n${signatureHtml}`
-      : renderedBody;
-
     startTransition(async () => {
-      const res = await sendEmail({
-        accountId,
-        to: to.map((r) => r.email),
-        cc: cc.length > 0 ? cc.map((r) => r.email) : undefined,
-        bcc: bcc.length > 0 ? bcc.map((r) => r.email) : undefined,
-        subject: renderedSubject,
-        body: bodyWithSignature,
-        leadId,
-      });
-      if (!res.ok) {
-        setErr(res.error);
-        return;
+      for (const r of to) {
+        const ctx: MergeContext = r.mergeContext ?? {
+          "contact.first_name": r.name.split(/\s+/)[0] ?? "",
+          "contact.full_name": r.name,
+        };
+        const renderedSubject = renderMerge(subject, ctx);
+        const renderedBody = renderMerge(body, ctx);
+        const bodyWithSignature = signatureHtml
+          ? `${renderedBody}\n\n${signatureHtml}`
+          : renderedBody;
+        const res = await sendLeadEmail({
+          leadId,
+          accountId,
+          to: [{ name: r.name, email: r.email, contactId: r.contactId }],
+          cc: cc.length > 0 ? cc.map((x) => x.email) : undefined,
+          bcc: bcc.length > 0 ? bcc.map((x) => x.email) : undefined,
+          subject: renderedSubject,
+          bodyHtml: bodyWithSignature,
+          templateId,
+        });
+        if (!res.ok) {
+          setErr(res.error);
+          return;
+        }
       }
       onClose();
     });

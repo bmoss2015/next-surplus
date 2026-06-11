@@ -82,7 +82,7 @@ function Section({
               <span>Address</span>
               <span>Stage</span>
               <span>Awaiting</span>
-              <span className="text-right">Est. Surplus</span>
+              <span className="text-right">Estimated Surplus</span>
             </div>
             {leads.map((lead) => (
               <div
@@ -123,7 +123,7 @@ function Section({
                         />
                       </span>
                     ) : (
-                      <span className="text-gray-500">Est. {formatCurrency(lead.estimated_surplus)}</span>
+                      <span className="text-gray-500">Estimated {formatCurrency(lead.estimated_surplus)}</span>
                     )}
                   </div>
                 </Link>

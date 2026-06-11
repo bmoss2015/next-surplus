@@ -162,7 +162,7 @@ export default async function ReportsPage() {
               value={fmtBig(data.wonSummary.totalFees)}
             />
             <Stat
-              label="Est. Net Payout"
+              label="Estimated Net Payout"
               value={fmtBig(data.wonSummary.totalNetPayout)}
             />
             <Stat

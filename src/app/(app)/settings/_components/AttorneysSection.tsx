@@ -86,7 +86,7 @@ export function AttorneysSection({
           <h1 className="section-h1">Attorneys</h1>
           <p className="section-desc">
             Attorneys you assign to leads filing claims. Their default cost
-            feeds into Est. Net To You.
+            feeds into Estimated Net To You.
           </p>
         </div>
         {canEdit && (
