@@ -9,6 +9,8 @@ import {
   IconBrandGmail,
   IconSparkles,
   IconDots,
+  IconPaperclip,
+  IconFile,
 } from "@tabler/icons-react";
 import { sendLeadEmail } from "@/app/(app)/leads/[id]/_email-send-action";
 import { upsertEmailTemplate } from "@/app/(app)/settings/_actions";
@@ -157,7 +159,11 @@ export function SendEmailModal({
   const bodyEditorRef = useRef<Editor | null>(null);
   const mergeRef = useRef<HTMLDivElement | null>(null);
   const saveTplRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [updateSearch, setUpdateSearch] = useState("");
+  const [attachments, setAttachments] = useState<
+    { filename: string; mimeType: string; size: number; base64: string }[]
+  >([]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -202,6 +208,54 @@ export function SendEmailModal({
       setBody((b) => b + placeholder);
     }
     setMergeOpen(false);
+  }
+
+  const MAX_TOTAL_ATTACHMENT_BYTES = 24 * 1024 * 1024;
+
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const idx = result.indexOf(",");
+        resolve(idx >= 0 ? result.slice(idx + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function onFilesPicked(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setErr(null);
+    const next = [...attachments];
+    let total = next.reduce((s, a) => s + a.size, 0);
+    for (const file of Array.from(files)) {
+      if (total + file.size > MAX_TOTAL_ATTACHMENT_BYTES) {
+        setErr(`Combined attachments would exceed 24 MB (Gmail's limit). Skipped: ${file.name}.`);
+        continue;
+      }
+      const base64 = await fileToBase64(file);
+      next.push({
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        base64,
+      });
+      total += file.size;
+    }
+    setAttachments(next);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeAttachment(idx: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }
 
   function saveTemplate(opts: { id: string | null; name: string }) {
@@ -265,6 +319,13 @@ export function SendEmailModal({
           threadId: replyContext?.threadId,
           inReplyTo: replyContext?.inReplyTo ?? null,
           referencesChain: replyContext?.referencesChain,
+          attachments: attachments.length > 0
+            ? attachments.map((a) => ({
+                filename: a.filename,
+                mimeType: a.mimeType,
+                base64: a.base64,
+              }))
+            : undefined,
         });
         if (!res.ok) {
           setErr(res.error);
@@ -506,6 +567,34 @@ export function SendEmailModal({
           </div>
         </div>
 
+        {attachments.length > 0 && (
+          <div className="shrink-0 border-t border-gray-200 bg-gray-50/50 px-6 py-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              {attachments.map((a, i) => (
+                <div
+                  key={i}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-[3px] text-[11.5px] text-[#0f1729]"
+                >
+                  <IconFile size={11} stroke={1.75} className="text-[#0d4b3a]" />
+                  <span className="max-w-[200px] truncate">{a.filename}</span>
+                  <span className="text-[10.5px] text-gray-400">· {formatBytes(a.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(i)}
+                    className="ml-0.5 cursor-pointer rounded text-gray-400 hover:text-red-600"
+                    aria-label={`Remove ${a.filename}`}
+                  >
+                    <IconX size={11} stroke={2} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-1.5 text-[10px] text-gray-400">
+              {formatBytes(attachments.reduce((s, a) => s + a.size, 0))} of 24 MB
+            </div>
+          </div>
+        )}
+
         {err && (
           <div className="border-t border-red-200 bg-red-50 px-6 py-2 text-[12px] text-red-700">
             {err}
@@ -513,7 +602,24 @@ export function SendEmailModal({
         )}
 
         <footer className="flex shrink-0 items-center justify-between border-t border-gray-200 px-6 py-3">
-          <div ref={saveTplRef} className="relative">
+          <div className="flex items-center gap-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={(e) => onFilesPicked(e.target.files)}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              title="Attach files"
+              aria-label="Attach files"
+            >
+              <IconPaperclip size={14} stroke={1.75} />
+            </button>
+            <div ref={saveTplRef} className="relative">
             <button
               type="button"
               onClick={() => setSaveTplOpen((v) => !v)}
@@ -706,6 +812,7 @@ export function SendEmailModal({
                 </div>
               </div>
             )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button

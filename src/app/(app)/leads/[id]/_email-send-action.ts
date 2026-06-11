@@ -18,6 +18,7 @@ export type SendLeadEmailInput = {
   threadId?: string;
   inReplyTo?: string | null;
   referencesChain?: string[];
+  attachments?: { filename: string; mimeType: string; base64: string }[];
 };
 
 function publicOrigin(): string {
@@ -71,6 +72,7 @@ export async function sendLeadEmail(
       threadId: input.threadId,
       inReplyTo: input.inReplyTo ?? null,
       referencesChain: input.referencesChain,
+      attachments: input.attachments && input.attachments.length > 0 ? input.attachments : undefined,
     });
 
     if (!sendRes.ok) {
