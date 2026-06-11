@@ -281,12 +281,6 @@ export function EmailTemplatesSection({
             onRenameCancel={() => setRenamingFolderId(null)}
           />
         ))}
-        <FolderTab
-          label="Unfiled"
-          active={filterFolder === UNFILED_KEY}
-          count={templates.filter((t) => !t.folder_id).length}
-          onClick={() => setFilterFolder(UNFILED_KEY)}
-        />
         {addingFolder ? (
           <div className="ml-2 flex items-center gap-1">
             <input
@@ -342,7 +336,7 @@ export function EmailTemplatesSection({
             <TemplateCard
               key={t.id}
               t={t}
-              folderName={folders.find((f) => f.id === t.folder_id)?.name ?? "Unfiled"}
+              folderName={folders.find((f) => f.id === t.folder_id)?.name ?? null}
               onEdit={() => setEditing(t)}
               onDuplicate={() => onDuplicate(t.id)}
               onDelete={() => onDelete(t.id)}
@@ -451,7 +445,7 @@ function TemplateCard({
   onDelete,
 }: {
   t: EmailTemplateRow;
-  folderName: string;
+  folderName: string | null;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -467,8 +461,8 @@ function TemplateCard({
       onClick={onEdit}
       className="group flex h-full cursor-pointer flex-col rounded-[10px] border border-gray-200 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-[#0d4b3a]/40 hover:shadow-[0_4px_16px_-4px_rgba(15,23,41,0.08)]"
     >
-      <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
-        {folderName}
+      <div className="min-h-[14px] text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
+        {folderName ?? ""}
       </div>
       <h4 className="mt-1.5 line-clamp-2 min-h-[2.4rem] text-[13.5px] font-semibold leading-snug text-[#0f1729]">
         {t.name}
@@ -479,8 +473,8 @@ function TemplateCard({
       <div className="mt-auto pt-4">
         <div className="grid grid-cols-3 gap-3 border-t border-gray-100 pt-3">
           <Stat label="Sends" value={String(t.used)} />
-          <Stat label="Open Rate" value={t.open_rate == null ? "—" : `${t.open_rate}%`} />
-          <Stat label="Reply Rate" value={t.reply_rate == null ? "—" : `${t.reply_rate}%`} />
+          <Stat label="Opens" value={t.open_rate == null ? "—" : `${t.open_rate}%`} />
+          <Stat label="Replies" value={t.reply_rate == null ? "—" : `${t.reply_rate}%`} />
         </div>
         <div className="mt-3 flex items-center justify-between">
           <div className="text-[10.5px] text-gray-400">
@@ -523,8 +517,8 @@ function TemplateCard({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="text-[10px] uppercase tracking-[0.08em] text-gray-400">{label}</div>
+    <div className="min-w-0">
+      <div className="truncate whitespace-nowrap text-[10px] uppercase tracking-[0.06em] text-gray-400">{label}</div>
       <div className="mt-0.5 text-[14px] font-medium tabular-nums tracking-tight text-gray-700">
         {value}
       </div>
@@ -738,7 +732,7 @@ function EditForm({
                   className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[12px] text-gray-600 hover:bg-gray-100 hover:text-[#0f1729]"
                 >
                   <IconFolder size={12} stroke={1.75} className="text-gray-400" />
-                  {selectedFolder?.name ?? "Unfiled"}
+                  {selectedFolder?.name ?? "No folder"}
                   <IconChevronDown size={10} stroke={2} className="text-gray-400" />
                 </button>
                 {folderOpen && (
@@ -749,9 +743,9 @@ function EditForm({
                         setFolderId(null);
                         setFolderOpen(false);
                       }}
-                      className="block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] text-gray-700 hover:bg-gray-50"
+                      className="block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] text-gray-500 hover:bg-gray-50"
                     >
-                      Unfiled
+                      No folder
                     </button>
                     {folders.map((f) => (
                       <button
