@@ -1,20 +1,12 @@
 "use client";
 
-// Billing — plan, phone-validation credit meter (pulls live remaining from
-// Clearout), payment method, invoice history. Each section sits in its own
-// card so the eye can step between them; section headers carry the heading
-// rather than a thin uppercase rule.
-//
-// The credit meter prefers live Clearout balance (auto-updates when Bree
-// tops off at clearoutphone.io). Falls back to the local cap-minus-used
-// calc only if the Clearout call fails.
-
 import { useState, useTransition } from "react";
 import {
   runPhoneValidationBackfill,
   previewPhoneValidationBackfill,
 } from "@/app/(app)/settings/_actions";
 import { DEFAULT_CREDIT_COST_USD } from "@/lib/phone-validate";
+import type { OrgBilling } from "@/lib/billing/fetch";
 
 type BackfillPreview = {
   uniquePhones: number;
@@ -31,20 +23,37 @@ export type PhoneValidationUsage = {
   source: "clearout_live" | "fallback";
 };
 
+const PRICE_USD = 69;
+
+function formatUsDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export function BillingSection({
   phoneUsage,
   phoneValidationEnabled,
   invoiceEmail,
+  billing,
 }: {
   phoneUsage: PhoneValidationUsage;
   phoneValidationEnabled: boolean;
   invoiceEmail: string;
+  billing: OrgBilling;
 }) {
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
   const [backfillErr, setBackfillErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<BackfillPreview | null>(null);
   const [previewPending, startPreview] = useTransition();
   const [confirmPending, startConfirm] = useTransition();
+  const [billingErr, setBillingErr] = useState<string | null>(null);
+  const [billingPending, startBilling] = useTransition();
 
   function onBackfillClick() {
     setBackfillErr(null);
@@ -85,10 +94,32 @@ export function BillingSection({
     });
   }
 
-  // Live remaining wins; fall back to cap-minus-all-time when Clearout
-  // can't be reached. The meter bar uses remaining vs the larger of
-  // (remaining + usedAllTime) and fallbackCap so the bar makes sense even
-  // when the user just topped off (recent purchases push remaining > cap).
+  function onStartTrial() {
+    setBillingErr(null);
+    startBilling(async () => {
+      const res = await fetch("/api/stripe/create-checkout", { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !body.url) {
+        setBillingErr(body.error ?? "Could not start checkout. Please try again.");
+        return;
+      }
+      window.location.href = body.url;
+    });
+  }
+
+  function onManageBilling() {
+    setBillingErr(null);
+    startBilling(async () => {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !body.url) {
+        setBillingErr(body.error ?? "Could not open the billing portal. Please try again.");
+        return;
+      }
+      window.open(body.url, "_blank", "noopener");
+    });
+  }
+
   const remaining = phoneUsage.remainingCredits ?? Math.max(
     0,
     phoneUsage.fallbackCap - phoneUsage.usedAllTime
@@ -105,6 +136,13 @@ export function BillingSection({
     currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  });
+
+  const planHero = renderPlanHero({
+    billing,
+    pending: billingPending,
+    onStartTrial,
+    onManageBilling,
   });
 
   return (
@@ -125,30 +163,13 @@ export function BillingSection({
         </div>
       </div>
 
-      <div className="plan-hero">
-        <div className="plan-hero-left">
-          <div className="plan-hero-eyebrow">Current Plan</div>
-          <div className="plan-hero-name">Team</div>
-          <div className="plan-hero-line">
-            Unlimited leads · 10 seats · all features included
-          </div>
+      {planHero}
+
+      {billingErr && (
+        <div className="billing-card-msg billing-card-msg-error" style={{ marginTop: 12 }}>
+          {billingErr}
         </div>
-        <div className="plan-hero-right">
-          <div className="plan-hero-price">
-            $197
-            <span className="plan-hero-price-suffix">/mo</span>
-          </div>
-          <div className="plan-hero-next">Next charge Jun 12, 2026</div>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm mt-2"
-            disabled
-            title="Stripe billing portal wires in Phase D"
-          >
-            Change Plan
-          </button>
-        </div>
-      </div>
+      )}
 
       <h2 className="billing-section-h">Phone Validation</h2>
       {!phoneValidationEnabled ? (
@@ -245,26 +266,8 @@ export function BillingSection({
       <h2 className="billing-section-h">Payment Method</h2>
       <div className="billing-card">
         <div className="billing-card-desc" style={{ marginBottom: 16 }}>
-          Charged monthly for your Moss Equity subscription. Credit or debit
-          cards. Outgoing checks pull from <a href="#mail-bank">Bank Accounts</a>{" "}
-          instead.
-        </div>
-        <div className="pref-row">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="card-brand">VISA</div>
-            <div>
-              <div className="pref-row-title">Visa ending in 4242</div>
-              <div className="pref-row-desc">Expires 09 / 2027 · Bree Moss</div>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            disabled
-            title="Stripe portal wires in Phase D"
-          >
-            Update Card
-          </button>
+          Charged monthly for your subscription. Credit or debit cards. Outgoing
+          checks pull from <a href="#mail-bank">Bank Accounts</a> instead.
         </div>
         <div className="pref-row">
           <div className="flex-1 min-w-0">
@@ -278,60 +281,136 @@ export function BillingSection({
             type="email"
             defaultValue={invoiceEmail}
             disabled
-            title="Save wires in Phase D"
+            title="Invoice email is your account email"
           />
         </div>
-      </div>
-
-      <h2 className="billing-section-h">Invoice History</h2>
-      <div className="billing-card">
-        <table className="inv-table">
-          <thead>
-            <tr>
-              <th>Period</th>
-              <th>Invoice</th>
-              <th>Status</th>
-              <th className="num">Amount</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {SAMPLE_INVOICES.map((inv) => (
-              <tr key={inv.id}>
-                <td>{inv.period}</td>
-                <td className="mono">{inv.id}</td>
-                <td>
-                  <span className="cov-status hot">
-                    <span className="dot" />
-                    Paid {inv.paid}
-                  </span>
-                </td>
-                <td className="num">{inv.amount}</td>
-                <td className="action">
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    title="Download PDF (wires in Phase D)"
-                    disabled
-                    style={{ opacity: 0.4 }}
-                  >
-                    <i className="icon icon-download" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="pref-row">
+          <div className="flex-1 min-w-0">
+            <div className="pref-row-title">Manage Payment Method</div>
+            <div className="pref-row-desc">
+              Update your card, view receipts, or cancel your plan.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            disabled={billingPending || !billing.stripeCustomerId}
+            onClick={onManageBilling}
+            title={
+              billing.stripeCustomerId
+                ? undefined
+                : "Start a trial first to open the billing portal."
+            }
+          >
+            {billingPending ? "Opening…" : "Manage Billing"}
+          </button>
+        </div>
       </div>
     </section>
   );
 }
 
-const SAMPLE_INVOICES = [
-  { id: "INV-2026-05", period: "May 2026", paid: "May 12", amount: "$197.00" },
-  { id: "INV-2026-04", period: "April 2026", paid: "Apr 12", amount: "$197.00" },
-  { id: "INV-2026-03", period: "March 2026", paid: "Mar 12", amount: "$197.00" },
-];
+function renderPlanHero({
+  billing,
+  pending,
+  onStartTrial,
+  onManageBilling,
+}: {
+  billing: OrgBilling;
+  pending: boolean;
+  onStartTrial: () => void;
+  onManageBilling: () => void;
+}) {
+  const status = billing.status;
+  const trialEnd = formatUsDate(billing.trialEndsAt);
+  const periodEnd = formatUsDate(billing.currentPeriodEnd);
+
+  let eyebrow = "Current Plan";
+  let planName = "Subscription";
+  let line = `$${PRICE_USD}/month, unlimited users, all features included.`;
+  let nextNote: string | null = null;
+  let primaryLabel: string;
+  let primaryHandler: () => void;
+  let primaryVariant: "btn-primary" | "btn-outline" = "btn-primary";
+  const ctaDisabled = pending;
+
+  switch (status) {
+    case "none":
+      eyebrow = "Get Started";
+      planName = "Try Free For 14 Days";
+      line = `Then $${PRICE_USD}/month, unlimited users. Cancel anytime.`;
+      primaryLabel = pending ? "Starting…" : "Start Free Trial";
+      primaryHandler = onStartTrial;
+      break;
+    case "trialing":
+      eyebrow = "Current Plan";
+      planName = "Free Trial";
+      line = `$${PRICE_USD}/month after the trial. Cancel anytime.`;
+      nextNote = trialEnd ? `Trial ends ${trialEnd}` : null;
+      primaryLabel = pending ? "Opening…" : "Manage Billing";
+      primaryHandler = onManageBilling;
+      primaryVariant = "btn-outline";
+      break;
+    case "active":
+      eyebrow = "Current Plan";
+      planName = "Active";
+      line = `$${PRICE_USD}/month, unlimited users, all features included.`;
+      nextNote = periodEnd ? `Next charge ${periodEnd}` : null;
+      primaryLabel = pending ? "Opening…" : "Manage Billing";
+      primaryHandler = onManageBilling;
+      primaryVariant = "btn-outline";
+      break;
+    case "past_due":
+      eyebrow = "Action Required";
+      planName = "Payment Failed";
+      line = "Update your card to keep using the portal without interruption.";
+      primaryLabel = pending ? "Opening…" : "Update Payment Method";
+      primaryHandler = onManageBilling;
+      break;
+    case "incomplete":
+      eyebrow = "Action Required";
+      planName = "Checkout Not Finished";
+      line = "Your last checkout did not complete. Start again to begin your trial.";
+      primaryLabel = pending ? "Starting…" : "Start Free Trial";
+      primaryHandler = onStartTrial;
+      break;
+    case "cancelled":
+      eyebrow = "Current Plan";
+      planName = "Cancelled";
+      line = `Resubscribe at $${PRICE_USD}/month, unlimited users.`;
+      primaryLabel = pending ? "Starting…" : "Resubscribe";
+      primaryHandler = onStartTrial;
+      break;
+    default:
+      primaryLabel = "Start Free Trial";
+      primaryHandler = onStartTrial;
+  }
+
+  return (
+    <div className="plan-hero">
+      <div className="plan-hero-left">
+        <div className="plan-hero-eyebrow">{eyebrow}</div>
+        <div className="plan-hero-name">{planName}</div>
+        <div className="plan-hero-line">{line}</div>
+      </div>
+      <div className="plan-hero-right">
+        <div className="plan-hero-price">
+          ${PRICE_USD}
+          <span className="plan-hero-price-suffix">/mo</span>
+        </div>
+        {nextNote && <div className="plan-hero-next">{nextNote}</div>}
+        <button
+          type="button"
+          className={`btn ${primaryVariant} btn-sm mt-2`}
+          disabled={ctaDisabled}
+          onClick={primaryHandler}
+        >
+          {primaryLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function BackfillConfirmModal({
   preview,
