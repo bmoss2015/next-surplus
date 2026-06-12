@@ -196,36 +196,6 @@ export function ConversationTabClient({
   } | null>(null);
 
   const readerRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerPx, setContainerPx] = useState<number>(0);
-
-  useEffect(() => {
-    const sidebar = document.querySelector<HTMLElement>("[data-lead-sidebar]");
-    function recompute() {
-      const el = containerRef.current;
-      if (!el) return;
-      const top = el.getBoundingClientRect().top;
-      const margin = 24;
-      const next = Math.max(420, Math.round(window.innerHeight - top - margin));
-      setContainerPx(next);
-      if (sidebar) {
-        sidebar.style.height = `${next}px`;
-        sidebar.style.overflowY = "auto";
-      }
-    }
-    recompute();
-    window.addEventListener("resize", recompute);
-    const ro = new ResizeObserver(recompute);
-    if (containerRef.current) ro.observe(containerRef.current);
-    return () => {
-      window.removeEventListener("resize", recompute);
-      ro.disconnect();
-      if (sidebar) {
-        sidebar.style.height = "";
-        sidebar.style.overflowY = "";
-      }
-    };
-  }, []);
 
   // Esc + arrow keys for the lightbox.
   useEffect(() => {
@@ -701,18 +671,14 @@ export function ConversationTabClient({
           independently inside a fixed-height surface so the page feels like a
           real email client instead of a list of vertical cards. */}
       <div
-        ref={containerRef}
-        className="grid overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-card"
+        className="grid overflow-hidden rounded-[6px] border border-gray-200 bg-surface"
         style={{
+          height: "min(82vh, 920px)",
           gridTemplateColumns: "320px 1fr",
-          height: containerPx > 0 ? `${containerPx}px` : "min(82vh, 920px)",
         }}
       >
         {/* LEFT — thread list. Pure type, no avatars, no chrome. */}
-        <aside
-          className="flex flex-col border-r border-gray-200 bg-[#fbfcfd] overflow-hidden"
-          style={{ height: containerPx > 0 ? `${containerPx}px` : undefined }}
-        >
+        <aside className="flex flex-col border-r border-gray-200 bg-[#fbfcfd]">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
             <div className="text-[11.5px] font-medium text-gray-500">
               {threadGroups.length === 0
@@ -743,19 +709,14 @@ export function ConversationTabClient({
           </div>
         </aside>
 
-        {/* RIGHT — internal scroll using JS-measured pixel height. No CSS
-            inheritance, no flex/grid track math. Reader is overflow:auto with
-            explicit pixel height set in inline style; reply bar shrinks to its
-            content height and sits below. */}
+        {/* RIGHT — selected thread reader. Section is overflow-y-auto (the
+            scroll container) and the persistent reply bar inside uses
+            position: sticky bottom-0 so it stays at the visible bottom edge
+            as you scroll the messages. */}
         <section
-          className="flex flex-col overflow-hidden bg-surface"
-          style={{ height: containerPx > 0 ? `${containerPx}px` : undefined }}
+          ref={readerRef}
+          className="flex flex-col overflow-y-auto bg-surface"
         >
-          <div
-            ref={readerRef}
-            className="flex-1 overflow-y-auto"
-            style={{ minHeight: 0 }}
-          >
           {selectedThread ? (
             <ThreadReader
               thread={selectedThread}
@@ -832,12 +793,11 @@ export function ConversationTabClient({
               {!noAccount && " Use New Message to start one, or click a contact above to email them."}
             </div>
           )}
-          </div>
           {selectedThread && !noAccount && (() => {
             const last = selectedThread.messages[selectedThread.messages.length - 1];
             const hasMultiple = last.to_addresses.length + last.cc_addresses.length > 1;
             return (
-              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-gray-200 bg-white px-5 py-3">
+              <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 border-t border-gray-200 bg-white/95 px-5 py-3 backdrop-blur">
                 <button
                   type="button"
                   onClick={() => startReply("reply", last)}
