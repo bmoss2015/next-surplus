@@ -147,7 +147,7 @@ export default function AcceptInvitePage() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <h1 className="m-0 text-[16px] font-medium tracking-tight text-ink">
-        Welcome To Moss Equity Partners
+        Welcome To Next Surplus
       </h1>
       <p className="text-[12px] text-gray-500">
         Confirm your name and set a password to finish setting up your account.

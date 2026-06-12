@@ -52,7 +52,7 @@ export function Sidebar({
     <aside className="bg-sidebar-gradient relative flex w-[200px] flex-col pb-20 pt-[22px] text-white">
       <div className="mb-[18px] px-[22px] pb-5">
         <div className="text-sm font-medium text-white tracking-tight">
-          Moss Equity Partners
+          Next Surplus
         </div>
       </div>
 
