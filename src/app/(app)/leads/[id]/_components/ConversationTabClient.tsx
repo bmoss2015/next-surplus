@@ -711,15 +711,17 @@ export function ConversationTabClient({
         </aside>
 
         {/* RIGHT — selected thread reader. Full-bleed editorial typography.
-            grid-rows [scroll area, pinned bar] is more reliable than flex
-            for keeping the reply bar visible — flex-1 + overflow-y-auto
-            collapses in some browsers when the parent's height isn't
-            explicitly set, which the 82vh grid row was not always providing. */}
-        <section
-          className="grid h-full grid-rows-[1fr_auto] overflow-hidden bg-surface"
-          style={{ minHeight: 0 }}
-        >
-          <div ref={readerRef} className="min-h-0 overflow-y-auto">
+            Layout: section is the positioning context (relative). Reader fills
+            the section, leaving 56px at the bottom for the pinned reply bar.
+            Position-absolute removes any reliance on flex/grid track sizing
+            calculations — the reader's height is always
+            (section height - reply bar height) regardless of content. */}
+        <section className="relative h-full overflow-hidden bg-surface">
+          <div
+            ref={readerRef}
+            className="absolute inset-x-0 top-0 overflow-y-auto"
+            style={{ bottom: selectedThread && !noAccount ? 56 : 0 }}
+          >
           {selectedThread ? (
             <ThreadReader
               thread={selectedThread}
@@ -804,7 +806,10 @@ export function ConversationTabClient({
               : (last.to_addresses[0] ?? "this thread");
             const hasMultiple = last.to_addresses.length + last.cc_addresses.length > 1;
             return (
-              <div className="flex shrink-0 items-center gap-2 border-t border-gray-200 bg-white px-4 py-2.5">
+              <div
+                className="absolute inset-x-0 bottom-0 flex items-center gap-2 border-t border-gray-200 bg-white px-4"
+                style={{ height: 56 }}
+              >
                 <button
                   type="button"
                   onClick={() => startReply("reply", last)}
