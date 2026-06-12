@@ -205,18 +205,13 @@ export function ConversationTabClient({
       if (!el) return;
       const top = el.getBoundingClientRect().top;
       const margin = 24;
-      const viewportFit = Math.round(window.innerHeight - top - margin);
-      const sidebar = document.querySelector<HTMLElement>("[data-lead-sidebar]");
-      const sidebarHeight = sidebar ? sidebar.offsetHeight : 0;
-      const next = Math.max(420, viewportFit, sidebarHeight);
+      const next = Math.max(420, Math.round(window.innerHeight - top - margin));
       setContainerPx(next);
     }
     recompute();
     window.addEventListener("resize", recompute);
     const ro = new ResizeObserver(recompute);
     if (containerRef.current) ro.observe(containerRef.current);
-    const sidebar = document.querySelector<HTMLElement>("[data-lead-sidebar]");
-    if (sidebar) ro.observe(sidebar);
     return () => {
       window.removeEventListener("resize", recompute);
       ro.disconnect();
@@ -698,7 +693,7 @@ export function ConversationTabClient({
           real email client instead of a list of vertical cards. */}
       <div
         ref={containerRef}
-        className="grid rounded-[6px] border border-gray-200 bg-surface"
+        className="sticky top-4 grid overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-card"
         style={{
           gridTemplateColumns: "320px 1fr",
           height: containerPx > 0 ? `${containerPx}px` : "min(82vh, 920px)",
