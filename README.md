@@ -26,8 +26,8 @@ Multi-tenant Next.js portal for surplus funds recovery operations. Built for Mos
 
 1. Clone and install:
    ```
-   git clone https://github.com/bmoss2015/MossEquityPartners.git
-   cd MossEquityPartners
+   git clone https://github.com/bmoss2015/next-surplus.git
+   cd next-surplus
    npm install
    ```
 
