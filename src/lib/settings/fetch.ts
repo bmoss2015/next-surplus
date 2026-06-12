@@ -377,6 +377,13 @@ export type EmailTemplateFolderRow = {
   sort_order: number;
 };
 
+export type EmailTemplateAttachment = {
+  filename: string;
+  mimeType: string;
+  size: number;
+  base64: string;
+};
+
 export type EmailTemplateRow = {
   id: string;
   name: string;
@@ -384,6 +391,7 @@ export type EmailTemplateRow = {
   subject: string;
   body_html: string;
   updated_at: string;
+  attachments: EmailTemplateAttachment[];
   used: number;
   open_rate: number | null;
   reply_rate: number | null;
@@ -409,17 +417,29 @@ export async function fetchEmailTemplates(): Promise<EmailTemplateRow[]> {
   const sb = await createClient();
   const { data, error } = await sb
     .from("email_templates")
-    .select("id, name, folder_id, subject, body_html, updated_at")
+    .select("id, name, folder_id, subject, body_html, updated_at, attachments")
     .order("name", { ascending: true });
   if (error) throw error;
-  const baseRows = (data ?? []).map((r) => ({
-    id: r.id as string,
-    name: (r.name as string | null) ?? "",
-    folder_id: (r.folder_id as string | null) ?? null,
-    subject: (r.subject as string | null) ?? "",
-    body_html: (r.body_html as string | null) ?? "",
-    updated_at: (r.updated_at as string) ?? new Date().toISOString(),
-  }));
+  const baseRows = (data ?? []).map((r) => {
+    const rawAtt = (r.attachments as unknown) ?? [];
+    const attachments: EmailTemplateAttachment[] = Array.isArray(rawAtt)
+      ? (rawAtt as Array<Record<string, unknown>>).map((a) => ({
+          filename: String(a.filename ?? ""),
+          mimeType: String(a.mimeType ?? a.mime_type ?? "application/octet-stream"),
+          size: Number(a.size ?? 0),
+          base64: String(a.base64 ?? ""),
+        }))
+      : [];
+    return {
+      id: r.id as string,
+      name: (r.name as string | null) ?? "",
+      folder_id: (r.folder_id as string | null) ?? null,
+      subject: (r.subject as string | null) ?? "",
+      body_html: (r.body_html as string | null) ?? "",
+      updated_at: (r.updated_at as string) ?? new Date().toISOString(),
+      attachments,
+    };
+  });
 
   const ids = baseRows.map((r) => r.id);
   if (ids.length === 0) {
@@ -429,7 +449,7 @@ export async function fetchEmailTemplates(): Promise<EmailTemplateRow[]> {
       open_rate: null,
       reply_rate: null,
       last_used: null,
-    }));
+    } as EmailTemplateRow));
   }
 
   const { data: tokenRows } = await sb

@@ -1103,11 +1103,18 @@ export async function upsertEmailTemplate(input: {
   folder_id?: string | null;
   subject: string;
   body_html: string;
+  attachments?: { filename: string; mimeType: string; size: number; base64: string }[];
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const profile = await getCurrentProfile();
   if (!profile) return { ok: false, error: "Not signed in" };
   const name = (input.name ?? "").trim();
   if (!name) return { ok: false, error: "Name is required" };
+  const attachments = (input.attachments ?? []).map((a) => ({
+    filename: a.filename,
+    mimeType: a.mimeType,
+    size: a.size,
+    base64: a.base64,
+  }));
   const sb = await createClient();
   if (input.id) {
     const { error } = await sb
@@ -1117,6 +1124,7 @@ export async function upsertEmailTemplate(input: {
         folder_id: input.folder_id ?? null,
         subject: (input.subject ?? "").trim(),
         body_html: input.body_html ?? "",
+        attachments,
         updated_at: new Date().toISOString(),
       })
       .eq("id", input.id);
@@ -1131,6 +1139,7 @@ export async function upsertEmailTemplate(input: {
       folder_id: input.folder_id ?? null,
       subject: (input.subject ?? "").trim(),
       body_html: input.body_html ?? "",
+      attachments,
       created_by: profile.id,
     })
     .select("id")

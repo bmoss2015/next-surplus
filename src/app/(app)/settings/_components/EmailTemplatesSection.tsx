@@ -12,6 +12,9 @@ import {
   IconSparkles,
   IconChevronDown,
   IconFolder,
+  IconPaperclip,
+  IconFile,
+  IconX,
 } from "@tabler/icons-react";
 import {
   upsertEmailTemplate,
@@ -25,6 +28,7 @@ import { RichTextEditor } from "@/components/email/RichTextEditor";
 import type {
   EmailTemplateRow,
   EmailTemplateFolderRow,
+  EmailTemplateAttachment,
 } from "@/lib/settings/fetch";
 
 const UNFILED_KEY = "__unfiled__";
@@ -85,6 +89,7 @@ export function EmailTemplatesSection({
     folder_id: string | null;
     subject: string;
     body_html: string;
+    attachments: EmailTemplateAttachment[];
   }) {
     setErrMsg(null);
     startTransition(async () => {
@@ -94,6 +99,7 @@ export function EmailTemplatesSection({
         folder_id: form.folder_id,
         subject: form.subject,
         body_html: form.body_html,
+        attachments: form.attachments,
       });
       if (!res.ok) {
         setErrMsg(res.error);
@@ -109,6 +115,7 @@ export function EmailTemplatesSection({
                   folder_id: form.folder_id,
                   subject: form.subject,
                   body_html: form.body_html,
+                  attachments: form.attachments,
                   updated_at: new Date().toISOString(),
                 }
               : t
@@ -123,6 +130,7 @@ export function EmailTemplatesSection({
             folder_id: form.folder_id,
             subject: form.subject,
             body_html: form.body_html,
+            attachments: form.attachments,
             updated_at: new Date().toISOString(),
             used: 0,
             open_rate: null,
@@ -633,6 +641,7 @@ function EditForm({
     folder_id: string | null;
     subject: string;
     body_html: string;
+    attachments: EmailTemplateAttachment[];
   }) => void;
   onAddFolder: (name: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>;
   errMsg: string | null;
@@ -644,6 +653,10 @@ function EditForm({
   const [folderId, setFolderId] = useState<string | null>(initial?.folder_id ?? null);
   const [subject, setSubject] = useState(initial?.subject ?? "");
   const [bodyHtml, setBodyHtml] = useState(initial?.body_html ?? "");
+  const [attachments, setAttachments] = useState<EmailTemplateAttachment[]>(
+    initial?.attachments ?? []
+  );
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [mergeOpen, setMergeOpen] = useState<null | "subject" | "body">(null);
   const [folderOpen, setFolderOpen] = useState(false);
   const subjectRef = useRef<HTMLInputElement | null>(null);
@@ -675,6 +688,49 @@ function EditForm({
   }, [mergeOpen]);
 
   const canSave = name.trim().length > 0 && subject.trim().length > 0;
+  const MAX_TOTAL_ATTACHMENT_BYTES = 24 * 1024 * 1024;
+
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const idx = result.indexOf(",");
+        resolve(idx >= 0 ? result.slice(idx + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function onFilesPicked(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const next = [...attachments];
+    let total = next.reduce((s, a) => s + a.size, 0);
+    for (const file of Array.from(files)) {
+      if (total + file.size > MAX_TOTAL_ATTACHMENT_BYTES) continue;
+      const base64 = await fileToBase64(file);
+      next.push({
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        base64,
+      });
+      total += file.size;
+    }
+    setAttachments(next);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeAttachment(idx: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
 
   function insertMerge(token: string) {
     const placeholder = `{{${token}}}`;
@@ -741,6 +797,7 @@ function EditForm({
                 folder_id: folderId,
                 subject: subject.trim(),
                 body_html: bodyHtml,
+                attachments,
               })
             }
             className="btn-primary cursor-pointer rounded-md px-4 py-2 text-[12.5px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -932,6 +989,61 @@ function EditForm({
               minRows={14}
               placeholder="Hi {{contact.first_name}}, I'm reaching out about the surplus funds from your tax sale at {{lead.property_address}}..."
             />
+          </div>
+          <div className="border-t border-gray-200 px-6 py-4">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
+                Default Attachments
+              </div>
+              <div className="flex items-center gap-2">
+                {attachments.length > 0 && (
+                  <span className="text-[10.5px] text-gray-400">
+                    {formatBytes(attachments.reduce((s, a) => s + a.size, 0))} of 24 MB
+                  </span>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={(e) => onFilesPicked(e.target.files)}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11.5px] font-medium text-[#0f1729] hover:border-[#0d4b3a]/40"
+                >
+                  <IconPaperclip size={12} stroke={1.75} />
+                  Attach
+                </button>
+              </div>
+            </div>
+            {attachments.length === 0 ? (
+              <p className="text-[11.5px] text-gray-500">
+                Files added here will be attached every time this template is used.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {attachments.map((a, i) => (
+                  <div
+                    key={i}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50/60 px-2 py-[3px] text-[11.5px] text-[#0f1729]"
+                  >
+                    <IconFile size={11} stroke={1.75} className="text-[#0d4b3a]" />
+                    <span className="max-w-[220px] truncate">{a.filename}</span>
+                    <span className="text-[10.5px] text-gray-400">· {formatBytes(a.size)}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(i)}
+                      className="cursor-pointer rounded text-gray-400 hover:text-red-600"
+                      aria-label={`Remove ${a.filename}`}
+                    >
+                      <IconX size={11} stroke={2} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {mergeOpen && (
             <div

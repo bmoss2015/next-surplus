@@ -197,6 +197,22 @@ export function SendEmailModal({
     if (!t) return;
     setSubject(t.subject);
     setBody(`${t.body_html}${initialSignatureBlock}`);
+    if (t.attachments && t.attachments.length > 0) {
+      setAttachments((prev) => {
+        const merged = [...prev];
+        for (const a of t.attachments) {
+          if (!merged.find((m) => m.filename === a.filename && m.size === a.size)) {
+            merged.push({
+              filename: a.filename,
+              mimeType: a.mimeType,
+              size: a.size,
+              base64: a.base64,
+            });
+          }
+        }
+        return merged;
+      });
+    }
   }
 
   function insertMergeToken(token: string) {
@@ -613,11 +629,11 @@ export function SendEmailModal({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11.5px] font-medium text-[#0f1729] hover:border-[#0d4b3a]/40"
               title="Attach files"
-              aria-label="Attach files"
             >
-              <IconPaperclip size={14} stroke={1.75} />
+              <IconPaperclip size={12} stroke={1.75} />
+              Attach
             </button>
             <div ref={saveTplRef} className="relative">
             <button
