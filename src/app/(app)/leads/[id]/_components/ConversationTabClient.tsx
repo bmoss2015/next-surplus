@@ -671,15 +671,15 @@ export function ConversationTabClient({
           independently inside a fixed-height surface so the page feels like a
           real email client instead of a list of vertical cards. */}
       <div
-        className="grid overflow-hidden rounded-[6px] border border-gray-200 bg-surface"
+        className="grid rounded-[6px] border border-gray-200 bg-surface"
         style={{
-          height: "min(82vh, 920px)",
           gridTemplateColumns: "320px 1fr",
-          gridTemplateRows: "1fr",
         }}
       >
-        {/* LEFT — thread list. Pure type, no avatars, no chrome. */}
-        <aside className="flex flex-col border-r border-gray-200 bg-[#fbfcfd]">
+        {/* LEFT — thread list. Pure type, no avatars, no chrome. Capped at
+            a fixed height with its own scroll so the right column can flow
+            in natural page scroll. */}
+        <aside className="flex flex-col border-r border-gray-200 bg-[#fbfcfd]" style={{ maxHeight: "min(82vh, 920px)" }}>
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
             <div className="text-[11.5px] font-medium text-gray-500">
               {threadGroups.length === 0
@@ -710,18 +710,11 @@ export function ConversationTabClient({
           </div>
         </aside>
 
-        {/* RIGHT — selected thread reader. Full-bleed editorial typography.
-            Layout: section is the positioning context (relative). Reader fills
-            the section, leaving 56px at the bottom for the pinned reply bar.
-            Position-absolute removes any reliance on flex/grid track sizing
-            calculations — the reader's height is always
-            (section height - reply bar height) regardless of content. */}
-        <section className="relative h-full overflow-hidden bg-surface">
-          <div
-            ref={readerRef}
-            className="absolute inset-x-0 top-0 overflow-y-auto"
-            style={{ bottom: selectedThread && !noAccount ? 56 : 0 }}
-          >
+        {/* RIGHT — selected thread reader. No internal scroll — the right
+            column flows naturally with the page, and the reply bar uses
+            position: sticky bottom-0 to stay anchored to the viewport
+            bottom as you read. This mirrors Front / HubSpot / Apollo. */}
+        <section className="relative bg-surface" ref={readerRef}>
           {selectedThread ? (
             <ThreadReader
               thread={selectedThread}
@@ -798,7 +791,6 @@ export function ConversationTabClient({
               {!noAccount && " Use New Message to start one, or click a contact above to email them."}
             </div>
           )}
-          </div>
           {selectedThread && !noAccount && (() => {
             const last = selectedThread.messages[selectedThread.messages.length - 1];
             const replyName = last.direction === "inbound"
@@ -807,8 +799,7 @@ export function ConversationTabClient({
             const hasMultiple = last.to_addresses.length + last.cc_addresses.length > 1;
             return (
               <div
-                className="absolute inset-x-0 bottom-0 flex items-center gap-2 border-t border-gray-200 bg-white px-4"
-                style={{ height: 56 }}
+                className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur"
               >
                 <button
                   type="button"
@@ -1225,40 +1216,6 @@ function ThreadReader({
         ))}
       </div>
 
-      {/* Sticky-feel reply rail at the bottom */}
-      {!noAccount && thread.channel !== "quo_sms" && (
-        <div className="mt-10 border-t border-gray-200 pt-5">
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-gray-400">
-            Continue Conversation
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onAction("reply", lastMsg)}
-              className="inline-flex items-center gap-1.5 rounded-md btn-primary px-4 py-[6px] text-[12px] font-medium text-white"
-            >
-              <IconArrowBackUp size={13} stroke={2} />
-              Reply
-            </button>
-            <button
-              type="button"
-              onClick={() => onAction("replyAll", lastMsg)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-surface px-4 py-[6px] text-[12px] text-ink hover:border-petrol-500 hover:text-petrol-700"
-            >
-              <IconArrowBackUpDouble size={13} stroke={2} />
-              Reply All
-            </button>
-            <button
-              type="button"
-              onClick={() => onAction("forward", lastMsg)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-surface px-4 py-[6px] text-[12px] text-ink hover:border-petrol-500 hover:text-petrol-700"
-            >
-              <IconArrowForwardUp size={13} stroke={2} />
-              Forward
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
