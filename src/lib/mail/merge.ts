@@ -66,6 +66,9 @@ export const MERGE_FIELDS: MergeField[] = [
   { key: "lead.estimated_surplus", label: "Estimated Surplus", example: "$42,500", group: "lead" },
   { key: "lead.confirmed_surplus", label: "Confirmed Surplus", example: "$42,500", group: "lead" },
   { key: "lead.owner_range", label: "Estimated Range To Owner", example: "$18,000 – $24,000", group: "lead" },
+  { key: "lead.recovery_fee_pct", label: "Recovery Fee Percent", example: "30%", group: "lead" },
+  { key: "lead.recovery_fee_amount", label: "Recovery Fee Amount", example: "$12,750", group: "lead" },
+  { key: "lead.est_net_to_owner", label: "Est. Net To You", example: "$11,250", group: "lead" },
 
   // Sender — from org settings
   { key: "sender.company_name", label: "Company Name", example: "Moss Equity Partners", group: "sender" },

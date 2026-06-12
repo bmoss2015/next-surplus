@@ -9,6 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:push:prod": "node scripts/apply-prod-migrations.mjs",
+    "db:push:staging": "node scripts/apply-staging-migrations.mjs",
+    "seed:test-emails": "node scripts/seed-test-emails.mjs",
     "postinstall": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
     "prepare": "node scripts/install-git-hooks.mjs"
   },
@@ -25,7 +27,9 @@
     "@tiptap/extension-table-cell": "^3.23.4",
     "@tiptap/extension-table-header": "^3.23.4",
     "@tiptap/extension-table-row": "^3.23.4",
+    "@tiptap/extension-text-align": "3.23.4",
     "@tiptap/extension-text-style": "^3.23.4",
+    "@tiptap/extension-underline": "3.23.4",
     "@tiptap/react": "^3.23.4",
     "@tiptap/starter-kit": "^3.23.4",
     "@types/papaparse": "^5.5.2",

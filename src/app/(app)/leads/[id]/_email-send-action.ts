@@ -15,6 +15,10 @@ export type SendLeadEmailInput = {
   subject: string;
   bodyHtml: string;
   templateId?: string | null;
+  threadId?: string;
+  inReplyTo?: string | null;
+  referencesChain?: string[];
+  attachments?: { filename: string; mimeType: string; base64: string }[];
 };
 
 function publicOrigin(): string {
@@ -65,6 +69,10 @@ export async function sendLeadEmail(
       subject,
       body: bodyWithPixel,
       leadId: input.leadId,
+      threadId: input.threadId,
+      inReplyTo: input.inReplyTo ?? null,
+      referencesChain: input.referencesChain,
+      attachments: input.attachments && input.attachments.length > 0 ? input.attachments : undefined,
     });
 
     if (!sendRes.ok) {

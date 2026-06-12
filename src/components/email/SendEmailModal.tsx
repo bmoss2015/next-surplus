@@ -4,16 +4,54 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import {
   IconX,
   IconChevronDown,
-  IconMailForward,
   IconSearch,
   IconPlus,
   IconBrandGmail,
+  IconSparkles,
+  IconDots,
+  IconPaperclip,
+  IconFile,
 } from "@tabler/icons-react";
 import { sendLeadEmail } from "@/app/(app)/leads/[id]/_email-send-action";
+import { upsertEmailTemplate } from "@/app/(app)/settings/_actions";
 import { renderMerge, type MergeContext } from "@/lib/mail/merge";
 import type { EmailRecipientCandidate } from "@/lib/email/lead-recipients";
 import type { EmailTemplateRow } from "@/lib/settings/fetch";
 import type { EmailAccountRow } from "@/lib/email/types";
+import { RichTextEditor } from "@/components/email/RichTextEditor";
+import type { Editor } from "@tiptap/react";
+
+const MERGE_TOKENS = [
+  { token: "contact.first_name", sample: "Roberta", group: "Recipient" },
+  { token: "contact.full_name", sample: "Roberta Mendes", group: "Recipient" },
+  { token: "contact.last_name", sample: "Mendes", group: "Recipient" },
+  { token: "lead.property_address", sample: "456 Oak Ave, Dallas, TX 75201", group: "Property" },
+  { token: "lead.property_street_address", sample: "456 Oak Ave", group: "Property" },
+  { token: "lead.property_city_state_zip", sample: "Dallas, TX 75201", group: "Property" },
+  { token: "lead.county", sample: "Dallas", group: "Property" },
+  { token: "lead.estimated_surplus", sample: "$42,500", group: "Property" },
+  { token: "lead.confirmed_surplus", sample: "$42,500", group: "Property" },
+  { token: "lead.recovery_fee_pct", sample: "30%", group: "Property" },
+  { token: "lead.recovery_fee_amount", sample: "$12,750", group: "Property" },
+  { token: "lead.est_net_to_owner", sample: "$11,250", group: "Property" },
+  { token: "lead.case_number", sample: "DC-25-04321", group: "Property" },
+  { token: "sender.signer_name", sample: "Bree Moss", group: "Sender" },
+  { token: "system.today_long", sample: "June 11, 2026", group: "Sender" },
+] as const;
+
+export type SendEmailReplyContext = {
+  mode: "reply" | "replyAll" | "forward";
+  threadId: string;
+  inReplyTo: string | null;
+  referencesChain: string[];
+  accountId: string;
+  defaultTo: { name: string; email: string }[];
+  defaultCc: { name: string; email: string }[];
+  baseSubject: string;
+  quotedHtml: string;
+  originalFrom: { name: string | null; address: string };
+  originalSentAt: string;
+};
 
 export type SendEmailModalProps = {
   open: boolean;
@@ -23,6 +61,7 @@ export type SendEmailModalProps = {
   templates: EmailTemplateRow[];
   accounts: EmailAccountRow[];
   signatureHtml?: string | null;
+  replyContext?: SendEmailReplyContext | null;
 };
 
 type Selected = {
@@ -41,34 +80,103 @@ export function SendEmailModal({
   templates,
   accounts,
   signatureHtml,
+  replyContext,
 }: SendEmailModalProps) {
   const activeAccounts = accounts.filter((a) => a.status === "active");
-  const defaultAccount = activeAccounts[0] ?? null;
+  const defaultAccount =
+    (replyContext &&
+      activeAccounts.find((a) => a.id === replyContext.accountId)) ??
+    activeAccounts[0] ??
+    null;
+
+  function buildReplySubject(base: string, mode: "reply" | "replyAll" | "forward"): string {
+    const prefix = mode === "forward" ? "Fwd:" : "Re:";
+    if (!base) return prefix;
+    if (base.toLowerCase().startsWith(prefix.toLowerCase())) return base;
+    return `${prefix} ${base}`;
+  }
+
+  function selectedFromAddrList(list: { name: string; email: string }[]): Selected[] {
+    return list.map((r) => {
+      const match = candidates.find(
+        (c) => c.email.toLowerCase() === r.email.toLowerCase()
+      );
+      return match
+        ? {
+            contactId: match.contact_id,
+            email: match.email,
+            name: match.name,
+            relation: match.relation,
+            mergeContext: match.merge_context,
+          }
+        : { contactId: null, email: r.email, name: r.name || r.email };
+    });
+  }
+
+  const accountSignature = (defaultAccount as EmailAccountRow | null)?.signature_html ?? signatureHtml ?? "";
+  const initialSignatureBlock = accountSignature ? `\n\n${accountSignature}` : "";
 
   const [accountId, setAccountId] = useState<string | null>(defaultAccount?.id ?? null);
   const [to, setTo] = useState<Selected[]>(
-    candidates.length > 0
-      ? [
-          {
-            contactId: candidates[0].contact_id,
-            email: candidates[0].email,
-            name: candidates[0].name,
-            relation: candidates[0].relation,
-            mergeContext: candidates[0].merge_context,
-          },
-        ]
-      : []
+    replyContext
+      ? selectedFromAddrList(replyContext.defaultTo)
+      : candidates.length > 0
+        ? [
+            {
+              contactId: candidates[0].contact_id,
+              email: candidates[0].email,
+              name: candidates[0].name,
+              relation: candidates[0].relation,
+              mergeContext: candidates[0].merge_context,
+            },
+          ]
+        : []
   );
-  const [cc, setCc] = useState<Selected[]>([]);
+  const [cc, setCc] = useState<Selected[]>(
+    replyContext ? selectedFromAddrList(replyContext.defaultCc) : []
+  );
   const [bcc, setBcc] = useState<Selected[]>([]);
-  const [ccOpen, setCcOpen] = useState(false);
+  const [ccOpen, setCcOpen] = useState(replyContext ? replyContext.defaultCc.length > 0 : false);
   const [bccOpen, setBccOpen] = useState(false);
   const [templateId, setTemplateId] = useState<string | null>(null);
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [subject, setSubject] = useState(
+    replyContext ? buildReplySubject(replyContext.baseSubject, replyContext.mode) : ""
+  );
+  const [body, setBody] = useState(() => {
+    if (replyContext && replyContext.mode === "forward") {
+      return `${initialSignatureBlock}\n\n${replyContext.quotedHtml}`;
+    }
+    return initialSignatureBlock;
+  });
   const [err, setErr] = useState<string | null>(null);
   const [accountPickerOpen, setAccountPickerOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [saveTplOpen, setSaveTplOpen] = useState(false);
+  const [saveTplPanel, setSaveTplPanel] = useState<null | "new" | "update">(null);
+  const [saveTplName, setSaveTplName] = useState("");
+  const [saveTplTargetId, setSaveTplTargetId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const bodyEditorRef = useRef<Editor | null>(null);
+  const mergeRef = useRef<HTMLDivElement | null>(null);
+  const saveTplRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [updateSearch, setUpdateSearch] = useState("");
+  const [attachments, setAttachments] = useState<
+    { filename: string; mimeType: string; size: number; base64: string }[]
+  >([]);
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (mergeRef.current && !mergeRef.current.contains(e.target as Node)) {
+        setMergeOpen(false);
+      }
+      if (saveTplRef.current && !saveTplRef.current.contains(e.target as Node)) {
+        setSaveTplOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -82,13 +190,111 @@ export function SendEmailModal({
     setTemplateId(id);
     if (!id) {
       setSubject("");
-      setBody("");
+      setBody(initialSignatureBlock);
       return;
     }
     const t = templates.find((x) => x.id === id);
     if (!t) return;
     setSubject(t.subject);
-    setBody(t.body_html);
+    setBody(`${t.body_html}${initialSignatureBlock}`);
+    if (t.attachments && t.attachments.length > 0) {
+      setAttachments((prev) => {
+        const merged = [...prev];
+        for (const a of t.attachments) {
+          if (!merged.find((m) => m.filename === a.filename && m.size === a.size)) {
+            merged.push({
+              filename: a.filename,
+              mimeType: a.mimeType,
+              size: a.size,
+              base64: a.base64,
+            });
+          }
+        }
+        return merged;
+      });
+    }
+  }
+
+  function insertMergeToken(token: string) {
+    const placeholder = `{{${token}}}`;
+    const ed = bodyEditorRef.current;
+    if (ed) {
+      ed.chain().focus().insertContent(placeholder).run();
+    } else {
+      setBody((b) => b + placeholder);
+    }
+    setMergeOpen(false);
+  }
+
+  const MAX_TOTAL_ATTACHMENT_BYTES = 24 * 1024 * 1024;
+
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const idx = result.indexOf(",");
+        resolve(idx >= 0 ? result.slice(idx + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function onFilesPicked(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setErr(null);
+    const next = [...attachments];
+    let total = next.reduce((s, a) => s + a.size, 0);
+    for (const file of Array.from(files)) {
+      if (total + file.size > MAX_TOTAL_ATTACHMENT_BYTES) {
+        setErr(`Combined attachments would exceed 24 MB (Gmail's limit). Skipped: ${file.name}.`);
+        continue;
+      }
+      const base64 = await fileToBase64(file);
+      next.push({
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        base64,
+      });
+      total += file.size;
+    }
+    setAttachments(next);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeAttachment(idx: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function saveTemplate(opts: { id: string | null; name: string }) {
+    setErr(null);
+    if (!subject.trim() || !body.trim()) {
+      setErr("Subject and body required to save as template");
+      return;
+    }
+    const existing = templates.find((t) => t.id === opts.id);
+    startTransition(async () => {
+      const res = await upsertEmailTemplate({
+        id: opts.id,
+        name: opts.name,
+        folder_id: existing?.folder_id ?? null,
+        subject: subject.trim(),
+        body_html: body,
+      });
+      if (!res.ok) setErr(res.error);
+      else {
+        setSaveTplOpen(false);
+        setSaveTplPanel(null);
+      }
+    });
   }
 
   function send() {
@@ -117,9 +323,6 @@ export function SendEmailModal({
         };
         const renderedSubject = renderMerge(subject, ctx);
         const renderedBody = renderMerge(body, ctx);
-        const bodyWithSignature = signatureHtml
-          ? `${renderedBody}\n\n${signatureHtml}`
-          : renderedBody;
         const res = await sendLeadEmail({
           leadId,
           accountId,
@@ -127,8 +330,18 @@ export function SendEmailModal({
           cc: cc.length > 0 ? cc.map((x) => x.email) : undefined,
           bcc: bcc.length > 0 ? bcc.map((x) => x.email) : undefined,
           subject: renderedSubject,
-          bodyHtml: bodyWithSignature,
+          bodyHtml: renderedBody,
           templateId,
+          threadId: replyContext?.threadId,
+          inReplyTo: replyContext?.inReplyTo ?? null,
+          referencesChain: replyContext?.referencesChain,
+          attachments: attachments.length > 0
+            ? attachments.map((a) => ({
+                filename: a.filename,
+                mimeType: a.mimeType,
+                base64: a.base64,
+              }))
+            : undefined,
         });
         if (!res.ok) {
           setErr(res.error);
@@ -150,7 +363,7 @@ export function SendEmailModal({
         className="relative z-10 flex max-h-[92vh] w-[820px] max-w-[95vw] flex-col overflow-hidden rounded-[12px] border border-gray-200 bg-white shadow-[0_24px_64px_-16px_rgba(15,23,41,0.20)]"
         style={{ fontFamily: "Inter, sans-serif" }}
       >
-        <header className="flex items-center justify-between border-b border-gray-150 px-6 py-3.5">
+        <header className="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-3.5">
           <div className="min-w-0">
             <div className="text-[10.5px] uppercase tracking-[0.08em] text-gray-400">
               Compose Email
@@ -169,8 +382,8 @@ export function SendEmailModal({
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="divide-y divide-gray-100">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 divide-y divide-gray-200">
             <Row label="From">
               {selectedAccount ? (
                 <div className="relative flex items-center gap-2 text-[13px]">
@@ -299,18 +512,11 @@ export function SendEmailModal({
             )}
 
             <Row label="Template">
-              <select
-                value={templateId ?? ""}
-                onChange={(e) => pickTemplate(e.target.value || null)}
-                className="w-full border-0 bg-transparent text-[13px] outline-none"
-              >
-                <option value="">— No template —</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              <TemplatePicker
+                templates={templates}
+                value={templateId}
+                onChange={(id) => pickTemplate(id)}
+              />
             </Row>
 
             <Row label="Subject">
@@ -323,25 +529,87 @@ export function SendEmailModal({
             </Row>
           </div>
 
-          <div className="px-6 py-5">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={14}
-              placeholder="Write your email. Use {{contact.first_name}}, {{lead.property_address}}, etc."
-              className="w-full resize-none border-0 bg-transparent text-[13.5px] leading-[1.7] text-[#0f1729] outline-none placeholder:text-gray-400"
-            />
-            {signatureHtml && (
-              <>
-                <hr className="my-3 border-t border-gray-100" />
-                <div
-                  className="text-[12.5px] leading-[1.55] text-[#0f1729]"
-                  dangerouslySetInnerHTML={{ __html: signatureHtml }}
-                />
-              </>
-            )}
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <div className="flex shrink-0 items-center justify-end gap-1 border-b border-gray-200 px-4 py-2">
+              <div ref={mergeRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMergeOpen((v) => !v)}
+                  className={
+                    "inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium " +
+                    (mergeOpen
+                      ? "bg-gray-100 text-[#0f1729]"
+                      : "text-gray-600 hover:bg-gray-100")
+                  }
+                  title="Insert merge field"
+                >
+                  <IconSparkles size={11} stroke={1.75} />
+                  Merge field
+                  <IconChevronDown size={10} stroke={2} className="text-gray-400" />
+                </button>
+                {mergeOpen && (
+                  <div className="absolute right-0 bottom-full z-50 mb-1 w-[340px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-[0_20px_50px_-12px_rgba(15,23,41,0.25)]">
+                    {(["Recipient", "Property", "Sender"] as const).map((group) => (
+                      <div key={group}>
+                        <div className="border-b border-gray-200 bg-gray-50/60 px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-gray-500">
+                          {group}
+                        </div>
+                        {MERGE_TOKENS.filter((t) => t.group === group).map((t) => (
+                          <button
+                            key={t.token}
+                            type="button"
+                            onClick={() => insertMergeToken(t.token)}
+                            className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-left text-[11.5px] hover:bg-gray-50"
+                          >
+                            <span className="text-[#0d4b3a]">{`{{${t.token}}}`}</span>
+                            <span className="ml-2 truncate text-[10.5px] text-gray-500">{t.sample}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <RichTextEditor
+                value={body}
+                onChange={setBody}
+                editorRef={bodyEditorRef}
+                minRows={12}
+                placeholder="Write your email..."
+              />
+            </div>
           </div>
         </div>
+
+        {attachments.length > 0 && (
+          <div className="shrink-0 border-t border-gray-200 bg-gray-50/50 px-6 py-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              {attachments.map((a, i) => (
+                <div
+                  key={i}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-[3px] text-[11.5px] text-[#0f1729]"
+                >
+                  <IconFile size={11} stroke={1.75} className="text-[#0d4b3a]" />
+                  <span className="max-w-[200px] truncate">{a.filename}</span>
+                  <span className="text-[10.5px] text-gray-400">· {formatBytes(a.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(i)}
+                    className="ml-0.5 cursor-pointer rounded text-gray-400 hover:text-red-600"
+                    aria-label={`Remove ${a.filename}`}
+                  >
+                    <IconX size={11} stroke={2} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-1.5 text-[10px] text-gray-400">
+              {formatBytes(attachments.reduce((s, a) => s + a.size, 0))} of 24 MB
+            </div>
+          </div>
+        )}
 
         {err && (
           <div className="border-t border-red-200 bg-red-50 px-6 py-2 text-[12px] text-red-700">
@@ -349,12 +617,218 @@ export function SendEmailModal({
           </div>
         )}
 
-        <footer className="flex items-center justify-between border-t border-gray-150 px-6 py-3">
-          <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
-            <IconMailForward size={11} stroke={1.75} />
-            {selectedAccount
-              ? `Sending via ${selectedAccount.address}`
-              : "No account selected"}
+        <footer className="flex shrink-0 items-center justify-between border-t border-gray-200 px-6 py-3">
+          <div className="flex items-center gap-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={(e) => onFilesPicked(e.target.files)}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11.5px] font-medium text-[#0f1729] hover:border-[#0d4b3a]/40"
+              title="Attach files"
+            >
+              <IconPaperclip size={12} stroke={1.75} />
+              Attach
+            </button>
+            <div ref={saveTplRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setSaveTplOpen((v) => !v)}
+              className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              title="More options"
+              aria-label="More options"
+            >
+              <IconDots size={14} stroke={1.75} />
+            </button>
+            {saveTplOpen && (
+              <div className="absolute bottom-full left-0 z-20 mb-1 w-[260px] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                {templateId && (() => {
+                  const t = templates.find((x) => x.id === templateId);
+                  if (!t) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSaveTplOpen(false);
+                        saveTemplate({ id: t.id, name: t.name });
+                      }}
+                      className="block w-full cursor-pointer border-b border-gray-100 px-3 py-2 text-left text-[12px] hover:bg-gray-50"
+                    >
+                      <div className="font-medium text-[#0f1729]">Save Changes</div>
+                      <div className="mt-0.5 truncate text-[10.5px] text-gray-500">
+                        Overwrites &ldquo;{t.name}&rdquo;
+                      </div>
+                    </button>
+                  );
+                })()}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSaveTplOpen(false);
+                    setSaveTplPanel("new");
+                    setSaveTplName(subject.trim().slice(0, 60));
+                  }}
+                  className="block w-full cursor-pointer px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50"
+                >
+                  Save As New Template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSaveTplOpen(false);
+                    setSaveTplPanel("update");
+                    setSaveTplTargetId(templateId);
+                  }}
+                  disabled={templates.length === 0}
+                  className="block w-full cursor-pointer border-t border-gray-100 px-3 py-2 text-left text-[12px] text-[#0f1729] hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
+                >
+                  Overwrite Existing Template
+                </button>
+              </div>
+            )}
+            {saveTplPanel && (
+              <div className="absolute bottom-full left-0 z-30 mb-2 w-[420px] overflow-hidden rounded-[10px] border border-gray-200 bg-white shadow-[0_16px_40px_-8px_rgba(15,23,41,0.18)]">
+                <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+                  <div>
+                    <div className="text-[13px] font-medium text-[#0f1729]">
+                      {saveTplPanel === "new" ? "Save As New Template" : "Overwrite Existing Template"}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-gray-500">
+                      {saveTplPanel === "new"
+                        ? "Reuse this email from any lead's Send Email modal."
+                        : "Overwrite an existing template with this subject and body."}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaveTplPanel(null);
+                      setSaveTplTargetId(null);
+                      setUpdateSearch("");
+                    }}
+                    className="cursor-pointer rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    aria-label="Close"
+                  >
+                    <IconX size={14} stroke={1.75} />
+                  </button>
+                </div>
+                <div className="px-4 py-3">
+                  {saveTplPanel === "new" ? (
+                    <div>
+                      <label className="text-[10.5px] uppercase tracking-[0.08em] text-gray-500">
+                        Template Name
+                      </label>
+                      <input
+                        autoFocus
+                        value={saveTplName}
+                        onChange={(e) => setSaveTplName(e.target.value)}
+                        placeholder="Opening Outreach — Tax Sale"
+                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[#0d4b3a]"
+                      />
+                      <div className="mt-3 rounded-md border border-gray-200 bg-gray-50/60 px-3 py-2 text-[11.5px] text-gray-500">
+                        Subject: <span className="text-[#0f1729]">{subject.trim() || "—"}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="relative">
+                        <IconSearch size={12} stroke={1.75} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          autoFocus
+                          value={updateSearch}
+                          onChange={(e) => setUpdateSearch(e.target.value)}
+                          placeholder="Search templates by name or subject..."
+                          className="w-full rounded-md border border-gray-200 bg-white py-1.5 pl-7 pr-2.5 text-[12.5px] outline-none focus:border-[#0d4b3a]"
+                        />
+                      </div>
+                      <div className="mt-2 max-h-[220px] overflow-auto rounded-md border border-gray-200">
+                        {templates
+                          .filter(
+                            (t) =>
+                              updateSearch.trim() === "" ||
+                              t.name.toLowerCase().includes(updateSearch.toLowerCase()) ||
+                              t.subject.toLowerCase().includes(updateSearch.toLowerCase())
+                          )
+                          .map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setSaveTplTargetId(t.id)}
+                              className={
+                                "flex w-full cursor-pointer items-start gap-2.5 border-b border-gray-100 px-3 py-2 text-left last:border-0 hover:bg-gray-50 " +
+                                (saveTplTargetId === t.id ? "bg-[#0d4b3a]/[0.04]" : "")
+                              }
+                            >
+                              <span
+                                className={
+                                  "mt-1 h-2.5 w-2.5 shrink-0 rounded-full border " +
+                                  (saveTplTargetId === t.id
+                                    ? "border-[#0d4b3a] bg-[#0d4b3a]"
+                                    : "border-gray-300")
+                                }
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-[12.5px] font-medium text-[#0f1729]">
+                                  {t.name}
+                                </div>
+                                {t.subject && (
+                                  <div className="truncate text-[11px] text-gray-500">{t.subject}</div>
+                                )}
+                                <div className="mt-0.5 text-[10.5px] text-gray-400">
+                                  Updated {new Date(t.updated_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        {templates.length === 0 && (
+                          <div className="px-3 py-4 text-center text-[11.5px] text-gray-500">
+                            No templates yet. Use Save as new instead.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-2 border-t border-gray-200 bg-gray-50/40 px-4 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaveTplPanel(null);
+                      setSaveTplTargetId(null);
+                      setUpdateSearch("");
+                    }}
+                    className="cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      pending ||
+                      (saveTplPanel === "new" && saveTplName.trim() === "") ||
+                      (saveTplPanel === "update" && !saveTplTargetId)
+                    }
+                    onClick={() => {
+                      if (saveTplPanel === "new") {
+                        saveTemplate({ id: null, name: saveTplName.trim() });
+                      } else if (saveTplTargetId) {
+                        const t = templates.find((x) => x.id === saveTplTargetId);
+                        if (t) saveTemplate({ id: t.id, name: t.name });
+                      }
+                    }}
+                    className="btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {pending ? "Saving…" : saveTplPanel === "new" ? "Save Template" : "Update Template"}
+                  </button>
+                </div>
+              </div>
+            )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -376,6 +850,76 @@ export function SendEmailModal({
           </div>
         </footer>
       </div>
+    </div>
+  );
+}
+
+function TemplatePicker({
+  templates,
+  value,
+  onChange,
+}: {
+  templates: EmailTemplateRow[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const selected = templates.find((t) => t.id === value);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-left text-[13px] hover:border-gray-300"
+      >
+        <span className={selected ? "text-[#0f1729]" : "text-gray-400"}>
+          {selected?.name ?? "No template"}
+        </span>
+        <IconChevronDown size={12} stroke={2} className="text-gray-400" />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[260px] overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onChange(null);
+              setOpen(false);
+            }}
+            className="block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] text-gray-500 hover:bg-gray-50"
+          >
+            No template
+          </button>
+          {templates.length > 0 && <div className="border-t border-gray-100" />}
+          {templates.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                onChange(t.id);
+                setOpen(false);
+              }}
+              className={
+                "block w-full cursor-pointer px-3 py-2 text-left text-[12.5px] hover:bg-gray-50 " +
+                (t.id === value ? "bg-gray-50 text-[#0f1729]" : "text-[#0f1729]")
+              }
+            >
+              <div className="truncate font-medium">{t.name}</div>
+              {t.subject && (
+                <div className="truncate text-[11px] text-gray-500">{t.subject}</div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -416,6 +960,7 @@ function RecipientRow({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -450,6 +995,8 @@ function RecipientRow({
       },
     ]);
     setQuery("");
+    setOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   function commitRawEmail(): boolean {
@@ -479,32 +1026,51 @@ function RecipientRow({
   return (
     <Row label={label} right={right}>
       <div ref={wrapRef} className="relative">
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div
+          className="flex cursor-text flex-wrap items-center gap-1.5"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              inputRef.current?.focus();
+            }
+          }}
+        >
           {selected.map((s) => (
             <Chip key={s.email} sel={s} onRemove={() => remove(s)} />
           ))}
           <input
+            ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+            }}
             onFocus={() => setOpen(true)}
+            onClick={() => setOpen(true)}
             onBlur={() => commitRawEmail()}
             onKeyDown={onKeyDown}
-            placeholder={selected.length === 0 ? "Search contacts or type an email..." : ""}
-            className="flex-1 min-w-[180px] border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
+            placeholder={
+              selected.length === 0
+                ? "Search contacts or type an email…"
+                : "Add another…"
+            }
+            className="flex-1 min-w-[140px] border-0 bg-transparent text-[13px] outline-none placeholder:text-gray-400"
           />
         </div>
-        {open && (matches.length > 0 || looksLikeEmail(query)) && (
-          <div className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-[300px] overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+        {open && (
+          <div className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-[300px] overflow-auto rounded-md border border-gray-200 bg-white shadow-[0_16px_40px_-8px_rgba(15,23,41,0.18)]">
             {matches.length > 0 && (
               <>
-                <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1 text-[10px] uppercase tracking-[0.08em] text-gray-500">
+                <div className="border-b border-gray-200 bg-gray-50/60 px-3 py-1 text-[10px] uppercase tracking-[0.08em] text-gray-500">
                   On this lead
                 </div>
                 {matches.map((c) => (
                   <button
                     key={c.contact_id}
                     type="button"
-                    onClick={() => add(c)}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      add(c);
+                    }}
                     className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left hover:bg-gray-50"
                   >
                     <Avatar initials={initialsOf(c.name)} />
@@ -528,9 +1094,25 @@ function RecipientRow({
               </div>
             )}
             {matches.length === 0 && !looksLikeEmail(query) && (
-              <div className="flex items-center gap-2 px-3 py-3 text-[12px] text-gray-500">
-                <IconSearch size={12} stroke={1.75} />
-                No matches. Paste a full email to add.
+              <div className="px-3 py-3 text-[12px] text-gray-500">
+                {selected.length === 0 ? (
+                  <div className="flex items-center gap-2">
+                    <IconSearch size={12} stroke={1.75} />
+                    No contacts on this lead. Type an email to add.
+                  </div>
+                ) : candidates.every((c) =>
+                    selected.find((s) => s.contactId === c.contact_id || s.email === c.email)
+                  ) ? (
+                  <div className="flex items-center gap-2">
+                    <IconSearch size={12} stroke={1.75} />
+                    All lead contacts added. Type an email to add another.
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <IconSearch size={12} stroke={1.75} />
+                    No matches. Keep typing or paste a full email.
+                  </div>
+                )}
               </div>
             )}
           </div>

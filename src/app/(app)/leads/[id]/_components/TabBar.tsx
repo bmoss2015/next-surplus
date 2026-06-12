@@ -13,7 +13,7 @@ const TABS = [
   { key: "mail", label: "Letters" },
   { key: "notes", label: "Notes" },
   { key: "tasks", label: "Tasks" },
-  { key: "conversation", label: "Conversation" },
+  { key: "conversation", label: "Messages" },
   { key: "activity", label: "Activity" },
 ] as const;
 

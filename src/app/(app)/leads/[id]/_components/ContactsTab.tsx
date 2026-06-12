@@ -10,9 +10,6 @@ import { RelativesSection } from "./RelativesSection";
 import { AttorneyAssignment } from "./AttorneyAssignment";
 import { MailingAddresses } from "./Overview/MailingAddresses";
 import { OtherContactsSection } from "./OtherContactsSection";
-import { SendMailButtonServer } from "@/components/mail/SendMailButtonServer";
-import { SendEmailButtonServer } from "@/components/email/SendEmailButtonServer";
-import { buildLeadSendMailCandidates } from "@/lib/mail/lead-candidates";
 
 export async function ContactsTab({ leadId }: { leadId: string }) {
   const sb = await createClient();
@@ -23,7 +20,6 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
     leadRow,
     leadParties,
     customRoles,
-    sendMailCandidates,
   ] = await Promise.all([
     fetchOwnersWithContacts(leadId),
     fetchRelatives(leadId),
@@ -31,7 +27,6 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
     sb.from("leads").select("attorney_id, attorney_cost").eq("id", leadId).maybeSingle(),
     fetchLeadParties(leadId),
     fetchOrgCustomRoles(),
-    buildLeadSendMailCandidates(leadId),
   ]);
 
   const currentAttorneyId =
@@ -104,11 +99,7 @@ export async function ContactsTab({ leadId }: { leadId: string }) {
         customRoles={customRoles}
         contacts={contacts}
       />
-      <div className="mt-4 flex flex-col gap-3">
-        <div className="flex items-center justify-end gap-2">
-          <SendMailButtonServer candidates={sendMailCandidates} />
-          <SendEmailButtonServer leadId={leadId} />
-        </div>
+      <div className="mt-4">
         <MailingAddresses
           leadId={leadId}
           initialAddresses={contacts}

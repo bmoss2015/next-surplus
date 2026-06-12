@@ -53,6 +53,8 @@ C:\\Users\\info\\moss-equity-portal
 
 \- Start: npm run dev → localhost:3000
 
+\- DB changes: `npm run db:push:staging` (uses SUPABASE_PAT, same engine as prod, no DB password drama)
+
 
 
 \### Production (never touch without Bree approval)
@@ -88,6 +90,10 @@ The `npm run db:push:prod` script talks to the Supabase Management API with a Pe
    `npm run db:push:prod`
 
    The script reads every file in `supabase/migrations/`, queries prod's `schema_migrations`, applies only what's missing, and records each apply so future runs stay in sync. Safe to re-run; it's a no-op when nothing's pending.
+
+\#### Staging migrations — same PAT, same script
+
+`npm run db:push:staging` mirrors the prod flow against `sghfmudgnddybsayfqbd`. Reuses the **same** `SUPABASE_PAT` (PATs are user-scoped, not project-scoped), so no extra setup. Safe to re-run; it's a no-op when nothing's pending. Use this instead of `npx supabase db push --linked` — no DB password lookup, no link toggling, and the local `supabase/.temp/project-ref` stays pinned to staging.
 
 \#### Why the old `npx supabase db push --linked` path is fragile
 
@@ -157,7 +163,7 @@ The assistant should drive the entire flow without manual GitHub clicks. `gh` CL
 
 \### Database
 
-\- Schema changes only via `supabase/migrations/*.sql` + `npx supabase db push --linked`. Never use Supabase MCP `apply_migration`, MCP `execute_sql` for DDL, or the dashboard SQL editor. If the file isn't in git, the change doesn't exist.
+\- Schema changes only via `supabase/migrations/*.sql` + `npm run db:push:staging` (preferred) or `npx supabase db push --linked` (legacy). Never use Supabase MCP `apply_migration`, MCP `execute_sql` for DDL, or the dashboard SQL editor. If the file isn't in git, the change doesn't exist.
 
 \- Every migration file is committed in the same PR as the code that depends on it. Local file + remote tracking + git stay in lockstep.
 

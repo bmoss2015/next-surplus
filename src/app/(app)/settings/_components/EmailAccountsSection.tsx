@@ -8,7 +8,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { disconnectEmailAccount } from "@/app/(app)/settings/_email-actions";
+import { disconnectEmailAccount, updateEmailAccountSignature } from "@/app/(app)/settings/_email-actions";
+import { RichTextEditor } from "@/components/email/RichTextEditor";
 import type { EmailAccountRow } from "@/lib/email/types";
 
 function formatSyncedAt(ts: string | null): string {
@@ -150,6 +151,8 @@ function AccountBlock({ acct }: { acct: EmailAccountRow }) {
         </button>
       </div>
 
+      <SignatureEditor acct={acct} />
+
       <div className="inbox-prefs">
         <Pref
           title="Sync read status to Gmail"
@@ -173,6 +176,60 @@ function AccountBlock({ acct }: { acct: EmailAccountRow }) {
         />
       </div>
     </>
+  );
+}
+
+function SignatureEditor({ acct }: { acct: EmailAccountRow }) {
+  const router = useRouter();
+  const [value, setValue] = useState(acct.signature_html ?? "");
+  const [pending, startTransition] = useTransition();
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const dirty = value !== (acct.signature_html ?? "");
+
+  function save() {
+    setErr(null);
+    startTransition(async () => {
+      const res = await updateEmailAccountSignature(acct.id, value);
+      if (!res.ok) {
+        setErr(res.error);
+        return;
+      }
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1500);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="mt-4 rounded-[10px] border border-gray-200 bg-white p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-[11px] uppercase tracking-[0.08em] text-gray-500">
+          Signature
+        </div>
+        {savedFlash && (
+          <span className="text-[11px] font-medium text-green-700">Saved</span>
+        )}
+      </div>
+      <RichTextEditor
+        value={value}
+        onChange={setValue}
+        placeholder="Bree Moss · Managing Partner · 713-555-0184"
+        minRows={5}
+      />
+      <div className="mt-2 flex items-center justify-end gap-2">
+        {err && <span className="mr-auto text-[11px] text-red-600">{err}</span>}
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty || pending}
+          className="btn btn-primary btn-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {pending ? "Saving…" : "Save Signature"}
+        </button>
+      </div>
+    </div>
   );
 }
 
