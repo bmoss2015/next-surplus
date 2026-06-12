@@ -33,6 +33,7 @@ import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
 import { fetchOrgStages } from "@/lib/stages/fetch";
 import { getValidationUsage, isPhoneValidationEnabled } from "@/lib/phone-validate";
+import { fetchOrgBilling } from "@/lib/billing/fetch";
 import { SettingsPreviewJsx } from "./_components/SettingsPreviewJsx";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +81,7 @@ export default async function SettingsPreviewJsxPage() {
     mailBank,
     lobPricing,
     phoneUsage,
+    billing,
   ] = isAdmin
     ? await Promise.all([
         fetchAppSettings(),
@@ -91,8 +93,9 @@ export default async function SettingsPreviewJsxPage() {
         fetchMailBankAccounts(),
         fetchLobPricingSettings(),
         getValidationUsage(profile.orgId),
+        fetchOrgBilling(),
       ])
-    : [null, null, [], [], null, null, [], null, null];
+    : [null, null, [], [], null, null, [], null, null, null];
 
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "(app)", "settings", "preview.css"),
@@ -165,6 +168,7 @@ export default async function SettingsPreviewJsxPage() {
           research,
           phoneUsage,
           phoneValidationEnabled: isPhoneValidationEnabled(),
+          billing,
           notificationPrefs,
           customerPricing,
           orgStages,
