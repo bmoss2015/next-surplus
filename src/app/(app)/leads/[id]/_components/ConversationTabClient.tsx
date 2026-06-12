@@ -205,13 +205,18 @@ export function ConversationTabClient({
       if (!el) return;
       const top = el.getBoundingClientRect().top;
       const margin = 24;
-      const next = Math.max(420, Math.round(window.innerHeight - top - margin));
+      const viewportFit = Math.round(window.innerHeight - top - margin);
+      const sidebar = document.querySelector<HTMLElement>("[data-lead-sidebar]");
+      const sidebarHeight = sidebar ? sidebar.offsetHeight : 0;
+      const next = Math.max(420, viewportFit, sidebarHeight);
       setContainerPx(next);
     }
     recompute();
     window.addEventListener("resize", recompute);
     const ro = new ResizeObserver(recompute);
     if (containerRef.current) ro.observe(containerRef.current);
+    const sidebar = document.querySelector<HTMLElement>("[data-lead-sidebar]");
+    if (sidebar) ro.observe(sidebar);
     return () => {
       window.removeEventListener("resize", recompute);
       ro.disconnect();

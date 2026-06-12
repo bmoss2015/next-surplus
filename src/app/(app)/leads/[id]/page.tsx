@@ -125,7 +125,7 @@ export default async function LeadDetailPage({
             {activeTab === "activity" && <ActivityTab leadId={lead.id} />}
           </div>
 
-          <div className="flex flex-col gap-[14px]">
+          <div data-lead-sidebar className="flex flex-col gap-[14px]">
             <div className="rounded-[10px] border border-gray-200 bg-surface p-4 shadow-card">
               <RecoveryFeeField
                 leadId={lead.id}
