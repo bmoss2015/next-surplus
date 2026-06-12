@@ -795,7 +795,6 @@ export function ConversationTabClient({
           )}
           {selectedThread && !noAccount && (() => {
             const last = selectedThread.messages[selectedThread.messages.length - 1];
-            const hasMultiple = last.to_addresses.length + last.cc_addresses.length > 1;
             return (
               <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 border-t border-gray-200 bg-white/95 px-5 py-3 backdrop-blur">
                 <button
@@ -806,16 +805,14 @@ export function ConversationTabClient({
                   <IconArrowBackUp size={13} stroke={2} />
                   Reply
                 </button>
-                {hasMultiple && (
-                  <button
-                    type="button"
-                    onClick={() => startReply("replyAll", last)}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3.5 py-[7px] text-[12.5px] font-medium text-[#0f1729] hover:border-[#0d4b3a]/40"
-                  >
-                    <IconArrowBackUpDouble size={13} stroke={2} />
-                    Reply All
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => startReply("replyAll", last)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3.5 py-[7px] text-[12.5px] font-medium text-[#0f1729] hover:border-[#0d4b3a]/40"
+                >
+                  <IconArrowBackUpDouble size={13} stroke={2} />
+                  Reply All
+                </button>
                 <button
                   type="button"
                   onClick={() => startReply("forward", last)}
