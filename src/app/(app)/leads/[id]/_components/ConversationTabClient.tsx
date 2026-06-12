@@ -200,6 +200,7 @@ export function ConversationTabClient({
   const [containerPx, setContainerPx] = useState<number>(0);
 
   useEffect(() => {
+    const sidebar = document.querySelector<HTMLElement>("[data-lead-sidebar]");
     function recompute() {
       const el = containerRef.current;
       if (!el) return;
@@ -207,6 +208,10 @@ export function ConversationTabClient({
       const margin = 24;
       const next = Math.max(420, Math.round(window.innerHeight - top - margin));
       setContainerPx(next);
+      if (sidebar) {
+        sidebar.style.height = `${next}px`;
+        sidebar.style.overflowY = "auto";
+      }
     }
     recompute();
     window.addEventListener("resize", recompute);
@@ -215,6 +220,10 @@ export function ConversationTabClient({
     return () => {
       window.removeEventListener("resize", recompute);
       ro.disconnect();
+      if (sidebar) {
+        sidebar.style.height = "";
+        sidebar.style.overflowY = "";
+      }
     };
   }, []);
 
@@ -693,7 +702,7 @@ export function ConversationTabClient({
           real email client instead of a list of vertical cards. */}
       <div
         ref={containerRef}
-        className="sticky top-4 grid overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-card"
+        className="grid overflow-hidden rounded-[10px] border border-gray-200 bg-surface shadow-card"
         style={{
           gridTemplateColumns: "320px 1fr",
           height: containerPx > 0 ? `${containerPx}px` : "min(82vh, 920px)",
