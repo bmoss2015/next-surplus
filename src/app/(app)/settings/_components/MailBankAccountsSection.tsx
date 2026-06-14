@@ -66,7 +66,7 @@ export function MailBankAccountsSection({
             Bank accounts used to fund outgoing checks and certified mail
             through Lob. ACH only, credit and debit cards aren&apos;t
             eligible since the network won&apos;t draw checks against a
-            credit line. Your monthly Moss Equity subscription is billed
+            credit line. Your monthly Next Surplus subscription is billed
             separately in <a href="#billing">Billing</a>.
           </p>
         </div>

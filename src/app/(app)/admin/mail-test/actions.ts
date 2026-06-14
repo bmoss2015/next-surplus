@@ -764,7 +764,7 @@ export async function seedSampleMailData(): Promise<
       recipient_state: s.state,
       recipient_postal_code: s.zip,
       recipient_country: "US",
-      from_name: (org.name as string | null) ?? "Moss Equity Partners",
+      from_name: (org.name as string | null) ?? "Next Surplus",
       from_address_line1: (org.address_line1 as string | null) ?? "100 Main St",
       from_address_line2: (org.address_line2 as string | null) ?? null,
       from_city: (org.city as string | null) ?? "Austin",

@@ -295,7 +295,7 @@ function TextEditor({
           placeholder={
             channel === "email"
               ? "Hi {{contact.first_name}},\n\nWe found surplus funds tied to your property at {{lead.address}}..."
-              : "Hi {{contact.first_name}}, this is Bree from Moss Equity..."
+              : "Hi {{contact.first_name}}, this is Bree from Next Surplus..."
           }
         />
       </div>

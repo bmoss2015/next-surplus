@@ -245,7 +245,7 @@ export function BillingSection({
       <h2 className="billing-section-h">Payment Method</h2>
       <div className="billing-card">
         <div className="billing-card-desc" style={{ marginBottom: 16 }}>
-          Charged monthly for your Moss Equity subscription. Credit or debit
+          Charged monthly for your Next Surplus subscription. Credit or debit
           cards. Outgoing checks pull from <a href="#mail-bank">Bank Accounts</a>{" "}
           instead.
         </div>

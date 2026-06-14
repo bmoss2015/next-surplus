@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Moss Equity Partners",
+  title: "Next Surplus",
   description: "Surplus funds recovery operations portal",
 };
 

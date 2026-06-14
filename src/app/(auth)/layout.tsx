@@ -9,7 +9,7 @@ export default function AuthLayout({
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           <div className="text-[20px] font-medium tracking-tight text-petrol-700">
-            Moss Equity Partners
+            Next Surplus
           </div>
         </div>
         <div className="rounded-[10px] border border-gray-200 bg-surface p-6 shadow-card">

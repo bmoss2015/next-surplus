@@ -71,8 +71,8 @@ export const MERGE_FIELDS: MergeField[] = [
   { key: "lead.est_net_to_owner", label: "Est. Net To You", example: "$11,250", group: "lead" },
 
   // Sender — from org settings
-  { key: "sender.company_name", label: "Company Name", example: "Moss Equity Partners", group: "sender" },
-  { key: "sender.legal_name", label: "Legal Name", example: "Moss Equity Partners, LLC", group: "sender" },
+  { key: "sender.company_name", label: "Company Name", example: "Your Company", group: "sender" },
+  { key: "sender.legal_name", label: "Legal Name", example: "Your Company, LLC", group: "sender" },
   { key: "sender.signer_name", label: "Signer Name", example: "Bree Moss", group: "sender" },
   { key: "sender.signer_title", label: "Signer Title", example: "Managing Partner", group: "sender" },
   { key: "sender.signature_image", label: "Signature Image", example: "[signature image]", group: "sender" },

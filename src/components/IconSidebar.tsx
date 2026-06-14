@@ -123,9 +123,9 @@ export function IconSidebar({
           <>
             <div
               className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-tight"
-              title="Moss Equity Partners"
+              title="Next Surplus"
             >
-              Moss Equity Partners
+              Next Surplus
             </div>
             <button
               type="button"
