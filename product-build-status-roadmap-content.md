@@ -76,6 +76,7 @@ Active priorities for the current quarter (April - June 2026). Ordered by consum
 
 - Google OAuth app verification (removes the "unverified app" warning users see today when connecting Gmail). Google review takes 4 to 8 weeks so the application must be submitted early in the quarter.
 - Public launch readiness (Owner / Viewer / Admin / Member roles, Stripe billing with plan picker, new-org onboarding flow as a post-signup wizard, public marketing site at mossequitypartners.com with pricing, features, and signup, per-org isolation polish).
+- Public sign up page at /signup (self-serve org creation — new firm enters company name, owner email, and password, then lands directly into the post-signup onboarding wizard and Stripe plan picker). Today new users can only join by invite, which blocks any marketing-driven acquisition.
 - Additional email providers (Microsoft 365 / Outlook two-way OAuth sync plus generic IMAP fallback alongside the existing Gmail integration).
 - In-app feedback widget (persistent floating button on every page for "send feedback", "request a feature", or "chat with us" without leaving the workflow).
 - Customer newsletter system (weekly send via Resend with feature highlights, how-to walkthroughs, and an embedded feedback prompt).
