@@ -304,12 +304,7 @@ export default function LandingV1() {
 
       <footer className="border-t border-gray-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-8 py-8 text-[12.5px] text-gray-500">
-          <div>
-            <span className="font-semibold text-ink">Next Surplus</span>
-            <span className="ml-2 text-gray-400">
-              Moss Equity Partners, LLC
-            </span>
-          </div>
+          <div className="font-semibold text-ink">Next Surplus</div>
           <div className="flex items-center gap-6">
             <Link href="/privacy" className="hover:text-ink">
               Privacy
