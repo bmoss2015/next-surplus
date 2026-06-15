@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "../_actions";
 
+const IS_PREVIEW = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview";
+const TEST_EMAIL = "info@mossyland.com";
+const TEST_PASSWORD = "Anderson1028!$";
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -12,11 +16,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  function attempt(emailValue: string, passwordValue: string) {
     setError(null);
     startTransition(async () => {
-      const result = await signIn(email, password);
+      const result = await signIn(emailValue, passwordValue);
       if (result.ok) {
         router.push("/");
         router.refresh();
@@ -24,6 +27,17 @@ export default function LoginPage() {
         setError(result.error);
       }
     });
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    attempt(email, password);
+  }
+
+  function signInWithTestCreds() {
+    setEmail(TEST_EMAIL);
+    setPassword(TEST_PASSWORD);
+    attempt(TEST_EMAIL, TEST_PASSWORD);
   }
 
   const inputClass =
@@ -79,6 +93,19 @@ export default function LoginPage() {
       >
         {pending ? "Signing in" : "Sign In"}
       </button>
+      {IS_PREVIEW && (
+        <div className="space-y-1.5 pt-2">
+          <button
+            type="button"
+            onClick={signInWithTestCreds}
+            disabled={pending}
+            className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[12px] font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+          >
+            Use Test Credentials
+          </button>
+          <p className="text-[10px] text-gray-400">Preview only. Signs in as {TEST_EMAIL}.</p>
+        </div>
+      )}
     </form>
   );
 }
