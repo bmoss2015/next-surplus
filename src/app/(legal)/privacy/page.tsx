@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         <p>
           Next Surplus (&quot;Next Surplus,&quot; &quot;we,&quot;
           &quot;us,&quot; or &quot;our&quot;) operates the Next Surplus
-          platform at app.nextsurplus.com (the &quot;Service&quot;). This
+          platform at nextsurplus.com (the &quot;Service&quot;). This
           Privacy Policy describes how we collect, use, store, and share
           your information when you use our Service.
         </p>
@@ -554,7 +554,7 @@ export default function PrivacyPage() {
           <a href="mailto:support@nextsurplus.com">support@nextsurplus.com</a>
           <br />
           Website:{" "}
-          <a href="https://app.nextsurplus.com">https://app.nextsurplus.com</a>
+          <a href="https://nextsurplus.com">https://nextsurplus.com</a>
         </p>
       </Section>
     </article>

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Terms of Service | Next Surplus",
   description:
-    "Terms governing your access to and use of Next Surplus at app.nextsurplus.com.",
+    "Terms governing your access to and use of Next Surplus at nextsurplus.com.",
 };
 
 export default function TermsPage() {
@@ -25,7 +25,7 @@ export default function TermsPage() {
       <div className="mt-6 mb-10">
         <p>
           These Terms of Service (&quot;Terms&quot;) govern your access to
-          and use of the Next Surplus platform at app.nextsurplus.com (the
+          and use of the Next Surplus platform at nextsurplus.com (the
           &quot;Service&quot;), operated by Next Surplus (&quot;Next
           Surplus,&quot; &quot;we,&quot; &quot;us,&quot; or
           &quot;our&quot;). By creating an account or using the Service,
