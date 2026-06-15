@@ -9,6 +9,7 @@
 // also blocks self-edits).
 
 import { useState } from "react";
+import { IconChevronRight, IconUserPlus } from "@tabler/icons-react";
 import type { OrgMemberRow } from "@/lib/settings/fetch";
 import { InviteMemberDrawer } from "./InviteMemberDrawer";
 import { MemberOverflow } from "./MemberOverflow";
@@ -45,9 +46,9 @@ export function TeamSection({
     <section id="panel-team" className="panel active">
       <div className="breadcrumb">
         <a>Settings</a>
-        <i className="icon icon-chevron-right" />
+        <IconChevronRight size={12} stroke={1.75} />
         <a>Workspace</a>
-        <i className="icon icon-chevron-right" />
+        <IconChevronRight size={12} stroke={1.75} />
         <span>Members</span>
       </div>
 
@@ -62,7 +63,7 @@ export function TeamSection({
             className="btn btn-light"
             onClick={() => setInviteOpen(true)}
           >
-            <i className="icon icon-user-plus" /> Invite Member
+            <IconUserPlus size={16} stroke={1.75} /> Invite Member
           </button>
         </div>
         <div className="hero-stats">
