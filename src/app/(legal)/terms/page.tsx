@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Terms of Service | Next Surplus",
   description:
-    "Terms governing your access to and use of Next Surplus at app.nextsurplus.com.",
+    "Terms governing your access to and use of Next Surplus at nextsurplus.com.",
 };
 
 export default function TermsPage() {
@@ -24,11 +24,11 @@ export default function TermsPage() {
 
       <div className="mt-6 mb-10">
         <p>
-          These Terms of Service (&quot;Terms&quot;) govern your access to and
-          use of Next Surplus at app.nextsurplus.com (the &quot;Service&quot;)
-          operated by Moss Equity Partners, LLC, doing business as Next
-          Surplus (&quot;Next Surplus,&quot; &quot;we,&quot; &quot;us,&quot;
-          or &quot;our&quot;). By creating an account or using the Service,
+          These Terms of Service (&quot;Terms&quot;) govern your access to
+          and use of the Next Surplus platform at nextsurplus.com (the
+          &quot;Service&quot;), operated by Next Surplus (&quot;Next
+          Surplus,&quot; &quot;we,&quot; &quot;us,&quot; or
+          &quot;our&quot;). By creating an account or using the Service,
           you agree to be bound by these Terms.
         </p>
       </div>
@@ -302,10 +302,10 @@ export default function TermsPage() {
         <Sub title="8.1 Our Property">
           <p>
             The Service, including its design, code, features, documentation,
-            and branding, is owned by Moss Equity Partners, LLC (d/b/a Next
-            Surplus) and protected by intellectual property laws. These Terms
-            do not grant you any rights to our intellectual property except
-            the limited right to use the Service as a subscriber.
+            and branding, is owned by Next Surplus and protected by
+            intellectual property laws. These Terms do not grant you any
+            rights to our intellectual property except the limited right to
+            use the Service as a subscriber.
           </p>
         </Sub>
         <Sub title="8.2 Feedback">
@@ -342,7 +342,7 @@ export default function TermsPage() {
 
       <Section title="10. Limitation of Liability">
         <p>
-          TO THE MAXIMUM EXTENT PERMITTED BY LAW, MOSS EQUITY PARTNERS, LLC
+          TO THE MAXIMUM EXTENT PERMITTED BY LAW, NEXT SURPLUS
           SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
           CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS,
           REVENUE, DATA, OR USE, ARISING OUT OF OR RELATED TO YOUR USE OF
@@ -362,11 +362,10 @@ export default function TermsPage() {
 
       <Section title="11. Indemnification">
         <p>
-          You agree to indemnify, defend, and hold harmless Moss Equity
-          Partners, LLC (d/b/a Next Surplus), its officers, directors,
-          employees, and agents from any claims, damages, losses, liabilities,
-          and expenses (including reasonable attorneys&apos; fees) arising
-          from:
+          You agree to indemnify, defend, and hold harmless Next Surplus,
+          its officers, directors, employees, and agents from any claims,
+          damages, losses, liabilities, and expenses (including reasonable
+          attorneys&apos; fees) arising from:
         </p>
         <ul>
           <li>Your use of the Service</li>
@@ -474,7 +473,7 @@ export default function TermsPage() {
       <Section title="17. Contact Us">
         <p>If you have questions about these Terms:</p>
         <p>
-          <strong>Moss Equity Partners, LLC (d/b/a Next Surplus)</strong>
+          <strong>Next Surplus</strong>
           <br />
           Email:{" "}
           <a href="mailto:support@nextsurplus.com">support@nextsurplus.com</a>
