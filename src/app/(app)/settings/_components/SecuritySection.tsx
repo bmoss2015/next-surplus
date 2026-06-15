@@ -21,8 +21,8 @@ export function SecuritySection() {
   const inputType = show ? "text" : "password";
   const ready =
     currentPw.length >= 1 &&
-    newPw.length >= 8 &&
-    confirmPw.length >= 8 &&
+    newPw.length >= 12 &&
+    confirmPw.length >= 12 &&
     newPw === confirmPw;
 
   function reset() {
@@ -40,8 +40,8 @@ export function SecuritySection() {
       setErrMsg("New passwords do not match.");
       return;
     }
-    if (newPw.length < 8) {
-      setErrMsg("New password must be at least 8 characters.");
+    if (newPw.length < 12) {
+      setErrMsg("New password must be at least 12 characters.");
       return;
     }
     startTransition(async () => {
@@ -92,7 +92,7 @@ export function SecuritySection() {
         <div className="flex-1 min-w-0">
           <div className="pref-row-title">New Password</div>
           <div className="pref-row-desc">
-            At least 8 characters. Mix letters, numbers, and symbols.
+            At least 12 characters. Mix letters, numbers, and symbols.
           </div>
         </div>
         <input
@@ -100,8 +100,8 @@ export function SecuritySection() {
           type={inputType}
           value={newPw}
           onChange={(e) => setNewPw(e.target.value)}
-          minLength={8}
-          placeholder="At least 8 characters"
+          minLength={12}
+          placeholder="At least 12 characters"
           autoComplete="new-password"
         />
       </div>
@@ -114,7 +114,7 @@ export function SecuritySection() {
           type={inputType}
           value={confirmPw}
           onChange={(e) => setConfirmPw(e.target.value)}
-          minLength={8}
+          minLength={12}
           placeholder="Re-enter new password"
           autoComplete="new-password"
         />
