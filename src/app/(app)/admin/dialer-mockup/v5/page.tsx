@@ -6,7 +6,7 @@ import { ACTIVE_LEAD, QUEUE, fmtMoney } from "../_sample";
 export default async function V5Page() {
   if (process.env.VERCEL_ENV === "production") notFound();
   const profile = await getCurrentProfile();
-  if (!profile?.isAdmin) notFound();
+  if (!profile) notFound();
 
   const lead = ACTIVE_LEAD;
   const lines = [

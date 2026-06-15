@@ -5,7 +5,7 @@ import { getCurrentProfile } from "@/lib/auth/current-user";
 export default async function DialerMockupIndexPage() {
   if (process.env.VERCEL_ENV === "production") notFound();
   const profile = await getCurrentProfile();
-  if (!profile?.isAdmin) notFound();
+  if (!profile) notFound();
 
   const variants = [
     {
@@ -47,6 +47,46 @@ export default async function DialerMockupIndexPage() {
       summary:
         "Multi-line. 2×2 grid of compact call cards when dialing four numbers at once. The card that connects expands to take the workspace, the others gray-pause. Side rail shows queue burn down. Single-line power mode is a switch.",
       why: "Nooks beats Orum on UI but Orum still leads on parallel dial volume. This direction borrows Nooks' calm visual layer over Orum's productivity ceiling. Future-proof: ships as power dial in V1, parallel ready when telephony supports it.",
+    },
+    {
+      slug: "v6",
+      title: "V6 — Property Map Workspace",
+      anchor: "Zillow · Apple Find My · Notion spatial",
+      summary:
+        "Map of the subject property fills the backdrop. Property card pinned top-left, surplus badge top-right, call surface and people strip pinned to the bottom. Disposition row inline. The property is the hero, not the person.",
+      why: "Surplus work is property-anchored. Most dialers treat each call as a contact-row event; the geography never shows. A spatial backdrop reframes the work and makes the asset undeniable, which is the right frame for high-value leads.",
+    },
+    {
+      slug: "v7",
+      title: "V7 — Inbox Triage",
+      anchor: "Superhuman · Hey · Front",
+      summary:
+        "Three pane email-app layout. Left rail is the queue as a thread list. Center is the lead as one threaded conversation, every call / mail / voicemail / note as a message bubble. Right rail is decide + snooze. Active call pinned as a thin bar above the dock.",
+      why: "Superhuman is the speed bar reviewers still cite as the gold standard. Treating a lead as a single conversation thread eliminates the panel fatigue Bree keeps calling out, and snooze fits surplus work where 'call back Tuesday' is the most common outcome.",
+    },
+    {
+      slug: "v8",
+      title: "V8 — Card Deck Focus",
+      anchor: "Tinder · Linear cycle · Apple Photos",
+      summary:
+        "One lead, edge to edge, on a dark stage. Two ghost cards stacked behind to telegraph the queue. Keyboard cycles J/K, decisions are C/D/S/X. Everything that's not this lead is hidden. Bottom bar shows the four big keys.",
+      why: "Power dialing is decision fatigue. Every other direction shows a queue, a sidebar, a map. This one shows the next decision and nothing else. Closest analog is a Tinder deck or Apple Photos full-screen review, scaled to a working surface.",
+    },
+    {
+      slug: "v9",
+      title: "V9 — Mission Briefing",
+      anchor: "Notion AI Canvas · CIA dossier · Classic newspaper",
+      summary:
+        "Cream paper, serif type. The lead presented as a prepared briefing with numbered sections: TL;DR, Key Facts, Open Questions, Suggested Opening, Risks, People. Call strip pinned at the foot. No data tables, no panels — only synthesized intelligence.",
+      why: "Bree keeps rejecting dashboard chrome. This direction strips it entirely and treats every call as a prepared briefing the analyst delivers before the rep dials. Heavy serif, no chips, no tinted backgrounds. Editorial confidence as the visual language.",
+    },
+    {
+      slug: "v10",
+      title: "V10 — Voice Co-Pilot",
+      anchor: "Otter.ai · Gong · Granola · ChatGPT Voice",
+      summary:
+        "Live transcript center stage. Rep bubbles right, lead bubbles left, AI cues inline as flagged notes. Right rail = co-pilot suggestions (say-now / avoid / ask) + flagged moments (objections, commitments). Left rail = lead context. Dock pinned at the bottom.",
+      why: "No surplus-specialized dialer ships an AI co-pilot today. Reps in this market spend the call balancing siblings, fee objections, and probate timelines. Real-time transcription + targeted cue cards is the highest-leverage feature once telephony lands.",
     },
   ];
 

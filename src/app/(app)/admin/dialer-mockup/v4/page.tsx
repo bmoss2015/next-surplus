@@ -12,7 +12,7 @@ import {
 export default async function V4Page() {
   if (process.env.VERCEL_ENV === "production") notFound();
   const profile = await getCurrentProfile();
-  if (!profile?.isAdmin) notFound();
+  if (!profile) notFound();
 
   const lead = ACTIVE_LEAD;
   const matrix = lead.bestTimeMatrix;
