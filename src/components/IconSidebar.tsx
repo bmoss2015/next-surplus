@@ -22,6 +22,7 @@ import {
   Scale,
   FileUp,
   BarChart3,
+  Phone,
   Settings,
   ShieldCheck,
   LogOut,
@@ -45,6 +46,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { label: "Dashboard", href: "/",         Icon: LayoutDashboard },
   { label: "Leads",     href: "/leads",    Icon: Users },
+  { label: "Dialer",    href: "/dialer",   Icon: Phone },
   { label: "Playbooks", href: "/playbooks",Icon: BookOpen },
   { label: "Tasks",     href: "/tasks",    Icon: CheckSquare },
   { label: "Inbox",     href: "/inbox",    Icon: Inbox },
