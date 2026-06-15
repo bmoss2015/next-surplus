@@ -7,8 +7,12 @@
 // don't all exist; Disconnect is the action that actually fires now.
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { disconnectEmailAccount, updateEmailAccountSignature } from "@/app/(app)/settings/_email-actions";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  disconnectEmailAccount,
+  setEmailAccountReadSync,
+  updateEmailAccountSignature,
+} from "@/app/(app)/settings/_email-actions";
 import { RichTextEditor } from "@/components/email/RichTextEditor";
 import type { EmailAccountRow } from "@/lib/email/types";
 
@@ -29,6 +33,18 @@ export function EmailAccountsSection({
 }: {
   initial: EmailAccountRow[];
 }) {
+  const router = useRouter();
+  const search = useSearchParams();
+  const connectStatus = search.get("email_connect");
+  const reason = search.get("reason");
+
+  function clearBanner() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("email_connect");
+    url.searchParams.delete("reason");
+    router.replace(url.pathname + url.search + url.hash);
+  }
+
   return (
     <section id="panel-email-accounts" className="panel active">
       <div className="breadcrumb">
@@ -47,6 +63,35 @@ export function EmailAccountsSection({
           </p>
         </div>
       </div>
+
+      {connectStatus === "success" && (
+        <div className="mb-3 flex items-center justify-between rounded-md border border-petrol-200 bg-petrol-50 px-3 py-2 text-[12.5px] text-petrol-700">
+          <span>
+            Account Connected. Initial sync is running in the background.
+          </span>
+          <button
+            type="button"
+            onClick={clearBanner}
+            className="cursor-pointer text-petrol-500 hover:text-petrol-700"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      {connectStatus === "error" && (
+        <div className="mb-3 flex items-center justify-between rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12.5px] text-danger">
+          <span>
+            Connection Failed{reason ? ` — ${reason.replace(/_/g, " ")}` : ""}.
+          </span>
+          <button
+            type="button"
+            onClick={clearBanner}
+            className="cursor-pointer text-danger hover:text-danger-strong"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {initial.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-surface p-8 text-center">
@@ -184,11 +229,7 @@ function AccountBlock({ acct }: { acct: EmailAccountRow }) {
       <SignatureEditor acct={acct} />
 
       <div className="inbox-prefs">
-        <Pref
-          title="Sync read status to Gmail"
-          desc="When you mark an email read here, also clear the unread label in Gmail."
-          on={acct.sync_read_to_provider}
-        />
+        <ReadSyncPref acct={acct} />
         <Pref
           title="Send from this address"
           desc="Use this inbox as the default sender when composing email from a lead."
@@ -282,6 +323,41 @@ function Pref({
         className={"toggle" + (on ? " on" : "")}
         title="Per-account toggles wire in Phase D"
         style={{ pointerEvents: "none", opacity: 0.6 }}
+      />
+    </div>
+  );
+}
+
+function ReadSyncPref({ acct }: { acct: EmailAccountRow }) {
+  const router = useRouter();
+  const [on, setOn] = useState(acct.sync_read_to_provider);
+  const [, startTransition] = useTransition();
+
+  function toggle() {
+    const next = !on;
+    setOn(next);
+    startTransition(async () => {
+      await setEmailAccountReadSync(acct.id, next);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="inbox-pref">
+      <div>
+        <div className="inbox-pref-title">Sync Read Status To Gmail</div>
+        <div className="inbox-pref-desc">
+          When you mark an email read here, also clear the unread label in
+          Gmail.
+        </div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="Toggle sync read status to Gmail"
+        onClick={toggle}
+        className={"toggle cursor-pointer" + (on ? " on" : "")}
       />
     </div>
   );
