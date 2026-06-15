@@ -6,6 +6,8 @@ const PUBLIC_PATHS = ["/login", "/forgot"];
 // Auth-flow pages reachable with OR without a session — you land on them holding
 // a recovery/invite session in order to set a password, so don't bounce.
 const AUTH_FLOW_PATHS = ["/reset", "/accept-invite"];
+// Always-open marketing / legal pages: anyone can view, no bounce either way.
+const OPEN_PATHS = ["/landing"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -24,6 +26,9 @@ export async function proxy(request: NextRequest) {
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const isAuthFlow = AUTH_FLOW_PATHS.some((p) => pathname.startsWith(p));
+  const isOpen = OPEN_PATHS.some((p) => pathname.startsWith(p));
+
+  if (isOpen) return NextResponse.next();
 
   let response = NextResponse.next({ request });
 
