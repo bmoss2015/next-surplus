@@ -6,8 +6,10 @@ const PUBLIC_PATHS = ["/login", "/forgot"];
 // Auth-flow pages reachable with OR without a session — you land on them holding
 // a recovery/invite session in order to set a password, so don't bounce.
 const AUTH_FLOW_PATHS = ["/reset", "/accept-invite"];
-// Always-open marketing / legal pages: anyone can view, no bounce either way.
-const OPEN_PATHS = ["/landing"];
+// Always-open pages: anyone can view, no bounce either way. Includes legal
+// pages required for Google OAuth verification + the public marketing
+// landing routes.
+const OPEN_PATHS = ["/privacy", "/terms", "/landing"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
