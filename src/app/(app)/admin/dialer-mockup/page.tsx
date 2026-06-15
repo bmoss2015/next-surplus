@@ -9,6 +9,30 @@ export default async function DialerMockupIndexPage() {
 
   const variants = [
     {
+      slug: "v37",
+      title: "V37 — Compact No-Scroll (1280px+ fits)",
+      anchor: "V35 spirit, tightened",
+      summary:
+        "Same three-column structure as V35 (Session Queue left, Call Stage center, Deal Facts + Contacts + Notes right) but every card padding and font size dropped by ~15% so the whole page fits on a 1280px laptop with no scroll. Same V25 live flashing dot, V17 floating shadows, V13 clean separate panels.",
+      why: "If 'everything fits on one page' is the priority, this is it. Lose a little breathing room, gain zero scroll across the entire screen.",
+    },
+    {
+      slug: "v36",
+      title: "V36 — Wrap-Up State Shown",
+      anchor: "V35 layout, wrap-up moment",
+      summary:
+        "Same skeleton as V35 but showing what happens after End Call. Center column reads: gradient hero with 'Call Just Ended' + note field, then a row of five outcome cards (Interested / Callback / Not Interested / Wrong Number / Do Not Contact), then the white Next Call card with 0:03 countdown and Dial Now.",
+      why: "V35 shows the LIVE state (you're talking). V36 shows the WRAP-UP state (after End Call). Same layout, different moment. Pair them to see both modes.",
+    },
+    {
+      slug: "v35",
+      title: "V35 — Live Call State (Recommended Starting Point)",
+      anchor: "V13 panels + V17 shadows + V25 controls + V29 gradient",
+      summary:
+        "Session Queue as a full-height left rail (your strongest direction). Smaller centered call card with V25 live flashing dot, V25 mute/hold/voicemail/end controls, V29-style clean gradient with no watermark. White Next Call card below shows the 0:03 countdown and Dial Now. Right rail has three separate floating cards: Deal Facts (county, sale type, sale date, owner status, surplus, net), Contacts and Phones, Recent Notes.",
+      why: "This is the consolidated answer to every piece of your last round. No watermark, no white strip at the top, no auto-detected text, no Lead History (redundant with Notes), no rainbow accents. Left queue rail, smaller call card, clear right-rail panels with shadows. Dial Now replaces Skip Wait (clearer phrasing).",
+    },
+    {
       slug: "v34",
       title: "V34 — Hero-Dominant + Queue Strip",
       anchor: "V28 spine, polished",
