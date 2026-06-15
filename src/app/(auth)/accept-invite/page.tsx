@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { completeInviteProfile } from "@/app/(app)/settings/_actions";
 
@@ -17,7 +16,6 @@ function splitName(fullName: string | null | undefined): {
 }
 
 export default function AcceptInvitePage() {
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [status, setStatus] = useState<"checking" | "ready" | "invalid">(
     "checking"
