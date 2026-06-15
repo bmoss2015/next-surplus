@@ -9,6 +9,54 @@ export default async function DialerMockupIndexPage() {
 
   const variants = [
     {
+      slug: "v26",
+      title: "V26 — Strip Layout (Spotify Home)",
+      anchor: "Spotify Home · Apple Music · App Store Today",
+      summary:
+        "Caller hero in a single large gradient banner across the top. Below it, horizontal scroll strips of cards for contacts, queue, notes. Bottom dock holds call controls and outcomes in one persistent row. Premium app-feel, content reads as a scrollable card show.",
+      why: "If V17's spirit was 'depth and bold caller card,' V26 takes that and stacks the supporting info as horizontal strips you can flick through. Multi-phone display lives inside the contact card. Queue is visible as a strip you can scan without leaving the page.",
+    },
+    {
+      slug: "v25",
+      title: "V25 — Fintech Dashboard (Stripe / Mercury)",
+      anchor: "Stripe Dashboard · Mercury",
+      summary:
+        "Precise grid with fine borders, pristine white, no glass effects. Hero block with rounded-square avatar, three pillar stats inline below, controls + End Call. Right rail has the full queue (1 through 10). Bottom row is a contacts table with one row per phone number plus a separate outcome panel.",
+      why: "V17 had a packed feeling. V25 is the calm-dense option. Fintech aesthetic. Every number, contact, phone, outcome is on one screen, separated by hairlines not boxes. For when 'premium' means 'precise' rather than 'glossy.'",
+    },
+    {
+      slug: "v24",
+      title: "V24 — Color Studio (warm color blocks, no tan)",
+      anchor: "Headspace · Notion · soft pastel SaaS",
+      summary:
+        "Light grey-blue background. Hero caller card is petrol gradient with white avatar. Stats are colored pills (mint, sky, lavender, rose) so each metric reads as a distinct cue, not 'four more numbers.' Contact cards take soft tints per role. Outcome panel and queue are calm white cards.",
+      why: "Bree said the V17 mesh colors were not her favorite but kept it light. V24 keeps light but uses color to give each piece its own identity. Tan is gone. No mesh. Distinct cues without going visually heavy.",
+    },
+    {
+      slug: "v23",
+      title: "V23 — Typographic (Linear)",
+      anchor: "Linear · Vercel docs · Apple typography",
+      summary:
+        "Single large center column with a strong typographic hierarchy. 64px display name, mid-weight stats divided by hairlines, contacts as a clean grid. No shadows, no glass, no boxes. The depth comes from spacing and weight. Right rail holds controls, outcome, queue, property facts.",
+      why: "If V17 won on 'big bold caller card,' V23 takes that to its logical conclusion: type IS the design. Quietest direction in the set. For when you want the dialer to feel like a Linear product instead of a CRM.",
+    },
+    {
+      slug: "v22",
+      title: "V22 — Modern Editorial (Apple News+)",
+      anchor: "Apple News+ · Bloomberg Edit · NYT Magazine",
+      summary:
+        "Two large rounded cards on the top row: hero caller (with display serif name) on the left, surplus + outcome panel on the right with an ink-black 'Net to Firm' callout. Bottom row is contacts and notes. Right rail is the full queue with avatars and progress.",
+      why: "Magazine LAYOUT not magazine FEEL (Bree shot down V19 newspaper). V22 borrows the Apple News+ grid and serif display for the lead name but stays modern. Outcome panel calls itself 'How Did The Call Go?' instead of 'End With A Disposition.'",
+    },
+    {
+      slug: "v21",
+      title: "V21 — Floating Cards (Vercel / Stripe marketing)",
+      anchor: "Vercel marketing · Stripe marketing · Notion 2026",
+      summary:
+        "Pure white background, four rounded cards floating at different shadow depths. Hero card on top with avatar + display name + controls + outcome buttons in one row. Surplus card top-right with an ink-on-petrol Net To Firm callout. Contacts card with multi-phone display (active, dead, last-attempt all visible). Side column for queue and notes.",
+      why: "V17 used glassmorphism for depth. V21 uses rich layered shadows instead. Lighter, cleaner, no gradient mesh, no violet. Every important field is its own card with its own shadow tier so 'everything looked the same' becomes 'everything has its own weight.'",
+    },
+    {
       slug: "v20",
       title: "V20 — Family Tree (the visual you wanted from V2)",
       anchor: "Genealogy mapped, modern",
