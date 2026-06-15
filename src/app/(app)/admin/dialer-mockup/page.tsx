@@ -9,6 +9,54 @@ export default async function DialerMockupIndexPage() {
 
   const variants = [
     {
+      slug: "v43",
+      title: "V43 — Horizontal Bands",
+      anchor: "Top to bottom stacked sections",
+      summary:
+        "Top: chrome with Lead 3 / 10 chip. Below: dedicated stats band with 36px tabular numbers (no more invisible stats). Below that: the green call + white next-call pair full width. Bottom: a four-column grid with Queue, Deal Facts, Contacts, Notes.",
+      why: "Solves the invisible-stats problem by giving them their own band. Solves the white-space problem by stacking horizontal sections that fill the whole screen. Flat rectangular buttons in the call card (no rounded pills).",
+    },
+    {
+      slug: "v42",
+      title: "V42 — Inverted Layout (Queue on Right)",
+      anchor: "Flipped from V35",
+      summary:
+        "Stats centered prominently in the top bar with the number above the label. LEFT side has Deal Facts + Contacts + Notes (the lead context). CENTER has the green + white call pair stacked. RIGHT side is the session queue. Mute / Hold / VM Drop are segmented bordered buttons (no pills).",
+      why: "If reading lead context first feels more natural than reading the queue first, the layout flips. Same data, different reading order. Test this against V35 and see which side your eye lands on.",
+    },
+    {
+      slug: "v41",
+      title: "V41 — Bento Mosaic",
+      anchor: "Apple Vision Pro · Linear marketing",
+      summary:
+        "12-column 6-row bento grid. Largest card = the green hero. Medium card = Stats with 28px numbers. Small card = Next Call in a vertical compressed form. Queue as a horizontal scrollable card strip. Deal Facts as a tall card. Contacts as a narrow card. Notes as a wide bottom card. Every piece sized by importance.",
+      why: "If the layout feeling too uniform is the problem, V41 gives every panel its own shape. Reads like a curated bento set rather than a CRM grid. Numbers and shapes both contribute to hierarchy.",
+    },
+    {
+      slug: "v40",
+      title: "V40 — Three Columns with Integrated Stats",
+      anchor: "Mercury / Stripe dashboard",
+      summary:
+        "Stats live in their own dedicated card at the top of the left rail (28px numbers). Below stats: Session Queue full-rail. Center column: green call card + white next-call card stacked vertically (no horizontal pair). Right column: Deal Facts + Contacts + Notes stacked. Soft segmented buttons.",
+      why: "Pulls stats out of the top bar entirely and gives them their own card on the left. If you wanted the stats more prominent without making the top bar taller, this is the move.",
+    },
+    {
+      slug: "v39",
+      title: "V39 — Tall Hero Left + Stacked Right",
+      anchor: "Asymmetric / cinematic",
+      summary:
+        "Big green call card on the LEFT (1.4× width, full height) including a 72px talk timer and a 36px Net To Firm counter inside the gradient itself. Right side: Next Call card on top, then a side-by-side Queue + Deal Facts row, then a side-by-side Contacts + Notes row at the foot.",
+      why: "If the white space in the middle was the problem, V39 fills it. The green card dominates the left, the right side is dense with information packed in. Mute / Hold / VM Drop as one segmented control row inside the green card.",
+    },
+    {
+      slug: "v38",
+      title: "V38 — Wide Hero Pair Top + Trinity Below",
+      anchor: "V29 pair scaled up",
+      summary:
+        "Top band: green call card (1.6×) + white Next Call card (1×) side by side, full screen width. Below: three-column trinity of Session Queue / Deal Facts + Contacts / Recent Notes. Stats at 24px bold inline in the top bar. Mute / Hold / VM Drop as soft square buttons in a hover-frame.",
+      why: "The V29 green+white pair you liked, scaled up so it fills the upper third of the screen. Everything else stays put. Smallest deviation from V35-V37 but fixes white-space + stat-prominence in one shot.",
+    },
+    {
       slug: "v37",
       title: "V37 — Compact No-Scroll (1280px+ fits)",
       anchor: "V35 spirit, tightened",
