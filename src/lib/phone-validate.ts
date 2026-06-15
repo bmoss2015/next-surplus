@@ -204,7 +204,7 @@ async function sendThresholdEmail(
   try {
     const resend = new Resend(apiKey);
     await resend.emails.send({
-      from: process.env.RESEND_FROM ?? "Next Surplus <noreply@send.nextsurplus.com>",
+      from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
       to: recipients,
       subject,
       html,
