@@ -9,8 +9,14 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
 import { validateAllUntestedForOrg, previewBackfillCount, DEFAULT_CREDIT_COST_USD } from "@/lib/phone-validate";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
+function resolveSiteUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+  if (explicit) return explicit;
+  const vercel = process.env.VERCEL_URL;
+  if (vercel) return `https://${vercel.replace(/\/$/, "")}`;
+  return "http://localhost:3000";
+}
+const SITE_URL = resolveSiteUrl();
 
 // -- My Profile (self-edit) --------------------------------------------------
 
