@@ -4,6 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUp } from "../_actions";
+import {
+  GoogleSignInButton,
+  OrDivider,
+} from "../_components/GoogleSignInButton";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -63,6 +67,8 @@ export default function SignUpPage() {
       <h1 className="m-0 text-[16px] font-medium tracking-tight text-ink">
         Create Account
       </h1>
+      <GoogleSignInButton label="Sign up with Google" />
+      <OrDivider />
       <div>
         <label className={labelClass}>Full Name</label>
         <input

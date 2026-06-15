@@ -4,6 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "../_actions";
+import {
+  GoogleSignInButton,
+  OrDivider,
+} from "../_components/GoogleSignInButton";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,6 +40,8 @@ export default function LoginPage() {
       <h1 className="m-0 text-[16px] font-medium tracking-tight text-ink">
         Sign In
       </h1>
+      <GoogleSignInButton label="Continue with Google" />
+      <OrDivider />
       <div>
         <label className={labelClass}>Email</label>
         <input

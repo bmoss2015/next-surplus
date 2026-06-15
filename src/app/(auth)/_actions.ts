@@ -91,3 +91,26 @@ export async function requestPasswordReset(
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+export async function startGoogleSignIn(): Promise<
+  { ok: true; url: string } | { ok: false; error: string }
+> {
+  const sb = await createClient();
+  const { data, error } = await sb.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${SITE_URL}/auth/callback?next=/`,
+      queryParams: { access_type: "offline", prompt: "consent" },
+      skipBrowserRedirect: true,
+    },
+  });
+  if (error || !data?.url) {
+    return {
+      ok: false,
+      error:
+        error?.message ??
+        "Google sign in is not enabled for this Supabase project.",
+    };
+  }
+  return { ok: true, url: data.url };
+}
