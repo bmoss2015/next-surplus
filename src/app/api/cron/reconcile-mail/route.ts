@@ -178,7 +178,7 @@ export async function GET(req: Request) {
 
       const apiKey = process.env.RESEND_API_KEY;
       const from =
-        process.env.RESEND_FROM ?? "notifications@mossequitypartners.com";
+        process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>";
       if (apiKey && owners && owners.length > 0) {
         for (const o of owners) {
           const email = (o.email as string | null) ?? null;

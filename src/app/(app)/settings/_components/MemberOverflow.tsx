@@ -7,6 +7,9 @@ import { IconDots } from "@tabler/icons-react";
 import {
   setMemberRole,
   removeMember,
+  resendInvite,
+  cancelInvite,
+  getInviteLink,
 } from "@/app/(app)/settings/_actions";
 import type { OrgMemberRow } from "@/lib/settings/fetch";
 
@@ -25,6 +28,7 @@ export function MemberOverflow({
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [copied, setCopied] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(
@@ -35,6 +39,7 @@ export function MemberOverflow({
     setOpen(false);
     setConfirmRemove(false);
     setErrMsg(null);
+    setCopied(false);
   }
 
   function toggle() {
@@ -102,6 +107,50 @@ export function MemberOverflow({
     });
   }
 
+  function resend() {
+    setErrMsg(null);
+    startTransition(async () => {
+      const res = await resendInvite(member.id);
+      if (!res.ok) {
+        setErrMsg(res.error);
+        return;
+      }
+      close();
+      router.refresh();
+    });
+  }
+
+  function cancel() {
+    setErrMsg(null);
+    startTransition(async () => {
+      const res = await cancelInvite(member.id);
+      if (!res.ok) {
+        setErrMsg(res.error);
+        return;
+      }
+      close();
+      router.refresh();
+    });
+  }
+
+  function copyLink() {
+    setErrMsg(null);
+    startTransition(async () => {
+      const res = await getInviteLink(member.id);
+      if (!res.ok) {
+        setErrMsg(res.error);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(res.url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch {
+        setErrMsg("Couldn't copy to clipboard. Try again.");
+      }
+    });
+  }
+
   if (isSelf) {
     return (
       <div className="overflow">
@@ -140,32 +189,66 @@ export function MemberOverflow({
                 borderRadius: 8,
                 boxShadow: "0 8px 24px -8px rgba(12,13,16,0.15)",
                 minWidth: MENU_WIDTH,
-                padding: "6px 0",
+                padding: 6,
                 zIndex: 9999,
               }}
             >
-              <MenuItem
-                label={member.role === "admin" ? "Make Member" : "Make Admin"}
-                onClick={flipRole}
-                disabled={pending}
-              />
-              <div
-                style={{
-                  height: 1,
-                  background: "var(--divider)",
-                  margin: "6px 0",
-                }}
-              />
-              <MenuItem
-                label={
-                  confirmRemove
-                    ? "Click Again To Confirm"
-                    : "Remove From Org"
-                }
-                onClick={() => (confirmRemove ? remove() : setConfirmRemove(true))}
-                disabled={pending}
-                danger
-              />
+              {member.pending ? (
+                <>
+                  <MenuItem
+                    label="Resend Invite"
+                    onClick={resend}
+                    disabled={pending}
+                  />
+                  <MenuItem
+                    label={copied ? "Copied" : "Copy Invite Link"}
+                    onClick={copyLink}
+                    disabled={pending || copied}
+                  />
+                  <div
+                    style={{
+                      height: 1,
+                      background: "var(--divider)",
+                      margin: "6px 0",
+                    }}
+                  />
+                  <MenuItem
+                    label={
+                      confirmRemove
+                        ? "Click Again To Confirm"
+                        : "Cancel Invite"
+                    }
+                    onClick={() => (confirmRemove ? cancel() : setConfirmRemove(true))}
+                    disabled={pending}
+                    danger
+                  />
+                </>
+              ) : (
+                <>
+                  <MenuItem
+                    label={member.role === "admin" ? "Make Member" : "Make Admin"}
+                    onClick={flipRole}
+                    disabled={pending}
+                  />
+                  <div
+                    style={{
+                      height: 1,
+                      background: "var(--divider)",
+                      margin: "6px 0",
+                    }}
+                  />
+                  <MenuItem
+                    label={
+                      confirmRemove
+                        ? "Click Again To Confirm"
+                        : "Remove From Org"
+                    }
+                    onClick={() => (confirmRemove ? remove() : setConfirmRemove(true))}
+                    disabled={pending}
+                    danger
+                  />
+                </>
+              )}
               {errMsg && (
                 <div
                   style={{
@@ -197,6 +280,7 @@ function MenuItem({
   disabled?: boolean;
   danger?: boolean;
 }) {
+  const hoverBg = danger ? "#fef2f2" : "#f4f5f7";
   return (
     <button
       type="button"
@@ -205,17 +289,19 @@ function MenuItem({
       style={{
         display: "block",
         width: "100%",
+        boxSizing: "border-box",
         textAlign: "left",
-        padding: "8px 14px",
+        padding: "8px 10px",
         fontSize: 12.5,
+        borderRadius: 6,
         color: danger ? "var(--danger)" : "var(--ink)",
         background: "transparent",
         border: 0,
         cursor: disabled ? "default" : "pointer",
+        transition: "background 0.08s",
       }}
       onMouseEnter={(e) => {
-        if (!disabled)
-          e.currentTarget.style.background = "rgba(12,13,16,0.04)";
+        if (!disabled) e.currentTarget.style.background = hoverBg;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
