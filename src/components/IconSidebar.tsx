@@ -81,8 +81,10 @@ export function IconSidebar({
     (item) =>
       (isAdmin || !item.adminOnly) && (isOwner || !item.ownerOnly)
   );
-  // Default collapsed (icons only). Hydrate from localStorage on mount.
-  const [expanded, setExpanded] = useState(false);
+  // Default expanded (matches Pipedrive / HubSpot / Attio conventions for
+  // first-time users). Hydrate from localStorage on mount so returning users
+  // get their saved preference.
+  const [expanded, setExpanded] = useState(true);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
