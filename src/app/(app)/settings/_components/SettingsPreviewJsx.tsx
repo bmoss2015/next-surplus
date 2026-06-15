@@ -29,6 +29,9 @@ import { CustomerPricingViewSection } from "./CustomerPricingViewSection";
 import { TemplatesSection } from "./TemplatesSection";
 import { EmailTemplatesSection } from "./EmailTemplatesSection";
 import { PlaybooksSection } from "./PlaybooksSection";
+import { DialerPhoneNumbersSection } from "./DialerPhoneNumbersSection";
+import { DialerPreferencesSection } from "./DialerPreferencesSection";
+import { DialerDispositionsSection } from "./DialerDispositionsSection";
 
 import type {
   AppSettings,
@@ -246,6 +249,12 @@ function renderPanel(
           canEdit={currentUser.isAdmin}
         />
       );
+    case "dialer-numbers":
+      return currentUser.isAdmin ? <DialerPhoneNumbersSection /> : <AdminGate />;
+    case "dialer-prefs":
+      return currentUser.isAdmin ? <DialerPreferencesSection /> : <AdminGate />;
+    case "dialer-dispositions":
+      return currentUser.isAdmin ? <DialerDispositionsSection /> : <AdminGate />;
     default:
       return <Placeholder panelKey={active} />;
   }
