@@ -24,10 +24,7 @@ export type OrgMemberRow = {
   id: string;
   full_name: string;
   email: string | null;
-  role: "admin" | "member";
-  // True until the invitee accepts — i.e. their auth user has no confirmed
-  // email / sign-in yet. (When the admin lookup is unavailable we can't tell, so
-  // it falls back to false rather than flagging everyone.)
+  role: "admin" | "member" | "owner";
   pending: boolean;
 };
 
@@ -72,7 +69,12 @@ export async function fetchOrgMembers(): Promise<OrgMemberRow[]> {
       id,
       full_name: (r.full_name as string | null) ?? "",
       email: (r.email as string | null) ?? null,
-      role: r.role === "admin" ? "admin" : "member",
+      role:
+        r.role === "owner"
+          ? "owner"
+          : r.role === "admin"
+            ? "admin"
+            : "member",
       pending: confirmed ? !confirmed.has(id) : false,
     };
   });
