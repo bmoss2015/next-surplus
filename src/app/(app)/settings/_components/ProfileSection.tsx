@@ -32,12 +32,12 @@ function initials(first: string, last: string): string {
 }
 
 const TIME_ZONES: { value: string; label: string }[] = [
-  { value: "America/New_York", label: "(GMT-05:00) Eastern Time — New York" },
-  { value: "America/Chicago", label: "(GMT-06:00) Central Time — Chicago" },
-  { value: "America/Denver", label: "(GMT-07:00) Mountain Time — Denver" },
-  { value: "America/Los_Angeles", label: "(GMT-08:00) Pacific Time — Los Angeles" },
-  { value: "America/Anchorage", label: "(GMT-09:00) Alaska Time — Anchorage" },
-  { value: "Pacific/Honolulu", label: "(GMT-10:00) Hawaii — Honolulu" },
+  { value: "America/New_York", label: "(GMT-05:00) Eastern Time, New York" },
+  { value: "America/Chicago", label: "(GMT-06:00) Central Time, Chicago" },
+  { value: "America/Denver", label: "(GMT-07:00) Mountain Time, Denver" },
+  { value: "America/Los_Angeles", label: "(GMT-08:00) Pacific Time, Los Angeles" },
+  { value: "America/Anchorage", label: "(GMT-09:00) Alaska Time, Anchorage" },
+  { value: "Pacific/Honolulu", label: "(GMT-10:00) Hawaii, Honolulu" },
 ];
 
 export function ProfileSection({
