@@ -1,19 +1,20 @@
 "use client";
 
-// Settings clone · Phase D.2 — per-row overflow menu for the Members list.
-//
-// Renders the three-dot trigger and a small popover with "Make Admin / Make
-// Member" and "Remove from Org". Both actions guard against the caller
-// editing their own row (server-side too, but the menu is also hidden when
-// the row is the current user). Remove uses a two-step confirm.
-
 import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { IconDots } from "@tabler/icons-react";
 import {
   setMemberRole,
   removeMember,
+  resendInvite,
+  cancelInvite,
+  getInviteLink,
 } from "@/app/(app)/settings/_actions";
 import type { OrgMemberRow } from "@/lib/settings/fetch";
+
+const MENU_WIDTH = 200;
+const MENU_GAP = 6;
 
 export function MemberOverflow({
   member,
@@ -27,19 +28,56 @@ export function MemberOverflow({
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const ref = useRef<HTMLDivElement | null>(null);
+  const [copied, setCopied] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(
+    null
+  );
 
-  // Close on outside click.
+  function close() {
+    setOpen(false);
+    setConfirmRemove(false);
+    setErrMsg(null);
+    setCopied(false);
+  }
+
+  function toggle() {
+    if (open) {
+      close();
+      return;
+    }
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setCoords({
+        top: rect.bottom + MENU_GAP,
+        left: rect.right - MENU_WIDTH,
+      });
+    }
+    setOpen(true);
+  }
+
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setConfirmRemove(false);
+      const t = e.target as Node;
+      if (
+        menuRef.current?.contains(t) ||
+        triggerRef.current?.contains(t)
+      ) {
+        return;
       }
+      close();
     };
+    const onScrollOrResize = () => close();
     window.addEventListener("mousedown", onClick);
-    return () => window.removeEventListener("mousedown", onClick);
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      window.removeEventListener("mousedown", onClick);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
   }, [open]);
 
   function flipRole() {
@@ -51,7 +89,7 @@ export function MemberOverflow({
         setErrMsg(res.error);
         return;
       }
-      setOpen(false);
+      close();
       router.refresh();
     });
   }
@@ -64,8 +102,52 @@ export function MemberOverflow({
         setErrMsg(res.error);
         return;
       }
-      setOpen(false);
+      close();
       router.refresh();
+    });
+  }
+
+  function resend() {
+    setErrMsg(null);
+    startTransition(async () => {
+      const res = await resendInvite(member.id);
+      if (!res.ok) {
+        setErrMsg(res.error);
+        return;
+      }
+      close();
+      router.refresh();
+    });
+  }
+
+  function cancel() {
+    setErrMsg(null);
+    startTransition(async () => {
+      const res = await cancelInvite(member.id);
+      if (!res.ok) {
+        setErrMsg(res.error);
+        return;
+      }
+      close();
+      router.refresh();
+    });
+  }
+
+  function copyLink() {
+    setErrMsg(null);
+    startTransition(async () => {
+      const res = await getInviteLink(member.id);
+      if (!res.ok) {
+        setErrMsg(res.error);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(res.url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch {
+        setErrMsg("Couldn't copy to clipboard. Try again.");
+      }
     });
   }
 
@@ -77,74 +159,112 @@ export function MemberOverflow({
           title="That's you"
           style={{ opacity: 0.3, pointerEvents: "none" }}
         >
-          <i className="icon icon-more-horizontal" />
+          <IconDots size={16} stroke={1.75} />
         </div>
       </div>
     );
   }
 
   return (
-    <div ref={ref} className="overflow" style={{ position: "relative" }}>
+    <div className="overflow">
       <button
+        ref={triggerRef}
         type="button"
         className="icon-btn"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         aria-label="Member actions"
       >
-        <i className="icon icon-more-horizontal" />
+        <IconDots size={16} stroke={1.75} />
       </button>
-      {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            marginTop: 6,
-            background: "var(--surface)",
-            border: "1px solid var(--hairline)",
-            borderRadius: 8,
-            boxShadow: "0 8px 24px -8px rgba(12,13,16,0.15)",
-            minWidth: 200,
-            padding: "6px 0",
-            zIndex: 20,
-          }}
-        >
-          <MenuItem
-            label={member.role === "admin" ? "Make Member" : "Make Admin"}
-            onClick={flipRole}
-            disabled={pending}
-          />
-          <div
-            style={{
-              height: 1,
-              background: "var(--divider)",
-              margin: "6px 0",
-            }}
-          />
-          <MenuItem
-            label={
-              confirmRemove
-                ? "Click again to confirm"
-                : "Remove from Org"
-            }
-            onClick={() => (confirmRemove ? remove() : setConfirmRemove(true))}
-            disabled={pending}
-            danger
-          />
-          {errMsg && (
+      {open && coords && typeof document !== "undefined"
+        ? createPortal(
             <div
+              ref={menuRef}
               style={{
-                padding: "8px 12px",
-                color: "var(--danger)",
-                fontSize: 11.5,
-                lineHeight: 1.4,
+                position: "fixed",
+                top: coords.top,
+                left: coords.left,
+                background: "var(--surface)",
+                border: "1px solid var(--hairline)",
+                borderRadius: 8,
+                boxShadow: "0 8px 24px -8px rgba(12,13,16,0.15)",
+                minWidth: MENU_WIDTH,
+                padding: 6,
+                zIndex: 9999,
               }}
             >
-              {errMsg}
-            </div>
-          )}
-        </div>
-      )}
+              {member.pending ? (
+                <>
+                  <MenuItem
+                    label="Resend Invite"
+                    onClick={resend}
+                    disabled={pending}
+                  />
+                  <MenuItem
+                    label={copied ? "Copied" : "Copy Invite Link"}
+                    onClick={copyLink}
+                    disabled={pending || copied}
+                  />
+                  <div
+                    style={{
+                      height: 1,
+                      background: "var(--divider)",
+                      margin: "6px 0",
+                    }}
+                  />
+                  <MenuItem
+                    label={
+                      confirmRemove
+                        ? "Click Again To Confirm"
+                        : "Cancel Invite"
+                    }
+                    onClick={() => (confirmRemove ? cancel() : setConfirmRemove(true))}
+                    disabled={pending}
+                    danger
+                  />
+                </>
+              ) : (
+                <>
+                  <MenuItem
+                    label={member.role === "admin" ? "Make Member" : "Make Admin"}
+                    onClick={flipRole}
+                    disabled={pending}
+                  />
+                  <div
+                    style={{
+                      height: 1,
+                      background: "var(--divider)",
+                      margin: "6px 0",
+                    }}
+                  />
+                  <MenuItem
+                    label={
+                      confirmRemove
+                        ? "Click Again To Confirm"
+                        : "Remove From Org"
+                    }
+                    onClick={() => (confirmRemove ? remove() : setConfirmRemove(true))}
+                    disabled={pending}
+                    danger
+                  />
+                </>
+              )}
+              {errMsg && (
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    color: "var(--danger)",
+                    fontSize: 11.5,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {errMsg}
+                </div>
+              )}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
@@ -160,6 +280,7 @@ function MenuItem({
   disabled?: boolean;
   danger?: boolean;
 }) {
+  const hoverBg = danger ? "#fef2f2" : "#f4f5f7";
   return (
     <button
       type="button"
@@ -168,17 +289,19 @@ function MenuItem({
       style={{
         display: "block",
         width: "100%",
+        boxSizing: "border-box",
         textAlign: "left",
-        padding: "8px 14px",
+        padding: "8px 10px",
         fontSize: 12.5,
+        borderRadius: 6,
         color: danger ? "var(--danger)" : "var(--ink)",
         background: "transparent",
         border: 0,
         cursor: disabled ? "default" : "pointer",
+        transition: "background 0.08s",
       }}
       onMouseEnter={(e) => {
-        if (!disabled)
-          e.currentTarget.style.background = "rgba(12,13,16,0.04)";
+        if (!disabled) e.currentTarget.style.background = hoverBg;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";

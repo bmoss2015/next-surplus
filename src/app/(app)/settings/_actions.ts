@@ -9,8 +9,14 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
 import { validateAllUntestedForOrg, previewBackfillCount, DEFAULT_CREDIT_COST_USD } from "@/lib/phone-validate";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
+function resolveSiteUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+  if (explicit) return explicit;
+  const vercel = process.env.VERCEL_URL;
+  if (vercel) return `https://${vercel.replace(/\/$/, "")}`;
+  return "http://localhost:3000";
+}
+const SITE_URL = resolveSiteUrl();
 
 // -- My Profile (self-edit) --------------------------------------------------
 
@@ -230,7 +236,7 @@ export async function inviteMember(
 
   const resend = new Resend(process.env.RESEND_API_KEY);
   const { error: emailError } = await resend.emails.send({
-    from: "bree@mossequitypartners.com",
+    from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
     to: cleanEmail,
     subject: "You have been invited to Next Surplus",
     html: `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
@@ -339,6 +345,205 @@ export async function removeMember(
     payload: {
       target_user_id: userId,
       target_name: (prior?.full_name as string | null) ?? (prior?.email as string | null) ?? null,
+    },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function resendInvite(
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin) return { ok: false, error: "Only admins can resend invites" };
+  if (userId === profile.id) return { ok: false, error: "You can't resend your own invite" };
+
+  const admin = createServiceClient();
+  const { data: target, error: targetErr } = await admin
+    .from("profiles")
+    .select("id, org_id, role, full_name, email")
+    .eq("id", userId)
+    .maybeSingle();
+  if (targetErr) return { ok: false, error: targetErr.message };
+  if (!target) return { ok: false, error: "That invite could not be found" };
+  if (target.org_id !== profile.orgId) {
+    return { ok: false, error: "That invite is not in your organization" };
+  }
+
+  const cleanEmail = (target.email as string | null)?.trim().toLowerCase();
+  if (!cleanEmail) return { ok: false, error: "That invite has no email on file" };
+  const cleanName = ((target.full_name as string | null) ?? "").trim();
+  const safeRole: "admin" | "member" =
+    target.role === "admin" ? "admin" : "member";
+
+  const { error: cleanupErr } = await admin.auth.admin.deleteUser(userId);
+  if (cleanupErr) return { ok: false, error: cleanupErr.message };
+
+  const { data: invited, error: linkErr } = await admin.auth.admin.generateLink({
+    type: "invite",
+    email: cleanEmail,
+    options: {
+      data: { org_id: profile.orgId, role: safeRole, full_name: cleanName },
+      redirectTo: `${SITE_URL}/accept-invite`,
+    },
+  });
+  if (linkErr) return { ok: false, error: linkErr.message };
+
+  const tokenHash = invited?.properties?.hashed_token;
+  if (!tokenHash) return { ok: false, error: "Could not generate the invite link" };
+  const inviteUrl = `${SITE_URL}/accept-invite?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const { error: emailError } = await resend.emails.send({
+    from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
+    to: cleanEmail,
+    subject: "You have been invited to Next Surplus",
+    html: `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
+  <h1 style="margin:0;font-size:20px;font-weight:600;color:#0d4b3a;">You Have Been Invited</h1>
+  <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">Hello ${cleanName || cleanEmail},</p>
+  <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">An account has been created for you on Next Surplus using <strong>${cleanEmail}</strong>. Click the button below to set your password and finish signing in.</p>
+  <p style="margin:24px 0 0;">
+    <a href="${inviteUrl}" style="display:inline-block;background:linear-gradient(90deg,#0d4b3a,#13644e);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 20px;border-radius:6px;">Accept Invite</a>
+  </p>
+  <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#64748b;">If the button does not work, copy and paste this link into your browser:<br>${inviteUrl}</p>
+</div>`,
+  });
+  if (emailError) {
+    return {
+      ok: false,
+      error: `Invite refreshed but the email failed to send: ${emailError.message}`,
+    };
+  }
+
+  const invitedId = invited?.user?.id;
+  if (invitedId) {
+    await admin.from("profiles").upsert(
+      {
+        id: invitedId,
+        org_id: profile.orgId,
+        role: safeRole,
+        full_name: cleanName,
+        email: cleanEmail,
+      },
+      { onConflict: "id" }
+    );
+  }
+
+  const sb = await createClient();
+  await sb.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "team_invite_resent",
+    payload: {
+      target_user_id: invitedId ?? userId,
+      target_email: cleanEmail,
+      target_name: cleanName || null,
+    },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function getInviteLink(
+  userId: string
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin) return { ok: false, error: "Only admins can copy invite links" };
+  if (userId === profile.id) return { ok: false, error: "You can't copy your own invite link" };
+
+  const admin = createServiceClient();
+  const { data: target, error: targetErr } = await admin
+    .from("profiles")
+    .select("id, org_id, role, full_name, email")
+    .eq("id", userId)
+    .maybeSingle();
+  if (targetErr) return { ok: false, error: targetErr.message };
+  if (!target) return { ok: false, error: "That invite could not be found" };
+  if (target.org_id !== profile.orgId) {
+    return { ok: false, error: "That invite is not in your organization" };
+  }
+
+  const cleanEmail = (target.email as string | null)?.trim().toLowerCase();
+  if (!cleanEmail) return { ok: false, error: "That invite has no email on file" };
+  const cleanName = ((target.full_name as string | null) ?? "").trim();
+  const safeRole: "admin" | "member" =
+    target.role === "admin" ? "admin" : "member";
+
+  const { error: cleanupErr } = await admin.auth.admin.deleteUser(userId);
+  if (cleanupErr) return { ok: false, error: cleanupErr.message };
+
+  const { data: invited, error: linkErr } = await admin.auth.admin.generateLink({
+    type: "invite",
+    email: cleanEmail,
+    options: {
+      data: { org_id: profile.orgId, role: safeRole, full_name: cleanName },
+      redirectTo: `${SITE_URL}/accept-invite`,
+    },
+  });
+  if (linkErr) return { ok: false, error: linkErr.message };
+
+  const tokenHash = invited?.properties?.hashed_token;
+  if (!tokenHash) return { ok: false, error: "Could not generate the invite link" };
+  const inviteUrl = `${SITE_URL}/accept-invite?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
+
+  const invitedId = invited?.user?.id;
+  if (invitedId) {
+    await admin.from("profiles").upsert(
+      {
+        id: invitedId,
+        org_id: profile.orgId,
+        role: safeRole,
+        full_name: cleanName,
+        email: cleanEmail,
+      },
+      { onConflict: "id" }
+    );
+  }
+
+  const sb = await createClient();
+  await sb.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "team_invite_link_copied",
+    payload: {
+      target_user_id: invitedId ?? userId,
+      target_email: cleanEmail,
+      target_name: cleanName || null,
+    },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true, url: inviteUrl };
+}
+
+export async function cancelInvite(
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin) return { ok: false, error: "Only admins can cancel invites" };
+  if (userId === profile.id) return { ok: false, error: "You can't cancel your own invite" };
+
+  const sb = await createClient();
+  const { data: prior } = await sb
+    .from("profiles")
+    .select("org_id, full_name, email")
+    .eq("id", userId)
+    .maybeSingle();
+  if (prior?.org_id && prior.org_id !== profile.orgId) {
+    return { ok: false, error: "That invite is not in your organization" };
+  }
+
+  const admin = createServiceClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) return { ok: false, error: error.message };
+
+  await sb.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "team_invite_cancelled",
+    payload: {
+      target_user_id: userId,
+      target_email: (prior?.email as string | null) ?? null,
+      target_name: (prior?.full_name as string | null) ?? null,
     },
   });
 
