@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconCircleCheck, IconFlag, IconClockHour4, IconGavel } from "@tabler/icons-react";
 import type { KanbanData, KanbanLead } from "@/lib/leads/fetch-kanban";
@@ -17,9 +17,6 @@ const KIND_DOT: Record<StageKind, string> = {
   lost: "bg-gray-500",
 };
 
-const COLUMN_WIDTH = 240;
-const COLUMN_GAP = 10;
-
 export function KanbanBoard({ initialData }: { initialData: KanbanData }) {
   const router = useRouter();
   const [stages] = useState(initialData.stages);
@@ -27,25 +24,6 @@ export function KanbanBoard({ initialData }: { initialData: KanbanData }) {
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
   const [hoverStageId, setHoverStageId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const mirrorRef = useRef<HTMLDivElement>(null);
-  const syncing = useRef(false);
-  function syncScroll(from: "mirror" | "body") {
-    if (syncing.current) return;
-    const body = bodyRef.current;
-    const mirror = mirrorRef.current;
-    if (!body || !mirror) return;
-    syncing.current = true;
-    if (from === "mirror") body.scrollLeft = mirror.scrollLeft;
-    else mirror.scrollLeft = body.scrollLeft;
-    requestAnimationFrame(() => {
-      syncing.current = false;
-    });
-  }
-
-  const contentWidth =
-    stages.length * COLUMN_WIDTH + Math.max(0, stages.length - 1) * COLUMN_GAP;
 
   function findStageOfLead(leadId: string): string | null {
     for (const s of stages) {
@@ -137,20 +115,7 @@ export function KanbanBoard({ initialData }: { initialData: KanbanData }) {
 
   return (
     <div>
-      <div
-        ref={mirrorRef}
-        onScroll={() => syncScroll("mirror")}
-        className="kanban-scroll sticky top-0 z-30 mb-2 h-[12px] overflow-x-scroll overflow-y-hidden bg-canvas"
-        aria-hidden
-      >
-        <div className="h-px" style={{ width: contentWidth }} />
-      </div>
-
-      <div
-        ref={bodyRef}
-        onScroll={() => syncScroll("body")}
-        className="kanban-scroll overflow-x-scroll pb-3"
-      >
+      <div className="kanban-scroll overflow-x-scroll pb-3">
         <div className="flex w-max gap-[10px]">
           {stages.map((stage) => {
             const leads = grouped[stage.id] ?? [];
