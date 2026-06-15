@@ -29,7 +29,7 @@ export function V3Modal() {
             className="mt-1.5 text-[12px] text-white/55"
             style={{ fontFamily: "monospace" }}
           >
-            // Server credentials. Tested before save.
+            {"// Server credentials. Tested before save."}
           </p>
 
           <div
