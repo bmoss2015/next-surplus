@@ -1,9 +1,7 @@
-import { notFound } from "next/navigation";
-import { getCurrentProfile } from "@/lib/auth/current-user";
-import { V2Modal } from "./_v2";
+import { redirect } from "next/navigation";
 
-export default async function V2Page() {
-  const profile = await getCurrentProfile();
-  if (!profile?.isAdmin) notFound();
-  return <V2Modal />;
+// v2 has five header variants under /v2/a through /v2/e. Default
+// landing is variant A.
+export default function V2Index() {
+  redirect("/admin/imap-mockup/v2/a");
 }
