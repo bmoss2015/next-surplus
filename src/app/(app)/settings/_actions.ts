@@ -77,8 +77,8 @@ export async function changeMyPassword(
   if (typeof currentPassword !== "string" || currentPassword.length === 0) {
     return { ok: false, error: "Enter your current password" };
   }
-  if (typeof newPassword !== "string" || newPassword.length < 8) {
-    return { ok: false, error: "New password must be at least 8 characters" };
+  if (typeof newPassword !== "string" || newPassword.length < 12) {
+    return { ok: false, error: "New password must be at least 12 characters" };
   }
   if (newPassword === currentPassword) {
     return { ok: false, error: "New password must be different from the current one" };
