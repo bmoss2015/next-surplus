@@ -112,6 +112,15 @@ export default function LoginPage() {
       >
         {pending ? "Signing in" : "Sign In"}
       </button>
+      <p className="text-center text-[11px] text-gray-500">
+        New to Next Surplus?{" "}
+        <Link
+          href="/signup"
+          className="text-petrol-500 hover:text-petrol-700"
+        >
+          Create Account
+        </Link>
+      </p>
     </form>
   );
 }

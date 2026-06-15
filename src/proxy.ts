@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 // Pages for signed-out users; a signed-in user hitting these is bounced home.
-const PUBLIC_PATHS = ["/login", "/forgot"];
+const PUBLIC_PATHS = ["/login", "/forgot", "/signup"];
 // Auth-flow pages reachable with OR without a session — you land on them holding
 // a recovery/invite session in order to set a password, so don't bounce.
 const AUTH_FLOW_PATHS = ["/reset", "/accept-invite"];
