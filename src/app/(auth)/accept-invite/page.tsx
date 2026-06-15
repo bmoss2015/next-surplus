@@ -112,8 +112,7 @@ export default function AcceptInvitePage() {
         setError(res.error);
         return;
       }
-      router.push("/");
-      router.refresh();
+      window.location.assign("/");
     });
   }
 
