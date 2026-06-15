@@ -9,6 +9,46 @@ export default async function DialerMockupIndexPage() {
 
   const variants = [
     {
+      slug: "v20",
+      title: "V20 — Family Tree (the visual you wanted from V2)",
+      anchor: "Genealogy mapped, modern",
+      summary:
+        "The estate sits at the top, the primary owner below it, heirs branch from there. Connected contact glows along the line that is on the call. Side rail shows surplus, AI brief. Dispositions stretch full width along the bottom. Light theme.",
+      why: "V2 had a compass that did not read as 'family.' V20 draws an actual tree, decedent at top, estate below, heirs side by side. Probate cases ARE family trees, so the chart and the work line up. Strikethrough wrong numbers, dim relatives not in contact.",
+    },
+    {
+      slug: "v19",
+      title: "V19 — Focus Mode (calm, monk-mode)",
+      anchor: "Headspace · Calm · Linear (calm)",
+      summary:
+        "Off-cream paper, no chrome, big light-weight display type. One column. Contact name as a 80px display headline, surplus to the right as a counter-balance. AI brief flows below as plain editorial. Bottom strip is the dispositions as a quiet row.",
+      why: "The other directions have packed every pixel. This one strips back. Heavy negative space, no panels, no boxes. The work IS the call, everything else is supporting prose. For when you want the dialer to feel premium and decisive instead of busy.",
+    },
+    {
+      slug: "v18",
+      title: "V18 — Studio Workstation (Figma feel)",
+      anchor: "Figma · Notion · Linear",
+      summary:
+        "Top toolbar with controls + counters. Left layers panel (Active Lead / Up Next / Done Today). Center canvas with the lead as the work surface (display headline, AI brief as a centered card, contact mini-cards below). Right inspector with surplus / property / disposition / quick note. Light, every panel has a different shape.",
+      why: "Bree said the others had 'no variation, everything looks the same.' V18 borrows the Figma three-pane app shell so the rail, canvas, and inspector each have their own visual treatment. Hierarchy is built into the shell itself.",
+    },
+    {
+      slug: "v17",
+      title: "V17 — Glass Bento (Apple Vision Pro / Linear marketing)",
+      anchor: "Apple Vision Pro · Linear marketing · Stripe",
+      summary:
+        "Soft tri-color gradient mesh background. Floating glass cards with real shadows at multiple depths. Big call card center-left, AI brief top-right, surplus mid-right, contacts as portrait cluster bottom-left, dispositions strip at the foot. Light, premium, layered.",
+      why: "Bree said V11-V15 felt flat. V17 leans hard into depth: glassmorphism, gradient backgrounds, soft shadows, blur. The same content, but presented as floating layers instead of stacked tiles. Modern premium SaaS aesthetic.",
+    },
+    {
+      slug: "v16",
+      title: "V16 — Hero Stage (Spotify Now Playing)",
+      anchor: "Spotify · Apple Music · Editorial covers",
+      summary:
+        "Two columns. Left 60% is the hero: contact name as a 80px display headline, watermark initials behind, big talk time, contact cluster across the bottom. Right 40% is the detail column with surplus headline, AI brief, queue. Bottom dock has all controls and dispositions in one row. Warm off-white background, no glass, no boxes on the hero.",
+      why: "Bree said important info got 'muted' in V11. V16 inverts that. The hero side has nothing competing with the contact name and the talk time. The detail side is calm and scannable. Spotify and Apple Music nailed this composition for a different domain. Translated cleanly here.",
+    },
+    {
       slug: "v15",
       title: "V15 — All In View Dashboard",
       anchor: "Nooks frame · Pipedrive uncluttered",
