@@ -230,7 +230,7 @@ export async function inviteMember(
 
   const resend = new Resend(process.env.RESEND_API_KEY);
   const { error: emailError } = await resend.emails.send({
-    from: "bree@mossequitypartners.com",
+    from: process.env.RESEND_FROM ?? "Next Surplus <noreply@send.nextsurplus.com>",
     to: cleanEmail,
     subject: "You have been invited to Next Surplus",
     html: `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
