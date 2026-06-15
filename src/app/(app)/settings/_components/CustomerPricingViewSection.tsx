@@ -74,11 +74,11 @@ export function CustomerPricingViewSection({
 
       <section
         className="mb-5 rounded-lg bg-white"
-        style={{ border: "1px solid #ebedf0" }}
+        style={{ border: "1px solid var(--hairline)" }}
       >
         <header
           className="px-5 py-3.5"
-          style={{ borderBottom: "1px solid #ebedf0" }}
+          style={{ borderBottom: "1px solid var(--hairline)" }}
         >
           <div className="text-[14px] font-semibold text-ink">Letters</div>
         </header>
@@ -90,11 +90,11 @@ export function CustomerPricingViewSection({
 
       <section
         className="mb-5 rounded-lg bg-white"
-        style={{ border: "1px solid #ebedf0" }}
+        style={{ border: "1px solid var(--hairline)" }}
       >
         <header
           className="px-5 py-3.5"
-          style={{ borderBottom: "1px solid #ebedf0" }}
+          style={{ borderBottom: "1px solid var(--hairline)" }}
         >
           <div className="text-[14px] font-semibold text-ink">Extra Pages</div>
         </header>
@@ -108,11 +108,11 @@ export function CustomerPricingViewSection({
 
       <section
         className="mb-5 rounded-lg bg-white"
-        style={{ border: "1px solid #ebedf0" }}
+        style={{ border: "1px solid var(--hairline)" }}
       >
         <header
           className="px-5 py-3.5"
-          style={{ borderBottom: "1px solid #ebedf0" }}
+          style={{ borderBottom: "1px solid var(--hairline)" }}
         >
           <div className="text-[14px] font-semibold text-ink">Checks</div>
         </header>
@@ -126,11 +126,11 @@ export function CustomerPricingViewSection({
 
       <section
         className="rounded-lg bg-white"
-        style={{ border: "1px solid #ebedf0" }}
+        style={{ border: "1px solid var(--hairline)" }}
       >
         <header
           className="px-5 py-3.5"
-          style={{ borderBottom: "1px solid #ebedf0" }}
+          style={{ borderBottom: "1px solid var(--hairline)" }}
         >
           <div className="text-[14px] font-semibold text-ink">Surcharges</div>
         </header>
@@ -160,14 +160,14 @@ function CustomerPriceColumn({
     <div className="px-5 py-4">
       <div
         className="mb-2 text-[11px] font-semibold uppercase tracking-wider"
-        style={{ color: "#5b606a" }}
+        style={{ color: "var(--text-3)" }}
       >
         {heading}
       </div>
       <table className="w-full text-[13px]">
         <tbody>
           {classes.map((c) => (
-            <tr key={c.label} style={{ borderBottom: "1px solid #f1f2f4" }}>
+            <tr key={c.label} style={{ borderBottom: "1px solid var(--divider)" }}>
               <td className="py-2 text-ink">{c.label}</td>
               <td className="py-2 text-right tabular-nums text-ink">
                 {fmt(c[pick])}
@@ -191,7 +191,7 @@ function FlatRowsView({
         {rows.map((r) => (
           <tr
             key={r.label}
-            style={{ borderBottom: "1px solid #f1f2f4" }}
+            style={{ borderBottom: "1px solid var(--divider)" }}
             className="last:border-b-0"
           >
             <td className="px-5 py-2.5 text-ink">{r.label}</td>

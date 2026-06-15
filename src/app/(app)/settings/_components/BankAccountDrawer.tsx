@@ -160,32 +160,22 @@ function AddDrawer({
       <div className="drawer-field">
         <div className="drawer-hint">
           You&apos;ll sign in to your bank through Plaid. We pull the
-          routing and account numbers from Plaid (you never type them)
-          and submit to Lob. Lob sends two small test deposits — we
-          watch your bank via Plaid and verify automatically when they
-          land (usually 1-2 business days). You don&apos;t need to
-          check your statement or come back. Plaid never shares your
-          password with us, and we only store the last four digits of
-          the routing and account numbers.
+          routing and account numbers from Plaid (you never type them).
+          We then send two small test deposits to verify the account,
+          and verify automatically when they land (usually 1 to 2
+          business days). You don&apos;t need to check your statement
+          or come back. Plaid never shares your password with us, and
+          we only store the last four digits of the routing and
+          account numbers.
         </div>
       </div>
       <div className="drawer-field">
         <label className="drawer-label">Account Holder Name</label>
         <input
-          className="input"
-          style={{ width: "100%" }}
+          className="input w-full"
           value={holder}
           onChange={(e) => setHolder(e.target.value)}
-          onKeyDown={(e) => {
-            if (
-              holder === "" &&
-              (e.key === "ArrowRight" || e.key === "Tab")
-            ) {
-              e.preventDefault();
-              setHolder("Moss Equity Partners LLC");
-            }
-          }}
-          placeholder="Moss Equity Partners LLC  (→ to accept)"
+          placeholder="Legal name on the account"
           autoFocus
         />
       </div>
