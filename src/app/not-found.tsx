@@ -21,13 +21,13 @@ export default function NotFound() {
         <div className="flex items-center justify-center gap-2">
           <Link
             href="/"
-            className="inline-flex h-9 items-center rounded-md btn-primary px-4 text-[13px] font-medium text-white"
+            className="inline-flex h-10 w-44 items-center justify-center rounded-md btn-primary text-[13px] font-medium text-white"
           >
             Back to Dashboard
           </Link>
           <Link
             href="/login"
-            className="inline-flex h-9 items-center rounded-md border border-gray-200 bg-white px-4 text-[13px] font-medium text-ink hover:border-petrol-300"
+            className="inline-flex h-10 w-44 items-center justify-center rounded-md border border-gray-200 bg-white text-[13px] font-medium text-ink hover:border-petrol-300"
           >
             Sign In
           </Link>

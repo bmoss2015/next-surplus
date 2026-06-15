@@ -37,13 +37,13 @@ export default function GlobalError({
           <button
             type="button"
             onClick={() => reset()}
-            className="inline-flex h-9 cursor-pointer items-center rounded-md btn-primary px-4 text-[13px] font-medium text-white"
+            className="inline-flex h-10 w-44 cursor-pointer items-center justify-center rounded-md btn-primary text-[13px] font-medium text-white"
           >
             Try Again
           </button>
           <Link
             href="/"
-            className="inline-flex h-9 items-center rounded-md border border-gray-200 bg-white px-4 text-[13px] font-medium text-ink hover:border-petrol-300"
+            className="inline-flex h-10 w-44 items-center justify-center rounded-md border border-gray-200 bg-white text-[13px] font-medium text-ink hover:border-petrol-300"
           >
             Back to Dashboard
           </Link>
