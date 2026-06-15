@@ -9,6 +9,46 @@ export default async function DialerMockupIndexPage() {
 
   const variants = [
     {
+      slug: "v31",
+      title: "V31 — Bottom Action Bar (Outreach pattern)",
+      anchor: "Outreach · Salesloft · Aircall",
+      summary:
+        "Persistent bottom bar morphs with call state. Left = countdown + Skip Wait. Middle = the five outcome buttons. Right = Skip Lead / Snooze Lead. Above it, the hero card occupies the workspace. Right side stack holds the contact tree (with expand/collapse) and the lead-distinct session queue.",
+      why: "Outreach and Salesloft use a persistent action bar for exactly this reason: the same physical spot on the screen is where you act, regardless of call state. Skip Lead and Snooze Lead are first-class buttons, not buried.",
+    },
+    {
+      slug: "v30",
+      title: "V30 — Step Indicator (Nooks pattern)",
+      anchor: "Nooks · Linear product",
+      summary:
+        "Top of screen shows four steps: Dialing → Connected → Wrap-Up → Next Lead. Current step (Wrap-Up) glows with a 0:03 countdown chip. Workspace below is split: call summary card on the left, wrap-up panel with a thick petrol-500 border on the right (cannot miss it), contacts and queue below.",
+      why: "Step indicator was your single biggest ask — 'guidance on what's next.' V30 puts that progress at the very top, persistent across calls. You always know what stage of the call you're in. The bordered wrap-up panel is the visual answer to 'is it a button or a popup.'",
+    },
+    {
+      slug: "v29",
+      title: "V29 — Now and Next (Aircall / Salesforce CTI)",
+      anchor: "Aircall · Salesforce CTI · Twilio Flex",
+      summary:
+        "Two cards on the top row. Left card = the call that just ended (dark petrol gradient with outcome buttons inline). Right card = the Next Call preview with a 0:03 countdown, Skip Wait button, then the next lead's avatar and number. Below, contact tree and session queue.",
+      why: "Aircall ships this layout. The 'always show what's next' card is the answer to 'I can't tell if the queue is part of the same lead or different ones' — the Next Call card is always one lead away. Skip Wait and Skip This Lead Entirely are both visible without clicking anything.",
+    },
+    {
+      slug: "v28",
+      title: "V28 — Inline Transform (Salesloft pattern)",
+      anchor: "Salesloft · Modern call hero",
+      summary:
+        "The single hero card morphs through call states without a modal or drawer. During wrap-up: header pulses, countdown chip shows 0:03, Skip Wait button appears, five outcome buttons fill the lower half, note field below. Same position, different mode. Right column always shows the deal card, contact tree, and short next-leads list.",
+      why: "If the V17 hero card was the win, V28 keeps it as the hero forever — it just changes what it's doing. No popup. No drawer. The wrap-up is the same card you were just looking at. Lowest cognitive switch between states.",
+    },
+    {
+      slug: "v27",
+      title: "V27 — Wrap-Up Side Drawer",
+      anchor: "PhoneBurner · ZoomInfo Engage",
+      summary:
+        "Three-column. Left = session queue (1 through 10, lead-level). Center = the petrol-gradient hero showing the last call + contact tree with expand. Right = a dedicated wrap-up drawer with the countdown / Skip Wait at the top, outcome buttons, quick-note field, and recent notes for context.",
+      why: "PhoneBurner is the disciplined real-estate-style dialer (your customer profile). Their wrap-up sits as a panel, not a modal. V27 borrows that exactly. The session queue on the left is labeled 'lead-level' so 3/10 means three of ten LEADS, not three of ten calls.",
+    },
+    {
       slug: "v26",
       title: "V26 — Strip Layout (Spotify Home)",
       anchor: "Spotify Home · Apple Music · App Store Today",
