@@ -4,6 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "../_actions";
+import {
+  GoogleSignInButton,
+  OrDivider,
+} from "../_components/GoogleSignInButton";
 
 const IS_PREVIEW = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview";
 const TESTER_EMAIL = "info@mossyland.com";
@@ -69,6 +73,8 @@ export default function LoginPage() {
           </div>
         </div>
       )}
+      <GoogleSignInButton label="Continue with Google" />
+      <OrDivider />
       <div>
         <label className={labelClass}>Email</label>
         <input
