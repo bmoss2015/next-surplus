@@ -137,10 +137,9 @@ export default async function MockupV11() {
                   sale of property...
                 </div>
                 <div className="mb-[2px] text-gray-700">
-                  Moss Equity Partners specializes in helping rightful
-                  owners recover these funds. If you would like to
-                  discuss your situation, please reply by mail or
-                  call us...
+                  Next Surplus specializes in helping rightful owners
+                  recover these funds. If you would like to discuss your
+                  situation, please reply by mail or call us...
                 </div>
                 <div className="mt-2 text-gray-700">Sincerely,</div>
                 <div className="text-gray-700">Bree Moss</div>
