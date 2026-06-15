@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
   }
 
   const redirect = NextResponse.redirect(
-    new URL("/settings?email_connect=success", req.url)
+    new URL("/settings?email_connect=success#email-accounts", req.url)
   );
   redirect.cookies.delete("google_oauth_state");
   return redirect;
