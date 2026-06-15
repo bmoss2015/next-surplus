@@ -32,7 +32,7 @@ export default function LegalLayout({
       </main>
 
       <footer className="border-t border-gray-200 px-6 py-8 text-center text-[14px] text-gray-500">
-        <p>Moss Equity Partners, LLC (d/b/a Next Surplus)</p>
+        <p>Next Surplus</p>
         <p>
           <a
             href="mailto:support@nextsurplus.com"
