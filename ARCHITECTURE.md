@@ -29,8 +29,8 @@ For granular ship history, see `CHANGELOG.md`.
 
 | Environment | Identifier | Purpose |
 |---|---|---|
-| Staging Supabase | `sghfmudgnddybsayfqbd` | Test data. Source of truth for local dev. |
-| Production Supabase | `qvyhdexoicoppgrvvtov` | Live database. Migrations 0080-0094 applied. |
+| Staging Supabase | `qfanroxcoepunmrmjabo` | Test data. Source of truth for local dev. |
+| Production Supabase | `rsdmyydyhqgkkvwlklif` | Live database. Migrations 0080-0094 applied. |
 | Automations Supabase | `hkubwxpyyejxffncxrez` | Separate project (Maryland research agent). NEVER push web app migrations here. |
 | GitHub repo | `bmoss2015/MossEquityPartners` | main branch is source of truth |
 | Vercel production | `moss-equity-portal.vercel.app` | Aliased to portal.mossequitypartners.com |
@@ -45,7 +45,7 @@ For granular ship history, see `CHANGELOG.md`.
 ## Deploy Process
 
 - **Local development:** `cd C:\Users\info\moss-equity-portal && npm run dev`. Points at staging Supabase by default.
-- **Staging migration push:** verify `supabase/.temp/project-ref` reads `sghfmudgnddybsayfqbd`, then `npx supabase db push --linked`
+- **Staging migration push:** verify `supabase/.temp/project-ref` reads `qfanroxcoepunmrmjabo`, then `npx supabase db push --linked`
 - **Production migration push:** relink to production project ref, push, then relink back to staging
 - **Production code deploy:** automatic on push to main via Vercel. Manual override: `npx vercel --prod`.
 - **Git workflow:** one commit per fix with descriptive message (`Fix LABEL: description` or conventional commit prefix)
@@ -135,7 +135,7 @@ Numbered, append-only record of major design choices. Each one would normally be
 
 ### ADR-003: Single Database, Two Supabase Projects (Staging + Production)
 
-**Decision:** Maintain separate Supabase projects for staging (`sghfmudgnddybsayfqbd`) and production (`qvyhdexoicoppgrvvtov`). Third project (`hkubwxpyyejxffncxrez`) is unrelated automations and never touched by web app migrations.
+**Decision:** Maintain separate Supabase projects for staging (`qfanroxcoepunmrmjabo`) and production (`rsdmyydyhqgkkvwlklif`). Third project (`hkubwxpyyejxffncxrez`) is unrelated automations and never touched by web app migrations.
 
 **Why:** Standard SaaS pattern. Eliminates risk of dev work hitting live data.
 

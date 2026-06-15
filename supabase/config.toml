@@ -2,7 +2,7 @@
 # project_id is filled in when you run `supabase link --project-ref <ref>`.
 # This file is committed; secrets live in .env.local.
 
-project_id = "sghfmudgnddybsayfqbd"
+project_id = "qfanroxcoepunmrmjabo"
 
 [db]
 major_version = 17
