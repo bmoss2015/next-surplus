@@ -189,7 +189,7 @@ export function MemberOverflow({
                 borderRadius: 8,
                 boxShadow: "0 8px 24px -8px rgba(12,13,16,0.15)",
                 minWidth: MENU_WIDTH,
-                padding: "6px 0",
+                padding: 6,
                 zIndex: 9999,
               }}
             >
@@ -209,7 +209,7 @@ export function MemberOverflow({
                     style={{
                       height: 1,
                       background: "var(--divider)",
-                      margin: "6px 6px",
+                      margin: "6px 0",
                     }}
                   />
                   <MenuItem
@@ -234,7 +234,7 @@ export function MemberOverflow({
                     style={{
                       height: 1,
                       background: "var(--divider)",
-                      margin: "6px 6px",
+                      margin: "6px 0",
                     }}
                   />
                   <MenuItem
@@ -288,10 +288,10 @@ function MenuItem({
       disabled={disabled}
       style={{
         display: "block",
-        width: "calc(100% - 12px)",
-        margin: "1px 6px",
+        width: "100%",
+        boxSizing: "border-box",
         textAlign: "left",
-        padding: "7px 10px",
+        padding: "8px 10px",
         fontSize: 12.5,
         borderRadius: 6,
         color: danger ? "var(--danger)" : "var(--ink)",
