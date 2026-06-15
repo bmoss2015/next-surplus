@@ -9,84 +9,124 @@ export default async function DialerMockupIndexPage() {
 
   const variants = [
     {
-      slug: "v1",
-      title: "V1 — Editorial Focus",
-      anchor: "Linear · Stripe Press · Superhuman",
+      slug: "v15",
+      title: "V15 — All In View Dashboard",
+      anchor: "Nooks frame · Pipedrive uncluttered",
       summary:
-        "Single column, magazine layout. Lead name as a 56px headline, sale info as a sub deck, contacts as a portrait cluster. Call dock peeks from the bottom edge. End Call slides a disposition ribbon across the screen, no modal. Keyboard shortcut on every action.",
-      why: "Aircall reviewers consistently praise the clean, low-click flow. Linear and Superhuman set the bar for typographic focus. Removes the disposition modal that interrupts the call rhythm.",
+        "Tile grid, no scroll. Top strip = six labeled session stats. Center row = call card + AI brief + contacts. Bottom strip = dispositions and a horizontal queue ribbon. Light, single line.",
+      why: "Bree's feedback: V1 info disappeared at the bottom. V15 puts everything on one screen with zero scroll. Each tile is scannable, the active call card is the visual hero, dispositions stretch full width so they're impossible to miss.",
     },
     {
-      slug: "v2",
-      title: "V2 — Constellation Cockpit",
-      anchor: "Attio · Affinity · Outreach",
+      slug: "v14",
+      title: "V14 — Parallel Done Right",
+      anchor: "Nooks parallel · V5 fixed",
       summary:
-        "Lead's contact graph is the page. Primary owner sits at the center of a constellation, heirs and relatives orbit. Currently dialed contact pulses. The call surface lives below the graph, with an editorial activity feed on the right. Dispositions inline at the bottom as ribbon cues.",
-      why: "Surplus funds work is relationship-heavy (heirs of an estate, multiple co-owners). Affinity sells on this. Attio's visual richness is the upgrade path away from standard CRM tables. No hex tiles, no dot+caps chips.",
+        "Dark, four-line grid. Each line card labels who is being called (Calling Heir / Calling Primary Owner) so the VA never wonders. Connected line shows controls + timer; ringing lines stay compact; voicemail-detected mutes. AI brief docks for the active line.",
+      why: "Bree's feedback on V5: the multi-line grid was the favorite, but it was unclear who was on the other end and what 'burn down' meant. V14 fixes both: explicit role labels per line, named stats only (Dials / Connects / Connect Rate / Avg Talk Time).",
     },
     {
-      slug: "v3",
-      title: "V3 — Workspace Doc",
-      anchor: "Notion · Roam · Superhuman",
+      slug: "v13",
+      title: "V13 — Dark Command Bridge",
+      anchor: "Nooks · V5 palette fixed",
       summary:
-        "Reads like a structured document about the lead. H1 owner name, H2 property, body paragraphs describing surplus + owners, contacts as inline mini cards, notes as blockquotes. Call dock pinned to the right edge, always visible. Cmd+K opens a command palette for disposition + actions.",
-      why: "Notion-style docs scale to any amount of context without feeling cluttered. Bree's complaint about other CRMs is panel-fatigue. This direction eliminates panels by letting the lead itself BE the page.",
+        "Single line. Dark theme but petrol-only palette (no violet). Session header with four labeled stats. Big active call card with role badge, talk time, mute / hold / voicemail / end. AI brief panel on the right, queue rail far right.",
+      why: "Bree's feedback on V5: liked the dark theme, did not like the violet clashing with green. V13 keeps the dark but commits to the brand petrol. Same content structure as V11, alternate skin.",
     },
     {
-      slug: "v4",
-      title: "V4 — Heatmap Workboard",
-      anchor: "Bloomberg Terminal · Slack · PhoneBurner discipline",
+      slug: "v12",
+      title: "V12 — Command Bridge With Constellation",
+      anchor: "Nooks frame · V2 visual win",
       summary:
-        "Left rail = queue list. Center = a big day-by-hour heatmap of best contact times based on past attempts and answer rate. Right rail = call controls + lead micro card + disposition tiles. The matrix is the visual anchor. Picks the next call slot from data instead of guessing.",
-      why: "Bloomberg-grade density without feeling like a generic dashboard. The heatmap is the kind of visualization no other dialer offers, and it directly answers 'when should I call this person.' Plays to the surplus-funds reality that people pick up at predictable windows.",
+        "Light, single line. Same layout as V11 but the right panel renders contacts as a constellation around the estate, the connected contact glowing. Brief sits above the constellation.",
+      why: "Bree liked V2's relationship visual ('pretty cool'). V12 keeps that visual but plants it inside a real dialer frame, with the AI brief above so the VA reads the summary before scanning the graph.",
     },
     {
-      slug: "v5",
-      title: "V5 — Parallel Power",
-      anchor: "Nooks · Orum · Mission Control",
+      slug: "v11",
+      title: "V11 — Command Bridge (Recommended Baseline)",
+      anchor: "Nooks",
       summary:
-        "Multi-line. 2×2 grid of compact call cards when dialing four numbers at once. The card that connects expands to take the workspace, the others gray-pause. Side rail shows queue burn down. Single-line power mode is a switch.",
-      why: "Nooks beats Orum on UI but Orum still leads on parallel dial volume. This direction borrows Nooks' calm visual layer over Orum's productivity ceiling. Future-proof: ships as power dial in V1, parallel ready when telephony supports it.",
+        "Light, single line. Session header (Dials / Connects / Connect Rate / Avg Talk Time, each labeled). Active call card centered with role badge, talk time, four controls + End Call. AI brief on the right. Queue rail far right. Multi-line toggle in the header off by default.",
+      why: "The recommended starting point. Combines the wins Bree called out (clear who is calling, role badge, AI brief, labeled stats, queue visible) into the canonical Nooks layout. Multi-line is one click away when telephony supports it.",
     },
     {
-      slug: "v6",
-      title: "V6 — Property Map Workspace",
-      anchor: "Zillow · Apple Find My · Notion spatial",
+      slug: "v10",
+      title: "V10 — Voice Co-Pilot",
+      anchor: "Otter.ai · Gong · Granola",
       summary:
-        "Map of the subject property fills the backdrop. Property card pinned top-left, surplus badge top-right, call surface and people strip pinned to the bottom. Disposition row inline. The property is the hero, not the person.",
-      why: "Surplus work is property-anchored. Most dialers treat each call as a contact-row event; the geography never shows. A spatial backdrop reframes the work and makes the asset undeniable, which is the right frame for high-value leads.",
+        "Live transcript center stage. Rep bubbles right, lead bubbles left, AI cues inline. Right rail = say-now / avoid / ask suggestions and flagged moments.",
+      why: "Earlier exploration. Bree read this as a conversation thread and rejected it.",
+    },
+    {
+      slug: "v9",
+      title: "V9 — Mission Briefing",
+      anchor: "Notion AI Canvas · CIA dossier",
+      summary:
+        "Cream paper, serif headlines. The lead presented as a prepared briefing with numbered sections: TL;DR, Key Facts, Open Questions, Suggested Opening, Risks, People.",
+      why: "Earlier exploration. Bree called this 'terrible, looks like the newspaper'.",
+    },
+    {
+      slug: "v8",
+      title: "V8 — Card Deck Focus",
+      anchor: "Tinder · Linear cycle",
+      summary:
+        "One lead, edge to edge, dark stage. Ghost cards stacked behind. Keyboard cycles J/K, decisions C/D/S/X. AI summary card on the right of the lead card.",
+      why: "Earlier exploration. Bree liked the AI summary panel but said the C/D/S/X shortcuts were too coded and there was too much scroll.",
     },
     {
       slug: "v7",
       title: "V7 — Inbox Triage",
       anchor: "Superhuman · Hey · Front",
       summary:
-        "Three pane email-app layout. Left rail is the queue as a thread list. Center is the lead as one threaded conversation, every call / mail / voicemail / note as a message bubble. Right rail is decide + snooze. Active call pinned as a thin bar above the dock.",
-      why: "Superhuman is the speed bar reviewers still cite as the gold standard. Treating a lead as a single conversation thread eliminates the panel fatigue Bree keeps calling out, and snooze fits surplus work where 'call back Tuesday' is the most common outcome.",
+        "Three pane email-app layout. Lead reads as one threaded conversation, every call / mail / voicemail / note as a message.",
+      why: "Earlier exploration. Bree read this as a conversation thread and rejected it.",
     },
     {
-      slug: "v8",
-      title: "V8 — Card Deck Focus",
-      anchor: "Tinder · Linear cycle · Apple Photos",
+      slug: "v6",
+      title: "V6 — Property Map Workspace",
+      anchor: "Zillow · Apple Find My",
       summary:
-        "One lead, edge to edge, on a dark stage. Two ghost cards stacked behind to telegraph the queue. Keyboard cycles J/K, decisions are C/D/S/X. Everything that's not this lead is hidden. Bottom bar shows the four big keys.",
-      why: "Power dialing is decision fatigue. Every other direction shows a queue, a sidebar, a map. This one shows the next decision and nothing else. Closest analog is a Tinder deck or Apple Photos full-screen review, scaled to a working surface.",
+        "Subject property fills the canvas as a parcel map. Property card top-left, surplus top-right, call surface and people strip docked at the bottom.",
+      why: "Earlier exploration. Bree rejected the map as not useful.",
     },
     {
-      slug: "v9",
-      title: "V9 — Mission Briefing",
-      anchor: "Notion AI Canvas · CIA dossier · Classic newspaper",
+      slug: "v5",
+      title: "V5 — Parallel Power (first take)",
+      anchor: "Nooks · Orum · Mission Control",
       summary:
-        "Cream paper, serif type. The lead presented as a prepared briefing with numbered sections: TL;DR, Key Facts, Open Questions, Suggested Opening, Risks, People. Call strip pinned at the foot. No data tables, no panels — only synthesized intelligence.",
-      why: "Bree keeps rejecting dashboard chrome. This direction strips it entirely and treats every call as a prepared briefing the analyst delivers before the rep dials. Heavy serif, no chips, no tinted backgrounds. Editorial confidence as the visual language.",
+        "Multi-line 2x2 grid of compact call cards. The card that connects expands, the others gray-pause. Side rail = session stats and queue.",
+      why: "Earlier exploration. Bree loved the multi-line grid but said it lacked role labels, used violet that clashed with green, and the 'burn down' label was confusing. V14 is the refined version.",
     },
     {
-      slug: "v10",
-      title: "V10 — Voice Co-Pilot",
-      anchor: "Otter.ai · Gong · Granola · ChatGPT Voice",
+      slug: "v4",
+      title: "V4 — Heatmap Workboard",
+      anchor: "Bloomberg Terminal · Slack",
       summary:
-        "Live transcript center stage. Rep bubbles right, lead bubbles left, AI cues inline as flagged notes. Right rail = co-pilot suggestions (say-now / avoid / ask) + flagged moments (objections, commitments). Left rail = lead context. Dock pinned at the bottom.",
-      why: "No surplus-specialized dialer ships an AI co-pilot today. Reps in this market spend the call balancing siblings, fee objections, and probate timelines. Real-time transcription + targeted cue cards is the highest-leverage feature once telephony lands.",
+        "Day-by-hour heatmap of best contact times, queue rail on the left, call controls on the right.",
+      why: "Earlier exploration. Bree pointed out VAs follow owner-set calling hours, so the heatmap isn't decision-grade for them.",
+    },
+    {
+      slug: "v3",
+      title: "V3 — Workspace Doc",
+      anchor: "Notion · Roam · Superhuman",
+      summary:
+        "Reads like a structured document about the lead. H1 owner name, H2 property, embedded contact cards, blockquote notes, timeline at the foot. Call dock pinned to the right edge.",
+      why: "Earlier exploration. Bree said this 'gives document, not dialer'. Rejected.",
+    },
+    {
+      slug: "v2",
+      title: "V2 — Constellation Cockpit",
+      anchor: "Attio · Affinity · Outreach",
+      summary:
+        "SVG constellation of contacts around the estate at the center. Call surface below, editorial activity feed on the right.",
+      why: "Earlier exploration. Bree liked the constellation visual and the call surface but said the activity feed should be notes instead. V12 picks up the visual win.",
+    },
+    {
+      slug: "v1",
+      title: "V1 — Editorial Focus",
+      anchor: "Linear · Stripe Press · Superhuman",
+      summary:
+        "Single column magazine layout, big headline, lead narrative as prose, contacts as a portrait cluster, call dock peeks from the bottom.",
+      why: "Earlier exploration. Bree liked the portrait cluster with the active highlight but said the page scrolled too much and the bottom dock disappeared. The portrait cluster carries forward.",
     },
   ];
 
@@ -94,17 +134,17 @@ export default async function DialerMockupIndexPage() {
     <div className="mx-auto max-w-[920px] px-7 py-10">
       <header className="mb-9">
         <div className="text-[11px] uppercase tracking-[0.4px] text-gray-500">
-          Internal Mockup Set
+          Internal Mockup Set · Newest First
         </div>
         <h1 className="m-0 mt-1 text-[34px] font-medium tracking-tight text-ink">
           Dialer Design Exploration
         </h1>
         <p className="mt-3 max-w-[64ch] text-[14px] leading-relaxed text-gray-500">
-          Five distinct directions for the surplus-funds dialer. Each is anchored
-          in patterns from the dialers reviewers praise (Aircall, Nooks,
-          PhoneBurner, Salesloft) and the visual references Bree picked for the
-          rest of the portal (Attio, Affinity, Linear, Superhuman). Pick one or
-          mix.
+          Anchored on Nooks for the dialer surface and PhoneBurner for one-call
+          discipline. V11 is the recommended baseline. V12 swaps in the
+          constellation, V13 darkens, V14 is the multi-line refinement of V5,
+          V15 fits everything on one zero-scroll dashboard. Earlier exploration
+          (V1 to V10) listed below for reference.
         </p>
       </header>
 
@@ -137,13 +177,6 @@ export default async function DialerMockupIndexPage() {
           </Link>
         ))}
       </div>
-
-      <footer className="mt-10 border-t border-gray-200 pt-6 text-[12px] leading-relaxed text-gray-500">
-        Anchors live in the description on each card. Telephony, recording, and
-        live transcription are noted where the design depends on them but no
-        integration is wired up yet. Notes, surplus, and contact data are sample
-        copy on one composite lead so the visual comparison stays honest.
-      </footer>
     </div>
   );
 }
