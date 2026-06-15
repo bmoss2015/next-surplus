@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { IconDots } from "@tabler/icons-react";
 import {
   setMemberRole,
   removeMember,
@@ -77,7 +78,7 @@ export function MemberOverflow({
           title="That's you"
           style={{ opacity: 0.3, pointerEvents: "none" }}
         >
-          <i className="icon icon-more-horizontal" />
+          <IconDots size={16} stroke={1.75} />
         </div>
       </div>
     );
@@ -91,7 +92,7 @@ export function MemberOverflow({
         onClick={() => setOpen((v) => !v)}
         aria-label="Member actions"
       >
-        <i className="icon icon-more-horizontal" />
+        <IconDots size={16} stroke={1.75} />
       </button>
       {open && (
         <div
