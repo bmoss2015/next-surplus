@@ -19,8 +19,8 @@ export function buildAuthorizeUrl(opts: {
   origin: string;
   state: string;
 }): string {
-  const clientId = process.env.MICROSOFT_OAUTH_CLIENT_ID;
-  if (!clientId) throw new Error("MICROSOFT_OAUTH_CLIENT_ID is not set.");
+  const clientId = process.env.MICROSOFT_CLIENT_ID;
+  if (!clientId) throw new Error("MICROSOFT_CLIENT_ID is not set.");
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -47,10 +47,10 @@ export async function exchangeCodeForTokens(opts: {
   code: string;
   origin: string;
 }): Promise<MicrosoftTokenResponse> {
-  const clientId = process.env.MICROSOFT_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.MICROSOFT_OAUTH_CLIENT_SECRET;
+  const clientId = process.env.MICROSOFT_CLIENT_ID;
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error("MICROSOFT_OAUTH_CLIENT_ID/SECRET not set.");
+    throw new Error("MICROSOFT_CLIENT_ID/SECRET not set.");
   }
   const res = await fetch(
     `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`,
@@ -76,10 +76,10 @@ export async function exchangeCodeForTokens(opts: {
 export async function refreshAccessToken(opts: {
   refreshToken: string;
 }): Promise<MicrosoftTokenResponse> {
-  const clientId = process.env.MICROSOFT_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.MICROSOFT_OAUTH_CLIENT_SECRET;
+  const clientId = process.env.MICROSOFT_CLIENT_ID;
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error("MICROSOFT_OAUTH_CLIENT_ID/SECRET not set.");
+    throw new Error("MICROSOFT_CLIENT_ID/SECRET not set.");
   }
   const res = await fetch(
     `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`,
