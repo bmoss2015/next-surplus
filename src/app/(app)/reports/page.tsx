@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconArrowRight, IconMail } from "@tabler/icons-react";
+import { IconArrowRight, IconMail, IconPhone } from "@tabler/icons-react";
 import { fetchReports, STAGE_NAMES } from "@/lib/reports/fetch";
 import { fetchMailReport } from "@/lib/mail/reports";
 import { formatCurrency } from "@/lib/leads/format";
@@ -21,13 +21,23 @@ export default async function ReportsPage() {
 
   return (
     <div className="px-7 py-6">
-      <div className="mb-[22px]">
-        <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
-          Reports
-        </h1>
-        <div className="mt-1 text-[13px] text-gray-500">
-          Read-only summaries of pipeline, conversion, and outcomes.
+      <div className="mb-[22px] flex items-start justify-between">
+        <div>
+          <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
+            Reports
+          </h1>
+          <div className="mt-1 text-[13px] text-gray-500">
+            Read-only summaries of pipeline, conversion, and outcomes.
+          </div>
         </div>
+        <Link
+          href="/reports/dialer"
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-surface px-3 py-1.5 text-[12px] font-medium text-ink hover:border-gray-300 hover:bg-gray-50"
+        >
+          <IconPhone size={12} stroke={2} />
+          Dialer Report
+          <IconArrowRight size={12} stroke={2} />
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-[18px]">
