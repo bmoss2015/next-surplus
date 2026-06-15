@@ -7,6 +7,8 @@ import { IconDots } from "@tabler/icons-react";
 import {
   setMemberRole,
   removeMember,
+  resendInvite,
+  cancelInvite,
 } from "@/app/(app)/settings/_actions";
 import type { OrgMemberRow } from "@/lib/settings/fetch";
 
@@ -102,6 +104,32 @@ export function MemberOverflow({
     });
   }
 
+  function resend() {
+    setErrMsg(null);
+    startTransition(async () => {
+      const res = await resendInvite(member.id);
+      if (!res.ok) {
+        setErrMsg(res.error);
+        return;
+      }
+      close();
+      router.refresh();
+    });
+  }
+
+  function cancel() {
+    setErrMsg(null);
+    startTransition(async () => {
+      const res = await cancelInvite(member.id);
+      if (!res.ok) {
+        setErrMsg(res.error);
+        return;
+      }
+      close();
+      router.refresh();
+    });
+  }
+
   if (isSelf) {
     return (
       <div className="overflow">
@@ -144,28 +172,57 @@ export function MemberOverflow({
                 zIndex: 9999,
               }}
             >
-              <MenuItem
-                label={member.role === "admin" ? "Make Member" : "Make Admin"}
-                onClick={flipRole}
-                disabled={pending}
-              />
-              <div
-                style={{
-                  height: 1,
-                  background: "var(--divider)",
-                  margin: "6px 0",
-                }}
-              />
-              <MenuItem
-                label={
-                  confirmRemove
-                    ? "Click Again To Confirm"
-                    : "Remove From Org"
-                }
-                onClick={() => (confirmRemove ? remove() : setConfirmRemove(true))}
-                disabled={pending}
-                danger
-              />
+              {member.pending ? (
+                <>
+                  <MenuItem
+                    label="Resend Invite"
+                    onClick={resend}
+                    disabled={pending}
+                  />
+                  <div
+                    style={{
+                      height: 1,
+                      background: "var(--divider)",
+                      margin: "6px 0",
+                    }}
+                  />
+                  <MenuItem
+                    label={
+                      confirmRemove
+                        ? "Click Again To Confirm"
+                        : "Cancel Invite"
+                    }
+                    onClick={() => (confirmRemove ? cancel() : setConfirmRemove(true))}
+                    disabled={pending}
+                    danger
+                  />
+                </>
+              ) : (
+                <>
+                  <MenuItem
+                    label={member.role === "admin" ? "Make Member" : "Make Admin"}
+                    onClick={flipRole}
+                    disabled={pending}
+                  />
+                  <div
+                    style={{
+                      height: 1,
+                      background: "var(--divider)",
+                      margin: "6px 0",
+                    }}
+                  />
+                  <MenuItem
+                    label={
+                      confirmRemove
+                        ? "Click Again To Confirm"
+                        : "Remove From Org"
+                    }
+                    onClick={() => (confirmRemove ? remove() : setConfirmRemove(true))}
+                    disabled={pending}
+                    danger
+                  />
+                </>
+              )}
               {errMsg && (
                 <div
                   style={{
