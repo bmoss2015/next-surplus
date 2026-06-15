@@ -10,6 +10,7 @@ import {
   getHeader,
   extractBodies,
 } from "@/lib/email/gmail";
+import { sendOutlookMessage } from "@/lib/email/outlook";
 import { findLeadForAddress } from "@/lib/email/auto-link";
 
 export type SendInput = {
@@ -38,66 +39,116 @@ export async function sendEmail(
   // Fetch the account row to confirm ownership and grab the from-address.
   const { data: acct, error: acctErr } = await sb
     .from("channel_accounts")
-    .select("id, address, display_name, org_id, user_id")
+    .select("id, address, display_name, org_id, user_id, provider")
     .eq("id", input.accountId)
     .maybeSingle();
   if (acctErr || !acct) return { ok: false, error: "Account not found" };
   if (acct.user_id !== user.id) return { ok: false, error: "Forbidden" };
 
-  const fromHeader = acct.display_name
-    ? `"${acct.display_name}" <${acct.address}>`
-    : acct.address;
-
-  const raw = buildRawMessage({
-    from: fromHeader,
-    to: input.to,
-    cc: input.cc,
-    bcc: input.bcc,
-    subject: input.subject,
-    bodyText: input.body,
-    inReplyTo: input.inReplyTo ?? undefined,
-    references: input.referencesChain,
-    attachments: input.attachments,
-  });
-
-  let sent;
-  try {
-    sent = await gmailSend({
-      accountId: input.accountId,
-      raw,
-      threadId: input.threadId,
-    });
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
-  }
-
-  // Re-fetch the sent message from Gmail so we get the canonical Message-ID
-  // and all headers, then upsert into our local tables. Using the service
-  // client here so we don't fight RLS over user/org context.
   const svc = createServiceClient();
-  let full;
-  try {
-    full = await gmailGet({ accountId: input.accountId, messageId: sent.id });
-  } catch (e) {
-    return {
-      ok: false,
-      error: `Sent OK but local persist failed: ${e instanceof Error ? e.message : e}`,
-    };
+
+  const provider = (acct.provider as string) === "outlook" ? "outlook" : "gmail";
+
+  let providerMessageId: string;
+  let providerThreadKey: string;
+  let messageIdHeader: string | null = null;
+  let subject = input.subject;
+  let bodyText: string | null = input.body;
+  let bodyHtml: string | null = null;
+  let snippet: string | null = null;
+  let sentAtIso = new Date().toISOString();
+  let inReplyToHdr: string | null = input.inReplyTo ?? null;
+  let referencesHdr: string | null =
+    input.referencesChain && input.referencesChain.length > 0
+      ? input.referencesChain.join(" ")
+      : null;
+
+  if (provider === "gmail") {
+    const fromHeader = acct.display_name
+      ? `"${acct.display_name}" <${acct.address}>`
+      : acct.address;
+
+    const raw = buildRawMessage({
+      from: fromHeader,
+      to: input.to,
+      cc: input.cc,
+      bcc: input.bcc,
+      subject: input.subject,
+      bodyText: input.body,
+      inReplyTo: input.inReplyTo ?? undefined,
+      references: input.referencesChain,
+      attachments: input.attachments,
+    });
+
+    let sent;
+    try {
+      sent = await gmailSend({
+        accountId: input.accountId,
+        raw,
+        threadId: input.threadId,
+      });
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+
+    let full;
+    try {
+      full = await gmailGet({
+        accountId: input.accountId,
+        messageId: sent.id,
+      });
+    } catch (e) {
+      return {
+        ok: false,
+        error: `Sent OK but local persist failed: ${e instanceof Error ? e.message : e}`,
+      };
+    }
+
+    subject = getHeader(full.payload, "Subject") ?? input.subject;
+    messageIdHeader = getHeader(full.payload, "Message-ID") ?? null;
+    inReplyToHdr = getHeader(full.payload, "In-Reply-To") ?? null;
+    referencesHdr = getHeader(full.payload, "References") ?? null;
+    const bodies = extractBodies(full.payload);
+    bodyText = bodies.text ?? input.body;
+    bodyHtml = bodies.html ?? null;
+    snippet = full.snippet ?? null;
+    sentAtIso = new Date(Number(full.internalDate)).toISOString();
+    providerMessageId = sent.id;
+    providerThreadKey = full.threadId;
+  } else {
+    let draft;
+    try {
+      draft = await sendOutlookMessage({
+        accountId: input.accountId,
+        from: {
+          address: acct.address,
+          name: acct.display_name ?? undefined,
+        },
+        to: input.to,
+        cc: input.cc,
+        bcc: input.bcc,
+        subject: input.subject,
+        bodyText: input.body,
+        inReplyTo: input.inReplyTo ?? null,
+        references: input.referencesChain,
+        attachments: input.attachments,
+      });
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+    providerMessageId = draft.id;
+    providerThreadKey = draft.conversationId;
+    messageIdHeader = draft.internetMessageId ?? null;
+    subject = draft.subject ?? input.subject;
+    snippet = draft.bodyPreview ?? null;
+    sentAtIso = draft.sentDateTime ?? new Date().toISOString();
   }
 
-  const subject = getHeader(full.payload, "Subject") ?? "";
-  const messageIdHeader = getHeader(full.payload, "Message-ID");
-  const inReplyToHdr = getHeader(full.payload, "In-Reply-To");
-  const referencesHdr = getHeader(full.payload, "References");
-  const bodies = extractBodies(full.payload);
-  const dateMs = Number(full.internalDate);
-
-  // Upsert conversation: use full.threadId.
   const { data: existingConv } = await svc
     .from("conversations")
     .select("id, participants, lead_id")
     .eq("channel_account_id", input.accountId)
-    .eq("provider_thread_key", full.threadId)
+    .eq("provider_thread_key", providerThreadKey)
     .maybeSingle();
 
   // If no leadId was passed in AND the conversation isn't already linked,
@@ -120,23 +171,20 @@ export async function sendEmail(
     }
   }
 
+  const previewSnippet = (snippet ?? "").slice(0, 240);
+
   let convId: string;
   if (existingConv) {
     convId = existingConv.id as string;
     await svc
       .from("conversations")
       .update({
-        last_message_at: new Date(dateMs).toISOString(),
-        last_message_preview: (full.snippet ?? "").slice(0, 240),
+        last_message_at: sentAtIso,
+        last_message_preview: previewSnippet,
         lead_id: resolvedLeadId,
-        // The user sending an outbound reply demonstrably means they've seen
-        // any prior inbound on this thread — clear the unread badge.
         unread_count: 0,
       })
       .eq("id", convId);
-    // Also mark any inbound messages on this thread as read so the lead's
-    // Conversation-tab unread badge clears even when we only had a stale
-    // unread_count without per-message reset.
     await svc
       .from("messages")
       .update({ is_read: true })
@@ -148,8 +196,8 @@ export async function sendEmail(
       .insert({
         org_id: acct.org_id,
         channel_account_id: input.accountId,
-        channel: "gmail",
-        provider_thread_key: full.threadId,
+        channel: provider,
+        provider_thread_key: providerThreadKey,
         subject,
         lead_id: resolvedLeadId,
         participants: [
@@ -157,8 +205,8 @@ export async function sendEmail(
           ...input.to.map((a) => ({ address: a })),
           ...(input.cc ?? []).map((a) => ({ address: a })),
         ],
-        last_message_at: new Date(dateMs).toISOString(),
-        last_message_preview: (full.snippet ?? "").slice(0, 240),
+        last_message_at: sentAtIso,
+        last_message_preview: previewSnippet,
         unread_count: 0,
       })
       .select("id")
@@ -177,7 +225,7 @@ export async function sendEmail(
     .insert({
       org_id: acct.org_id,
       conversation_id: convId,
-      channel: "gmail",
+      channel: provider,
       direction: "outbound",
       from_address: acct.address,
       from_name: acct.display_name ?? null,
@@ -185,16 +233,16 @@ export async function sendEmail(
       cc_addresses: input.cc ?? [],
       bcc_addresses: input.bcc ?? [],
       subject,
-      body_text: bodies.text ?? input.body,
-      body_html: bodies.html ?? null,
-      snippet: full.snippet ?? null,
-      provider_message_id: sent.id,
-      provider_thread_id: full.threadId,
+      body_text: bodyText,
+      body_html: bodyHtml,
+      snippet,
+      provider_message_id: providerMessageId,
+      provider_thread_id: providerThreadKey,
       in_reply_to: inReplyToHdr ?? null,
       references_chain: referencesHdr
         ? referencesHdr.split(/\s+/).filter(Boolean)
         : [],
-      sent_at: new Date(dateMs).toISOString(),
+      sent_at: sentAtIso,
       is_read: true,
       sent_by_user_id: user.id,
       metadata: { message_id_header: messageIdHeader ?? null },

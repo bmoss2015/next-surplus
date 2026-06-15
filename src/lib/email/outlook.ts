@@ -229,3 +229,114 @@ export function getHeader(
   }
   return null;
 }
+
+type GraphRecipient = { emailAddress: { address: string; name?: string } };
+
+export type CreatedOutlookDraft = {
+  id: string;
+  conversationId: string;
+  internetMessageId?: string;
+  subject?: string;
+  bodyPreview?: string;
+  sentDateTime?: string;
+  receivedDateTime?: string;
+};
+
+function asRecipients(addrs: string[] | undefined): GraphRecipient[] {
+  return (addrs ?? [])
+    .filter(Boolean)
+    .map((a) => ({ emailAddress: { address: a } }));
+}
+
+export async function sendOutlookMessage(opts: {
+  accountId: string;
+  from: { address: string; name?: string };
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  bodyHtml?: string;
+  bodyText?: string;
+  inReplyTo?: string | null;
+  references?: string[];
+  attachments?: {
+    filename: string;
+    mimeType: string;
+    base64: string;
+  }[];
+  replyToConversationId?: string | null;
+}): Promise<CreatedOutlookDraft> {
+  const headers: { name: string; value: string }[] = [];
+  if (opts.inReplyTo) {
+    headers.push({ name: "In-Reply-To", value: opts.inReplyTo });
+  }
+  if (opts.references && opts.references.length > 0) {
+    headers.push({
+      name: "References",
+      value: opts.references.join(" "),
+    });
+  }
+
+  const contentType: "html" | "text" = opts.bodyHtml ? "html" : "text";
+  const content = opts.bodyHtml ?? opts.bodyText ?? "";
+
+  const messagePayload: Record<string, unknown> = {
+    subject: opts.subject,
+    body: { contentType, content },
+    toRecipients: asRecipients(opts.to),
+    ccRecipients: asRecipients(opts.cc),
+    bccRecipients: asRecipients(opts.bcc),
+    from: {
+      emailAddress: {
+        address: opts.from.address,
+        ...(opts.from.name ? { name: opts.from.name } : {}),
+      },
+    },
+  };
+  if (headers.length > 0) {
+    messagePayload.internetMessageHeaders = headers;
+  }
+
+  const draft = await graphFetch<CreatedOutlookDraft>(
+    opts.accountId,
+    `/me/messages`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(messagePayload),
+    }
+  );
+
+  for (const att of opts.attachments ?? []) {
+    await graphFetch(
+      opts.accountId,
+      `/me/messages/${draft.id}/attachments`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: att.filename,
+          contentType: att.mimeType,
+          contentBytes: att.base64,
+        }),
+      }
+    );
+  }
+
+  const token = await getValidAccessToken(opts.accountId);
+  const sendRes = await fetch(
+    `${GRAPH_BASE}/me/messages/${draft.id}/send`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!sendRes.ok) {
+    throw new Error(
+      `Graph send ${sendRes.status}: ${await sendRes.text()}`
+    );
+  }
+
+  return draft;
+}
