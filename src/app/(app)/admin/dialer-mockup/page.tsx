@@ -9,6 +9,30 @@ export default async function DialerMockupIndexPage() {
 
   const variants = [
     {
+      slug: "v34",
+      title: "V34 — Hero-Dominant + Queue Strip",
+      anchor: "V28 spine, polished",
+      summary:
+        "Hero card spans 9 columns and includes the deal headline inline (Hayes Estate · Cuyahoga County · Stage · Attempt 1 of 4) plus a large Net To Firm counter inside the gradient. Right column is a compressed contact tree + recent notes. Session queue runs as a horizontal card strip across the bottom.",
+      why: "If you want the call surface to feel cinematic and the queue scannable left-to-right (like a Spotify playlist row), this is the layout. Deal context lives inline with the hero so you never lose it.",
+    },
+    {
+      slug: "v33",
+      title: "V33 — Deal Card Up Front",
+      anchor: "V28 spine, deal-first",
+      summary:
+        "Top row is two side-by-side cards: the Deal card (Hayes Estate, property, surplus, net, lead history, tags) and the wrap-up Hero. Below: contact tree, distinct-leads queue, and recent notes side by side. Deal context is the visual anchor on the left.",
+      why: "Direct fix for 'who's Cornelius, where is this, what's been said.' The Deal card answers all three before you look at the call. Best for VAs who want lead context as a permanent reference, not a sub-element.",
+    },
+    {
+      slug: "v32",
+      title: "V32 — Polished V28 (Recommended)",
+      anchor: "V28 spine, refined",
+      summary:
+        "Hero card on the left with full wrap-up state: countdown + Skip Wait, five outcome buttons with sub-labels (Move to Contract, Schedule a time, etc.), persistent note field at the bottom. Right rail is four small cards: Deal · Contacts · Queue · Notes.",
+      why: "The straight refinement of V28. Contact tree cleaned up (compact rows, expand/collapse with active-number counter). Outcomes have descriptive sub-labels so 'Interested' is paired with 'Move to Contract.' This is what I'd ship.",
+    },
+    {
       slug: "v31",
       title: "V31 — Bottom Action Bar (Outreach pattern)",
       anchor: "Outreach · Salesloft · Aircall",
