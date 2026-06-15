@@ -37,23 +37,23 @@ export function InboxEmptyState({
               lead&apos;s conversations pin to its detail page
               automatically.
             </p>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <div className="mt-5 grid grid-cols-3 gap-2">
               <a
                 href="/api/oauth/google/start"
-                className="inline-flex h-9 w-36 items-center justify-center rounded-md btn-primary text-[13px] font-medium text-white"
+                className="flex h-10 items-center justify-center rounded-md btn-primary text-[12.5px] font-medium text-white"
               >
-                Connect Gmail
+                Gmail
               </a>
               <a
                 href="/api/oauth/microsoft/start"
-                className="inline-flex h-9 w-36 items-center justify-center rounded-md border border-gray-200 bg-white text-[13px] font-medium text-ink hover:border-petrol-300"
+                className="flex h-10 items-center justify-center rounded-md border border-gray-200 bg-white text-[12.5px] font-medium text-ink hover:border-petrol-300"
               >
-                Connect Outlook
+                Outlook
               </a>
               <button
                 type="button"
                 onClick={() => setImapOpen(true)}
-                className="inline-flex h-9 w-36 cursor-pointer items-center justify-center rounded-md border border-gray-200 bg-white text-[13px] font-medium text-ink hover:border-petrol-300"
+                className="flex h-10 cursor-pointer items-center justify-center rounded-md border border-gray-200 bg-white text-[12.5px] font-medium text-ink hover:border-petrol-300"
               >
                 Other (IMAP)
               </button>

@@ -1,15 +1,28 @@
 "use client";
 
-import { IconMail, IconCheck, IconChevronRight } from "@tabler/icons-react";
+import { IconAtom, IconCheck, IconChevronRight } from "@tabler/icons-react";
 import { MockupShell, PRESETS } from "../_shared";
 
 export function V2Modal() {
   return (
     <MockupShell active="v2">
       <div className="w-full max-w-[460px] overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]">
-        <div className="flex items-center justify-center border-b border-gray-100 bg-[#0d4b3a] py-7 text-white">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15 backdrop-blur">
-            <IconMail size={26} stroke={1.6} />
+        <div
+          className="relative flex items-center justify-center overflow-hidden border-b border-gray-100 py-8 text-white"
+          style={{
+            background:
+              "linear-gradient(135deg, #0d4b3a 0%, #14735a 45%, #1a8a9c 100%)",
+          }}
+        >
+          <div
+            className="absolute inset-0 opacity-[0.18]"
+            style={{
+              background:
+                "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.6), transparent 45%), radial-gradient(circle at 80% 70%, rgba(255,255,255,0.4), transparent 50%)",
+            }}
+          />
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-white/25 bg-white/10 backdrop-blur-sm shadow-[0_8px_24px_-6px_rgba(0,0,0,0.35)]">
+            <IconAtom size={30} stroke={1.5} />
           </div>
         </div>
 
