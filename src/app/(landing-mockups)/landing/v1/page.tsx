@@ -8,12 +8,12 @@ export const metadata: Metadata = {
 export default function LandingV1() {
   return (
     <div className="min-h-screen bg-white text-ink">
-      {/* HERO — gradient dark, type-forward, no pricing, no green-dot pill */}
+      {/* HERO + Nav share the gradient. Single continuous teal field. */}
       <section
         className="relative overflow-hidden text-white"
         style={{
           background:
-            "radial-gradient(ellipse at top, #0d4b3a 0%, #051a14 55%, #02100c 100%)",
+            "radial-gradient(ellipse at top, #0d4b3a 0%, #051a14 60%, #02100c 100%)",
         }}
       >
         <Nav />
@@ -22,13 +22,13 @@ export default function LandingV1() {
             Operations Platform For Surplus Recovery
           </div>
           <h1 className="m-0 text-[68px] font-semibold leading-[1.02] tracking-[-0.03em]">
-            Run every case
+            Run Every Case
             <br />
-            <span className="text-white/55">in one place.</span>
+            <span className="text-white/55">In One Place</span>
           </h1>
           <p className="mx-auto mt-8 max-w-xl text-[16.5px] leading-relaxed text-white/65">
-            Replace your spreadsheets, sticky notes, and five tabs with
-            a deliberate platform built for surplus recovery firms.
+            Next Surplus replaces the spreadsheets, sticky notes, and
+            five-tab workflow a surplus recovery firm runs on today.
             Lead pipeline, threaded inbox, physical mail, verified
             checks. One login.
           </p>
@@ -49,8 +49,8 @@ export default function LandingV1() {
         </div>
       </section>
 
-      {/* SOCIAL PROOF — quiet positioning band */}
-      <section className="border-b border-gray-200">
+      {/* SOCIAL PROOF — white band, no tan */}
+      <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-5xl px-8 py-10 text-center">
           <div className="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-gray-500">
             Built For Operators Working
@@ -67,8 +67,8 @@ export default function LandingV1() {
         </div>
       </section>
 
-      {/* PROBLEM */}
-      <section className="bg-[#fafaf8]">
+      {/* PROBLEM — cool gray-50, never tan */}
+      <section className="bg-gray-50">
         <div className="mx-auto max-w-5xl px-8 py-24">
           <div className="grid grid-cols-2 gap-16">
             <div>
@@ -76,24 +76,24 @@ export default function LandingV1() {
                 The Problem
               </div>
               <h2 className="mt-3 text-[36px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink">
-                A recovery firm runs on five tools and a spreadsheet.
+                Five Tools And A Spreadsheet
               </h2>
             </div>
             <div className="space-y-5 pt-8 text-[15px] leading-relaxed text-gray-700">
               <p>
-                The lead list lives in one place. The inbox lives in
-                another. The mail-merge template is in Google Docs.
-                The case notes are in a different doc. The check
-                ledger is in QuickBooks.
+                The lead list lives in one tab. The inbox lives in
+                another. Mail-merge templates live in Google Docs.
+                Case notes live in a different doc. The check ledger
+                lives in QuickBooks.
               </p>
               <p>
                 Cases fall through the cracks. Surplus claims expire.
-                You spend more time stitching tools together than
-                actually recovering funds.
+                Recovery firms spend more time stitching tools
+                together than actually recovering funds.
               </p>
               <p className="text-[#0d4b3a]">
-                Next Surplus collapses all five into one workspace,
-                purpose-built for your case load.
+                Next Surplus collapses the entire stack into one
+                workspace, purpose-built for this case load.
               </p>
             </div>
           </div>
@@ -101,14 +101,14 @@ export default function LandingV1() {
       </section>
 
       {/* FEATURES */}
-      <section id="features" className="border-t border-gray-200">
+      <section id="features" className="border-t border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-8 py-28">
           <div className="mx-auto max-w-2xl text-center">
             <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#0d4b3a]">
               The Platform
             </div>
             <h2 className="mt-3 text-[40px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink">
-              Everything a recovery firm runs on.
+              Everything A Recovery Firm Runs On
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-[14.5px] leading-relaxed text-gray-600">
               Four core surfaces. No add-ons. No upcharges.
@@ -118,92 +118,99 @@ export default function LandingV1() {
           <div className="mt-16 grid grid-cols-2 gap-6">
             <FeatureCard
               eyebrow="01 Lead Pipeline"
-              title="Track every case from sale notice to payout."
-              body="Customizable stages. Automatic activity log. County, state, sale type, surplus amount, estimated net all on one row. Filters that match how you actually work."
+              title="Track Every Case From Sale Notice To Payout"
+              body="Customizable stages. Automatic activity log. County, state, sale type, surplus amount, and estimated net all live on one row. Filters match how recovery firms actually work, not generic CRM defaults."
             />
             <FeatureCard
               eyebrow="02 Threaded Inbox"
-              title="Gmail and Outlook, sorted to the right lead."
-              body="Connect your existing inbox. Conversations auto-link to the property owner. Send replies without leaving the case. Read receipts, attachment archive, conversation history."
+              title="Gmail And Outlook, Sorted To The Right Lead"
+              body="Connect an existing inbox. Conversations auto-link to the property owner. Reply without leaving the case. Read receipts, attachment archive, full conversation history."
             />
             <FeatureCard
-              eyebrow="03 Physical Mail"
-              title="Letters and checks, one click."
-              body="USPS letters and printed checks from inside the platform. Templates with merge fields. Tracking on every piece. Sent mail attaches to the lead automatically."
+              eyebrow="03 Physical Mail And Checks"
+              title="USPS Letters And Printed Checks, One Click"
+              body="Templates with merge fields. Tracking on every piece. Sent mail attaches to the lead automatically. Pricing on each piece is transparent on every monthly invoice."
             />
             <FeatureCard
-              eyebrow="04 Verified Bank"
-              title="Plaid-linked accounts for check sending."
-              body="Connect your business checking once. Micro-deposits handled. We hand the routing details directly to the printer so the bank numbers never sit in plain text."
+              eyebrow="04 Verified Bank Accounts"
+              title="Plaid Linked, Verified Once"
+              body="Connect business checking through Plaid. Micro-deposits handled automatically. Bank numbers never sit in plain text; routing details flow directly to the print partner."
             />
           </div>
         </div>
       </section>
 
-      {/* WHO IT'S FOR */}
-      <section className="bg-[#fafaf8] border-t border-gray-200">
+      {/* WHO IT'S FOR — cool gray-50 */}
+      <section className="border-t border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-6xl px-8 py-28">
           <div className="mx-auto max-w-2xl text-center">
             <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#0d4b3a]">
               Who It Is For
             </div>
             <h2 className="mt-3 text-[36px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink">
-              Built for the way recovery firms actually work.
+              Built For Recovery Firms At Every Stage
             </h2>
           </div>
 
           <div className="mt-14 grid grid-cols-3 gap-6">
             <PersonaCard
               title="The Solo Operator"
-              body="You run every case yourself. You need one tool that does the work of five. Next Surplus replaces your spreadsheet, your inbox, your mail merge, and your check writer."
+              body="One person, every case. Next Surplus replaces a spreadsheet, an inbox, a mail-merge template, and a check writer with a single workspace."
             />
             <PersonaCard
               title="The Small Firm"
-              body="You and two colleagues. You need a shared pipeline, shared inbox visibility, and assignable cases. Each user is included; no per-seat charge."
+              body="Two or three operators. Shared pipeline, shared inbox visibility, assignable cases. Every user included, never a per-seat charge."
             />
             <PersonaCard
               title="The Growing Team"
-              body="You are scaling from three to ten operators. You need automatic activity logs, audit-ready trails, and stage rules that enforce process without slowing you down."
+              body="Three to ten operators. Automatic activity logs, audit-ready trails, stage rules that enforce process without slowing the team down."
             />
           </div>
         </div>
       </section>
 
-      {/* PRICING — proper section, not in hero */}
-      <section id="pricing" className="border-t border-gray-200">
+      {/* PRICING — Founders Rate framing */}
+      <section id="pricing" className="border-t border-gray-200 bg-white">
         <div className="mx-auto max-w-4xl px-8 py-28 text-center">
           <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#0d4b3a]">
-            Pricing
+            Founders Rate
           </div>
           <h2 className="mt-3 text-[40px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink">
-            One plan. Every feature. Every user.
+            One Plan, Every Feature, Every User
           </h2>
           <p className="mx-auto mt-4 max-w-md text-[14.5px] leading-relaxed text-gray-600">
             Most CRM platforms charge per seat and gate features
-            behind tiers. We do not.
+            behind tiers. Next Surplus does not. This rate is locked
+            in for every firm that joins during the launch window.
           </p>
 
           <div className="mx-auto mt-14 max-w-md rounded-2xl border border-gray-200 bg-white p-10 text-left shadow-[0_24px_50px_-20px_rgba(15,23,41,0.18)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0d4b3a]">
-              Standard
+            <div className="flex items-baseline justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0d4b3a]">
+                Founders Plan
+              </div>
+              <div className="rounded-full border border-[#0d4b3a]/30 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-[#0d4b3a]">
+                Launch Pricing
+              </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-1.5">
+            <div className="mt-4 flex items-baseline gap-1.5">
               <span className="text-[56px] font-semibold leading-none tracking-tight text-ink">
                 $69
               </span>
-              <span className="text-[14px] text-gray-500">/ month</span>
+              <span className="text-[14px] text-gray-500">/ Month</span>
             </div>
             <div className="mt-1 text-[13px] text-gray-500">
-              Per organization. Billed monthly.
+              Per organization, billed monthly. Locked in for the life
+              of the account.
             </div>
             <ul className="mt-7 space-y-2.5 text-[13.5px] text-ink">
               {[
-                "Unlimited users in your organization",
-                "Lead pipeline with custom stages",
-                "Gmail and Outlook inbox sync",
-                "Physical letters and checks via USPS",
-                "Plaid bank verification",
-                "Templates, activity log, audit trail",
+                "Unlimited Users In Your Organization",
+                "Lead Pipeline With Custom Stages",
+                "Gmail And Outlook Inbox Sync",
+                "Physical Letters And Printed Checks",
+                "Plaid Bank Verification",
+                "Templates, Activity Log, Audit Trail",
               ].map((line) => (
                 <li key={line} className="flex items-start gap-2.5">
                   <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#0d4b3a]" />
@@ -215,48 +222,48 @@ export default function LandingV1() {
               href="/signup"
               className="mt-8 inline-flex h-11 w-full items-center justify-center rounded-md bg-[#0d4b3a] text-[14px] font-medium text-white hover:bg-[#0a3d2f]"
             >
-              Start Free
+              Claim Founders Rate
             </Link>
           </div>
 
-          <div className="mt-8 text-[12.5px] text-gray-500">
-            Physical mail is billed separately at cost plus a 20%
-            service fee. Transparent on every invoice.
+          <div className="mt-6 text-[12.5px] text-gray-500">
+            Mail pricing is itemized on each monthly invoice. See the
+            Features section for delivery details.
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section id="faq" className="bg-[#fafaf8] border-t border-gray-200">
+      {/* FAQ — cool gray-50 */}
+      <section id="faq" className="border-t border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-3xl px-8 py-24">
           <div className="text-center">
             <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#0d4b3a]">
               FAQ
             </div>
             <h2 className="mt-3 text-[32px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink">
-              Common questions.
+              Common Questions
             </h2>
           </div>
           <div className="mt-12 space-y-px overflow-hidden rounded-lg border border-gray-200 bg-white">
             <Faq
-              q="What states does the platform support?"
-              a="All fifty states. Stage logic and surplus calculations are configurable per organization, so it adapts to your jurisdiction."
+              q="What States Does The Platform Support?"
+              a="All fifty states. Stage logic and surplus calculations are configurable per organization, so the platform adapts to local jurisdiction."
             />
             <Faq
-              q="Do I have to use a specific email provider?"
-              a="No. Gmail and Outlook connect via OAuth, and any other inbox connects via IMAP. The platform syncs the inbox you already use."
+              q="Do I Have To Use A Specific Email Provider?"
+              a="No. Gmail and Outlook connect via OAuth, and any other inbox connects via IMAP. The platform syncs the inbox an operator already uses."
             />
             <Faq
-              q="How do you handle physical mail?"
-              a="Letters and checks ship through a USPS-licensed print partner. You write the letter, click send. The recipient gets the piece in their mailbox in three to five business days, with tracking attached to the lead."
+              q="How Does Physical Mail Get Sent?"
+              a="Letters and checks ship through a USPS-licensed print partner. The operator writes the letter and clicks send. The recipient receives the piece in three to five business days, with tracking attached to the lead. Pricing is transparent on every monthly invoice."
             />
             <Faq
-              q="Is my data isolated from other firms?"
-              a="Yes. Every organization runs in its own isolated namespace; another firm cannot view your pipeline, your mail, or your contacts."
+              q="Is My Data Isolated From Other Firms?"
+              a="Yes. Every organization runs in its own namespace. Another firm cannot view a pipeline, mail, or contact list outside its own."
             />
             <Faq
-              q="Can I cancel anytime?"
-              a="Yes. Cancel from Settings. Your account stays active through the end of the billing period, then enters a 30-day read-only window so you can export your data."
+              q="Can I Cancel Anytime?"
+              a="Yes. Cancel from Settings. The account stays active through the end of the billing period, then enters a 30-day read-only window for data export."
             />
           </div>
         </div>
@@ -272,10 +279,10 @@ export default function LandingV1() {
       >
         <div className="mx-auto max-w-3xl px-8 py-24 text-center">
           <h2 className="m-0 text-[44px] font-semibold leading-[1.1] tracking-[-0.02em]">
-            Stop running your firm in five tabs.
+            Stop Running A Firm In Five Tabs
           </h2>
           <p className="mx-auto mt-5 max-w-lg text-[15.5px] text-white/65">
-            Sign up, import your first batch of leads, send your first
+            Sign up, import a first batch of leads, send a first
             letter inside ten minutes.
           </p>
           <div className="mt-9 flex items-center justify-center gap-2">
@@ -295,7 +302,6 @@ export default function LandingV1() {
         </div>
       </section>
 
-      {/* FOOTER */}
       <footer className="border-t border-gray-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-8 py-8 text-[12.5px] text-gray-500">
           <div>
