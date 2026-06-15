@@ -1,6 +1,6 @@
 "use client";
 
-import { IconAtom, IconCheck, IconChevronRight } from "@tabler/icons-react";
+import { IconCheck, IconChevronRight, IconX } from "@tabler/icons-react";
 import { MockupShell, PRESETS } from "../_shared";
 
 export function V2Modal() {
@@ -8,29 +8,30 @@ export function V2Modal() {
     <MockupShell active="v2">
       <div className="w-full max-w-[460px] overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]">
         <div
-          className="relative flex items-center justify-center overflow-hidden border-b border-gray-100 py-8 text-white"
+          className="h-1"
           style={{
             background:
-              "linear-gradient(135deg, #0d4b3a 0%, #14735a 45%, #1a8a9c 100%)",
+              "linear-gradient(90deg, #0a3d4a 0%, #0d6c7d 60%, #1a8a9c 100%)",
           }}
-        >
-          <div
-            className="absolute inset-0 opacity-[0.18]"
-            style={{
-              background:
-                "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.6), transparent 45%), radial-gradient(circle at 80% 70%, rgba(255,255,255,0.4), transparent 50%)",
-            }}
-          />
-          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-white/25 bg-white/10 backdrop-blur-sm shadow-[0_8px_24px_-6px_rgba(0,0,0,0.35)]">
-            <IconAtom size={30} stroke={1.5} />
-          </div>
+        />
+        <div className="flex items-center justify-between px-7 pt-5 pb-1">
+          <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+            Connect Email
+          </span>
+          <button
+            type="button"
+            className="-mr-2 flex h-7 w-7 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-ink"
+            aria-label="Close"
+          >
+            <IconX size={16} stroke={2} />
+          </button>
         </div>
 
-        <div className="px-7 pt-7 pb-2 text-center">
-          <h2 className="m-0 text-[20px] font-semibold tracking-tight text-ink">
-            Connect Your Email
+        <div className="px-7 pt-2 pb-2">
+          <h2 className="m-0 text-[22px] font-semibold leading-tight tracking-tight text-ink">
+            Sign In With Fastmail
           </h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-gray-500">
+          <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500">
             Three short steps. The platform handles the rest.
           </p>
         </div>
