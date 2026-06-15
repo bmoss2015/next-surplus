@@ -445,6 +445,77 @@ export async function resendInvite(
   return { ok: true };
 }
 
+export async function getInviteLink(
+  userId: string
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin) return { ok: false, error: "Only admins can copy invite links" };
+  if (userId === profile.id) return { ok: false, error: "You can't copy your own invite link" };
+
+  const admin = createServiceClient();
+  const { data: target, error: targetErr } = await admin
+    .from("profiles")
+    .select("id, org_id, role, full_name, email")
+    .eq("id", userId)
+    .maybeSingle();
+  if (targetErr) return { ok: false, error: targetErr.message };
+  if (!target) return { ok: false, error: "That invite could not be found" };
+  if (target.org_id !== profile.orgId) {
+    return { ok: false, error: "That invite is not in your organization" };
+  }
+
+  const cleanEmail = (target.email as string | null)?.trim().toLowerCase();
+  if (!cleanEmail) return { ok: false, error: "That invite has no email on file" };
+  const cleanName = ((target.full_name as string | null) ?? "").trim();
+  const safeRole: "admin" | "member" =
+    target.role === "admin" ? "admin" : "member";
+
+  const { error: cleanupErr } = await admin.auth.admin.deleteUser(userId);
+  if (cleanupErr) return { ok: false, error: cleanupErr.message };
+
+  const { data: invited, error: linkErr } = await admin.auth.admin.generateLink({
+    type: "invite",
+    email: cleanEmail,
+    options: {
+      data: { org_id: profile.orgId, role: safeRole, full_name: cleanName },
+      redirectTo: `${SITE_URL}/accept-invite`,
+    },
+  });
+  if (linkErr) return { ok: false, error: linkErr.message };
+
+  const tokenHash = invited?.properties?.hashed_token;
+  if (!tokenHash) return { ok: false, error: "Could not generate the invite link" };
+  const inviteUrl = `${SITE_URL}/accept-invite?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
+
+  const invitedId = invited?.user?.id;
+  if (invitedId) {
+    await admin.from("profiles").upsert(
+      {
+        id: invitedId,
+        org_id: profile.orgId,
+        role: safeRole,
+        full_name: cleanName,
+        email: cleanEmail,
+      },
+      { onConflict: "id" }
+    );
+  }
+
+  const sb = await createClient();
+  await sb.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "team_invite_link_copied",
+    payload: {
+      target_user_id: invitedId ?? userId,
+      target_email: cleanEmail,
+      target_name: cleanName || null,
+    },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true, url: inviteUrl };
+}
+
 export async function cancelInvite(
   userId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
