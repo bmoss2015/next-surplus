@@ -1,4 +1,4 @@
-name: Legal Pages: No Hardcoded Prices
+name: "Legal Pages - No Hardcoded Prices"
 
 on:
   pull_request:
