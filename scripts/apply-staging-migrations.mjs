@@ -33,7 +33,11 @@ function readEnvLocalValue(key) {
   return null;
 }
 
-const PAT = process.env.SUPABASE_PAT || readEnvLocalValue("SUPABASE_PAT");
+const PAT =
+  readEnvLocalValue("SUPABASE_PAT") ||
+  process.env.SUPABASE_PAT ||
+  readEnvLocalValue("SUPABASE_ACCESS_TOKEN") ||
+  process.env.SUPABASE_ACCESS_TOKEN;
 const PROJECT_REF = "qfanroxcoepunmrmjabo";
 const MIGRATIONS_DIR = path.join(REPO_ROOT, "supabase", "migrations");
 const API = `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`;

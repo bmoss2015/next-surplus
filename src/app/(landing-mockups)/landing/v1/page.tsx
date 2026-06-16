@@ -187,30 +187,30 @@ export default function LandingV1() {
           <div className="mx-auto mt-14 max-w-md rounded-2xl border border-gray-200 bg-white p-10 text-left shadow-[0_24px_50px_-20px_rgba(15,23,41,0.18)]">
             <div className="flex items-baseline justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0d4b3a]">
-                Founders Plan
+                Founders Rate
               </div>
               <div className="rounded-full border border-[#0d4b3a]/30 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-[#0d4b3a]">
-                Launch Pricing
+                Limited Window
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-1.5">
               <span className="text-[56px] font-semibold leading-none tracking-tight text-ink">
-                $69
+                $49
               </span>
               <span className="text-[14px] text-gray-500">/ Month</span>
             </div>
             <div className="mt-1 text-[13px] text-gray-500">
-              Per organization, billed monthly. Locked in for the life
-              of the account.
+              Per organization, billed monthly. Annual billing available
+              at signup.
             </div>
             <ul className="mt-7 space-y-2.5 text-[13.5px] text-ink">
               {[
                 "Unlimited Users In Your Organization",
                 "Lead Pipeline With Custom Stages",
-                "Gmail And Outlook Inbox Sync",
-                "Physical Letters And Printed Checks",
-                "Plaid Bank Verification",
+                "Gmail Inbox Sync",
                 "Templates, Activity Log, Audit Trail",
+                "CSV Import And Export",
+                "Locked Rate For Twelve Months",
               ].map((line) => (
                 <li key={line} className="flex items-start gap-2.5">
                   <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#0d4b3a]" />
@@ -227,8 +227,7 @@ export default function LandingV1() {
           </div>
 
           <div className="mt-6 text-[12.5px] text-gray-500">
-            Mail pricing is itemized on each monthly invoice. See the
-            Features section for delivery details.
+            Microsoft Outlook and IMAP inbox sync are coming next.
           </div>
         </div>
       </section>
@@ -246,24 +245,40 @@ export default function LandingV1() {
           </div>
           <div className="mt-12 space-y-px overflow-hidden rounded-lg border border-gray-200 bg-white">
             <Faq
-              q="What States Does The Platform Support?"
-              a="All fifty states. Stage logic and surplus calculations are configurable per organization, so the platform adapts to local jurisdiction."
+              q="Who built this?"
+              a="Built by an active surplus funds operator who needed better tools than what's on the market. Built by operators, for operators. Every feature decision goes through people who use the platform daily."
             />
             <Faq
-              q="Do I Have To Use A Specific Email Provider?"
-              a="No. Gmail and Outlook connect via OAuth, and any other inbox connects via IMAP. The platform syncs the inbox an operator already uses."
+              q="What does Next Surplus do?"
+              a="Centralizes everything a recovery operation needs: lead intake, owner research, outreach, case tracking, and document management. One workspace instead of five."
             />
             <Faq
-              q="How Does Physical Mail Get Sent?"
-              a="Letters and checks ship through a USPS-licensed print partner. The operator writes the letter and clicks send. The recipient receives the piece in three to five business days, with tracking attached to the lead. Pricing is transparent on every monthly invoice."
+              q="Is the development team active?"
+              a="Yes. We ship updates frequently and act on customer feedback. If there's a feature you need, tell us. We don't sit on requests."
             />
             <Faq
-              q="Is My Data Isolated From Other Firms?"
-              a="Yes. Every organization runs in its own namespace. Another firm cannot view a pipeline, mail, or contact list outside its own."
+              q="What's included in the subscription?"
+              a="Lead management, pipeline tracking, document management, email integration, team invites, lead import, and every feature we ship going forward. Unlimited users per account."
             />
             <Faq
-              q="Can I Cancel Anytime?"
-              a="Yes. Cancel from Settings. The account stays active through the end of the billing period, then enters a 30-day read-only window for data export."
+              q="Is email integration extra?"
+              a="No. Email integration is included at no extra cost. Other CRMs charge a per seat or per inbox fee for email sync. We don't."
+            />
+            <Faq
+              q="What email providers work?"
+              a="Gmail today. Microsoft Outlook and IMAP support coming soon."
+            />
+            <Faq
+              q="Is my data private?"
+              a="Your data stays separate from other firms. Only people you invite to your account can see it."
+            />
+            <Faq
+              q="Can I cancel anytime?"
+              a="Yes. No long term contracts."
+            />
+            <Faq
+              q="Is there a free trial?"
+              a="Yes. 14 days. No card required to start exploring."
             />
           </div>
         </div>
