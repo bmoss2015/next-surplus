@@ -312,18 +312,18 @@ export function ConnectImapModal({
             type="button"
             onClick={submit}
             disabled={!ready || submitting}
-            className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-md btn-primary text-[14px] font-medium text-white disabled:opacity-50"
+            className="flex h-12 w-full cursor-pointer items-center justify-between gap-2 rounded-md btn-primary px-5 text-[14px] font-medium text-white disabled:opacity-50"
           >
-            {submitting ? "Testing Connection" : "Continue"}
+            <span>{submitting ? "Testing Connection" : "Continue"}</span>
             <IconChevronRight size={16} stroke={2.4} />
           </button>
         </div>
 
         <div className="border-t border-gray-100 bg-gray-50 px-7 py-3">
-          <div className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">
             Switch Provider
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-gray-600">
+          <div className="flex flex-wrap items-center justify-start gap-1.5 text-[11px] text-gray-600">
             {PRESETS.filter(
               (p) => customMode || p.label !== preset.label
             ).map((p) => (
