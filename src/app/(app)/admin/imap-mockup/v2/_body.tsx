@@ -40,19 +40,21 @@ export function V2Body() {
       </div>
 
       <div className="border-t border-gray-100 px-7 py-5">
-        <button className="flex h-12 w-full items-center justify-center gap-2 rounded-md btn-primary text-[14px] font-medium text-white">
-          Continue
+        <button className="flex h-12 w-full items-center justify-between gap-2 rounded-md btn-primary px-5 text-[14px] font-medium text-white">
+          <span>Continue</span>
           <IconChevronRight size={16} stroke={2.4} />
         </button>
       </div>
 
-      <div className="border-t border-gray-100 bg-gray-50 px-7 py-3 text-center">
-        <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-gray-500">
-          <span>Or pick another:</span>
+      <div className="border-t border-gray-100 bg-gray-50 px-7 py-3">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+          Switch Provider
+        </div>
+        <div className="flex flex-wrap items-center justify-start gap-1.5 text-[11px] text-gray-600">
           {PRESETS.filter((p) => p.label !== "Fastmail").map((p) => (
             <button
               key={p.label}
-              className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 hover:border-gray-300"
+              className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 font-medium hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
             >
               {p.label}
             </button>
