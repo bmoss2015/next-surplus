@@ -59,8 +59,8 @@ export function EmailAccountsSection({
         <div>
           <h1 className="section-h1">Email Accounts</h1>
           <p className="section-desc">
-            Connect Gmail so the portal can read and send email from this
-            inbox.
+            Connect Gmail, Outlook, or any IMAP inbox so the portal can
+            read and send email from it.
           </p>
         </div>
       </div>
@@ -182,9 +182,9 @@ function AccountBlock({ acct }: { acct: EmailAccountRow }) {
 
   const statusText =
     acct.status === "active"
-      ? `Active · ${formatSyncedAt(acct.last_synced_at).toLowerCase()}`
+      ? `Active · ${formatSyncedAt(acct.last_synced_at)}`
       : acct.status === "reauth_required"
-        ? "Re-authentication required"
+        ? "Re-Authentication Required"
         : "Disabled";
 
   function onClickDisconnect() {
@@ -249,9 +249,9 @@ function AccountBlock({ acct }: { acct: EmailAccountRow }) {
           }
         >
           {pending
-            ? "Disconnecting…"
+            ? "Disconnecting"
             : confirming
-              ? "Click again to confirm"
+              ? "Click Again To Confirm"
               : "Disconnect"}
         </button>
       </div>

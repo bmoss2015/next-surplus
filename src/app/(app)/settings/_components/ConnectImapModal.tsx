@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   IconCheck,
   IconChevronRight,
-  IconChevronLeft,
   IconMail,
   IconX,
 } from "@tabler/icons-react";
@@ -71,20 +70,12 @@ export function ConnectImapModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-
-  const [preset, setPreset] = useState<Preset | null>(null);
-  const [customMode, setCustomMode] = useState(false);
-  const [customHost, setCustomHost] = useState("");
-  const [customPort, setCustomPort] = useState(993);
-  const [customSmtpHost, setCustomSmtpHost] = useState("");
-  const [customSmtpPort, setCustomSmtpPort] = useState(465);
-
+  const [preset, setPreset] = useState<Preset>(PRESETS[0]);
   const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
-
-  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [err, setErr] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [submitting, setSubmitting] = useState(false);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     if (!open) return;
@@ -98,65 +89,39 @@ export function ConnectImapModal({
   useEffect(() => {
     if (!open) return;
     /* eslint-disable react-hooks/set-state-in-effect */
-    setStep(1);
-    setPreset(null);
-    setCustomMode(false);
+    setPreset(PRESETS[0]);
     setAddress("");
     setPassword("");
     setErr(null);
+    setSubmitting(false);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open]);
 
-  const providerLabel = preset?.label ?? (customMode ? "Custom Server" : "");
-
-  function pickPreset(p: Preset) {
-    setPreset(p);
-    setCustomMode(false);
-    setStep(2);
-  }
-
-  function pickCustom() {
-    setPreset(null);
-    setCustomMode(true);
-    setStep(2);
-  }
+  const ready = address.length > 0 && password.length > 0;
 
   function submit() {
+    if (!ready) return;
     setErr(null);
-    if (!address || !password) {
-      setErr("Email address and password are required.");
-      return;
-    }
-    const imap_host = preset?.imap_host ?? customHost;
-    const imap_port = preset?.imap_port ?? customPort;
-    const imap_secure = preset?.imap_secure ?? true;
-    const smtp_host = preset?.smtp_host ?? customSmtpHost;
-    const smtp_port = preset?.smtp_port ?? customSmtpPort;
-    const smtp_secure = preset?.smtp_secure ?? true;
-    if (!imap_host || !smtp_host) {
-      setErr("Server hostnames are required.");
-      return;
-    }
-    setStep(3);
+    setSubmitting(true);
     startTransition(async () => {
       const res = await connectImapAccount({
         address,
         creds: {
-          imap_host,
-          imap_port,
-          imap_secure,
+          imap_host: preset.imap_host,
+          imap_port: preset.imap_port,
+          imap_secure: preset.imap_secure,
           imap_username: address,
           imap_password: password,
-          smtp_host,
-          smtp_port,
-          smtp_secure,
+          smtp_host: preset.smtp_host,
+          smtp_port: preset.smtp_port,
+          smtp_secure: preset.smtp_secure,
           smtp_username: address,
           smtp_password: password,
         },
       });
       if (!res.ok) {
         setErr(res.error);
-        setStep(2);
+        setSubmitting(false);
         return;
       }
       onClose();
@@ -173,7 +138,7 @@ export function ConnectImapModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-[480px] overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]"
+        className="relative w-full max-w-[460px] overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]"
       >
         <div
           className="flex items-center justify-between px-5 py-2.5 text-white"
@@ -197,9 +162,7 @@ export function ConnectImapModal({
 
         <div className="px-7 pt-6 pb-2">
           <h2 className="m-0 text-[22px] font-semibold leading-tight tracking-tight text-ink">
-            {providerLabel
-              ? `Sign In With ${providerLabel}`
-              : "Connect Your Email"}
+            Sign In With {preset.label}
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500">
             Three short steps. We test the connection before saving.
@@ -210,149 +173,68 @@ export function ConnectImapModal({
           <Step
             n={1}
             title="Pick Your Provider"
-            done={step > 1}
-            active={step === 1}
-            body={
-              step > 1
-                ? `${providerLabel} selected`
-                : "Choose your inbox provider, or enter a custom IMAP server."
-            }
-          >
-            {step === 1 && (
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {PRESETS.map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => pickPreset(p)}
-                    className="cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-2.5 text-[13px] font-medium text-ink hover:border-[#0d4b3a] hover:bg-[#0d4b3a]/[0.03]"
-                  >
-                    {p.label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={pickCustom}
-                  className="col-span-2 cursor-pointer rounded-md border border-dashed border-gray-300 bg-white px-3 py-2.5 text-[12.5px] font-medium text-gray-600 hover:border-gray-400 hover:text-ink"
-                >
-                  Custom IMAP Server
-                </button>
-              </div>
-            )}
-          </Step>
-
+            done
+            body={`${preset.label} selected`}
+          />
           <Step
             n={2}
             title="Sign In"
-            done={step > 2}
-            active={step === 2}
-            body={
-              step >= 2
-                ? customMode
-                  ? "Enter your server details and credentials."
-                  : "Enter the email and app password for this inbox."
-                : undefined
-            }
+            active
+            body={`Enter the email and app password for your ${preset.label} inbox.`}
           >
-            {step === 2 && (
-              <div className="mt-4 space-y-3">
-                {customMode && (
-                  <div className="grid grid-cols-[1fr_90px] gap-2">
-                    <FieldInput
-                      placeholder="IMAP server (e.g. imap.example.com)"
-                      value={customHost}
-                      onChange={setCustomHost}
-                    />
-                    <FieldInput
-                      placeholder="993"
-                      value={String(customPort)}
-                      onChange={(v) => setCustomPort(Number(v) || 0)}
-                    />
-                    <FieldInput
-                      placeholder="SMTP server (e.g. smtp.example.com)"
-                      value={customSmtpHost}
-                      onChange={setCustomSmtpHost}
-                    />
-                    <FieldInput
-                      placeholder="465"
-                      value={String(customSmtpPort)}
-                      onChange={(v) => setCustomSmtpPort(Number(v) || 0)}
-                    />
-                  </div>
-                )}
-                <FieldInput
-                  type="email"
-                  placeholder="Email Address"
-                  value={address}
-                  onChange={setAddress}
-                />
-                <FieldInput
-                  type="password"
-                  placeholder="App Password"
-                  value={password}
-                  onChange={setPassword}
-                />
-                {err && (
-                  <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
-                    {err}
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="mt-4 space-y-3">
+              <BigInput
+                type="email"
+                placeholder="Email Address"
+                value={address}
+                onChange={setAddress}
+              />
+              <BigInput
+                type="password"
+                placeholder="App Password"
+                value={password}
+                onChange={setPassword}
+              />
+              {err && (
+                <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
+                  {err}
+                </div>
+              )}
+            </div>
           </Step>
-
           <Step
             n={3}
             title="Confirm Connection"
-            done={false}
-            active={step === 3}
-            body={
-              step === 3
-                ? pending
-                  ? "Testing IMAP and SMTP servers..."
-                  : "Connection verified."
-                : "We test both servers before saving."
-            }
+            body="The platform tests the connection before saving."
           />
         </div>
 
-        <div className="border-t border-gray-100 bg-gray-50/60 px-7 py-4">
-          {step === 1 && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-11 w-full cursor-pointer rounded-md border border-gray-200 bg-white text-[13.5px] font-medium text-ink hover:border-gray-300"
-            >
-              Cancel
-            </button>
-          )}
-          {step === 2 && (
-            <div className="flex items-center gap-2">
+        <div className="border-t border-gray-100 px-7 py-5">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!ready || submitting}
+            className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-md btn-primary text-[14px] font-medium text-white disabled:opacity-50"
+          >
+            {submitting ? "Testing Connection" : "Continue"}
+            {!submitting && <IconChevronRight size={16} stroke={2.4} />}
+          </button>
+        </div>
+
+        <div className="border-t border-gray-100 bg-gray-50 px-7 py-3 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-gray-500">
+            <span>Or pick another:</span>
+            {PRESETS.filter((p) => p.label !== preset.label).map((p) => (
               <button
+                key={p.label}
                 type="button"
-                onClick={() => setStep(1)}
-                className="inline-flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-[13.5px] font-medium text-ink hover:border-gray-300"
+                onClick={() => setPreset(p)}
+                className="cursor-pointer rounded-full border border-gray-200 bg-white px-2.5 py-0.5 hover:border-gray-300"
               >
-                <IconChevronLeft size={14} stroke={2.2} />
-                Back
+                {p.label}
               </button>
-              <button
-                type="button"
-                onClick={submit}
-                disabled={pending}
-                className="inline-flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md btn-primary text-[13.5px] font-medium text-white disabled:opacity-50"
-              >
-                Test &amp; Connect
-                <IconChevronRight size={14} stroke={2.4} />
-              </button>
-            </div>
-          )}
-          {step === 3 && (
-            <div className="flex h-11 items-center justify-center gap-2 text-[13px] text-gray-500">
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#0d4b3a] border-r-transparent" />
-              {pending ? "Verifying connection" : "Saving"}
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -411,7 +293,7 @@ function Step({
   );
 }
 
-function FieldInput({
+function BigInput({
   type = "text",
   placeholder,
   value,
@@ -428,7 +310,7 @@ function FieldInput({
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="block h-11 w-full rounded-md border border-gray-200 bg-white px-3.5 text-[13.5px] text-ink outline-none focus:border-[#0d4b3a] focus:ring-2 focus:ring-[#0d4b3a]/15"
+      className="block h-11 w-full rounded-md border border-gray-200 bg-white px-3.5 text-[13.5px] text-ink outline-none focus:border-[#0d4b3a]"
     />
   );
 }
