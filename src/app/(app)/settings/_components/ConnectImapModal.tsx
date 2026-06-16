@@ -367,38 +367,33 @@ function Step({
   active?: boolean;
   children?: React.ReactNode;
 }) {
+  const eyebrowColor = done
+    ? "text-[#0d4b3a]"
+    : active
+      ? "text-[#0d4b3a]"
+      : "text-gray-400";
+  const titleColor = active || done ? "text-ink" : "text-gray-400";
   return (
-    <div className="flex gap-2.5 pb-6 last:pb-0">
-      <span
-        className={`mt-[3px] inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
-          done
-            ? "bg-[#0d4b3a] text-white"
-            : active
-              ? "border-[1.5px] border-[#0d4b3a] bg-white text-[#0d4b3a]"
-              : "border border-gray-300 bg-white text-gray-400"
-        }`}
+    <div className="pb-6 last:pb-0">
+      <div
+        className={`mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${eyebrowColor}`}
       >
-        {done ? <IconCheck size={11} stroke={3} /> : n}
-      </span>
-      <div className="min-w-0 flex-1">
+        <span>
+          {done ? "Done" : active ? "Now" : "Next"} · Step {n}
+        </span>
+        {done && <IconCheck size={12} stroke={3} />}
+      </div>
+      <div className={`text-[15px] font-semibold ${titleColor}`}>{title}</div>
+      {body && (
         <div
-          className={`text-[14px] font-semibold leading-snug ${
-            active || done ? "text-ink" : "text-gray-400"
+          className={`mt-1 text-[12.5px] leading-relaxed ${
+            active || done ? "text-gray-600" : "text-gray-400"
           }`}
         >
-          {title}
+          {body}
         </div>
-        {body && (
-          <div
-            className={`mt-1 text-[12px] leading-relaxed ${
-              active || done ? "text-gray-600" : "text-gray-400"
-            }`}
-          >
-            {body}
-          </div>
-        )}
-        {children}
-      </div>
+      )}
+      {children}
     </div>
   );
 }

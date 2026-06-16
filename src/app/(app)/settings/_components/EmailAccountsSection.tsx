@@ -121,20 +121,20 @@ function EmptyState() {
       <div className="flex flex-wrap items-center justify-center gap-2">
         <a
           href="/api/oauth/google/start"
-          className="inline-flex h-9 items-center gap-2 rounded-md btn-primary px-4 text-[13px] font-medium text-white"
+          className="inline-flex h-10 w-52 items-center justify-center rounded-md btn-primary text-[13px] font-medium text-white"
         >
           Connect Gmail
         </a>
         <a
           href="/api/oauth/microsoft/start"
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-200 bg-white px-4 text-[13px] font-medium text-ink hover:border-petrol-300"
+          className="inline-flex h-10 w-52 items-center justify-center rounded-md border border-gray-200 bg-white text-[13px] font-medium text-ink hover:border-petrol-300"
         >
           Connect Outlook
         </a>
         <button
           type="button"
           onClick={() => setImapOpen(true)}
-          className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-white px-4 text-[13px] font-medium text-ink hover:border-petrol-300"
+          className="inline-flex h-10 w-52 cursor-pointer items-center justify-center rounded-md border border-gray-200 bg-white text-[13px] font-medium text-ink hover:border-petrol-300"
         >
           Connect Other (IMAP)
         </button>
