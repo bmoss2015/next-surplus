@@ -245,24 +245,40 @@ export default function LandingV1() {
           </div>
           <div className="mt-12 space-y-px overflow-hidden rounded-lg border border-gray-200 bg-white">
             <Faq
-              q="What States Does The Platform Support?"
-              a="All fifty states. Stage logic and surplus calculations are configurable per organization, so the platform adapts to local jurisdiction."
+              q="Who built this?"
+              a="Built by an active surplus funds operator who needed better tools than what's on the market. Built by operators, for operators. Every feature decision goes through people who use the platform daily."
             />
             <Faq
-              q="Which Email Inboxes Does It Sync?"
-              a="Gmail today, via OAuth. Microsoft Outlook and IMAP are next. Email sync is included in the subscription."
+              q="What does Next Surplus do?"
+              a="Centralizes everything a recovery operation needs: lead intake, owner research, outreach, case tracking, and document management. One workspace instead of five."
             />
             <Faq
-              q="What Is The Founders Rate?"
-              a="A locked monthly price for the first year of active subscription. Customers who sign up before the Founders Rate window closes keep the price for twelve months, then renew at standard pricing."
+              q="Is the development team active?"
+              a="Yes. We ship updates frequently and act on customer feedback. If there's a feature you need, tell us. We don't sit on requests."
             />
             <Faq
-              q="How Long Does It Take To Get Started?"
-              a="Sign up, invite a teammate, import a CSV of leads, and start working pipeline the same day. There is no implementation period and no required onboarding call."
+              q="What's included in the subscription?"
+              a="Lead management, pipeline tracking, document management, email integration, team invites, lead import, and every feature we ship going forward. Unlimited users per account."
             />
             <Faq
-              q="Can I Cancel Anytime?"
-              a="Yes. Cancel from Settings. The subscription stays active through the end of the current billing period. Export your data at any time before or after cancellation."
+              q="Is email integration extra?"
+              a="No. Email integration is included at no extra cost. Other CRMs charge a per seat or per inbox fee for email sync. We don't."
+            />
+            <Faq
+              q="What email providers work?"
+              a="Gmail today. Microsoft Outlook and IMAP support coming soon."
+            />
+            <Faq
+              q="Is my data private?"
+              a="Your data stays separate from other firms. Only people you invite to your account can see it."
+            />
+            <Faq
+              q="Can I cancel anytime?"
+              a="Yes. No long term contracts."
+            />
+            <Faq
+              q="Is there a free trial?"
+              a="Yes. 14 days. No card required to start exploring."
             />
           </div>
         </div>
