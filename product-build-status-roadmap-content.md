@@ -1,4 +1,4 @@
-# Moss Equity Partners - Web App: Product Roadmap Content
+# Next Surplus: Product Roadmap Content
 
 This file is the source content for the auto-generated Product Build Status & Roadmap document. The Cloudflare Worker reads this file every Monday at 9am Central (and on demand) and generates the doc that lands in the Shared Drive.
 
@@ -10,7 +10,7 @@ The Worker parses by `##` headers. Do not change the section names below. Add ne
 
 ## Product Overview
 
-Moss Equity Partners - Web App is the operations platform for surplus funds recovery firms. It centralizes lead intake, owner research, outreach, contracts, and claim filing into one workspace so operators can pursue more deals with less manual work. Built for solo operators and small teams, designed to scale to multi-state firms with dozens of users.
+Next Surplus is the operations platform for surplus funds recovery firms. It centralizes lead intake, owner research, outreach, contracts, and claim filing into one workspace so operators can pursue more deals with less manual work. Built for solo operators and small teams, designed to scale to multi-state firms with dozens of users.
 
 ---
 
@@ -46,7 +46,7 @@ Snapshot at the $97 to 99 price band, used to ground roadmap and pricing decisio
 | Pricing model | Flat subscription | Flat subscription | Hidden, demo-gated funnel | $97 subscription + usage on top |
 | A2P 10DLC handling | [unverified] | [unverified] | [unverified, inherits GHL manual process] | User-driven through Trust Center, manual, common rejections (owner-experienced "treacherous") |
 
-### Where Moss can credibly lead
+### Where Next Surplus can credibly lead
 
 | Lever | Status today | Notes |
 |---|---|---|
@@ -133,4 +133,4 @@ Items deprioritized or held for later evaluation. Not committed to a specific qu
 - Stage progression triggers (replies auto-advance leads through the pipeline). Revisit after cadences ship.
 - Automated task generation based on activity rules. Revisit after cadences ship.
 - Attorney marketplace (operators routed to filers per state with referral revenue share). Interesting product extension once the core platform is launched and monetized.
-- Nationwide county-office directory bundled inside the platform (Surplus Systems markets one as part of their bundle; could fit as a researcher-facing reference layer in Moss). Lower priority than core outreach features.
+- Nationwide county-office directory bundled inside the platform (Surplus Systems markets one as part of their bundle; could fit as a researcher-facing reference layer in Next Surplus). Lower priority than core outreach features.
