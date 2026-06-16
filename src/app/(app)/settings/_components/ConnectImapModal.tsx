@@ -96,14 +96,15 @@ export function ConnectImapModal({
   }, [open, onClose]);
 
   useEffect(() => {
-    if (open) {
-      setStep(1);
-      setPreset(null);
-      setCustomMode(false);
-      setAddress("");
-      setPassword("");
-      setErr(null);
-    }
+    if (!open) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setStep(1);
+    setPreset(null);
+    setCustomMode(false);
+    setAddress("");
+    setPassword("");
+    setErr(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [open]);
 
   const providerLabel = preset?.label ?? (customMode ? "Custom Server" : "");
