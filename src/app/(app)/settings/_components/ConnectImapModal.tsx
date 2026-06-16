@@ -18,6 +18,8 @@ type Preset = {
   smtp_host: string;
   smtp_port: number;
   smtp_secure: boolean;
+  setupSteps: string[];
+  setupLink: { label: string; url: string };
 };
 
 const PRESETS: Preset[] = [
@@ -29,6 +31,15 @@ const PRESETS: Preset[] = [
     smtp_host: "smtp.fastmail.com",
     smtp_port: 465,
     smtp_secure: true,
+    setupSteps: [
+      "Sign in to Fastmail and open Settings → Privacy & Security → App Passwords.",
+      "Click New App Password, name it 'Next Surplus', and copy the generated password.",
+      "Use that app password below — your regular Fastmail password will not work.",
+    ],
+    setupLink: {
+      label: "Open Fastmail App Passwords",
+      url: "https://app.fastmail.com/settings/security/passwords",
+    },
   },
   {
     label: "iCloud",
@@ -38,6 +49,15 @@ const PRESETS: Preset[] = [
     smtp_host: "smtp.mail.me.com",
     smtp_port: 587,
     smtp_secure: false,
+    setupSteps: [
+      "Sign in to your Apple ID and open Sign-In and Security → App-Specific Passwords.",
+      "Generate a new app-specific password named 'Next Surplus'.",
+      "Use that app password below — Apple blocks IMAP with your normal password.",
+    ],
+    setupLink: {
+      label: "Open Apple App-Specific Passwords",
+      url: "https://account.apple.com/account/manage",
+    },
   },
   {
     label: "Zoho",
@@ -47,6 +67,15 @@ const PRESETS: Preset[] = [
     smtp_host: "smtp.zoho.com",
     smtp_port: 465,
     smtp_secure: true,
+    setupSteps: [
+      "In Zoho Mail, go to Settings → Mail Accounts → IMAP and toggle IMAP Access ON.",
+      "At accounts.zoho.com → Security → App Passwords, generate one named 'Next Surplus'.",
+      "Use that app password below. If your account is on Zoho EU / IN / AU / CN, pick Custom Server instead and use imap.zoho.<your-region>.",
+    ],
+    setupLink: {
+      label: "Open Zoho App Passwords",
+      url: "https://accounts.zoho.com/home#security/app_password",
+    },
   },
   {
     label: "Yahoo",
@@ -56,15 +85,15 @@ const PRESETS: Preset[] = [
     smtp_host: "smtp.mail.yahoo.com",
     smtp_port: 465,
     smtp_secure: true,
-  },
-  {
-    label: "ProtonMail",
-    imap_host: "127.0.0.1",
-    imap_port: 1143,
-    imap_secure: false,
-    smtp_host: "127.0.0.1",
-    smtp_port: 1025,
-    smtp_secure: false,
+    setupSteps: [
+      "Sign in at Yahoo Account Security and turn on Two-Step Verification (Yahoo requires it for IMAP).",
+      "Generate an App Password named 'Next Surplus'.",
+      "Use that app password below.",
+    ],
+    setupLink: {
+      label: "Open Yahoo Account Security",
+      url: "https://login.yahoo.com/account/security",
+    },
   },
   {
     label: "AOL",
@@ -74,6 +103,15 @@ const PRESETS: Preset[] = [
     smtp_host: "smtp.aol.com",
     smtp_port: 465,
     smtp_secure: true,
+    setupSteps: [
+      "Sign in at AOL Account Security and turn on Two-Step Verification.",
+      "Generate an App Password named 'Next Surplus'.",
+      "Use that app password below.",
+    ],
+    setupLink: {
+      label: "Open AOL Account Security",
+      url: "https://login.aol.com/account/security",
+    },
   },
   {
     label: "GMX",
@@ -83,6 +121,15 @@ const PRESETS: Preset[] = [
     smtp_host: "mail.gmx.com",
     smtp_port: 465,
     smtp_secure: true,
+    setupSteps: [
+      "Sign in to GMX webmail and open Settings → POP3 / IMAP.",
+      "Enable IMAP and Send and Receive via External Programs.",
+      "Use your regular GMX password below.",
+    ],
+    setupLink: {
+      label: "Open GMX Settings",
+      url: "https://www.gmx.com",
+    },
   },
   {
     label: "Mail.com",
@@ -92,6 +139,15 @@ const PRESETS: Preset[] = [
     smtp_host: "smtp.mail.com",
     smtp_port: 465,
     smtp_secure: true,
+    setupSteps: [
+      "Sign in to Mail.com and open Settings → POP3 / IMAP.",
+      "Enable IMAP access for external programs.",
+      "Use your regular Mail.com password below.",
+    ],
+    setupLink: {
+      label: "Open Mail.com",
+      url: "https://www.mail.com",
+    },
   },
 ];
 
@@ -239,8 +295,35 @@ export function ConnectImapModal({
             title={`${providerLabel} Selected`}
             done
           />
+          {!customMode && (
+            <Step
+              n={2}
+              title="Prepare Your Account"
+              active
+              body={`${preset.label} requires a one-time setup before the platform can sign in.`}
+            >
+              <div className="mt-3 rounded-md border border-[#0d4b3a]/15 bg-[#0d4b3a]/[0.04] p-4">
+                <ol className="space-y-2 text-left text-[12.5px] leading-relaxed text-ink">
+                  {preset.setupSteps.map((step, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="text-[#0d4b3a]">{i + 1}.</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+                <a
+                  href={preset.setupLink.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[#0d4b3a] underline decoration-[#0d4b3a]/40 underline-offset-2 hover:decoration-[#0d4b3a]"
+                >
+                  {preset.setupLink.label} →
+                </a>
+              </div>
+            </Step>
+          )}
           <Step
-            n={2}
+            n={customMode ? 2 : 3}
             title="Sign In"
             active
             body="Enter the email and password for the inbox you want to connect."
@@ -298,7 +381,7 @@ export function ConnectImapModal({
             </div>
           </Step>
           <Step
-            n={3}
+            n={customMode ? 3 : 4}
             title="Confirm Connection"
             body="The platform tests the connection before saving."
           />

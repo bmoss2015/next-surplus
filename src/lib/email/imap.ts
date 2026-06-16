@@ -18,6 +18,51 @@ export type ImapSmtpCredentials = {
   smtp_password: string;
 };
 
+function humanizeImapError(raw: string, side: "IMAP" | "SMTP"): string {
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes("authenticationfailed") ||
+    lower.includes("invalid credentials") ||
+    lower.includes("incorrect password") ||
+    lower.includes("login failed") ||
+    lower.includes("auth failed") ||
+    (lower.includes("auth") && lower.includes("rejected"))
+  ) {
+    return `${side} login was rejected by the server. The most common cause is that your provider requires an app-specific password instead of your regular password. Generate one in your email provider's security settings and try again.`;
+  }
+  if (
+    lower.includes("logindisabled") ||
+    lower.includes("login disabled") ||
+    lower.includes("not enabled")
+  ) {
+    return `${side} access is disabled on your email account. Open your provider's settings, turn on ${side} access, then try again.`;
+  }
+  if (
+    lower.includes("econnrefused") ||
+    lower.includes("connection refused")
+  ) {
+    return `Could not reach the ${side} server. Double-check the server name and port. If you're using a custom server, ask your provider for the correct ${side} hostname.`;
+  }
+  if (
+    lower.includes("etimedout") ||
+    lower.includes("timeout") ||
+    lower.includes("timed out")
+  ) {
+    return `The ${side} server did not respond in time. Check your internet connection and the server name. If you're behind a corporate firewall, ${side} ports may be blocked.`;
+  }
+  if (
+    lower.includes("certificate") ||
+    lower.includes("ssl") ||
+    lower.includes("tls handshake")
+  ) {
+    return `The ${side} server's SSL/TLS handshake failed. Try the alternate encryption mode (port 993 for SSL, 143 for STARTTLS on IMAP; 465/587 on SMTP).`;
+  }
+  if (lower.includes("enotfound") || lower.includes("getaddrinfo")) {
+    return `The ${side} server name could not be resolved. Check that the hostname is spelled correctly.`;
+  }
+  return `${side} server said: ${raw}`;
+}
+
 export async function testImapSmtpConnection(
   creds: ImapSmtpCredentials
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -32,10 +77,8 @@ export async function testImapSmtpConnection(
     await imap.connect();
     await imap.logout();
   } catch (e) {
-    return {
-      ok: false,
-      error: `IMAP login failed: ${e instanceof Error ? e.message : String(e)}`,
-    };
+    const raw = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: humanizeImapError(raw, "IMAP") };
   }
   try {
     const transport = nodemailer.createTransport({
@@ -46,10 +89,8 @@ export async function testImapSmtpConnection(
     });
     await transport.verify();
   } catch (e) {
-    return {
-      ok: false,
-      error: `SMTP login failed: ${e instanceof Error ? e.message : String(e)}`,
-    };
+    const raw = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: humanizeImapError(raw, "SMTP") };
   }
   return { ok: true };
 }
