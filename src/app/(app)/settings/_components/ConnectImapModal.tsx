@@ -205,7 +205,7 @@ export function ConnectImapModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-[460px] overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]"
+        className="relative w-full max-w-[460px] overflow-hidden rounded-[20px] bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]"
       >
         <div
           className="flex items-center justify-between px-5 py-2.5 text-white"
@@ -286,10 +286,14 @@ export function ConnectImapModal({
               />
               <BigInput
                 type="password"
-                placeholder="Password Or App Password"
+                placeholder="Password"
                 value={password}
                 onChange={setPassword}
               />
+              <p className="text-[11px] leading-relaxed text-gray-500">
+                If you have two-factor authentication on, generate an
+                app password from your inbox settings and use that.
+              </p>
               {err && (
                 <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
                   {err}
@@ -365,27 +369,26 @@ function Step({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="relative pb-6 pl-10 last:pb-0">
-      <div
-        className={`absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-full text-[11.5px] font-semibold ${
-          done
-            ? "bg-[#0d4b3a] text-white"
-            : active
-              ? "border-2 border-[#0d4b3a] bg-white text-[#0d4b3a]"
-              : "border border-gray-300 bg-white text-gray-400"
-        }`}
-      >
-        {done ? <IconCheck size={14} stroke={3} /> : n}
-      </div>
-      {n < 3 && (
-        <div className="absolute left-[13.5px] top-7 h-[calc(100%-12px)] w-px bg-gray-200" />
-      )}
-      <div
-        className={`text-[13.5px] font-semibold ${
-          active || done ? "text-ink" : "text-gray-400"
-        }`}
-      >
-        {title}
+    <div className="pb-6 last:pb-0">
+      <div className="mb-1 flex items-center gap-2">
+        <span
+          className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
+            done
+              ? "bg-[#0d4b3a] text-white"
+              : active
+                ? "border-[1.5px] border-[#0d4b3a] bg-white text-[#0d4b3a]"
+                : "border border-gray-300 bg-white text-gray-400"
+          }`}
+        >
+          {done ? <IconCheck size={11} stroke={3} /> : n}
+        </span>
+        <div
+          className={`text-[14px] font-semibold ${
+            active || done ? "text-ink" : "text-gray-400"
+          }`}
+        >
+          {title}
+        </div>
       </div>
       {body && (
         <div
