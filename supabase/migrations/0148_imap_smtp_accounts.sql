@@ -4,6 +4,9 @@
 -- (Fastmail, Zoho, Apple iCloud, generic IMAP) alongside the
 -- existing Gmail and Outlook OAuth integrations. Credentials are
 -- stored encrypted (same encryptToken helper as access tokens).
+--
+-- channel_accounts.provider is a Postgres enum (channel_provider),
+-- not a check constraint, so 'imap' is added via ALTER TYPE.
 
 alter table public.channel_accounts
   add column if not exists imap_host text,
@@ -20,14 +23,10 @@ alter table public.channel_accounts
 do $$
 begin
   if not exists (
-    select 1 from pg_constraint where conname = 'channel_accounts_provider_check'
+    select 1 from pg_enum
+    where enumtypid = 'public.channel_provider'::regtype
+      and enumlabel = 'imap'
   ) then
-    return;
+    alter type public.channel_provider add value 'imap';
   end if;
-  alter table public.channel_accounts
-    drop constraint channel_accounts_provider_check;
 end $$;
-
-alter table public.channel_accounts
-  add constraint channel_accounts_provider_check
-  check (provider in ('gmail', 'outlook', 'imap', 'quo_sms'));
