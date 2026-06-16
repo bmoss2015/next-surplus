@@ -208,7 +208,7 @@ export function ConnectImapModal({
         className="relative w-full max-w-[460px] overflow-hidden rounded-[20px] bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]"
       >
         <div
-          className="flex items-center justify-between px-5 py-2.5 text-white"
+          className="flex items-center justify-between rounded-t-[20px] px-5 py-2.5 text-white"
           style={{ background: HEADER_GRADIENT }}
         >
           <div className="flex items-center gap-2">
@@ -239,9 +239,8 @@ export function ConnectImapModal({
         <div className="px-7 py-5">
           <Step
             n={1}
-            title="Pick Your Provider"
+            title={`${providerLabel} Selected`}
             done
-            body={`${providerLabel} selected`}
           />
           <Step
             n={2}
@@ -369,37 +368,37 @@ function Step({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="pb-6 last:pb-0">
-      <div className="mb-1 flex items-center gap-2">
-        <span
-          className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
-            done
-              ? "bg-[#0d4b3a] text-white"
-              : active
-                ? "border-[1.5px] border-[#0d4b3a] bg-white text-[#0d4b3a]"
-                : "border border-gray-300 bg-white text-gray-400"
-          }`}
-        >
-          {done ? <IconCheck size={11} stroke={3} /> : n}
-        </span>
+    <div className="flex gap-2.5 pb-6 last:pb-0">
+      <span
+        className={`mt-[3px] inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+          done
+            ? "bg-[#0d4b3a] text-white"
+            : active
+              ? "border-[1.5px] border-[#0d4b3a] bg-white text-[#0d4b3a]"
+              : "border border-gray-300 bg-white text-gray-400"
+        }`}
+      >
+        {done ? <IconCheck size={11} stroke={3} /> : n}
+      </span>
+      <div className="min-w-0 flex-1">
         <div
-          className={`text-[14px] font-semibold ${
+          className={`text-[14px] font-semibold leading-snug ${
             active || done ? "text-ink" : "text-gray-400"
           }`}
         >
           {title}
         </div>
+        {body && (
+          <div
+            className={`mt-1 text-[12px] leading-relaxed ${
+              active || done ? "text-gray-600" : "text-gray-400"
+            }`}
+          >
+            {body}
+          </div>
+        )}
+        {children}
       </div>
-      {body && (
-        <div
-          className={`mt-1 text-[12px] leading-relaxed ${
-            active || done ? "text-gray-600" : "text-gray-400"
-          }`}
-        >
-          {body}
-        </div>
-      )}
-      {children}
     </div>
   );
 }
