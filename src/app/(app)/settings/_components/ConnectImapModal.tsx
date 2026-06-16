@@ -4,7 +4,9 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   IconCheck,
+  IconChevronLeft,
   IconChevronRight,
+  IconExternalLink,
   IconMail,
   IconX,
 } from "@tabler/icons-react";
@@ -152,9 +154,10 @@ const PRESETS: Preset[] = [
 ];
 
 const CUSTOM_LABEL = "Custom Server";
-
 const HEADER_GRADIENT =
   "linear-gradient(135deg, #0d4b3a 0%, #145e48 55%, #1f7a5e 100%)";
+
+type Step = 1 | 2 | 3 | 4;
 
 export function ConnectImapModal({
   open,
@@ -172,11 +175,13 @@ export function ConnectImapModal({
   const [customSmtpPort, setCustomSmtpPort] = useState("465");
   const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
+  const [step, setStep] = useState<Step>(1);
   const [err, setErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [, startTransition] = useTransition();
 
   const providerLabel = customMode ? CUSTOM_LABEL : preset.label;
+  const totalSteps = customMode ? 3 : 4;
 
   useEffect(() => {
     if (!open) return;
@@ -198,20 +203,52 @@ export function ConnectImapModal({
     setCustomSmtpPort("465");
     setAddress("");
     setPassword("");
+    setStep(1);
     setErr(null);
     setSubmitting(false);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open]);
 
-  const ready =
+  function selectPreset(p: Preset) {
+    setPreset(p);
+    setCustomMode(false);
+    setStep(1);
+    setErr(null);
+  }
+  function selectCustom() {
+    setCustomMode(true);
+    setStep(1);
+    setErr(null);
+  }
+
+  const credsReady =
     address.length > 0 &&
     password.length > 0 &&
     (!customMode ||
       (customImapHost.length > 0 && customSmtpHost.length > 0));
 
-  function submit() {
-    if (!ready) return;
+  function next() {
     setErr(null);
+    if (customMode) {
+      if (step === 1) return setStep(2);
+      if (step === 2) return runConnect();
+    } else {
+      if (step === 1) return setStep(2);
+      if (step === 2) return setStep(3);
+      if (step === 3) return runConnect();
+    }
+  }
+  function back() {
+    setErr(null);
+    if (step > 1) setStep((step - 1) as Step);
+  }
+
+  function runConnect() {
+    if (!credsReady) {
+      setErr("Email address and password are required.");
+      return;
+    }
+    setStep(totalSteps as Step);
     setSubmitting(true);
     const imapHost = customMode ? customImapHost : preset.imap_host;
     const imapPort = customMode ? Number(customImapPort) : preset.imap_port;
@@ -236,6 +273,7 @@ export function ConnectImapModal({
       if (!res.ok) {
         setErr(res.error);
         setSubmitting(false);
+        setStep((customMode ? 2 : 3) as Step);
         return;
       }
       onClose();
@@ -243,16 +281,32 @@ export function ConnectImapModal({
     });
   }
 
-  function selectPreset(p: Preset) {
-    setPreset(p);
-    setCustomMode(false);
-  }
-
-  function selectCustom() {
-    setCustomMode(true);
-  }
-
   if (!open) return null;
+
+  const stepTitle = (() => {
+    if (customMode) {
+      if (step === 1) return "Server Settings";
+      if (step === 2) return "Sign In";
+      return "Connecting";
+    }
+    if (step === 1) return "Prepare Your Account";
+    if (step === 2) return "Sign In";
+    if (step === 3) return "Sign In";
+    return "Connecting";
+  })();
+
+  const ctaLabel = (() => {
+    if (submitting) return "Testing Connection";
+    if (customMode) {
+      if (step === 1) return "Continue";
+      if (step === 2) return "Test & Connect";
+      return "Connecting";
+    }
+    if (step === 1) return "I'm Ready";
+    if (step === 2) return "Continue";
+    if (step === 3) return "Test & Connect";
+    return "Connecting";
+  })();
 
   return (
     <div
@@ -261,10 +315,11 @@ export function ConnectImapModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-[460px] overflow-hidden rounded-[20px] bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]"
+        className="relative flex w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]"
+        style={{ height: "min(640px, calc(100vh - 32px))" }}
       >
         <div
-          className="flex items-center justify-between rounded-t-[20px] px-5 py-2.5 text-white"
+          className="flex shrink-0 items-center justify-between rounded-t-[20px] px-5 py-2.5 text-white"
           style={{ background: HEADER_GRADIENT }}
         >
           <div className="flex items-center gap-2">
@@ -283,124 +338,120 @@ export function ConnectImapModal({
           </button>
         </div>
 
-        <div className="px-7 pt-6 pb-2 text-left">
-          <h2 className="m-0 text-left text-[22px] font-semibold leading-tight tracking-tight text-ink">
-            Sign In With {providerLabel}
+        <div className="shrink-0 border-b border-gray-100 px-7 pt-5 pb-4 text-left">
+          <div className="mb-1 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0d4b3a]">
+            Step {step} Of {totalSteps}
+          </div>
+          <h2 className="m-0 text-left text-[20px] font-semibold leading-tight tracking-tight text-ink">
+            {stepTitle}
           </h2>
+          <div className="mt-3 flex gap-1">
+            {Array.from({ length: totalSteps }).map((_, i) => {
+              const n = i + 1;
+              const done = n < step;
+              const current = n === step;
+              return (
+                <span
+                  key={n}
+                  className={`h-1 flex-1 rounded-full ${
+                    done
+                      ? "bg-[#0d4b3a]"
+                      : current
+                        ? "bg-[#0d4b3a]/40"
+                        : "bg-gray-200"
+                  }`}
+                />
+              );
+            })}
+          </div>
         </div>
 
-        <div className="px-7 py-5">
-          <Step
-            n={1}
-            title={`${providerLabel} Selected`}
-            done
-          />
-          {!customMode && (
-            <Step
-              n={2}
-              title="Prepare Your Account"
-              active
-              body={`${preset.label} requires a one-time setup before the platform can sign in.`}
-            >
-              <div className="mt-3 rounded-md border border-[#0d4b3a]/15 bg-[#0d4b3a]/[0.04] p-4">
-                <ol className="space-y-2 text-left text-[12.5px] leading-relaxed text-ink">
-                  {preset.setupSteps.map((step, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="text-[#0d4b3a]">{i + 1}.</span>
-                      <span>{step}</span>
-                    </li>
-                  ))}
-                </ol>
-                <a
-                  href={preset.setupLink.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[#0d4b3a] underline decoration-[#0d4b3a]/40 underline-offset-2 hover:decoration-[#0d4b3a]"
-                >
-                  {preset.setupLink.label} →
-                </a>
-              </div>
-            </Step>
+        <div className="flex-1 overflow-y-auto px-7 py-5 text-left">
+          {!customMode && step === 1 && (
+            <PrepareStep preset={preset} providerLabel={providerLabel} />
           )}
-          <Step
-            n={customMode ? 2 : 3}
-            title="Sign In"
-            active
-            body="Enter the email and password for the inbox you want to connect."
-          >
-            <div className="mt-4 space-y-3">
-              {customMode && (
-                <>
-                  <div className="grid grid-cols-[1fr_84px] gap-2">
-                    <BigInput
-                      placeholder="IMAP Server (e.g. mail.example.com)"
-                      value={customImapHost}
-                      onChange={setCustomImapHost}
-                    />
-                    <BigInput
-                      placeholder="993"
-                      value={customImapPort}
-                      onChange={setCustomImapPort}
-                    />
-                  </div>
-                  <div className="grid grid-cols-[1fr_84px] gap-2">
-                    <BigInput
-                      placeholder="SMTP Server (e.g. smtp.example.com)"
-                      value={customSmtpHost}
-                      onChange={setCustomSmtpHost}
-                    />
-                    <BigInput
-                      placeholder="465"
-                      value={customSmtpPort}
-                      onChange={setCustomSmtpPort}
-                    />
-                  </div>
-                </>
-              )}
-              <BigInput
-                type="email"
-                placeholder="Email Address"
-                value={address}
-                onChange={setAddress}
-              />
-              <BigInput
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={setPassword}
-              />
-              <p className="text-left text-[11px] leading-relaxed text-gray-500">
-                If you have two-factor authentication on, generate an
-                app password from your inbox settings and use that.
-              </p>
-              {err && (
-                <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
-                  {err}
-                </div>
-              )}
+          {!customMode && step === 2 && (
+            <SignInStep
+              providerLabel={providerLabel}
+              address={address}
+              setAddress={setAddress}
+              password={password}
+              setPassword={setPassword}
+            />
+          )}
+          {!customMode && step === 3 && (
+            <ConfirmStep
+              address={address}
+              providerLabel={providerLabel}
+              err={err}
+              submitting={submitting}
+            />
+          )}
+
+          {customMode && step === 1 && (
+            <CustomServerStep
+              customImapHost={customImapHost}
+              setCustomImapHost={setCustomImapHost}
+              customImapPort={customImapPort}
+              setCustomImapPort={setCustomImapPort}
+              customSmtpHost={customSmtpHost}
+              setCustomSmtpHost={setCustomSmtpHost}
+              customSmtpPort={customSmtpPort}
+              setCustomSmtpPort={setCustomSmtpPort}
+            />
+          )}
+          {customMode && step === 2 && (
+            <SignInStep
+              providerLabel={providerLabel}
+              address={address}
+              setAddress={setAddress}
+              password={password}
+              setPassword={setPassword}
+            />
+          )}
+          {customMode && step === 3 && (
+            <ConfirmStep
+              address={address}
+              providerLabel={providerLabel}
+              err={err}
+              submitting={submitting}
+            />
+          )}
+
+          {err && step !== (totalSteps as Step) && (
+            <div className="mt-4 rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-left text-[12px] leading-relaxed text-danger">
+              <strong className="mb-0.5 block">Connection failed</strong>
+              {err}
             </div>
-          </Step>
-          <Step
-            n={customMode ? 3 : 4}
-            title="Confirm Connection"
-            body="The platform tests the connection before saving."
-          />
+          )}
         </div>
 
-        <div className="border-t border-gray-100 px-7 py-5">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!ready || submitting}
-            className="flex h-12 w-full cursor-pointer items-center justify-between gap-2 rounded-md btn-primary px-5 text-[14px] font-medium text-white disabled:opacity-50"
-          >
-            <span>{submitting ? "Testing Connection" : "Continue"}</span>
-            <IconChevronRight size={16} stroke={2.4} />
-          </button>
+        <div className="shrink-0 border-t border-gray-100 bg-white px-7 py-4">
+          <div className="flex items-center gap-2">
+            {step > 1 && step !== totalSteps && (
+              <button
+                type="button"
+                onClick={back}
+                className="inline-flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-[13.5px] font-medium text-ink hover:border-gray-300"
+              >
+                <IconChevronLeft size={14} stroke={2.2} />
+                Back
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={next}
+              disabled={submitting}
+              className="inline-flex h-11 flex-1 cursor-pointer items-center justify-between rounded-md btn-primary px-5 text-[13.5px] font-medium text-white disabled:opacity-50"
+            >
+              <span>{ctaLabel}</span>
+              <IconChevronRight size={14} stroke={2.4} />
+            </button>
+          </div>
         </div>
 
-        <div className="border-t border-gray-100 bg-gray-50 px-7 py-3">
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+        <div className="shrink-0 border-t border-gray-100 bg-gray-50 px-7 py-2.5">
+          <div className="mb-1.5 text-left text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">
             Switch Provider
           </div>
           <div className="flex flex-wrap items-center justify-start gap-1.5 text-[11px] text-gray-600">
@@ -432,48 +483,196 @@ export function ConnectImapModal({
   );
 }
 
-function Step({
-  n,
-  title,
-  body,
-  done,
-  active,
-  children,
+function PrepareStep({
+  preset,
+  providerLabel,
 }: {
-  n: number;
-  title: string;
-  body?: string;
-  done?: boolean;
-  active?: boolean;
-  children?: React.ReactNode;
+  preset: Preset;
+  providerLabel: string;
 }) {
-  const eyebrowColor = done
-    ? "text-[#0d4b3a]"
-    : active
-      ? "text-[#0d4b3a]"
-      : "text-gray-400";
-  const titleColor = active || done ? "text-ink" : "text-gray-400";
   return (
-    <div className="pb-6 text-left last:pb-0">
-      <div
-        className={`mb-1 flex items-center gap-1.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] ${eyebrowColor}`}
-      >
-        <span>Step {n}</span>
-        {done && <IconCheck size={12} stroke={3} />}
-      </div>
-      <div className={`text-left text-[15px] font-semibold ${titleColor}`}>
-        {title}
-      </div>
-      {body && (
-        <div
-          className={`mt-1 text-left text-[12.5px] leading-relaxed ${
-            active || done ? "text-gray-600" : "text-gray-400"
-          }`}
+    <div className="text-left">
+      <p className="mb-4 text-[13px] leading-relaxed text-gray-600">
+        {providerLabel} requires a one-time setup in your email account
+        before the platform can sign in. Complete the steps below, then
+        click <strong>I&apos;m Ready</strong>.
+      </p>
+      <div className="rounded-md border border-[#0d4b3a]/15 bg-[#0d4b3a]/[0.04] p-4">
+        <ol className="space-y-2.5 text-left text-[12.5px] leading-relaxed text-ink">
+          {preset.setupSteps.map((step, i) => (
+            <li key={i} className="flex gap-2.5">
+              <span className="mt-[1px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#0d4b3a] text-[9px] font-semibold text-white">
+                {i + 1}
+              </span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+        <a
+          href={preset.setupLink.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-flex items-center gap-1.5 text-[12px] font-medium text-[#0d4b3a] underline decoration-[#0d4b3a]/40 underline-offset-2 hover:decoration-[#0d4b3a]"
         >
-          {body}
+          {preset.setupLink.label}
+          <IconExternalLink size={12} stroke={2} />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function SignInStep({
+  providerLabel,
+  address,
+  setAddress,
+  password,
+  setPassword,
+}: {
+  providerLabel: string;
+  address: string;
+  setAddress: (v: string) => void;
+  password: string;
+  setPassword: (v: string) => void;
+}) {
+  return (
+    <div className="text-left">
+      <p className="mb-4 text-[13px] leading-relaxed text-gray-600">
+        Enter the email address and the app password you generated for{" "}
+        {providerLabel}.
+      </p>
+      <div className="space-y-3">
+        <BigInput
+          type="email"
+          placeholder="Email Address"
+          value={address}
+          onChange={setAddress}
+        />
+        <BigInput
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={setPassword}
+        />
+      </div>
+      <p className="mt-3 text-left text-[11px] leading-relaxed text-gray-500">
+        Most providers require an app-specific password when two-factor
+        authentication is on. Use the app password from the previous
+        step, not your normal login password.
+      </p>
+    </div>
+  );
+}
+
+function CustomServerStep({
+  customImapHost,
+  setCustomImapHost,
+  customImapPort,
+  setCustomImapPort,
+  customSmtpHost,
+  setCustomSmtpHost,
+  customSmtpPort,
+  setCustomSmtpPort,
+}: {
+  customImapHost: string;
+  setCustomImapHost: (v: string) => void;
+  customImapPort: string;
+  setCustomImapPort: (v: string) => void;
+  customSmtpHost: string;
+  setCustomSmtpHost: (v: string) => void;
+  customSmtpPort: string;
+  setCustomSmtpPort: (v: string) => void;
+}) {
+  return (
+    <div className="text-left">
+      <p className="mb-4 text-[13px] leading-relaxed text-gray-600">
+        Enter your incoming (IMAP) and outgoing (SMTP) server addresses.
+        Your email provider lists these on their settings or help page.
+      </p>
+      <div className="space-y-3">
+        <div>
+          <div className="mb-1 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-gray-500">
+            IMAP (Incoming)
+          </div>
+          <div className="grid grid-cols-[1fr_84px] gap-2">
+            <BigInput
+              placeholder="imap.example.com"
+              value={customImapHost}
+              onChange={setCustomImapHost}
+            />
+            <BigInput
+              placeholder="993"
+              value={customImapPort}
+              onChange={setCustomImapPort}
+            />
+          </div>
         </div>
-      )}
-      {children}
+        <div>
+          <div className="mb-1 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-gray-500">
+            SMTP (Outgoing)
+          </div>
+          <div className="grid grid-cols-[1fr_84px] gap-2">
+            <BigInput
+              placeholder="smtp.example.com"
+              value={customSmtpHost}
+              onChange={setCustomSmtpHost}
+            />
+            <BigInput
+              placeholder="465"
+              value={customSmtpPort}
+              onChange={setCustomSmtpPort}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmStep({
+  address,
+  providerLabel,
+  err,
+  submitting,
+}: {
+  address: string;
+  providerLabel: string;
+  err: string | null;
+  submitting: boolean;
+}) {
+  if (submitting) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center text-center">
+        <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-[3px] border-[#0d4b3a] border-r-transparent" />
+        <div className="text-[14px] font-semibold text-ink">
+          Verifying Connection
+        </div>
+        <div className="mt-1 text-[12.5px] text-gray-600">
+          Testing IMAP and SMTP for {address || providerLabel}.
+        </div>
+      </div>
+    );
+  }
+  if (err) {
+    return (
+      <div className="text-left">
+        <p className="text-[13px] leading-relaxed text-gray-600">
+          The connection test for {address || providerLabel} did not
+          succeed. See the error below, fix it, then go back and try
+          again.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-full flex-col items-center justify-center text-center">
+      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0d4b3a] text-white">
+        <IconCheck size={20} stroke={3} />
+      </div>
+      <div className="text-[14px] font-semibold text-ink">All Set</div>
+      <div className="mt-1 text-[12.5px] text-gray-600">
+        Connected. Closing the modal.
+      </div>
     </div>
   );
 }
