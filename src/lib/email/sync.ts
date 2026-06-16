@@ -13,7 +13,10 @@ import {
   parseFromHeader,
   type GmailMessageFull,
 } from "./gmail";
+import { fetchInboxSince, type ImapMessage } from "./imap";
 import { findLeadForAddress } from "./auto-link";
+
+const IMAP_BATCH_LIMIT = 100;
 
 const BACKFILL_QUERY = "newer_than:90d";
 // Soft cap on how many messages a single sync run will pull during backfill.
@@ -417,18 +420,251 @@ async function upsertConversation(opts: {
   };
 }
 
-// Convenience used by the cron route — syncs every active gmail account.
+// Sync an IMAP account. Uses UID as the sync cursor; on first run the
+// cursor is null and we pull the most recent IMAP_BATCH_LIMIT messages
+// in INBOX. Subsequent runs pull anything newer than the saved cursor.
+export async function syncImapAccount(accountId: string): Promise<SyncResult> {
+  const svc = createServiceClient();
+  const result: SyncResult = {
+    accountId,
+    mode: "backfill",
+    messagesIngested: 0,
+    attachmentsStored: 0,
+    errors: [],
+  };
+
+  const { data: acct, error: acctErr } = await svc
+    .from("channel_accounts")
+    .select("id, org_id, user_id, address, sync_cursor, provider")
+    .eq("id", accountId)
+    .maybeSingle();
+  if (acctErr || !acct) throw new Error(`account ${accountId} not found`);
+  if (acct.provider !== "imap") return result;
+
+  const sinceUid = acct.sync_cursor ? Number(acct.sync_cursor) : null;
+  result.mode = sinceUid ? "incremental" : "backfill";
+
+  let messages: ImapMessage[];
+  let newestUid: number | null;
+  try {
+    const r = await fetchInboxSince({
+      accountId,
+      sinceUid,
+      limit: IMAP_BATCH_LIMIT,
+    });
+    messages = r.messages;
+    newestUid = r.newestUid;
+  } catch (e) {
+    result.errors.push(e instanceof Error ? e.message : String(e));
+    return result;
+  }
+
+  for (const m of messages) {
+    try {
+      const ingested = await ingestImapMessage(accountId, acct, m);
+      if (ingested) result.messagesIngested += 1;
+    } catch (e) {
+      result.errors.push(
+        `uid ${m.uid}: ${e instanceof Error ? e.message : e}`
+      );
+    }
+  }
+
+  if (newestUid !== null) {
+    await svc
+      .from("channel_accounts")
+      .update({ sync_cursor: String(newestUid) })
+      .eq("id", accountId);
+  }
+  await svc
+    .from("channel_accounts")
+    .update({ last_synced_at: new Date().toISOString() })
+    .eq("id", accountId);
+
+  return result;
+}
+
+async function ingestImapMessage(
+  accountId: string,
+  acct: AccountCtx,
+  m: ImapMessage
+): Promise<boolean> {
+  const svc = createServiceClient();
+
+  const providerMessageId = m.envelope.messageId
+    ? m.envelope.messageId.replace(/[<>]/g, "")
+    : `uid-${m.uid}`;
+
+  const { data: existing } = await svc
+    .from("messages")
+    .select("id, conversations!inner(channel_account_id)")
+    .eq("provider_message_id", providerMessageId)
+    .eq("conversations.channel_account_id", accountId)
+    .maybeSingle();
+  if (existing) return false;
+
+  const subject = m.envelope.subject ?? "";
+  const fromEmail = (m.envelope.from?.[0]?.address ?? "").toLowerCase();
+  const fromName = m.envelope.from?.[0]?.name ?? undefined;
+  const toAddrs = (m.envelope.to ?? [])
+    .map((a) => (a.address ?? "").toLowerCase())
+    .filter(Boolean);
+  const ccAddrs = (m.envelope.cc ?? [])
+    .map((a) => (a.address ?? "").toLowerCase())
+    .filter(Boolean);
+  const bccAddrs = (m.envelope.bcc ?? [])
+    .map((a) => (a.address ?? "").toLowerCase())
+    .filter(Boolean);
+  const direction: "inbound" | "outbound" =
+    fromEmail === acct.address.toLowerCase() ? "outbound" : "inbound";
+  const sentAtIso = (m.envelope.date ?? new Date()).toISOString();
+  const snippet = (m.bodyText ?? m.bodyHtml ?? "").slice(0, 240);
+  const inReplyTo = m.envelope.inReplyTo ?? null;
+
+  const conv = await upsertImapConversation({
+    accountId,
+    orgId: acct.org_id,
+    providerThreadKey: m.threadKey,
+    subject,
+    accountAddress: acct.address,
+    direction,
+    fromEmail,
+    fromName,
+    toAddrs,
+    ccAddrs,
+    snippet,
+    sentAtIso,
+  });
+
+  const { error: msgErr } = await svc
+    .from("messages")
+    .insert({
+      org_id: acct.org_id,
+      conversation_id: conv.id,
+      channel: "imap",
+      direction,
+      from_address: fromEmail,
+      from_name: fromName ?? null,
+      to_addresses: toAddrs,
+      cc_addresses: ccAddrs,
+      bcc_addresses: bccAddrs,
+      subject,
+      body_text: m.bodyText,
+      body_html: m.bodyHtml,
+      snippet,
+      provider_message_id: providerMessageId,
+      provider_thread_id: m.threadKey,
+      in_reply_to: inReplyTo,
+      references_chain: [],
+      sent_at: sentAtIso,
+      is_read: true,
+      metadata: { uid: m.uid, message_id_header: m.envelope.messageId ?? null },
+    });
+  if (msgErr) throw new Error(`message insert failed: ${msgErr.message}`);
+
+  await svc
+    .from("conversations")
+    .update({
+      last_message_at: sentAtIso,
+      last_message_preview: snippet,
+      unread_count: direction === "inbound" ? (conv.unread_count ?? 0) + 1 : (conv.unread_count ?? 0),
+    })
+    .eq("id", conv.id);
+
+  return true;
+}
+
+async function upsertImapConversation(opts: {
+  accountId: string;
+  orgId: string;
+  providerThreadKey: string;
+  subject: string;
+  accountAddress: string;
+  direction: "inbound" | "outbound";
+  fromEmail: string;
+  fromName?: string;
+  toAddrs: string[];
+  ccAddrs: string[];
+  snippet: string;
+  sentAtIso: string;
+}): Promise<{ id: string; unread_count: number | null }> {
+  const svc = createServiceClient();
+  const { data: existing } = await svc
+    .from("conversations")
+    .select("id, unread_count")
+    .eq("channel_account_id", opts.accountId)
+    .eq("provider_thread_key", opts.providerThreadKey)
+    .maybeSingle();
+  if (existing) {
+    return {
+      id: existing.id as string,
+      unread_count: existing.unread_count as number | null,
+    };
+  }
+
+  const counterparty =
+    opts.direction === "inbound"
+      ? opts.fromEmail
+      : opts.toAddrs.find(
+          (a) => a.toLowerCase() !== opts.accountAddress.toLowerCase()
+        ) ?? null;
+
+  let leadId: string | null = null;
+  if (counterparty) {
+    leadId = await findLeadForAddress(svc, {
+      orgId: opts.orgId,
+      address: counterparty,
+    });
+  }
+
+  const participants = [
+    { address: opts.fromEmail, name: opts.fromName },
+    ...opts.toAddrs.map((a) => ({ address: a })),
+    ...opts.ccAddrs.map((a) => ({ address: a })),
+  ].filter((p) => p.address);
+
+  const { data: inserted, error } = await svc
+    .from("conversations")
+    .insert({
+      org_id: opts.orgId,
+      channel_account_id: opts.accountId,
+      channel: "imap",
+      provider_thread_key: opts.providerThreadKey,
+      subject: opts.subject,
+      lead_id: leadId,
+      participants,
+      last_message_at: opts.sentAtIso,
+      last_message_preview: opts.snippet,
+      unread_count: opts.direction === "inbound" ? 1 : 0,
+    })
+    .select("id, unread_count")
+    .maybeSingle();
+  if (error || !inserted) {
+    throw new Error(`conversation insert failed: ${error?.message ?? "no row"}`);
+  }
+  return {
+    id: inserted.id as string,
+    unread_count: inserted.unread_count as number | null,
+  };
+}
+
+// Convenience used by the cron route — syncs every active gmail and imap
+// account. Outlook is handled by its own branch (PR #107) when merged.
 export async function syncAllActiveAccounts(): Promise<SyncResult[]> {
   const svc = createServiceClient();
   const { data: accounts } = await svc
     .from("channel_accounts")
-    .select("id")
-    .eq("provider", "gmail")
+    .select("id, provider")
+    .in("provider", ["gmail", "imap"])
     .eq("status", "active");
   const results: SyncResult[] = [];
   for (const a of accounts ?? []) {
     try {
-      results.push(await syncGmailAccount(a.id));
+      if (a.provider === "gmail") {
+        results.push(await syncGmailAccount(a.id as string));
+      } else if (a.provider === "imap") {
+        results.push(await syncImapAccount(a.id as string));
+      }
     } catch (e) {
       results.push({
         accountId: a.id as string,
