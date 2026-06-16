@@ -187,30 +187,30 @@ export default function LandingV1() {
           <div className="mx-auto mt-14 max-w-md rounded-2xl border border-gray-200 bg-white p-10 text-left shadow-[0_24px_50px_-20px_rgba(15,23,41,0.18)]">
             <div className="flex items-baseline justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0d4b3a]">
-                Founders Plan
+                Founders Rate
               </div>
               <div className="rounded-full border border-[#0d4b3a]/30 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-[#0d4b3a]">
-                Launch Pricing
+                Limited Window
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-1.5">
               <span className="text-[56px] font-semibold leading-none tracking-tight text-ink">
-                $69
+                $49
               </span>
               <span className="text-[14px] text-gray-500">/ Month</span>
             </div>
             <div className="mt-1 text-[13px] text-gray-500">
-              Per organization, billed monthly. Locked in for the life
-              of the account.
+              Per organization, billed monthly. Annual billing available
+              at signup.
             </div>
             <ul className="mt-7 space-y-2.5 text-[13.5px] text-ink">
               {[
                 "Unlimited Users In Your Organization",
                 "Lead Pipeline With Custom Stages",
-                "Gmail And Outlook Inbox Sync",
-                "Physical Letters And Printed Checks",
-                "Plaid Bank Verification",
+                "Gmail Inbox Sync",
                 "Templates, Activity Log, Audit Trail",
+                "CSV Import And Export",
+                "Locked Rate For Twelve Months",
               ].map((line) => (
                 <li key={line} className="flex items-start gap-2.5">
                   <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#0d4b3a]" />
@@ -227,8 +227,7 @@ export default function LandingV1() {
           </div>
 
           <div className="mt-6 text-[12.5px] text-gray-500">
-            Mail pricing is itemized on each monthly invoice. See the
-            Features section for delivery details.
+            Microsoft Outlook and IMAP inbox sync are coming next.
           </div>
         </div>
       </section>
@@ -250,20 +249,20 @@ export default function LandingV1() {
               a="All fifty states. Stage logic and surplus calculations are configurable per organization, so the platform adapts to local jurisdiction."
             />
             <Faq
-              q="Do I Have To Use A Specific Email Provider?"
-              a="No. Gmail and Outlook connect via OAuth, and any other inbox connects via IMAP. The platform syncs the inbox an operator already uses."
+              q="Which Email Inboxes Does It Sync?"
+              a="Gmail today, via OAuth. Microsoft Outlook and IMAP are next. Email sync is included in the subscription."
             />
             <Faq
-              q="How Does Physical Mail Get Sent?"
-              a="Letters and checks ship through a USPS-licensed print partner. The operator writes the letter and clicks send. The recipient receives the piece in three to five business days, with tracking attached to the lead. Pricing is transparent on every monthly invoice."
+              q="What Is The Founders Rate?"
+              a="A locked monthly price for the first year of active subscription. Customers who sign up before the Founders Rate window closes keep the price for twelve months, then renew at standard pricing."
             />
             <Faq
-              q="Is My Data Isolated From Other Firms?"
-              a="Yes. Every organization runs in its own namespace. Another firm cannot view a pipeline, mail, or contact list outside its own."
+              q="How Long Does It Take To Get Started?"
+              a="Sign up, invite a teammate, import a CSV of leads, and start working pipeline the same day. There is no implementation period and no required onboarding call."
             />
             <Faq
               q="Can I Cancel Anytime?"
-              a="Yes. Cancel from Settings. The account stays active through the end of the billing period, then enters a 30-day read-only window for data export."
+              a="Yes. Cancel from Settings. The subscription stays active through the end of the current billing period. Export your data at any time before or after cancellation."
             />
           </div>
         </div>

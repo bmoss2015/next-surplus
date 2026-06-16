@@ -1,0 +1,24 @@
+name: Legal Pages: No Hardcoded Prices
+
+on:
+  pull_request:
+    paths:
+      - "src/app/(legal)/**"
+      - "scripts/check-legal-no-hardcoded-prices.mjs"
+      - ".github/workflows/legal-no-hardcoded-prices.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/app/(legal)/**"
+      - "scripts/check-legal-no-hardcoded-prices.mjs"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Scan legal pages for hardcoded $NN literals
+        run: node scripts/check-legal-no-hardcoded-prices.mjs
