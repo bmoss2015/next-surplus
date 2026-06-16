@@ -1,6 +1,6 @@
 // One-off verification harness for "Fix PPPP2" — exercises the import server
 // action's writeContactsForLead / writeRelativesForLead logic against the
-// STAGING DB (sghfmudgnddybsayfqbd), attached to an existing owner-less lead,
+// STAGING DB (qfanroxcoepunmrmjabo), attached to an existing owner-less lead,
 // using a synthetic Excess Elite row that matches the task brief. Reads
 // everything back, checks each expected outcome, then deletes exactly the rows
 // it created. Also unit-checks the pure CSV transforms used for lead-level
@@ -17,7 +17,7 @@ const env = Object.fromEntries(
 );
 const url = env.NEXT_PUBLIC_SUPABASE_URL;
 const key = env.SUPABASE_SERVICE_ROLE_KEY;
-if (!/sghfmudgnddybsayfqbd/.test(url)) { console.error("Not staging — abort. URL =", url); process.exit(1); }
+if (!/qfanroxcoepunmrmjabo/.test(url)) { console.error("Not staging — abort. URL =", url); process.exit(1); }
 const sb = createClient(url, key, { auth: { persistSession: false } });
 
 // ---- transforms copied from src/app/(app)/imports/_shared.ts ---------------

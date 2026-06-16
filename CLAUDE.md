@@ -2,8 +2,8 @@
 
 Before running ANY supabase command, run: cat supabase/.temp/project-ref
 
-If the output is NOT sghfmudgnddybsayfqbd, stop immediately and run:
-npx supabase link --project-ref sghfmudgnddybsayfqbd
+If the output is NOT qfanroxcoepunmrmjabo, stop immediately and run:
+npx supabase link --project-ref qfanroxcoepunmrmjabo
 
 Then verify again before proceeding.
 
@@ -43,7 +43,7 @@ C:\\Users\\info\\moss-equity-portal
 
 \### Staging (work here first, always)
 
-\- Supabase project: sghfmudgnddybsayfqbd
+\- Supabase project: qfanroxcoepunmrmjabo
 
 \- .env.local points here by default
 
@@ -59,7 +59,7 @@ C:\\Users\\info\\moss-equity-portal
 
 \### Production (never touch without Bree approval)
 
-\- Supabase project: qvyhdexoicoppgrvvtov
+\- Supabase project: rsdmyydyhqgkkvwlklif
 
 \- URL: moss-equity-portal.vercel.app
 
@@ -93,7 +93,7 @@ The `npm run db:push:prod` script talks to the Supabase Management API with a Pe
 
 \#### Staging migrations — same PAT, same script
 
-`npm run db:push:staging` mirrors the prod flow against `sghfmudgnddybsayfqbd`. Reuses the **same** `SUPABASE_PAT` (PATs are user-scoped, not project-scoped), so no extra setup. Safe to re-run; it's a no-op when nothing's pending. Use this instead of `npx supabase db push --linked` — no DB password lookup, no link toggling, and the local `supabase/.temp/project-ref` stays pinned to staging.
+`npm run db:push:staging` mirrors the prod flow against `qfanroxcoepunmrmjabo`. Reuses the **same** `SUPABASE_PAT` (PATs are user-scoped, not project-scoped), so no extra setup. Safe to re-run; it's a no-op when nothing's pending. Use this instead of `npx supabase db push --linked` — no DB password lookup, no link toggling, and the local `supabase/.temp/project-ref` stays pinned to staging.
 
 \#### Why the old `npx supabase db push --linked` path is fragile
 
@@ -169,7 +169,7 @@ The assistant should drive the entire flow without manual GitHub clicks. `gh` CL
 
 \- File naming: `NNNN_<short_name>.sql` where NNNN = max existing + 1. Never reuse a number.
 
-\- Before pushing: `cat supabase/.temp/project-ref` must read `sghfmudgnddybsayfqbd` (staging). Verify every time.
+\- Before pushing: `cat supabase/.temp/project-ref` must read `qfanroxcoepunmrmjabo` (staging). Verify every time.
 
 \- Never edit the database directly through any UI or raw SQL tool.
 
@@ -269,13 +269,13 @@ The assistant should drive the entire flow without manual GitHub clicks. `gh` CL
 
 \## Architecture Notes
 
-\- Staging Supabase: sghfmudgnddybsayfqbd
+\- Staging Supabase: qfanroxcoepunmrmjabo
 
 &#x20; (full portal schema, 42 test leads,
 
 &#x20; migrations 0001-0014 applied)
 
-\- Production Supabase: qvyhdexoicoppgrvvtov
+\- Production Supabase: rsdmyydyhqgkkvwlklif
 
 &#x20; (empty until migrations run)
 

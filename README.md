@@ -40,9 +40,9 @@ Multi-tenant Next.js portal for surplus funds recovery operations. Built for Mos
    ```
    cat supabase/.temp/project-ref
    ```
-   Output should be `sghfmudgnddybsayfqbd`. If not:
+   Output should be `qfanroxcoepunmrmjabo`. If not:
    ```
-   npx supabase link --project-ref sghfmudgnddybsayfqbd
+   npx supabase link --project-ref qfanroxcoepunmrmjabo
    ```
 
 4. Start the dev server:
@@ -83,7 +83,7 @@ See `CLAUDE.md` for the full branch → PR → preview → merge → auto-deploy
 
 | | Staging | Production |
 |---|---|---|
-| Supabase project | sghfmudgnddybsayfqbd | qvyhdexoicoppgrvvtov |
+| Supabase project | qfanroxcoepunmrmjabo | rsdmyydyhqgkkvwlklif |
 | Dev URL | http://localhost:3000 (or Vercel preview) | https://portal.mossequitypartners.com |
 | Vendor mode | Test / sandbox keys | Live keys |
 
