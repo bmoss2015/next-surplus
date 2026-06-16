@@ -227,13 +227,10 @@ export function ConnectImapModal({
           </button>
         </div>
 
-        <div className="px-7 pt-6 pb-2">
-          <h2 className="m-0 text-[22px] font-semibold leading-tight tracking-tight text-ink">
+        <div className="px-7 pt-6 pb-2 text-left">
+          <h2 className="m-0 text-left text-[22px] font-semibold leading-tight tracking-tight text-ink">
             Sign In With {providerLabel}
           </h2>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500">
-            Three short steps. The platform handles the rest.
-          </p>
         </div>
 
         <div className="px-7 py-5">
@@ -289,7 +286,7 @@ export function ConnectImapModal({
                 value={password}
                 onChange={setPassword}
               />
-              <p className="text-[11px] leading-relaxed text-gray-500">
+              <p className="text-left text-[11px] leading-relaxed text-gray-500">
                 If you have two-factor authentication on, generate an
                 app password from your inbox settings and use that.
               </p>
@@ -374,19 +371,19 @@ function Step({
       : "text-gray-400";
   const titleColor = active || done ? "text-ink" : "text-gray-400";
   return (
-    <div className="pb-6 last:pb-0">
+    <div className="pb-6 text-left last:pb-0">
       <div
-        className={`mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${eyebrowColor}`}
+        className={`mb-1 flex items-center gap-1.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] ${eyebrowColor}`}
       >
-        <span>
-          {done ? "Done" : active ? "Now" : "Next"} · Step {n}
-        </span>
+        <span>Step {n}</span>
         {done && <IconCheck size={12} stroke={3} />}
       </div>
-      <div className={`text-[15px] font-semibold ${titleColor}`}>{title}</div>
+      <div className={`text-left text-[15px] font-semibold ${titleColor}`}>
+        {title}
+      </div>
       {body && (
         <div
-          className={`mt-1 text-[12.5px] leading-relaxed ${
+          className={`mt-1 text-left text-[12.5px] leading-relaxed ${
             active || done ? "text-gray-600" : "text-gray-400"
           }`}
         >
