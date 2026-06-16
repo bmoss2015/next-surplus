@@ -5,7 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 const PUBLIC_PATHS = ["/login", "/forgot"];
 // Auth-flow pages reachable with OR without a session — you land on them holding
 // a recovery/invite session in order to set a password, so don't bounce.
-const AUTH_FLOW_PATHS = ["/reset", "/accept-invite"];
+const AUTH_FLOW_PATHS = ["/reset", "/accept-invite", "/share"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
