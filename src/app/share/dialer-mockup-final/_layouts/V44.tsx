@@ -3,7 +3,6 @@ import {
   QUEUE,
   CONTACTS,
   ACTIVITY,
-  NEXT_LEAD,
 } from "../_data";
 import {
   CanvasFrame,
