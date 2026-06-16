@@ -153,7 +153,7 @@ export function ConnectImapModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-white/80 hover:bg-white/10 hover:text-white"
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-white/70 hover:bg-white/10 hover:text-white"
             aria-label="Close"
           >
             <IconX size={14} stroke={2.2} />
@@ -165,7 +165,7 @@ export function ConnectImapModal({
             Sign In With {preset.label}
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500">
-            Three short steps. We test the connection before saving.
+            Three short steps. The platform handles the rest.
           </p>
         </div>
 
@@ -180,7 +180,7 @@ export function ConnectImapModal({
             n={2}
             title="Sign In"
             active
-            body={`Enter the email and app password for your ${preset.label} inbox.`}
+            body="Enter the email and app password for the inbox you want to connect."
           >
             <div className="mt-4 space-y-3">
               <BigInput
@@ -217,7 +217,7 @@ export function ConnectImapModal({
             className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-md btn-primary text-[14px] font-medium text-white disabled:opacity-50"
           >
             {submitting ? "Testing Connection" : "Continue"}
-            {!submitting && <IconChevronRight size={16} stroke={2.4} />}
+            <IconChevronRight size={16} stroke={2.4} />
           </button>
         </div>
 
