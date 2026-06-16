@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { fetchLegalPricing } from "@/lib/legal/pricing";
 
 export const metadata: Metadata = {
   title: "Terms of Service | Next Surplus",
@@ -7,11 +6,7 @@ export const metadata: Metadata = {
     "Terms governing your access to and use of Next Surplus at app.nextsurplus.com.",
 };
 
-export const dynamic = "force-dynamic";
-
-export default async function TermsPage() {
-  const pricing = await fetchLegalPricing();
-
+export default function TermsPage() {
   return (
     <article className="prose-legal">
       <h1 className="mb-2 text-[32px] font-bold text-[#0d4b3a]">
@@ -93,10 +88,10 @@ export default async function TermsPage() {
       <Section title="3. Subscription and Billing">
         <Sub title="3.1 Pricing">
           <p>
-            The Service is offered at a flat rate of {pricing.monthlyFormatted}{" "}
-            per month per Organization, billed monthly. This includes
-            unlimited users within the Organization. Pricing is subject to
-            change with 30 days written notice to active subscribers.
+            Current subscription pricing is shown during signup and is
+            available at any time from Settings &gt; Billing within the
+            Service. Pricing is subject to change with 30 days written
+            notice to active subscribers.
           </p>
         </Sub>
         <Sub title="3.2 Payment Processing">
