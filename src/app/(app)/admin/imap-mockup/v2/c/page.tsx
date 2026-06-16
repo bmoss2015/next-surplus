@@ -11,8 +11,14 @@ export default async function V2C() {
   return (
     <MockupShell active="v2">
       <div className="relative w-full max-w-[460px] overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-[0_24px_60px_-12px_rgba(15,23,41,0.4)]">
-        {/* C: Brand-dark strip, small mark + label, close on right */}
-        <div className="flex items-center justify-between bg-[#0a3d4a] px-5 py-2.5 text-white">
+        {/* C: Forest-green gradient strip, small mark + label, close on right */}
+        <div
+          className="flex items-center justify-between px-5 py-2.5 text-white"
+          style={{
+            background:
+              "linear-gradient(135deg, #0d4b3a 0%, #145e48 55%, #1f7a5e 100%)",
+          }}
+        >
           <div className="flex items-center gap-2">
             <IconMail size={14} stroke={2} />
             <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em]">
