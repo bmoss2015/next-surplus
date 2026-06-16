@@ -28,7 +28,7 @@ alter table public.app_pricing_config
   add column if not exists founder_cutoff_date timestamptz;
 
 update public.app_pricing_config
-set founder_cutoff_date = (current_date + interval '60 days')::timestamptz,
+set founder_cutoff_date = timestamptz '2026-08-01 00:00:00-05',
     updated_at = now()
 where id = 1
   and founder_cutoff_date is null;
