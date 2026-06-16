@@ -427,27 +427,37 @@ export function ConnectImapModal({
         </div>
 
         <div className="shrink-0 border-t border-gray-100 bg-white px-7 py-4">
-          <div className="flex items-center gap-2">
-            {step > 1 && step !== totalSteps && (
+          {step > 1 && step !== totalSteps ? (
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={back}
-                className="inline-flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-[13.5px] font-medium text-ink hover:border-gray-300"
+                className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-[13.5px] font-medium text-ink hover:border-gray-300"
               >
                 <IconChevronLeft size={14} stroke={2.2} />
                 Back
               </button>
-            )}
+              <button
+                type="button"
+                onClick={next}
+                disabled={submitting}
+                className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-md btn-primary text-[13.5px] font-medium text-white disabled:opacity-50"
+              >
+                {ctaLabel}
+                <IconChevronRight size={14} stroke={2.4} />
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
               onClick={next}
               disabled={submitting}
-              className="inline-flex h-11 flex-1 cursor-pointer items-center justify-between rounded-md btn-primary px-5 text-[13.5px] font-medium text-white disabled:opacity-50"
+              className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md btn-primary text-[13.5px] font-medium text-white disabled:opacity-50"
             >
-              <span>{ctaLabel}</span>
+              {ctaLabel}
               <IconChevronRight size={14} stroke={2.4} />
             </button>
-          </div>
+          )}
         </div>
 
         <div className="shrink-0 border-t border-gray-100 bg-gray-50 px-7 py-2.5">
