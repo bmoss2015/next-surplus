@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DiamondMark, Wordmark } from "../../_components/BrandMark";
+import { Wordmark } from "../../_components/BrandMark";
 import { GoogleButton } from "../../_components/GoogleButton";
 import { PasswordField } from "../../_components/PasswordField";
 
@@ -9,10 +9,6 @@ export default function SignupV2Attio() {
       <BrandPanel />
       <div className="flex items-center justify-center bg-white px-8 py-14">
         <div className="w-full max-w-[380px]">
-          <div className="mb-8 lg:hidden">
-            <DiamondMark size="md" />
-          </div>
-
           <div className="mb-6">
             <h1 className="m-0 text-[22px] font-semibold tracking-[-0.02em] text-[#04261c]">
               Create Your Account
@@ -71,8 +67,7 @@ function BrandPanel() {
           "linear-gradient(160deg, #04261c 0%, #0d4b3a 70%, #13644e 100%)",
       }}
     >
-      <div className="flex items-center gap-3 text-white">
-        <DiamondMark size="md" tone="dark" />
+      <div className="text-white">
         <Wordmark size="md" tone="dark" />
       </div>
 

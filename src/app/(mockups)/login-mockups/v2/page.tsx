@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DiamondMark, Wordmark } from "../../_components/BrandMark";
+import { Wordmark } from "../../_components/BrandMark";
 import { GoogleButton } from "../../_components/GoogleButton";
 
 export default function LoginV2Attio() {
@@ -78,8 +78,7 @@ function BrandPanel() {
           "linear-gradient(160deg, #04261c 0%, #0d4b3a 70%, #13644e 100%)",
       }}
     >
-      <div className="flex items-center gap-3 text-white">
-        <DiamondMark size="md" tone="dark" />
+      <div className="text-white">
         <Wordmark size="md" tone="dark" />
       </div>
 
@@ -98,7 +97,8 @@ function BrandPanel() {
         </p>
       </div>
 
-      <div className="text-[11px] text-white/40">Workflow Minds LLC, 2026</div>
+      <div />
+
     </div>
   );
 }

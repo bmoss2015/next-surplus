@@ -95,7 +95,8 @@ function BrandPanel() {
         </p>
       </div>
 
-      <div className="text-[11px] text-white/40">Workflow Minds LLC, 2026</div>
+      <div />
+
     </div>
   );
 }

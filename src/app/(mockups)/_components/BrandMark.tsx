@@ -23,6 +23,48 @@ export function DiamondMark({
   );
 }
 
+export function DiamondGlyph({
+  size = "md",
+  color = "#ffffff",
+}: {
+  size?: Size;
+  color?: string;
+}) {
+  const px = SIZES[size];
+  return (
+    <svg viewBox="0 0 68 68" width={px} height={px} aria-hidden>
+      <polygon
+        points="34,8 60,34 34,60 8,34"
+        fill="none"
+        stroke={color}
+        strokeWidth="3"
+      />
+      <polygon points="34,8 60,34 34,34" fill={color} opacity="0.9" />
+      <polygon points="34,34 60,34 34,60" fill={color} opacity="0.55" />
+    </svg>
+  );
+}
+
+export function CircleMark({
+  size = "md",
+  tone = "light",
+}: {
+  size?: Size;
+  tone?: Tone;
+}) {
+  const px = SIZES[size];
+  const bg = tone === "light" ? "#04261c" : "#ffffff";
+  const tip = tone === "light" ? "#ffffff" : "#04261c";
+  return (
+    <svg viewBox="0 0 68 68" width={px} height={px} aria-hidden>
+      <circle cx="34" cy="34" r="32" fill={bg} />
+      <polygon points="34,16 52,34 34,52 16,34" fill={tip} />
+      <polygon points="34,16 52,34 34,34" fill="#13644e" />
+      <polygon points="34,34 52,34 34,52" fill="#4a9c75" />
+    </svg>
+  );
+}
+
 export function Wordmark({
   size = "md",
   tone = "light",
