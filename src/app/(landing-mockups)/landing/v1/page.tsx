@@ -123,7 +123,7 @@ export default function LandingV1() {
             />
             <FeatureCard
               eyebrow="02 Threaded Inbox"
-              title="Gmail And Outlook, Sorted To The Right Lead"
+              title="Gmail, Sorted To The Right Lead"
               body="Connect an existing inbox. Conversations auto-link to the property owner. Reply without leaving the case. Read receipts, attachment archive, full conversation history."
             />
             <FeatureCard
@@ -224,10 +224,6 @@ export default function LandingV1() {
             >
               Claim Founders Rate
             </Link>
-          </div>
-
-          <div className="mt-6 text-[12.5px] text-gray-500">
-            Microsoft Outlook and IMAP inbox sync are coming next.
           </div>
         </div>
       </section>
