@@ -287,6 +287,22 @@ The assistant should drive the entire flow without manual GitHub clicks. `gh` CL
 
 ---
 
+## Activity Log
+
+After merging any PR or completing any significant change (migration, deployment, config update), append a one line summary to the activity log at the repo root:
+
+    echo "YYYY-MM-DD | PR #NNN | short description" >> docs/claude-code-activity.md
+
+Create the file if it does not exist. One line per item. No headers, no formatting. Example:
+
+    2026-06-17 | PR #136 | Stripped Outlook from landing page feature card and pricing subtitle
+    2026-06-17 | PR #133 | Favicon, apple touch icon, android chrome, manifest, og-image, 10 brand SVGs
+    2026-06-17 | PR #132 | Archived standard_monthly Stripe price, removed env var, cleaned code refs
+
+This file is read by Cowork at session start to understand what has been implemented without needing GitHub API access.
+
+---
+
 ## Slash Command Doc Updates
 
 For updating the Product Build Status & Roadmap and the Architecture documentation, use slash command triggers. The skill at `.claude/skills/roadmap/SKILL.md` handles classification, preview, and commit.
