@@ -15,21 +15,17 @@ export function FollowUpToast({
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
-    if (!visible) {
-      setCountdown(5);
-      return;
-    }
-    setCountdown(5);
+    if (!visible) return;
+    const start = Date.now();
     const tick = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(tick);
-          onDismiss();
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
+      const elapsed = Math.floor((Date.now() - start) / 1000);
+      const remaining = Math.max(0, 5 - elapsed);
+      setCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(tick);
+        onDismiss();
+      }
+    }, 200);
     return () => clearInterval(tick);
   }, [visible, onDismiss]);
 

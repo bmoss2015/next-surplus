@@ -2,7 +2,6 @@
 
 import {
   IconMicrophone,
-  IconMicrophoneOff,
   IconHandStop,
   IconArrowsTransferUp,
   IconNote,

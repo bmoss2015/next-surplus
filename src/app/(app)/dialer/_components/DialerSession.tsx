@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { IconPhone, IconPlayerSkipForward } from "@tabler/icons-react";
 import { DialerHeader } from "./DialerHeader";
 import { QueuePanel } from "./QueuePanel";
@@ -29,29 +29,7 @@ export function DialerSession() {
 
   const activeLead = queue.find((l) => l.id === activeLeadId) ?? queue[0];
 
-  useEffect(() => {
-    if (state !== "wrapup" || !selectedOutcome || countdown === null) return;
-    if (countdown <= 0) {
-      advance();
-      return;
-    }
-    const t = setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
-    return () => clearTimeout(t);
-  }, [countdown, state, selectedOutcome]);
-
-  function endCall() {
-    setState("wrapup");
-  }
-
-  function pickOutcome(o: CallOutcome) {
-    setSelectedOutcome(o);
-    setCountdown(3);
-    if (!skipFollowUp && (o === "Interested" || o === "Callback Requested")) {
-      setToastVisible(true);
-    }
-  }
-
-  function advance() {
+  const advance = useCallback(() => {
     const nextContact = activeLead.contacts[contactIndex + 1];
     if (nextContact) {
       setContactIndex((i) => i + 1);
@@ -68,6 +46,34 @@ export function DialerSession() {
     setQuickNote("");
     setSkipFollowUp(false);
     setCountdown(null);
+  }, [activeLead, contactIndex, queue]);
+
+  useEffect(() => {
+    if (state !== "wrapup" || !selectedOutcome) return;
+    const start = Date.now();
+    const tick = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - start) / 1000);
+      const remaining = 3 - elapsed;
+      if (remaining <= 0) {
+        clearInterval(tick);
+        advance();
+        return;
+      }
+      setCountdown(remaining);
+    }, 200);
+    return () => clearInterval(tick);
+  }, [state, selectedOutcome, advance]);
+
+  function endCall() {
+    setState("wrapup");
+  }
+
+  function pickOutcome(o: CallOutcome) {
+    setSelectedOutcome(o);
+    setCountdown(3);
+    if (!skipFollowUp && (o === "Interested" || o === "Callback Requested")) {
+      setToastVisible(true);
+    }
   }
 
   function skipCountdown() {
