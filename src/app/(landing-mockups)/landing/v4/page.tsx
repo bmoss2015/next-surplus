@@ -93,7 +93,7 @@ export default function LandingV4() {
             className="mt-3 text-[44px] tracking-[-0.02em] text-ink"
             style={{ fontFamily: "Georgia, serif" }}
           >
-            $69 per month
+            $49 per month
           </div>
           <p className="mx-auto mt-3 max-w-md text-[13.5px] text-ink/60">
             Unlimited users. Physical mail at cost plus 20%, billed

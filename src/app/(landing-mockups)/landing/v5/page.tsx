@@ -96,7 +96,7 @@ export default function LandingV5() {
               Pricing
             </div>
             <div className="text-[16px] leading-[1.7] text-ink/80">
-              $69 per month, every user included. Mail is billed at cost
+              $49 per month, every user included. Mail is billed at cost
               plus 20% per piece, transparent on every invoice.
             </div>
           </div>

@@ -20,7 +20,7 @@ Internal alpha live at portal.mossequitypartners.com. Bree and Rik are using it 
 
 Production launched 2026-05-12. Currently shipping fixes and feature additions daily through Claude Code with auto-deploy to Vercel.
 
-Pricing strategy: launch a Founder / Lite tier at $59 to 69 once Q2 launch readiness ships, bump to $97 to 99 in Q3 when SMS, voice calling, and e-signature land. Founder customers grandfather at $69 for 12 months. This trades upfront revenue clarity for faster validated demand.
+Pricing strategy: Founders Rate at $49 / month (or $470 / year) during the launch window, bump to $97 to 99 in Q3 when SMS, voice calling, and e-signature land. Founder customers grandfather at the Founders Rate for 12 months. This trades upfront revenue clarity for faster validated demand.
 
 ---
 
@@ -77,6 +77,7 @@ Active priorities for the current quarter (April - June 2026). Ordered by consum
 - Google OAuth app verification (removes the "unverified app" warning users see today when connecting Gmail). Google review takes 4 to 8 weeks so the application must be submitted early in the quarter.
 - Public launch readiness (Owner / Viewer / Admin / Member roles, Stripe billing with plan picker, new-org onboarding flow as a post-signup wizard, public marketing site at mossequitypartners.com with pricing, features, and signup, per-org isolation polish).
 - Public sign up page at /signup (self-serve org creation — new firm enters company name, owner email, and password, then lands directly into the post-signup onboarding wizard and Stripe plan picker). Today new users can only join by invite, which blocks any marketing-driven acquisition.
+- Post-payment return flow. Stripe Checkout `success_url` and `cancel_url` must route into the authenticated onboarding wizard (e.g. `/onboarding?step=verifying&session_id={CHECKOUT_SESSION_ID}`), NOT to the marketing root or `/login`. Confirmed during the 2026-06-17 live billing smoke test: a CLI-minted Checkout session whose `success_url` pointed at `app.nextsurplus.com` dropped the buyer at a sign-in page they have no account for. The signup-first → plan-picker → Checkout sequence avoids this only if the return URLs are stitched back to the in-progress org session.
 - Additional email providers (Microsoft 365 / Outlook two-way OAuth sync plus generic IMAP fallback alongside the existing Gmail integration).
 - In-app feedback widget (persistent floating button on every page for "send feedback", "request a feature", or "chat with us" without leaving the workflow).
 - Customer newsletter system (weekly send via Resend with feature highlights, how-to walkthroughs, and an embedded feedback prompt).

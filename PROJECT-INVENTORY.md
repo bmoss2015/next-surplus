@@ -173,7 +173,7 @@ All under `/settings`. Admin-only unless noted.
 - **Scripts:** A Settings section was scaffolded once but no user-facing editor exists today
 - **Click-to-call:** Phone numbers are display-only, no dialer wired
 - **Plaid bank verification:** Planned, not built (would layer on Lob's existing microdeposit flow to skip the 1–3 business day wait)
-- **Stripe billing:** Code shipped (checkout session, signed webhook handler, customer portal handoff, founder-lock daily cron). Going live requires the Stripe Dashboard product + three recurring prices (beta_founder monthly $49, beta_founder annual $470, standard monthly $69) and the corresponding Vercel env vars (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, the three price IDs).
+- **Stripe billing:** Code shipped (checkout session, signed webhook handler, customer portal handoff, founder-lock daily cron). Going live requires the Stripe Dashboard product + two recurring prices (beta_founder monthly $49, beta_founder annual $470) and the corresponding Vercel env vars (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, the two price IDs).
 - **Public marketing website:** Does not exist; `portal.mossequitypartners.com` is admin / app only, no marketing surface
 - **Onboarding flow for new orgs / new users:** Not built; new users land directly in the app post-invite
 - **E-signature:** Not built, provider not yet chosen

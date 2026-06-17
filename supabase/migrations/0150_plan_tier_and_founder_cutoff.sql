@@ -1,11 +1,9 @@
 -- Plan tier enum + Founder Rate cutoff.
 --
--- Three tiers:
---   founder       -> legacy/comp/lifetime locks. Never auto-promoted.
+-- Tiers:
+--   founder       -> legacy/comp/lifetime locks.
 --   beta_founder  -> $49/month or $470/year while founder window is open.
---                    Auto-promoted to standard 12 months after activation
---                    via the founder-lock-expiration cron.
---   standard      -> $69/month default after founder window closes.
+--   standard      -> reserved enum value kept for forward compatibility.
 --
 -- Signup behavior: app_pricing_config.founder_cutoff_date controls which
 -- tier a new org lands on. A BEFORE INSERT trigger reads the cutoff and

@@ -92,7 +92,7 @@ Sent: 4 letters, $7.42 total. Track at /mail.`}</code>
             ["7k+", "Letters Sent"],
             ["18", "States Covered"],
             ["99.97%", "Uptime"],
-            ["$69", "Per Month"],
+            ["$49", "Per Month"],
           ].map(([num, label]) => (
             <div
               key={label}
