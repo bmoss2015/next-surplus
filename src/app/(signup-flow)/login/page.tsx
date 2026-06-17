@@ -54,11 +54,8 @@ export default function LoginPage() {
 
         <div className="mb-7 text-center">
           <h1 className="m-0 text-[20px] font-semibold tracking-[-0.02em] text-[#04261c]">
-            Welcome Back
+            Log in to Next Surplus
           </h1>
-          <p className="mt-2 text-[12.5px] leading-relaxed text-[#6b7280]">
-            Sign in to your Next Surplus workspace.
-          </p>
         </div>
 
         {IS_PREVIEW && (

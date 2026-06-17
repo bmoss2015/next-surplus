@@ -43,10 +43,10 @@ export default function SignupPage() {
 
         <div className="mb-7 text-center">
           <h1 className="m-0 text-[20px] font-semibold tracking-[-0.02em] text-[#04261c]">
-            Create Your Account
+            Create your account
           </h1>
           <p className="mt-2 text-[12.5px] leading-relaxed text-[#6b7280]">
-            14 day free trial. $49 a month, locked for 12 months.
+            Founders Rate. $49 a month, price held for 12 months. 14 day free trial.
           </p>
         </div>
 
