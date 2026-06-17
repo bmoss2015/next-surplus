@@ -35,7 +35,7 @@ const PUBLIC_PATHS = ["/login", "/forgot", "/signup"];
 // Auth-flow pages reachable with OR without a session.
 const AUTH_FLOW_PATHS = ["/reset", "/accept-invite"];
 // Always-open pages: anyone can view, no bounce in either direction.
-const OPEN_PATHS = ["/landing", "/pricing", "/privacy", "/terms"];
+const OPEN_PATHS = ["/landing", "/pricing", "/privacy", "/terms", "/signup-mockups", "/login-mockups"];
 
 function isMarketingPath(pathname: string): boolean {
   return MARKETING_PATHS.some(
