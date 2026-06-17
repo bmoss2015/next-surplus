@@ -1,7 +1,7 @@
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { Resend } from "resend";
 import { createServiceClient } from "./supabase/service";
-import { renderEmailShell, escapeHtml } from "./email-template";
+import { renderEmailShell } from "./email-template";
 
 // Clearout Phone — pay-as-you-go credit pool, no monthly auto-reset.
 // Default cap matches a fresh 5,000-credit top-up. Override per-org via
