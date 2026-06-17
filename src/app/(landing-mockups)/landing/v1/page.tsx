@@ -37,7 +37,7 @@ export default function LandingV1() {
               href="/signup"
               className="inline-flex h-12 w-48 items-center justify-center rounded-md bg-white text-[14px] font-medium text-[#0d4b3a] hover:bg-white/90"
             >
-              Start Free
+              Start Free Trial
             </Link>
             <a
               href="#features"
@@ -289,13 +289,13 @@ export default function LandingV1() {
               href="/signup"
               className="inline-flex h-12 w-48 items-center justify-center rounded-md bg-white text-[14px] font-medium text-[#0d4b3a] hover:bg-white/90"
             >
-              Start Free
+              Start Free Trial
             </Link>
             <Link
               href="/login"
               className="inline-flex h-12 w-48 items-center justify-center rounded-md border border-white/25 bg-white/[0.04] text-[14px] font-medium text-white hover:bg-white/[0.08]"
             >
-              Sign In
+              Log in
             </Link>
           </div>
         </div>
@@ -341,13 +341,13 @@ function Nav() {
           FAQ
         </a>
         <Link href="/login" className="hover:text-white">
-          Sign In
+          Log in
         </Link>
         <Link
           href="/signup"
           className="rounded-md bg-white px-3.5 py-1.5 text-[12.5px] font-medium text-[#0d4b3a] hover:bg-white/90"
         >
-          Get Started
+          Start Free Trial
         </Link>
       </nav>
     </header>
