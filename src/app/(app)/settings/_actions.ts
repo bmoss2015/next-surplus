@@ -13,8 +13,16 @@ import { renderEmailShell, renderEmailButton, escapeHtml } from "@/lib/email-tem
 function resolveSiteUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   if (explicit) return explicit;
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) return `https://${vercel.replace(/\/$/, "")}`;
+  if (process.env.VERCEL_ENV === "production") {
+    return "https://app.nextsurplus.com";
+  }
+  // Per-branch previews share the staging Supabase project, so the staging
+  // alias is a valid invite/callback host even when the email was emitted
+  // from a *.vercel.app preview. Prefer it over the per-deploy URL so the
+  // links in transactional emails stay clean and stable.
+  if (process.env.VERCEL_ENV) {
+    return "https://staging.nextsurplus.com";
+  }
   return "http://localhost:3000";
 }
 const SITE_URL = resolveSiteUrl();

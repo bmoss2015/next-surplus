@@ -12,8 +12,13 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
-const LOGO_URL = "https://app.nextsurplus.com/images/email-logo.png";
-const APP_URL = "https://app.nextsurplus.com";
+// EMAIL_LOGO_URL / NEXTSURPLUS_APP_URL are optional Supabase secrets that let
+// staging point at the staging origin and prod at app.nextsurplus.com. The
+// fallback assumes prod since that's the most common host for this function.
+const LOGO_URL =
+  Deno.env.get("EMAIL_LOGO_URL") ??
+  `${(Deno.env.get("NEXTSURPLUS_APP_URL") ?? "https://app.nextsurplus.com").replace(/\/$/, "")}/images/email-logo.png`;
+const APP_URL = (Deno.env.get("NEXTSURPLUS_APP_URL") ?? "https://app.nextsurplus.com").replace(/\/$/, "");
 const FONT_STACK = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 function renderEmailShell({
