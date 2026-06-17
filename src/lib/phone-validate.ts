@@ -187,19 +187,23 @@ async function sendThresholdEmail(
   const remaining = Math.max(0, cap - used);
   const subject =
     threshold === 100
-      ? "Phone validation paused — credit balance exhausted"
-      : `Phone validation: ${threshold}% of credit balance used`;
+      ? "Phone validation paused, credit balance exhausted"
+      : `Phone validation at ${threshold}% of credit balance`;
+
+  const preheader =
+    threshold === 100
+      ? `Your phone validation add-on has used 100% of its credit balance.`
+      : `Your phone validation add-on has used ${threshold}% of its credit balance.`;
 
   const bodyIntro =
     threshold === 100
-      ? "Your Phone Validation add-on has consumed 100% of its credit balance. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened until more credits are added. The add-on does not auto-recharge."
-      : `Your Phone Validation add-on has consumed <strong>${threshold}%</strong> of its credit balance. Validation continues normally. This is a heads-up so you can add more credits before hitting zero. <strong>${remaining.toLocaleString()}</strong> credits remaining.`;
+      ? "Your phone validation add-on has consumed 100% of its credit balance. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened until more credits are added. The add-on does not auto-recharge."
+      : `Your phone validation add-on has consumed <strong>${threshold}%</strong> of its credit balance. Validation continues normally. This is a heads-up so you can add more credits before hitting zero. <strong>${remaining.toLocaleString()}</strong> credits remaining.`;
 
   const bodyHtml = `
-    <h1 style="margin:0;font-size:20px;font-weight:600;color:#1a1a1a;">${escapeHtml(subject)}</h1>
-    <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">${bodyIntro}</p>
-    <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Credits used: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
-    <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#5a5a5a;">Open Settings &rsaquo; Billing in the portal to see the live meter and add more credits.</p>
+    <p style="margin:0;font-size:15px;line-height:1.6;">${bodyIntro}</p>
+    <p style="margin:16px 0 0;font-size:15px;line-height:1.6;">Credits used: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
+    <p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:#6b7280;">Open Settings &rsaquo; Billing in the portal to see the live meter and add more credits.</p>
   `;
 
   try {
@@ -208,7 +212,7 @@ async function sendThresholdEmail(
       from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
       to: recipients,
       subject,
-      html: renderEmailShell({ subject, bodyHtml }),
+      html: renderEmailShell({ subject, bodyHtml, preheader }),
     });
   } catch (e) {
     console.error("[phone-validate] resend email failed:", e);

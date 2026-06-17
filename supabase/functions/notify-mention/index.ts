@@ -13,6 +13,8 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const LOGO_URL = "https://app.nextsurplus.com/images/email-logo.png";
+const APP_URL = "https://app.nextsurplus.com";
+const FONT_STACK = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 function renderEmailShell({
   subject,
@@ -21,10 +23,10 @@ function renderEmailShell({
 }: {
   subject: string;
   bodyHtml: string;
-  preheader?: string;
+  preheader: string;
 }): string {
   const safeSubject = escapeHtml(subject);
-  const safePreheader = preheader ? escapeHtml(preheader) : "";
+  const safePreheader = escapeHtml(preheader);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -35,29 +37,29 @@ function renderEmailShell({
   <title>${safeSubject}</title>
   <style>
     :root { color-scheme: light only; supported-color-schemes: light; }
-    a { color: #13644e; }
+    a { color: #13644e; text-decoration: none; }
     a:hover { text-decoration: underline; }
   </style>
 </head>
-<body style="margin:0;padding:0;background-color:#f5f7fa;font-family:Inter,Helvetica,Arial,sans-serif;color:#1a1a1a;">
-  ${safePreheader ? `<div style="display:none;font-size:1px;color:#f5f7fa;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${safePreheader}</div>` : ""}
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f7fa;padding:32px 16px;">
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:${FONT_STACK};color:#1a1a1a;">
+  <div style="display:none;font-size:1px;color:#f5f5f5;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${safePreheader}</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f5f5;padding:32px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
           <tr>
-            <td bgcolor="#04261c" style="background-color:#04261c;padding:24px 28px;" align="left">
-              <img src="${LOGO_URL}" alt="Next Surplus" width="160" style="display:block;border:0;outline:none;text-decoration:none;height:auto;">
+            <td bgcolor="#04261c" align="center" height="48" style="background-color:#04261c;height:48px;padding:10px 0;line-height:0;">
+              <img src="${LOGO_URL}" alt="Next Surplus" width="160" height="28" style="display:block;border:0;outline:none;text-decoration:none;width:160px;height:28px;margin:0 auto;">
             </td>
           </tr>
           <tr>
-            <td bgcolor="#ffffff" style="background-color:#ffffff;padding:28px;font-size:14px;line-height:1.7;color:#1a1a1a;">
+            <td bgcolor="#ffffff" style="background-color:#ffffff;padding:32px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:#1a1a1a;">
               ${bodyHtml}
             </td>
           </tr>
           <tr>
-            <td bgcolor="#ffffff" style="background-color:#ffffff;padding:0 28px 28px;border-top:1px solid #e5e7eb;">
-              <p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#5a5a5a;">Next Surplus</p>
+            <td bgcolor="#f5f5f5" style="background-color:#f5f5f5;padding:20px 32px;border-top:1px solid #e5e7eb;font-family:${FONT_STACK};font-size:12px;line-height:1.5;color:#6b7280;">
+              <a href="${APP_URL}" style="color:#6b7280;text-decoration:none;">Next Surplus</a>
             </td>
           </tr>
         </table>
@@ -66,6 +68,16 @@ function renderEmailShell({
   </table>
 </body>
 </html>`;
+}
+
+function renderEmailButton({ href, label }: { href: string; label: string }): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+  <tr>
+    <td bgcolor="#13644e" style="background-color:#13644e;border-radius:6px;">
+      <a href="${escapeHtml(href)}" style="display:inline-block;min-height:20px;padding:12px 24px;font-family:${FONT_STACK};font-size:15px;font-weight:500;color:#ffffff;text-decoration:none;border-radius:6px;line-height:20px;">${escapeHtml(label)}</a>
+    </td>
+  </tr>
+</table>`;
 }
 
 const CORS = {
@@ -129,39 +141,30 @@ serve(async (req: Request) => {
   }
 
   const subject = leadOwnerName
-    ? `${actorFirstName} mentioned you on the ${leadOwnerName} Lead`
+    ? `${actorFirstName} mentioned you in ${leadOwnerName}`
     : `${actorFirstName} mentioned you on a lead`;
 
-  const safeActorFirst = escapeHtml(actorFirstName);
   const safeOwner = escapeHtml(leadOwnerName);
+  const safeActorName = escapeHtml(actorName);
   const safeComment = escapeHtml(commentText).replace(/\n/g, "<br/>");
-  const safeLink = escapeHtml(link);
 
-  const heading = `${safeActorFirst} mentioned you${safeOwner ? ` on the ${safeOwner} Lead` : ""}`;
+  const preheader = leadOwnerName
+    ? `${actorName} left a note for you on ${leadOwnerName}.`
+    : `${actorName} left a note for you on a lead.`;
+
   const bodyHtml = `
-    <h1 style="margin:0 0 16px;font-size:20px;font-weight:600;color:#1a1a1a;">${heading}</h1>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 24px;background-color:#f8fafc;border-radius:10px;">
+    <p style="margin:0;font-size:15px;line-height:1.6;">${safeActorName} mentioned you${safeOwner ? ` in <strong>${safeOwner}</strong>` : ""}:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:16px 0 0;background-color:#f5f5f5;border-radius:6px;">
       <tr>
-        <td style="padding:18px 22px;font-size:14px;line-height:1.7;color:#1a1a1a;">
+        <td style="padding:16px 20px;font-size:15px;line-height:1.6;color:#1a1a1a;">
           ${safeComment}
         </td>
       </tr>
     </table>
-    ${
-      link
-        ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
-      <tr>
-        <td bgcolor="#13644e" style="background-color:#13644e;border-radius:6px;">
-          <a href="${safeLink}" style="display:inline-block;padding:11px 22px;font-size:13px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;letter-spacing:0.2px;">Open The Discussion</a>
-        </td>
-      </tr>
-    </table>`
-        : ""
-    }
-    <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#5a5a5a;">You received this because you were @mentioned on a lead in Next Surplus.</p>
+    ${link ? renderEmailButton({ href: link, label: "Open the discussion" }) : ""}
   `;
 
-  const html = renderEmailShell({ subject, bodyHtml });
+  const html = renderEmailShell({ subject, bodyHtml, preheader });
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
