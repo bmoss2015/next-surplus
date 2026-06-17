@@ -13,6 +13,7 @@ type Metric = {
   value: string;
   delta: number;
   detail: string;
+  hideTrend?: boolean;
 };
 
 const METRICS: Metric[] = [
@@ -35,10 +36,11 @@ const METRICS: Metric[] = [
     detail: "Up from 28% last session",
   },
   {
-    label: "Total Talk",
+    label: "Total Talk Time",
     value: "47:12",
-    delta: -1,
-    detail: "Slightly below your 52 minute average",
+    delta: 0,
+    detail: "Cumulative talk time across this session",
+    hideTrend: true,
   },
 ];
 
@@ -54,20 +56,12 @@ export function DialerHeader({
   return (
     <header className="flex h-[68px] items-center justify-between border-b border-gray-200 bg-white px-6">
       <div className="flex items-center gap-8">
-        <div className="flex items-center gap-2.5">
-          <div
-            aria-hidden
-            className="h-8 w-8 rounded-md"
-            style={{
-              background:
-                "linear-gradient(135deg, #04261c 0%, #0d4b3a 70%, #13644e 100%)",
-            }}
-          />
-          <div className="leading-tight">
-            <div className="text-[13px] font-semibold tracking-tight text-ink">
-              Power Dialer
-            </div>
-            <div className="text-[11px] text-gray-500">Session in progress</div>
+        <div className="leading-tight">
+          <div className="text-[13px] font-semibold tracking-tight text-ink">
+            Power Dialer
+          </div>
+          <div className="text-[11px] text-gray-500">
+            {paused ? "Session Paused" : "Session In Progress"}
           </div>
         </div>
 
@@ -117,7 +111,9 @@ function MetricColumn({ metric }: { metric: Metric }) {
         <span className="text-[22px] font-semibold leading-none text-ink tabular-nums">
           {metric.value}
         </span>
-        <TrendIcon size={15} stroke={2.25} style={{ color: trendColor }} />
+        {!metric.hideTrend && (
+          <TrendIcon size={15} stroke={2.25} style={{ color: trendColor }} />
+        )}
       </div>
       {open && (
         <div

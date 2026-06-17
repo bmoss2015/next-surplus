@@ -80,30 +80,33 @@ export function LeadDataPanel({
       <Divider />
 
       <Section title="Contact Tree">
-        <ul className="space-y-2.5">
-          {lead.contacts.map((c) => (
+        <ul className="divide-y divide-[rgba(15,23,41,0.06)]">
+          {lead.contacts.map((c, i) => (
             <li
               key={c.id}
-              className="flex items-start gap-2.5 rounded-md px-1.5 py-1 transition hover:bg-gray-50"
+              className={[
+                "flex items-start gap-3 px-1.5 transition hover:bg-gray-50",
+                i === 0 ? "pb-3" : "py-3",
+              ].join(" ")}
             >
-              <div
-                className={[
-                  "mt-1 h-2 w-2 shrink-0 rounded-full",
-                  c.status === "active"
-                    ? "bg-petrol-500"
-                    : c.status === "done"
-                      ? "bg-gray-400"
-                      : "bg-gray-300",
-                ].join(" ")}
-              />
+              <ContactAvatar name={c.name} active={c.status === "active"} />
               <div className="min-w-0 flex-1">
-                <div className="text-[12.5px] font-medium text-ink">
-                  {c.name}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate text-[13px] font-semibold text-ink">
+                    {c.name}
+                  </div>
+                  {c.status === "active" && (
+                    <span className="shrink-0 rounded-sm bg-petrol-500/10 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.10em] text-petrol-500">
+                      On Call
+                    </span>
+                  )}
                 </div>
-                <div className="text-[11.5px] text-gray-500">
-                  {c.relationship}
+                <div className="mt-1">
+                  <span className="inline-flex items-center rounded-sm bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600">
+                    {c.relationship}
+                  </span>
                 </div>
-                <div className="text-[11.5px] tabular-nums text-gray-500">
+                <div className="mt-1 text-[11.5px] tabular-nums text-gray-500">
                   {c.phone}
                 </div>
               </div>
@@ -112,6 +115,27 @@ export function LeadDataPanel({
         </ul>
       </Section>
     </aside>
+  );
+}
+
+function ContactAvatar({ name, active }: { name: string; active: boolean }) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+  return (
+    <div
+      className={[
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+        active
+          ? "bg-petrol-500 text-white"
+          : "bg-gray-100 text-gray-600 ring-1 ring-gray-200",
+      ].join(" ")}
+    >
+      {initials}
+    </div>
   );
 }
 
@@ -126,8 +150,8 @@ function Section({
 }) {
   return (
     <div className="px-5 py-5">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold tracking-tight text-ink">
+      <div className="mb-3.5 flex items-center justify-between border-b border-[rgba(15,23,41,0.06)] pb-2">
+        <h2 className="text-[13.5px] font-bold tracking-tight text-ink">
           {title}
         </h2>
         {trailing}

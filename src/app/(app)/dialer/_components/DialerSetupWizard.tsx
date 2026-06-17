@@ -281,7 +281,6 @@ function StepCallSettings() {
   const [skipDnc, setSkipDnc] = useState(true);
   const [skipLitigated, setSkipLitigated] = useState(true);
   const [wrapUp, setWrapUp] = useState(3);
-  const [pauseOnNote, setPauseOnNote] = useState(true);
   const [vmDrop, setVmDrop] = useState<"off" | "on">("off");
 
   return (
@@ -354,21 +353,7 @@ function StepCallSettings() {
           </div>
         </div>
         <div className="mt-2 text-[12px] text-gray-500">
-          Pause between calls to log the outcome before the next dial fires.
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-[16px] font-semibold tracking-tight text-ink">
-          Note Handling
-        </h2>
-        <div className="mt-3">
-          <CheckRow
-            checked={pauseOnNote}
-            onChange={setPauseOnNote}
-            label="Pause Countdown If I'm Typing a Note"
-            hint="The next dial waits until you stop typing in the wrap up note field."
-          />
+          Pause between calls to log the outcome before the next dial fires. The countdown auto pauses while you are typing a note.
         </div>
       </div>
 

@@ -25,17 +25,17 @@ export function ActivityTimelinePanel({
       <div
         onClick={onClose}
         className={[
-          "fixed inset-0 z-40 bg-black/20 transition-opacity duration-200",
+          "absolute inset-0 z-40 bg-black/15 transition-opacity duration-200",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         ].join(" ")}
       />
       <aside
         className={[
-          "fixed right-0 top-0 z-50 flex h-screen w-[420px] flex-col bg-white shadow-2xl transition-transform duration-200",
+          "absolute right-0 top-0 z-50 flex h-full w-[420px] flex-col bg-white shadow-[-12px_0_28px_-12px_rgba(15,23,41,0.18)] transition-transform duration-200",
           open ? "translate-x-0" : "translate-x-full",
         ].join(" ")}
       >
-        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-5">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 px-5">
           <div className="min-w-0">
             <h2 className="truncate text-[15px] font-semibold tracking-tight text-ink">
               Activity Timeline

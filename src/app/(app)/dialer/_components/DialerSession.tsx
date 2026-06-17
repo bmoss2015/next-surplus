@@ -26,6 +26,7 @@ export function DialerSession() {
   const [quickNote, setQuickNote] = useState("");
   const [skipFollowUp, setSkipFollowUp] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [noteFocused, setNoteFocused] = useState(false);
 
   const activeLead = queue.find((l) => l.id === activeLeadId) ?? queue[0];
 
@@ -49,7 +50,7 @@ export function DialerSession() {
   }, [activeLead, contactIndex, queue]);
 
   useEffect(() => {
-    if (state !== "wrapup" || !selectedOutcome) return;
+    if (state !== "wrapup" || !selectedOutcome || noteFocused) return;
     const start = Date.now();
     const tick = setInterval(() => {
       const elapsed = Math.floor((Date.now() - start) / 1000);
@@ -62,7 +63,7 @@ export function DialerSession() {
       setCountdown(remaining);
     }, 200);
     return () => clearInterval(tick);
-  }, [state, selectedOutcome, advance]);
+  }, [state, selectedOutcome, noteFocused, advance]);
 
   function endCall() {
     setState("wrapup");

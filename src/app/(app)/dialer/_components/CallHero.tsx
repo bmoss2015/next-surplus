@@ -33,6 +33,7 @@ export function CallHero({
   setQuickNote,
   skipFollowUp,
   setSkipFollowUp,
+  onNoteFocusChange,
 }: {
   lead: DialerLead;
   contactIndex: number;
@@ -45,6 +46,7 @@ export function CallHero({
   setQuickNote: (s: string) => void;
   skipFollowUp: boolean;
   setSkipFollowUp: (b: boolean) => void;
+  onNoteFocusChange: (focused: boolean) => void;
 }) {
   const [elapsed, setElapsed] = useState(272);
   const tickRef = useRef<NodeJS.Timeout | null>(null);
@@ -219,7 +221,9 @@ export function CallHero({
               <input
                 value={quickNote}
                 onChange={(e) => setQuickNote(e.target.value)}
-                placeholder="Quick note (optional)"
+                onFocus={() => onNoteFocusChange(true)}
+                onBlur={() => onNoteFocusChange(false)}
+                placeholder="Quick Note (Optional)"
                 className="w-full border-0 border-b border-white/40 bg-transparent pb-1.5 text-[13.5px] text-white placeholder:text-white/55 outline-none focus:border-white"
               />
             </div>
@@ -231,7 +235,7 @@ export function CallHero({
                 onChange={(e) => setSkipFollowUp(e.target.checked)}
                 className="h-3.5 w-3.5 accent-white"
               />
-              Skip follow up this call
+              Skip Follow Up This Call
             </label>
           </div>
         )}
@@ -242,9 +246,9 @@ export function CallHero({
 
 function FinancialRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-6">
+    <div className="grid grid-cols-[160px_minmax(0,1fr)] items-baseline gap-x-12">
       <span className="text-[16px] text-white/85">{label}</span>
-      <span className="text-[16px] font-semibold tabular-nums text-white">
+      <span className="text-right text-[16px] font-semibold tabular-nums text-white">
         {value}
       </span>
     </div>

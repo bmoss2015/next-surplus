@@ -56,6 +56,51 @@ const NAV: NavItem[] = [
   { label: "Owner",     href: "/owner",    Icon: ShieldCheck, ownerOnly: true },
 ];
 
+function NextSurplusLockup() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 460 80"
+      role="img"
+      aria-label="Next Surplus"
+      style={{ height: 28, width: "auto", display: "block" }}
+    >
+      <rect x="14" y="14" width="52" height="52" fill="#ffffff" />
+      <polygon points="40,26 54,40 40,54 26,40" fill="#04261c" />
+      <polygon points="40,26 54,40 40,40" fill="#4a9c75" />
+      <polygon points="40,40 54,40 40,54" fill="#13644e" />
+      <text
+        x="90"
+        y="56"
+        fontSize="42"
+        fontWeight="500"
+        fill="#ffffff"
+        letterSpacing="-0.5"
+        fontFamily="'Plus Jakarta Sans', system-ui, sans-serif"
+      >
+        Next Surplus
+      </text>
+    </svg>
+  );
+}
+
+function NextSurplusMark() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 64 64"
+      role="img"
+      aria-label="Next Surplus"
+      style={{ width: 32, height: 32, display: "block" }}
+    >
+      <rect x="6" y="6" width="52" height="52" fill="#ffffff" />
+      <polygon points="32,18 46,32 32,46 18,32" fill="#04261c" />
+      <polygon points="32,18 46,32 32,32" fill="#4a9c75" />
+      <polygon points="32,32 46,32 32,46" fill="#13644e" />
+    </svg>
+  );
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -116,18 +161,14 @@ export function IconSidebar({
       }}
     >
       {/* Brand row — collapse toggle lives here at the top instead of buried
-          near the account menu. Collapsed: the ME monogram is the expand
-          button (one tap to expand). Expanded: full wordmark on the left,
-          dedicated collapse chevron on the right. Two states, never both
-          monogram + wordmark together. */}
+          near the account menu. Collapsed: the icon-only logo is the expand
+          button (one tap to expand). Expanded: full horizontal lockup on the
+          left, dedicated collapse chevron on the right. */}
       <div className="flex h-14 shrink-0 items-center gap-2.5 px-[18px]">
         {expanded ? (
           <>
-            <div
-              className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-tight"
-              title="Next Surplus"
-            >
-              Next Surplus
+            <div className="min-w-0 flex-1" title="Next Surplus">
+              <NextSurplusLockup />
             </div>
             <button
               type="button"
@@ -145,10 +186,9 @@ export function IconSidebar({
             onClick={toggle}
             aria-label="Expand sidebar"
             title="Expand"
-            className="mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-[11.5px] font-bold tracking-tight text-white transition-all hover:brightness-125"
-            style={{ background: "rgba(255,255,255,0.10)" }}
+            className="mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition-all hover:brightness-125"
           >
-            ME
+            <NextSurplusMark />
           </button>
         )}
       </div>
