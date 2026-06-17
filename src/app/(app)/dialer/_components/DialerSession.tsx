@@ -157,23 +157,31 @@ export function DialerSession() {
             activeLeadId={activeLeadId}
             onSelect={selectLead}
           />
-          <CallHero
-            lead={activeLead}
-            contactIndex={contactIndex}
-            totalContacts={activeLead.contacts.length}
-            state={state}
-            onEndCall={endCall}
-            onOutcome={pickOutcome}
-            selectedOutcome={selectedOutcome}
-            quickNote={quickNote}
-            setQuickNote={setQuickNote}
-            skipFollowUp={skipFollowUp}
-            setSkipFollowUp={setSkipFollowUp}
-          />
-          <LeadDataPanel
-            lead={activeLead}
-            onOpenTimeline={() => setTimelineOpen(true)}
-          />
+          <div className="relative flex flex-1 overflow-hidden">
+            <CallHero
+              lead={activeLead}
+              contactIndex={contactIndex}
+              totalContacts={activeLead.contacts.length}
+              state={state}
+              onEndCall={endCall}
+              onOutcome={pickOutcome}
+              selectedOutcome={selectedOutcome}
+              quickNote={quickNote}
+              setQuickNote={setQuickNote}
+              skipFollowUp={skipFollowUp}
+              setSkipFollowUp={setSkipFollowUp}
+              onNoteFocusChange={setNoteFocused}
+            />
+            <LeadDataPanel
+              lead={activeLead}
+              onOpenTimeline={() => setTimelineOpen(true)}
+            />
+            <ActivityTimelinePanel
+              open={timelineOpen}
+              lead={activeLead}
+              onClose={() => setTimelineOpen(false)}
+            />
+          </div>
         </div>
       </div>
 
@@ -181,12 +189,6 @@ export function DialerSession() {
         visible={toastVisible}
         onUndo={() => setToastVisible(false)}
         onDismiss={() => setToastVisible(false)}
-      />
-
-      <ActivityTimelinePanel
-        open={timelineOpen}
-        lead={activeLead}
-        onClose={() => setTimelineOpen(false)}
       />
     </div>
   );
