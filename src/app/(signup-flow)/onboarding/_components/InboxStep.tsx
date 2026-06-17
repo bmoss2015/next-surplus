@@ -50,7 +50,7 @@ export function InboxStep() {
       </div>
 
       <div className="mt-6 rounded-[6px] border border-[#e5e7eb] bg-[#fafbfc] px-4 py-3 text-[11.5px] leading-relaxed text-[#374151]">
-        Google may show an "unverified app" warning the first time you connect.
+        Google may show an unverified app warning the first time you connect.
         That is expected during our verification review. The connection is
         end to end encrypted and only reads owner threads you label.
       </div>

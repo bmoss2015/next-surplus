@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { LockupHorizontal } from "../../../(mockups)/_components/BrandMark";
 
 type VerifyState = "loading" | "success" | "stalled";
@@ -10,19 +10,16 @@ type VerifyState = "loading" | "success" | "stalled";
 const POLL_INTERVAL_MS = 2000;
 const STALL_TIMEOUT_MS = 30_000;
 
-export function VerifyClient() {
+export function VerifyClient({ sessionId }: { sessionId: string | null }) {
   const router = useRouter();
-  const params = useSearchParams();
-  const sessionId = params.get("session_id");
-  const [state, setState] = useState<VerifyState>("loading");
-  const startedAt = useRef<number>(Date.now());
+  const [state, setState] = useState<VerifyState>(
+    sessionId ? "loading" : "stalled"
+  );
+  const startedAt = useRef<number>(0);
 
   useEffect(() => {
-    if (!sessionId) {
-      setState("stalled");
-      return;
-    }
-
+    if (!sessionId) return;
+    startedAt.current = Date.now();
     let cancelled = false;
 
     async function poll() {

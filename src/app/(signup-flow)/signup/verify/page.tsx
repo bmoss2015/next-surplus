@@ -3,10 +3,15 @@ import { VerifyClient } from "./_VerifyClient";
 
 export const dynamic = "force-dynamic";
 
-export default function VerifyPage() {
+export default async function VerifyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ session_id?: string }>;
+}) {
+  const params = await searchParams;
   return (
     <Suspense fallback={null}>
-      <VerifyClient />
+      <VerifyClient sessionId={params.session_id ?? null} />
     </Suspense>
   );
 }
