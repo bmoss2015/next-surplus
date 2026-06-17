@@ -4,6 +4,22 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Next Surplus",
   description: "Surplus funds recovery operations portal",
+  icons: {
+    icon: [
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-48.png", sizes: "48x48", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: "/favicon.ico",
+  },
+  manifest: "/manifest.json",
+  openGraph: {
+    title: "Next Surplus",
+    description: "Operations Platform For Surplus Recovery",
+    url: "https://nextsurplus.com",
+    images: [{ url: "https://nextsurplus.com/og-image.png", width: 1200, height: 630 }],
+  },
 };
 
 // Inter + JetBrains Mono are loaded from Google Fonts portal-wide so the
