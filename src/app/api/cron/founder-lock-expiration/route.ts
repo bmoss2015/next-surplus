@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createServiceClient } from "@/lib/supabase/service";
+import { renderEmailShell, escapeHtml } from "@/lib/email-template";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -70,17 +71,17 @@ async function sendFounderNotice(org: {
 
   const resend = new Resend(apiKey);
   const subject = "Heads Up: Your Founders Rate Window Is Ending";
-  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:520px;margin:0 auto;padding:24px;">
-  <h1 style="margin:0;font-size:22px;font-weight:600;color:#0d4b3a;">${subject}</h1>
-  <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">You've been on the Founders Rate for ten months. Reach out before month twelve if you'd like to confirm renewal terms for ${org.name}.</p>
-  <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">No action required, your access continues uninterrupted.</p>
-  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Manage billing anytime from Settings &rsaquo; Billing.</p>
-</div>`;
+  const bodyHtml = `
+    <h1 style="margin:0;font-size:22px;font-weight:600;color:#1a1a1a;">${escapeHtml(subject)}</h1>
+    <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">You've been on the Founders Rate for ten months. Reach out before month twelve if you'd like to confirm renewal terms for ${escapeHtml(org.name)}.</p>
+    <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">No action required, your access continues uninterrupted.</p>
+    <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#5a5a5a;">Manage billing anytime from Settings &rsaquo; Billing.</p>
+  `;
 
   await resend.emails.send({
     from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
     to: org.email,
     subject,
-    html,
+    html: renderEmailShell({ subject, bodyHtml }),
   });
 }

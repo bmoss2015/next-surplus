@@ -1,6 +1,7 @@
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { Resend } from "resend";
 import { createServiceClient } from "./supabase/service";
+import { renderEmailShell, escapeHtml } from "./email-template";
 
 // Clearout Phone — pay-as-you-go credit pool, no monthly auto-reset.
 // Default cap matches a fresh 5,000-credit top-up. Override per-org via
@@ -194,12 +195,12 @@ async function sendThresholdEmail(
       ? "Your Phone Validation add-on has consumed 100% of its credit balance. New phone numbers added via import or contact-add will land as <strong>Not Verified</strong> and will not be screened until more credits are added. The add-on does not auto-recharge."
       : `Your Phone Validation add-on has consumed <strong>${threshold}%</strong> of its credit balance. Validation continues normally. This is a heads-up so you can add more credits before hitting zero. <strong>${remaining.toLocaleString()}</strong> credits remaining.`;
 
-  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
-  <h1 style="margin:0;font-size:20px;font-weight:600;color:#0d4b3a;">${subject}</h1>
-  <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">${bodyIntro}</p>
-  <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Credits used: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
-  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b;">Open Settings &rsaquo; Billing in the portal to see the live meter and add more credits.</p>
-</div>`;
+  const bodyHtml = `
+    <h1 style="margin:0;font-size:20px;font-weight:600;color:#1a1a1a;">${escapeHtml(subject)}</h1>
+    <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">${bodyIntro}</p>
+    <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">Credits used: <strong>${used.toLocaleString()} / ${cap.toLocaleString()}</strong></p>
+    <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#5a5a5a;">Open Settings &rsaquo; Billing in the portal to see the live meter and add more credits.</p>
+  `;
 
   try {
     const resend = new Resend(apiKey);
@@ -207,7 +208,7 @@ async function sendThresholdEmail(
       from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
       to: recipients,
       subject,
-      html,
+      html: renderEmailShell({ subject, bodyHtml }),
     });
   } catch (e) {
     console.error("[phone-validate] resend email failed:", e);
