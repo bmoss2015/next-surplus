@@ -245,40 +245,32 @@ export default function LandingV1() {
           </div>
           <div className="mt-12 space-y-px overflow-hidden rounded-lg border border-gray-200 bg-white">
             <Faq
-              q="Who built this?"
-              a="Built by an active surplus funds operator who needed better tools than what's on the market. Built by operators, for operators. Every feature decision goes through people who use the platform daily."
+              q="How Quickly Can I Get Started?"
+              a="Sign up, connect your Gmail inbox, and import your first batch of leads from CSV in under ten minutes. Most operators send a first letter or email the same day."
             />
             <Faq
-              q="What does Next Surplus do?"
-              a="Centralizes everything a recovery operation needs: lead intake, owner research, outreach, case tracking, and document management. One workspace instead of five."
+              q="Can I Import Leads From My Current System?"
+              a="Yes. CSV import is built in. Map your columns once and your existing leads load into your pipeline with statuses preserved. No data engineering required."
             />
             <Faq
-              q="Is the development team active?"
-              a="Yes. We ship updates frequently and act on customer feedback. If there's a feature you need, tell us. We don't sit on requests."
+              q="Will My Existing Gmail Account Work?"
+              a="Yes. Next Surplus connects to your existing Gmail through Google's official OAuth flow. Every email you send through Next Surplus is sent from your normal Gmail address, and replies land in your normal inbox. Your team keeps their existing email addresses."
             />
             <Faq
-              q="What's included in the subscription?"
-              a="Lead management, pipeline tracking, document management, email integration, team invites, lead import, and every feature we ship going forward. Unlimited users per account."
+              q="How Is My Data Protected?"
+              a="Each company's data is fully isolated from every other account on the platform. Only users you invite to your workspace can see your leads, documents, or email. Email sync uses OAuth, so account passwords are never seen, stored, or transmitted to Next Surplus."
             />
             <Faq
-              q="Is email integration extra?"
-              a="No. Email integration is included at no extra cost. Other CRMs charge a per seat or per inbox fee for email sync. We don't."
+              q="Are There Per Seat Fees Or Add Ons?"
+              a="No. One flat monthly price covers your entire team and every feature on the platform. No per seat fees, no per inbox fees, no module upgrades. Physical mail and check printing are billed at cost plus a flat markup, shown on every monthly invoice."
             />
             <Faq
-              q="What email providers work?"
-              a="Gmail today. Microsoft Outlook and IMAP support coming soon."
+              q="Can I Cancel My Subscription?"
+              a="Yes. There are no long term contracts. Cancel from your billing settings in a single click. Your account stays active through the end of your current billing period, and your data stays exportable from Settings as long as the account is open."
             />
             <Faq
-              q="Is my data private?"
-              a="Your data stays separate from other firms. Only people you invite to your account can see it."
-            />
-            <Faq
-              q="Can I cancel anytime?"
-              a="Yes. No long term contracts."
-            />
-            <Faq
-              q="Is there a free trial?"
-              a="Yes. 14 days. No card required to start exploring."
+              q="What Kind Of Support Do You Offer?"
+              a="Email support@nextsurplus.com. The team building the product answers support directly. Response within one business day on weekdays. Priority support for urgent claim deadlines."
             />
           </div>
         </div>
