@@ -13,18 +13,15 @@ export function getStripe(): Stripe {
 }
 
 export function priceIdFor(
-  planTier: "founder" | "beta_founder" | "standard",
+  planTier: "founder" | "beta_founder",
   interval: "monthly" | "annual"
 ): string {
   if (planTier === "founder") {
     return requireEnv("STRIPE_BETA_FOUNDER_MONTHLY_PRICE_ID");
   }
-  if (planTier === "beta_founder") {
-    return interval === "annual"
-      ? requireEnv("STRIPE_BETA_FOUNDER_ANNUAL_PRICE_ID")
-      : requireEnv("STRIPE_BETA_FOUNDER_MONTHLY_PRICE_ID");
-  }
-  return requireEnv("STRIPE_STANDARD_MONTHLY_PRICE_ID");
+  return interval === "annual"
+    ? requireEnv("STRIPE_BETA_FOUNDER_ANNUAL_PRICE_ID")
+    : requireEnv("STRIPE_BETA_FOUNDER_MONTHLY_PRICE_ID");
 }
 
 function requireEnv(name: string): string {

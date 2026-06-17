@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Fails CI if the privacy or terms page source contains hardcoded
-// dollar literals like "$49" or "$69.00".
+// dollar literals like "$49" or "$470.00".
 //
 // Rationale: legal pages MUST pull subscription pricing from
 // app_pricing_config at render time. A baked-in number in the source

@@ -42,10 +42,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "org_not_found" }, { status: 404 });
   }
 
-  const priceId = priceIdFor(
-    org.plan_tier as "founder" | "beta_founder" | "standard",
-    interval
-  );
+  const tier: "founder" | "beta_founder" =
+    org.plan_tier === "founder" ? "founder" : "beta_founder";
+  const priceId = priceIdFor(tier, interval);
 
   const origin =
     req.headers.get("origin") ??

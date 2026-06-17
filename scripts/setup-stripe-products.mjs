@@ -8,10 +8,9 @@
 //
 // What it creates:
 //   - Product "Next Surplus" (or reuses existing match by name)
-//   - Three recurring prices, identified by lookup_key:
+//   - Two recurring prices, identified by lookup_key:
 //       beta_founder_monthly  $49 / month
 //       beta_founder_annual   $470 / year
-//       standard_monthly      $69 / month
 //   - Webhook endpoint at the provided URL listening for the five
 //     subscription / invoice events the handler in
 //     src/app/api/webhooks/stripe/route.ts expects
@@ -95,12 +94,6 @@ const PRICES = [
     nickname: "Founders Rate (Annual)",
     unit_amount: 47000,
     interval: "year",
-  },
-  {
-    lookup_key: "standard_monthly",
-    nickname: "Standard (Monthly)",
-    unit_amount: 6900,
-    interval: "month",
   },
 ];
 const WEBHOOK_EVENTS = [
@@ -267,7 +260,6 @@ async function main() {
   console.log(
     `STRIPE_BETA_FOUNDER_ANNUAL_PRICE_ID=${priceMap.beta_founder_annual}`
   );
-  console.log(`STRIPE_STANDARD_MONTHLY_PRICE_ID=${priceMap.standard_monthly}`);
   console.log("==============================================================");
   if (!secret && endpoint) {
     console.log("");
