@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="640" height="400" font-family="'Plus Jakarta Sans', system-ui, sans-serif">
+  <g transform="translate(126 14)">
+    <rect x="0" y="0" width="68" height="68" fill="#ffffff"/>
+    <polygon points="34,16 56,34 34,52 12,34" fill="#04261c"/>
+    <polygon points="34,16 56,34 34,34" fill="#4a9c75"/>
+    <polygon points="34,34 56,34 34,52" fill="#13644e"/>
+  </g>
+  <text x="160" y="148" font-size="38" font-weight="500" fill="#ffffff" letter-spacing="-0.5" word-spacing="6" text-anchor="middle">Next Surplus</text>
+</svg>
