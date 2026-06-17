@@ -246,23 +246,19 @@ export default function LandingV1() {
           <div className="mt-12 space-y-px overflow-hidden rounded-lg border border-gray-200 bg-white">
             <Faq
               q="How Quickly Can I Get Started?"
-              a="Sign up, connect your Gmail inbox, and import your first batch of leads from CSV in under ten minutes. Most operators send a first letter or email the same day."
+              a="Sign up, import your leads from a CSV, and start sending outreach the same day. Most operators have their first case loaded into the pipeline within ten minutes."
             />
             <Faq
               q="Can I Import Leads From My Current System?"
               a="Yes. CSV import is built in. Map your columns once and your existing leads load into your pipeline with statuses preserved. No data engineering required."
             />
             <Faq
-              q="Will My Existing Gmail Account Work?"
-              a="Yes. Next Surplus connects to your existing Gmail through Google's official OAuth flow. Every email you send through Next Surplus is sent from your normal Gmail address, and replies land in your normal inbox. Your team keeps their existing email addresses."
-            />
-            <Faq
               q="How Is My Data Protected?"
-              a="Each company's data is fully isolated from every other account on the platform. Only users you invite to your workspace can see your leads, documents, or email. Email sync uses OAuth, so account passwords are never seen, stored, or transmitted to Next Surplus."
+              a="Each company's data is fully isolated from every other account on the platform. Only users you invite to your workspace can see your leads, documents, or case notes."
             />
             <Faq
               q="Are There Per Seat Fees Or Add Ons?"
-              a="No. One flat monthly price covers your entire team and every feature on the platform. No per seat fees, no per inbox fees, no module upgrades. Physical mail and check printing are billed at cost plus a flat markup, shown on every monthly invoice."
+              a="No. One flat monthly price covers your entire team and every feature on the platform. No per seat fees, no module upgrades, no contract minimums. Physical mail and check printing are billed at cost plus a flat markup, shown on every monthly invoice."
             />
             <Faq
               q="Can I Cancel My Subscription?"
