@@ -37,7 +37,7 @@ export default function LandingV1() {
               href="/signup"
               className="inline-flex h-12 w-48 items-center justify-center rounded-md bg-white text-[14px] font-medium text-[#0d4b3a] hover:bg-white/90"
             >
-              Start Free
+              Start Free Trial
             </Link>
             <a
               href="#features"
@@ -123,7 +123,7 @@ export default function LandingV1() {
             />
             <FeatureCard
               eyebrow="02 Threaded Inbox"
-              title="Gmail And Outlook, Sorted To The Right Lead"
+              title="Gmail, Sorted To The Right Lead"
               body="Connect an existing inbox. Conversations auto-link to the property owner. Reply without leaving the case. Read receipts, attachment archive, full conversation history."
             />
             <FeatureCard
@@ -225,10 +225,6 @@ export default function LandingV1() {
               Claim Founders Rate
             </Link>
           </div>
-
-          <div className="mt-6 text-[12.5px] text-gray-500">
-            Microsoft Outlook and IMAP inbox sync are coming next.
-          </div>
         </div>
       </section>
 
@@ -293,13 +289,13 @@ export default function LandingV1() {
               href="/signup"
               className="inline-flex h-12 w-48 items-center justify-center rounded-md bg-white text-[14px] font-medium text-[#0d4b3a] hover:bg-white/90"
             >
-              Start Free
+              Start Free Trial
             </Link>
             <Link
               href="/login"
               className="inline-flex h-12 w-48 items-center justify-center rounded-md border border-white/25 bg-white/[0.04] text-[14px] font-medium text-white hover:bg-white/[0.08]"
             >
-              Sign In
+              Log in
             </Link>
           </div>
         </div>
@@ -345,13 +341,13 @@ function Nav() {
           FAQ
         </a>
         <Link href="/login" className="hover:text-white">
-          Sign In
+          Log in
         </Link>
         <Link
           href="/signup"
           className="rounded-md bg-white px-3.5 py-1.5 text-[12.5px] font-medium text-[#0d4b3a] hover:bg-white/90"
         >
-          Get Started
+          Start Free Trial
         </Link>
       </nav>
     </header>
