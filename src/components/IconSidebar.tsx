@@ -127,10 +127,9 @@ export function IconSidebar({
               src="/brand/11-icon-dark-bg-transparent.svg"
               alt=""
               aria-hidden
-              width={18}
-              height={18}
+              width={10}
+              height={10}
               className="shrink-0"
-              style={{ transform: "translateY(1px)" }}
             />
             <div
               className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-tight text-white"
