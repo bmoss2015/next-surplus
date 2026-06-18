@@ -455,7 +455,7 @@ const TEMPLATE_BODY_HTML = `
 <p>{contact.first_name} {contact.last_name}<br/>
 {contact.address}</p>
 <p>Dear {contact.first_name},</p>
-<p>This is a Moss Equity mail-harness test letter. It exercises the
+<p>This is a Next Surplus mail-harness test letter. It exercises the
 template merge path: today's date is {system.today}, and you live in
 {contact.city}, {contact.state}.</p>
 <p>Sincerely,<br/>{sender.signer_name}<br/>{sender.signer_title}<br/>
@@ -465,7 +465,7 @@ template merge path: today's date is {system.today}, and you live in
 function buildBody(kind: Scenario["body"]): string {
   if (kind === "empty") return "";
   if (kind === "short") {
-    return "<p>This is a Moss Equity mail-harness blank-letter test piece.</p>";
+    return "<p>This is a Next Surplus mail-harness blank-letter test piece.</p>";
   }
   if (kind === "merged") {
     return TEMPLATE_BODY_HTML;
@@ -566,7 +566,7 @@ async function fetchRecentNotificationsForScenario(profileId: string) {
 const SAMPLE_BODY_HTML = `<!doctype html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family: Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0.75in;">
-<div><p>March 14, 2026</p><p>Dear neighbor,</p><p>Our research indicates you may be entitled to funds being held by the county following a recent property sale. Moss Equity Partners specializes in recovering these surplus funds on behalf of rightful owners.</p><p>If you'd like to discuss whether this applies to your situation, please reply by mail or call us at (512) 555-0142. There is no cost to you to learn more.</p><p>Sincerely,<br/>Bree Moss<br/>Moss Equity Partners</p></div>
+<div><p>March 14, 2026</p><p>Dear neighbor,</p><p>Our research indicates you may be entitled to funds being held by the county following a recent property sale. Next Surplus specializes in recovering these surplus funds on behalf of rightful owners.</p><p>If you'd like to discuss whether this applies to your situation, please reply by mail or call us at (512) 555-0142. There is no cost to you to learn more.</p><p>Sincerely,<br/>Bree Moss<br/>Next Surplus</p></div>
 </body></html>`;
 
 export type SeededLeadStage = {
