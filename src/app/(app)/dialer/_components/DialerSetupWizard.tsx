@@ -394,10 +394,10 @@ function StepCallSettings() {
 
 const OUTCOMES = [
   {
-    name: "Connected",
+    name: "Spoke",
     color: "#13644e",
     desc: "Live conversation. Send the prospect a follow up recap with next steps.",
-    defaultTemplate: "Connected Call Recap",
+    defaultTemplate: "Spoke Call Recap",
   },
   {
     name: "Voicemail",

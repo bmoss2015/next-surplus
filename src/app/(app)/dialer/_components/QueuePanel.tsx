@@ -7,11 +7,13 @@ import type { DialerLead } from "../_mock-data";
 export function QueuePanel({
   leads,
   activeLeadId,
+  activeContactIndex,
   onSelect,
   calledLeadIds,
 }: {
   leads: DialerLead[];
   activeLeadId: string;
+  activeContactIndex: number;
   onSelect: (id: string) => void;
   calledLeadIds: Set<string>;
 }) {
@@ -124,6 +126,28 @@ export function QueuePanel({
                 <div className="mt-0.5 truncate text-[11px] text-petrol-500 tabular-nums">
                   ${lead.surplus.toLocaleString()} Surplus
                 </div>
+                {isActive && lead.contacts.length > 1 && (
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-petrol-500">
+                      Contact {activeContactIndex + 1} of {lead.contacts.length}
+                    </span>
+                    <div className="flex gap-0.5">
+                      {lead.contacts.map((_, ci) => (
+                        <span
+                          key={ci}
+                          className={[
+                            "h-1 w-2 rounded-sm",
+                            ci < activeContactIndex
+                              ? "bg-petrol-500/60"
+                              : ci === activeContactIndex
+                                ? "bg-petrol-500"
+                                : "bg-gray-300",
+                          ].join(" ")}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </button>
           );

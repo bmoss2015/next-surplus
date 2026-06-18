@@ -22,7 +22,7 @@ import type { CallOutcome, DialerLead } from "../_mock-data";
 type CallState = "live" | "wrapup";
 
 const OUTCOMES: CallOutcome[] = [
-  "Connected",
+  "Spoke",
   "Voicemail",
   "No Answer",
   "Wrong Number",

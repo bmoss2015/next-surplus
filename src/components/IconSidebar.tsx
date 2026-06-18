@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   LogOut,
   ChevronsLeft,
+  PhoneCall,
   type LucideIcon,
 } from "lucide-react";
 import { signOut } from "@/app/(auth)/_actions";
@@ -43,17 +44,18 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { label: "Dashboard", href: "/",         Icon: LayoutDashboard },
-  { label: "Leads",     href: "/leads",    Icon: Users },
-  { label: "Playbooks", href: "/playbooks",Icon: BookOpen },
-  { label: "Tasks",     href: "/tasks",    Icon: CheckSquare },
-  { label: "Inbox",     href: "/inbox",    Icon: Inbox },
-  { label: "Letters",   href: "/mail",     Icon: Mail },
-  { label: "Claims",    href: "/claims",   Icon: Scale },
-  { label: "Imports",   href: "/imports",  Icon: FileUp },
-  { label: "Reports",   href: "/reports",  Icon: BarChart3 },
-  { label: "Settings",  href: "/settings", Icon: Settings },
-  { label: "Owner",     href: "/owner",    Icon: ShieldCheck, ownerOnly: true },
+  { label: "Dashboard",    href: "/",              Icon: LayoutDashboard },
+  { label: "Leads",        href: "/leads",         Icon: Users },
+  { label: "Playbooks",    href: "/playbooks",     Icon: BookOpen },
+  { label: "Tasks",        href: "/tasks",         Icon: CheckSquare },
+  { label: "Inbox",        href: "/inbox",         Icon: Inbox },
+  { label: "Letters",      href: "/mail",          Icon: Mail },
+  { label: "Claims",       href: "/claims",        Icon: Scale },
+  { label: "Imports",      href: "/imports",       Icon: FileUp },
+  { label: "Reports",      href: "/reports",       Icon: BarChart3 },
+  { label: "Power Dialer", href: "/dialer/setup",  Icon: PhoneCall, ownerOnly: true },
+  { label: "Settings",     href: "/settings",      Icon: Settings },
+  { label: "Owner",        href: "/owner",         Icon: ShieldCheck, ownerOnly: true },
 ];
 
 function NextSurplusLockup() {
