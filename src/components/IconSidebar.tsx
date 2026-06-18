@@ -120,7 +120,7 @@ export function IconSidebar({
           render their logomark directly on the sidebar surface. Expanded:
           diamond + "Next Surplus" white wordmark + collapse chevron.
           Collapsed: diamond only, doubles as the expand button. */}
-      <div className="flex h-16 shrink-0 items-center gap-3 px-[18px]">
+      <div className="flex h-16 shrink-0 items-center gap-2.5 pl-[10px] pr-3">
         {expanded ? (
           <>
             <img
