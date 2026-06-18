@@ -1,28 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore, useState } from "react";
 
 const STORAGE_KEY = "ns_cookie_consent";
 
-export function CookieConsent() {
-  const [visible, setVisible] = useState(false);
+function readConsent(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
 
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem(STORAGE_KEY)) setVisible(true);
-    } catch {
-      setVisible(true);
-    }
-  }, []);
+const subscribe = (onChange: () => void) => {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+};
+
+export function CookieConsent() {
+  const consent = useSyncExternalStore(
+    subscribe,
+    () => readConsent(),
+    () => null,
+  );
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed || consent) return null;
 
   function dismiss() {
     try {
       localStorage.setItem(STORAGE_KEY, "essential-only");
     } catch {}
-    setVisible(false);
+    setDismissed(true);
   }
-
-  if (!visible) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white shadow-[0_-4px_12px_rgba(15,23,41,0.06)]">
