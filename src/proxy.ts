@@ -148,14 +148,7 @@ export async function proxy(request: NextRequest) {
 
   if (user && isPublic) {
     if (kind === "marketing") {
-      const url = request.nextUrl.clone();
-      url.host = APP_HOST;
-      url.protocol = "https:";
-      url.pathname = "/";
-      url.search = "";
-      const r = NextResponse.redirect(url);
-      response.cookies.getAll().forEach((c) => r.cookies.set(c));
-      return r;
+      return response;
     }
     return redirectTo("/");
   }
