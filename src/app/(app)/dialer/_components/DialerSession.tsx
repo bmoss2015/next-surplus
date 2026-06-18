@@ -75,6 +75,12 @@ export function DialerSession() {
     setCountdown(WRAP_UP_DEFAULT);
   }
 
+  function endCallSkipWrapUp() {
+    setSelectedOutcome("Connected");
+    if (!skipFollowUp) setToastVisible(true);
+    advance();
+  }
+
   function pickOutcome(o: CallOutcome) {
     setSelectedOutcome(o);
     if (o !== "Connected") {
@@ -125,6 +131,7 @@ export function DialerSession() {
             totalContacts={activeLead.contacts.length}
             state={state}
             onEndCall={endCall}
+            onEndCallSkipWrapUp={endCallSkipWrapUp}
             onOutcome={pickOutcome}
             selectedOutcome={selectedOutcome}
             quickNote={quickNote}
