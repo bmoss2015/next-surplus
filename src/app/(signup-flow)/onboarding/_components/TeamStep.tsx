@@ -11,6 +11,16 @@ export function TeamStep() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  function landInApp() {
+    const host =
+      typeof window !== "undefined" ? window.location.host : "";
+    if (host === "nextsurplus.com" || host === "www.nextsurplus.com") {
+      window.location.assign("https://app.nextsurplus.com/");
+    } else {
+      router.push("/");
+    }
+  }
+
   function next() {
     setError(null);
     const list = emails
@@ -19,14 +29,14 @@ export function TeamStep() {
       .filter((e) => e.includes("@"));
 
     if (list.length === 0) {
-      router.push("/");
+      landInApp();
       return;
     }
 
     startTransition(async () => {
       const result = await inviteTeammates({ emails: list });
       if (result.ok) {
-        router.push("/");
+        landInApp();
       } else {
         setError(result.error);
       }
@@ -41,7 +51,7 @@ export function TeamStep() {
       primaryLabel={emails.trim() ? "Send Invites" : "Finish"}
       onPrimary={next}
       primaryPending={pending}
-      skipHref="/"
+      skipHref="https://app.nextsurplus.com/"
     >
       <div className="flex flex-col gap-2">
         <label className="text-[11.5px] font-medium text-[#374151]">
