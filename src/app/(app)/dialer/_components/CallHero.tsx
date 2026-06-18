@@ -6,6 +6,9 @@ import {
   IconArrowsTransferUp,
   IconNote,
   IconPhoneOff,
+  IconPhonePause,
+  IconVoicemail,
+  IconAlertCircle,
   IconNumber,
   IconBold,
   IconItalic,
@@ -35,7 +38,6 @@ export function CallHero({
   totalContacts,
   state,
   onEndCall,
-  onEndCallSkipWrapUp,
   onOutcome,
   selectedOutcome,
   quickNote,
@@ -51,7 +53,6 @@ export function CallHero({
   totalContacts: number;
   state: CallState;
   onEndCall: () => void;
-  onEndCallSkipWrapUp: () => void;
   onOutcome: (o: CallOutcome) => void;
   selectedOutcome: CallOutcome;
   quickNote: string;
@@ -216,65 +217,40 @@ export function CallHero({
               </div>
             )}
 
-            <div className="flex items-center gap-2 text-[12px] text-white/60">
-              <span className="font-semibold uppercase tracking-[0.10em]">
-                Mark As
-              </span>
-              <button
-                type="button"
+            <div className="flex items-stretch gap-1">
+              <ControlButton icon={IconMicrophone} label="Mute" />
+              <ControlButton icon={IconNumber} label="Keypad" />
+              <ControlButton icon={IconHandStop} label="Hold" />
+              <ControlButton icon={IconArrowsTransferUp} label="Transfer" />
+              <ControlButton
+                icon={IconNote}
+                label="Add Note"
+                active={liveNoteOpen}
+                onClick={() => setLiveNoteOpen((o) => !o)}
+              />
+              <span className="mx-1 self-center h-7 w-px bg-white/15" />
+              <ControlButton
+                icon={IconPhonePause}
+                label="No Answer"
                 onClick={() => onOutcome("No Answer")}
-                className="rounded-md px-2 py-1 text-[12.5px] font-medium text-white/75 transition hover:bg-white/[0.08] hover:text-white"
-              >
-                No Answer
-              </button>
-              <button
-                type="button"
+              />
+              <ControlButton
+                icon={IconVoicemail}
+                label="Voicemail"
                 onClick={() => onOutcome("Voicemail")}
-                className="rounded-md px-2 py-1 text-[12.5px] font-medium text-white/75 transition hover:bg-white/[0.08] hover:text-white"
-              >
-                Voicemail
-              </button>
-              <button
-                type="button"
+              />
+              <ControlButton
+                icon={IconAlertCircle}
+                label="Wrong Number"
                 onClick={() => onOutcome("Wrong Number")}
-                className="rounded-md px-2 py-1 text-[12.5px] font-medium text-white/75 transition hover:bg-white/[0.08] hover:text-white"
-              >
-                Wrong Number
-              </button>
-              <span className="ml-auto text-[11px] text-white/50">
-                Auto advances without wrap up
-              </span>
-            </div>
-
-            <div className="flex items-end justify-between">
-              <div className="flex gap-1">
-                <ControlButton icon={IconMicrophone} label="Mute" />
-                <ControlButton icon={IconNumber} label="Keypad" />
-                <ControlButton icon={IconHandStop} label="Hold" />
-                <ControlButton icon={IconArrowsTransferUp} label="Transfer" />
+              />
+              <div className="ml-auto">
                 <ControlButton
-                  icon={IconNote}
-                  label="Add Note"
-                  active={liveNoteOpen}
-                  onClick={() => setLiveNoteOpen((o) => !o)}
-                />
-              </div>
-              <div className="flex flex-col items-end gap-1.5">
-                <button
-                  type="button"
+                  icon={IconPhoneOff}
+                  label="End Call"
                   onClick={onEndCall}
-                  className="flex h-10 items-center gap-1.5 rounded-lg bg-[#b91c1c] px-4 text-[13px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.20)] transition hover:bg-[#a01818]"
-                >
-                  <IconPhoneOff size={14} stroke={2.25} />
-                  End Call → Wrap Up
-                </button>
-                <button
-                  type="button"
-                  onClick={onEndCallSkipWrapUp}
-                  className="text-[11.5px] font-medium text-white/65 transition hover:text-white"
-                >
-                  End Call → Next Lead
-                </button>
+                  danger
+                />
               </div>
             </div>
           </div>
@@ -361,7 +337,7 @@ function NoteTextarea({
     editorProps: {
       attributes: {
         class:
-          "dialer-note-editor focus:outline-none text-[13.5px] leading-[1.65] text-ink",
+          "dialer-note-editor focus:outline-none text-[13.5px] leading-[1.65] text-white",
       },
     },
     immediatelyRender: false,
@@ -386,11 +362,11 @@ function NoteTextarea({
   return (
     <div
       className={[
-        "overflow-hidden rounded-lg bg-white shadow-[0_4px_18px_-6px_rgba(0,0,0,0.30)]",
+        "overflow-hidden rounded-lg bg-white/[0.06] transition focus-within:bg-white/[0.09]",
         fill ? "flex flex-1 flex-col min-h-0" : "",
       ].join(" ")}
     >
-      <div className="flex shrink-0 items-center gap-0.5 border-b border-gray-200 bg-gray-50 px-2 py-1.5">
+      <div className="flex shrink-0 items-center gap-0.5 border-b border-white/10 px-2 py-1.5">
         <NoteToolBtn
           icon={IconBold}
           label="Bold"
@@ -403,7 +379,7 @@ function NoteTextarea({
           active={editor.isActive("italic")}
           onClick={() => editor.chain().focus().toggleItalic().run()}
         />
-        <span className="mx-0.5 h-3.5 w-px bg-gray-200" />
+        <span className="mx-0.5 h-3.5 w-px bg-white/15" />
         <NoteToolBtn
           icon={IconList}
           label="Bullet list"
@@ -433,12 +409,12 @@ function NoteTextarea({
       </div>
       <div
         className={[
-          "relative overflow-y-auto bg-white px-3.5 py-2.5",
+          "relative overflow-y-auto px-3.5 py-2.5",
           fill ? "flex-1 min-h-0" : "max-h-[220px] min-h-[72px]",
         ].join(" ")}
       >
         {isEmpty && placeholder && (
-          <div className="pointer-events-none absolute left-3.5 top-2.5 text-[13.5px] text-gray-400">
+          <div className="pointer-events-none absolute left-3.5 top-2.5 text-[13.5px] text-white/50">
             {placeholder}
           </div>
         )}
@@ -489,10 +465,10 @@ function NoteToolBtn({
       className={
         "rounded-md p-1.5 transition-colors " +
         (disabled
-          ? "text-gray-300"
+          ? "text-white/25"
           : active
-            ? "bg-gray-200 text-ink"
-            : "text-gray-500 hover:bg-gray-100 hover:text-ink")
+            ? "bg-white/15 text-white"
+            : "text-white/65 hover:bg-white/10 hover:text-white")
       }
     >
       <Icon size={13} stroke={1.75} />
@@ -515,11 +491,13 @@ function ControlButton({
   icon: Icon,
   label,
   active,
+  danger,
   onClick,
 }: {
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
   label: string;
   active?: boolean;
+  danger?: boolean;
   onClick?: () => void;
 }) {
   return (
@@ -527,14 +505,16 @@ function ControlButton({
       type="button"
       onClick={onClick}
       className={[
-        "flex h-11 w-[88px] flex-col items-center justify-center gap-1 rounded-lg transition",
-        active
-          ? "bg-white/10 text-white"
-          : "text-white/70 hover:bg-white/[0.08] hover:text-white",
+        "flex h-11 w-[78px] flex-col items-center justify-center gap-1 rounded-lg px-1 transition",
+        danger
+          ? "bg-[#b91c1c] text-white shadow-[0_2px_6px_rgba(0,0,0,0.20)] hover:bg-[#a01818]"
+          : active
+            ? "bg-white/10 text-white"
+            : "text-white/70 hover:bg-white/[0.08] hover:text-white",
       ].join(" ")}
     >
       <Icon size={15} stroke={2} />
-      <span className="text-[11.5px] font-medium leading-none">{label}</span>
+      <span className="whitespace-nowrap text-[10.5px] font-medium leading-none">{label}</span>
     </button>
   );
 }
