@@ -120,15 +120,15 @@ export function IconSidebar({
           render their logomark directly on the sidebar surface. Expanded:
           diamond + "Next Surplus" white wordmark + collapse chevron.
           Collapsed: diamond only, doubles as the expand button. */}
-      <div className="flex h-14 shrink-0 items-center gap-2.5 px-[18px]">
+      <div className="flex h-16 shrink-0 items-center gap-3 px-[18px]">
         {expanded ? (
           <>
             <img
               src="/brand/11-icon-dark-bg-transparent.svg"
               alt=""
               aria-hidden
-              width={30}
-              height={30}
+              width={44}
+              height={44}
               className="shrink-0"
             />
             <div
@@ -153,13 +153,13 @@ export function IconSidebar({
             onClick={toggle}
             aria-label="Expand sidebar"
             title="Expand"
-            className="mx-auto flex h-11 w-11 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-white/10"
+            className="mx-auto flex h-12 w-12 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-white/10"
           >
             <img
               src="/brand/11-icon-dark-bg-transparent.svg"
               alt="Next Surplus"
-              width={36}
-              height={36}
+              width={48}
+              height={48}
             />
           </button>
         )}
