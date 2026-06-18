@@ -56,7 +56,7 @@ export function CallHero({
   onSkipLead: () => void;
   paused: boolean;
 }) {
-  const [elapsed, setElapsed] = useState(272);
+  const [elapsed, setElapsed] = useState(0);
   const tickRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -64,11 +64,14 @@ export function CallHero({
       if (tickRef.current) clearInterval(tickRef.current);
       return;
     }
-    tickRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    const start = Date.now();
+    tickRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
     return () => {
       if (tickRef.current) clearInterval(tickRef.current);
     };
-  }, [state]);
+  }, [state, lead.id, contactIndex]);
 
   const contact = lead.contacts[contactIndex] ?? lead.contacts[0];
   const recoveryDollars = lead.surplus * (lead.recoveryFeePct / 100);
@@ -168,7 +171,7 @@ export function CallHero({
               <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
                 Lead Summary
               </div>
-              <ul className="mt-3 space-y-2.5 overflow-y-auto pr-1">
+              <ul className="mt-[46px] space-y-2.5 overflow-y-auto pr-1">
                 {lead.summary.map((s, i) => (
                   <li
                     key={i}
@@ -192,7 +195,7 @@ export function CallHero({
                 <NoteTextarea
                   value={quickNote}
                   onChange={setQuickNote}
-                  placeholder="Capture key details from this call"
+                  placeholder=""
                   fill
                 />
               </div>
@@ -250,7 +253,7 @@ export function CallHero({
             <NoteTextarea
               value={quickNote}
               onChange={setQuickNote}
-              placeholder="Capture key details from this call"
+              placeholder=""
               autoFocus
               fill
             />
