@@ -35,6 +35,7 @@ export function CallHero({
   totalContacts,
   state,
   onEndCall,
+  onEndCallSkipWrapUp,
   onOutcome,
   selectedOutcome,
   quickNote,
@@ -50,6 +51,7 @@ export function CallHero({
   totalContacts: number;
   state: CallState;
   onEndCall: () => void;
+  onEndCallSkipWrapUp: () => void;
   onOutcome: (o: CallOutcome) => void;
   selectedOutcome: CallOutcome;
   quickNote: string;
@@ -213,8 +215,39 @@ export function CallHero({
                 />
               </div>
             )}
+
+            <div className="flex items-center gap-2 text-[12px] text-white/60">
+              <span className="font-semibold uppercase tracking-[0.10em]">
+                Mark As
+              </span>
+              <button
+                type="button"
+                onClick={() => onOutcome("No Answer")}
+                className="rounded-md px-2 py-1 text-[12.5px] font-medium text-white/75 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                No Answer
+              </button>
+              <button
+                type="button"
+                onClick={() => onOutcome("Voicemail")}
+                className="rounded-md px-2 py-1 text-[12.5px] font-medium text-white/75 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                Voicemail
+              </button>
+              <button
+                type="button"
+                onClick={() => onOutcome("Wrong Number")}
+                className="rounded-md px-2 py-1 text-[12.5px] font-medium text-white/75 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                Wrong Number
+              </button>
+              <span className="ml-auto text-[11px] text-white/50">
+                Auto advances without wrap up
+              </span>
+            </div>
+
             <div className="flex items-end justify-between">
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 <ControlButton icon={IconMicrophone} label="Mute" />
                 <ControlButton icon={IconNumber} label="Keypad" />
                 <ControlButton icon={IconHandStop} label="Hold" />
@@ -226,49 +259,33 @@ export function CallHero({
                   onClick={() => setLiveNoteOpen((o) => !o)}
                 />
               </div>
-              <button
-                type="button"
-                onClick={onEndCall}
-                className="flex h-11 w-[110px] items-center justify-center gap-1.5 rounded-lg bg-[#b91c1c] text-[13px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.20)] transition hover:bg-[#a01818]"
-              >
-                <IconPhoneOff size={15} stroke={2.25} />
-                End Call
-              </button>
+              <div className="flex flex-col items-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={onEndCall}
+                  className="flex h-10 items-center gap-1.5 rounded-lg bg-[#b91c1c] px-4 text-[13px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.20)] transition hover:bg-[#a01818]"
+                >
+                  <IconPhoneOff size={14} stroke={2.25} />
+                  End Call → Wrap Up
+                </button>
+                <button
+                  type="button"
+                  onClick={onEndCallSkipWrapUp}
+                  className="text-[11.5px] font-medium text-white/65 transition hover:text-white"
+                >
+                  End Call → Next Lead
+                </button>
+              </div>
             </div>
           </div>
         ) : (
           <div className="flex flex-1 flex-col">
-            <div className="grid grid-cols-4 gap-2">
-              {OUTCOMES.map((o) => {
-                const sel = selectedOutcome === o;
-                return (
-                  <button
-                    key={o}
-                    type="button"
-                    onClick={() => onOutcome(o)}
-                    className={[
-                      "h-10 rounded-full px-4 text-[13px] font-semibold transition",
-                      sel
-                        ? "bg-white text-ink"
-                        : "text-white/70 hover:bg-white/[0.08] hover:text-white",
-                    ].join(" ")}
-                  >
-                    {o}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between gap-4 px-1">
-              <span className="text-[12px] uppercase tracking-[0.10em] text-white/55">
-                {selectedOutcome === "Connected" ? "Wrap Up" : "Skipping Wrap Up"}
+            <div className="flex items-center justify-between gap-4 px-1">
+              <span className="text-[12px] font-semibold uppercase tracking-[0.10em] text-white/60">
+                Call Note
               </span>
-              <span className="text-[16px] font-medium tabular-nums text-white/85">
-                {paused
-                  ? "Paused"
-                  : selectedOutcome === "Connected"
-                    ? `${formatCountdown(countdown)} remaining`
-                    : "Auto advancing"}
+              <span className="text-[18px] font-medium tabular-nums text-white/90">
+                {paused ? "Paused" : `${formatCountdown(countdown)} remaining`}
               </span>
             </div>
 
@@ -282,7 +299,7 @@ export function CallHero({
               />
             </div>
 
-            <div className="mt-3 flex items-center justify-between gap-4">
+            <div className="mt-4 flex items-center justify-between gap-4">
               <label className="inline-flex cursor-pointer items-center gap-2 text-[12.5px] text-white/85">
                 <input
                   type="checkbox"
@@ -295,7 +312,7 @@ export function CallHero({
               <button
                 type="button"
                 onClick={onNextLead}
-                className="flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-[13.5px] font-semibold text-ink transition hover:bg-gray-100"
+                className="flex h-10 items-center gap-2 rounded-lg bg-[#13644e] px-5 text-[13.5px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.30),0_6px_16px_-4px_rgba(13,75,58,0.40)] transition hover:bg-[#0f5544]"
               >
                 Next Lead
                 <IconArrowRight size={15} stroke={2.25} />
@@ -344,7 +361,7 @@ function NoteTextarea({
     editorProps: {
       attributes: {
         class:
-          "dialer-note-editor focus:outline-none text-[13.5px] leading-[1.65] text-white",
+          "dialer-note-editor focus:outline-none text-[13.5px] leading-[1.65] text-ink",
       },
     },
     immediatelyRender: false,
@@ -369,11 +386,11 @@ function NoteTextarea({
   return (
     <div
       className={[
-        "rounded-lg bg-black/20 ring-1 ring-white/25 transition focus-within:bg-black/25 focus-within:ring-white/35",
+        "overflow-hidden rounded-lg bg-white shadow-[0_4px_18px_-6px_rgba(0,0,0,0.30)]",
         fill ? "flex flex-1 flex-col min-h-0" : "",
       ].join(" ")}
     >
-      <div className="flex shrink-0 items-center gap-0.5 border-b border-white/15 px-2 py-1.5">
+      <div className="flex shrink-0 items-center gap-0.5 border-b border-gray-200 bg-gray-50 px-2 py-1.5">
         <NoteToolBtn
           icon={IconBold}
           label="Bold"
@@ -386,7 +403,7 @@ function NoteTextarea({
           active={editor.isActive("italic")}
           onClick={() => editor.chain().focus().toggleItalic().run()}
         />
-        <span className="mx-0.5 h-3.5 w-px bg-white/20" />
+        <span className="mx-0.5 h-3.5 w-px bg-gray-200" />
         <NoteToolBtn
           icon={IconList}
           label="Bullet list"
@@ -416,12 +433,12 @@ function NoteTextarea({
       </div>
       <div
         className={[
-          "relative overflow-y-auto px-3.5 py-2.5",
+          "relative overflow-y-auto bg-white px-3.5 py-2.5",
           fill ? "flex-1 min-h-0" : "max-h-[220px] min-h-[72px]",
         ].join(" ")}
       >
         {isEmpty && placeholder && (
-          <div className="pointer-events-none absolute left-3.5 top-2.5 text-[13.5px] text-white/55">
+          <div className="pointer-events-none absolute left-3.5 top-2.5 text-[13.5px] text-gray-400">
             {placeholder}
           </div>
         )}
@@ -472,10 +489,10 @@ function NoteToolBtn({
       className={
         "rounded-md p-1.5 transition-colors " +
         (disabled
-          ? "text-white/25"
+          ? "text-gray-300"
           : active
-            ? "bg-white/20 text-white"
-            : "text-white/70 hover:bg-white/10 hover:text-white")
+            ? "bg-gray-200 text-ink"
+            : "text-gray-500 hover:bg-gray-100 hover:text-ink")
       }
     >
       <Icon size={13} stroke={1.75} />
@@ -509,10 +526,12 @@ function ControlButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-11 w-[110px] flex-col items-center justify-center gap-0.5 rounded-lg text-white transition hover:bg-[rgba(4,38,28,0.40)]"
-      style={{
-        background: active ? "rgba(255,255,255,0.18)" : "rgba(4,38,28,0.55)",
-      }}
+      className={[
+        "flex h-11 w-[88px] flex-col items-center justify-center gap-1 rounded-lg transition",
+        active
+          ? "bg-white/10 text-white"
+          : "text-white/70 hover:bg-white/[0.08] hover:text-white",
+      ].join(" ")}
     >
       <Icon size={15} stroke={2} />
       <span className="text-[11.5px] font-medium leading-none">{label}</span>
