@@ -332,3 +332,22 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   color: #0d4b3a;
   text-decoration: underline;
 }
+
+.mention-highlight {
+  position: relative;
+}
+.mention-highlight::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: 2px;
+  background-image: linear-gradient(180deg, #04261c 0%, #13644e 50%, #4a9c75 100%);
+  animation: mention-highlight-fade 2400ms ease-out forwards;
+}
+@keyframes mention-highlight-fade {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}

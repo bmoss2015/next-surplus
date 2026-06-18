@@ -64,26 +64,19 @@ export async function sendMentionEmail(
     : "";
 
   const subject = leadOwnerName
-    ? `${actorFirstName} Mentioned You in ${leadOwnerName}`
+    ? `${actorFirstName} Mentioned You on the ${leadOwnerName} Lead`
     : `${actorFirstName} Mentioned You on a Lead`;
 
-  const safeOwner = escapeHtml(leadOwnerName);
-  const safeActorName = escapeHtml(actorName);
   const safeComment = escapeHtml(commentText).replace(/\n/g, "<br/>");
 
   const preheader = leadOwnerName
     ? `${actorName} left a note for you on ${leadOwnerName}.`
     : `${actorName} left a note for you on a lead.`;
 
-  const introCopy = leadOwnerName
-    ? `${safeActorName} left a note on <strong>${safeOwner}</strong>:`
-    : `${safeActorName} left a note for you:`;
-
   const bodyHtml = `
     ${renderEmailEyebrow("Mention")}
     ${renderEmailHeadline(subject)}
-    ${renderEmailIntro(introCopy)}
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:16px 0 0;background-color:#f5f5f5;border-radius:4px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:20px 0 0;background-color:#f5f5f5;border-radius:4px;">
       <tr>
         <td style="padding:16px 20px;font-family:Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;">
           ${safeComment}
