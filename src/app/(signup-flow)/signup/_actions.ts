@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getStripe, priceIdFor } from "@/lib/stripe/client";
+import { rateLimit, clientIp } from "@/lib/security/rate-limit";
 
 type SignupResult =
   | { ok: true; checkoutUrl: string; sessionId: string }
@@ -17,6 +18,15 @@ export async function signUp(input: {
   const email = input.email.trim().toLowerCase();
   const password = input.password;
   const firmName = input.firmName.trim();
+
+  const ip = await clientIp();
+  const limit = rateLimit(`signup:${ip}`, 10, 60 * 1000);
+  if (!limit.ok) {
+    return {
+      ok: false,
+      error: `Too many signup attempts. Try again in ${limit.retryAfterSec} seconds.`,
+    };
+  }
 
   if (!email || !password || !firmName) {
     return { ok: false, error: "Company name, email, and password are required." };
