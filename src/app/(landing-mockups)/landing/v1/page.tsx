@@ -327,9 +327,14 @@ export default function LandingV1() {
 function Nav() {
   return (
     <header className="mx-auto flex max-w-6xl items-center justify-between px-8 py-6">
-      <div className="text-[15px] font-semibold tracking-tight">
-        Next Surplus
-      </div>
+      <Link href="/" aria-label="Next Surplus" className="inline-flex items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/12-lockup-horizontal-dark-transparent.svg"
+          alt="Next Surplus"
+          className="h-7 w-auto"
+        />
+      </Link>
       <nav className="flex items-center gap-8 text-[12.5px] text-white/70">
         <a href="#features" className="hover:text-white">
           Product
