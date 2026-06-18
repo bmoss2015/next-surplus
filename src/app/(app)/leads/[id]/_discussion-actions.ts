@@ -162,23 +162,34 @@ export async function postComment(input: {
         ((leadRow?.lead_id as string | null) ?? "the");
       const link = `/leads/${input.leadId}?tab=notes#comment-${commentId}`;
       const actorFirstName = firstNameOf(profile.fullName, profile.email);
+      const appUrl = process.env.NEXT_PUBLIC_SITE_URL
+        ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000";
       for (const recipientId of recipients) {
         const m = memberById.get(recipientId);
         if (!m?.email) continue;
         try {
-          await sb.functions.invoke("notify-mention", {
-            body: {
+          await fetch(`${appUrl}/api/notifications/mention`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": process.env.INTERNAL_API_SECRET ?? "",
+            },
+            body: JSON.stringify({
               recipientEmail: m.email,
               recipientName: m.firstName,
+              actorName: profile.fullName,
               actorFirstName,
               leadId: input.leadId,
               leadOwnerName,
               commentText: body,
               link,
-            },
+            }),
           });
         } catch {
-          // swallow — missing/failing edge function must not break posting
+          // swallow — failed email must not break posting
         }
       }
     } catch {
