@@ -59,11 +59,13 @@ export async function proxy(request: NextRequest) {
   // Allow Next internals + static assets + the OAuth/recovery callback.
   // /images/* must stay open because Resend-rendered emails fetch the
   // header logo from app.nextsurplus.com/images/email-logo.png.
+  // /brand/* serves the sidebar diamond + other static brand SVGs.
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/images/") ||
+    pathname.startsWith("/brand/") ||
     pathname.includes("/favicon")
   ) {
     return NextResponse.next();
