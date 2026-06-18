@@ -49,6 +49,7 @@ export function CallHero({
   onNoteFocusChange: (focused: boolean) => void;
 }) {
   const [elapsed, setElapsed] = useState(272);
+  const [liveNoteOpen, setLiveNoteOpen] = useState(false);
   const tickRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -174,22 +175,52 @@ export function CallHero({
 
       <div className="mt-auto pt-6">
         {state === "live" ? (
-          <div className="flex items-end justify-between">
-            <div className="flex gap-2">
-              <ControlButton icon={IconMicrophone} label="Mute" />
-              <ControlButton icon={IconNumber} label="Keypad" />
-              <ControlButton icon={IconHandStop} label="Hold" />
-              <ControlButton icon={IconArrowsTransferUp} label="Transfer" />
-              <ControlButton icon={IconNote} label="Add Note" />
+          <div className="space-y-4">
+            {liveNoteOpen && (
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
+                    Call Note
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLiveNoteOpen(false)}
+                    className="text-[11.5px] font-medium text-white/70 hover:text-white"
+                  >
+                    Close
+                  </button>
+                </div>
+                <NoteTextarea
+                  value={quickNote}
+                  onChange={setQuickNote}
+                  onFocusChange={onNoteFocusChange}
+                  placeholder="Capture key details from this call"
+                  autoFocus
+                />
+              </div>
+            )}
+            <div className="flex items-end justify-between">
+              <div className="flex gap-2">
+                <ControlButton icon={IconMicrophone} label="Mute" />
+                <ControlButton icon={IconNumber} label="Keypad" />
+                <ControlButton icon={IconHandStop} label="Hold" />
+                <ControlButton icon={IconArrowsTransferUp} label="Transfer" />
+                <ControlButton
+                  icon={IconNote}
+                  label="Add Note"
+                  active={liveNoteOpen}
+                  onClick={() => setLiveNoteOpen((o) => !o)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={onEndCall}
+                className="flex h-11 w-[110px] items-center justify-center gap-1.5 rounded-lg bg-[#b91c1c] text-[13px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.20)] transition hover:bg-[#a01818]"
+              >
+                <IconPhoneOff size={15} stroke={2.25} />
+                End Call
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onEndCall}
-              className="flex h-11 w-[110px] items-center justify-center gap-1.5 rounded-lg bg-[#b91c1c] text-[13px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.20)] transition hover:bg-[#a01818]"
-            >
-              <IconPhoneOff size={15} stroke={2.25} />
-              End Call
-            </button>
           </div>
         ) : (
           <div>
@@ -218,13 +249,14 @@ export function CallHero({
             </div>
 
             <div className="mt-5">
-              <input
+              <div className="mb-1.5 text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
+                Call Note
+              </div>
+              <NoteTextarea
                 value={quickNote}
-                onChange={(e) => setQuickNote(e.target.value)}
-                onFocus={() => onNoteFocusChange(true)}
-                onBlur={() => onNoteFocusChange(false)}
-                placeholder="Quick Note (Optional)"
-                className="w-full border-0 border-b border-white/40 bg-transparent pb-1.5 text-[13.5px] text-white placeholder:text-white/55 outline-none focus:border-white"
+                onChange={setQuickNote}
+                onFocusChange={onNoteFocusChange}
+                placeholder="Capture key details from this call"
               />
             </div>
 
@@ -244,6 +276,52 @@ export function CallHero({
   );
 }
 
+function NoteTextarea({
+  value,
+  onChange,
+  onFocusChange,
+  placeholder,
+  autoFocus,
+}: {
+  value: string;
+  onChange: (s: string) => void;
+  onFocusChange: (focused: boolean) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  function resize() {
+    const ta = ref.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    const next = Math.min(ta.scrollHeight, 220);
+    ta.style.height = `${next}px`;
+  }
+
+  useEffect(() => {
+    resize();
+    if (autoFocus) ref.current?.focus();
+  }, [autoFocus]);
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => {
+        onChange(e.target.value);
+        resize();
+      }}
+      onFocus={() => onFocusChange(true)}
+      onBlur={() => onFocusChange(false)}
+      placeholder={placeholder}
+      rows={3}
+      className="w-full resize-none rounded-lg bg-[rgba(4,38,28,0.55)] px-3.5 py-2.5 text-[13.5px] leading-relaxed text-white placeholder:text-white/55 outline-none ring-1 ring-white/15 transition focus:bg-[rgba(4,38,28,0.70)] focus:ring-white/40"
+      style={{ maxHeight: 220, minHeight: 76 }}
+    />
+  );
+}
+
 function FinancialRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[160px_minmax(0,1fr)] items-baseline gap-x-12">
@@ -258,15 +336,22 @@ function FinancialRow({ label, value }: { label: string; value: string }) {
 function ControlButton({
   icon: Icon,
   label,
+  active,
+  onClick,
 }: {
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
   label: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="flex h-11 w-[110px] flex-col items-center justify-center gap-0.5 rounded-lg text-white transition hover:bg-[rgba(4,38,28,0.40)]"
-      style={{ background: "rgba(4,38,28,0.55)" }}
+      style={{
+        background: active ? "rgba(255,255,255,0.18)" : "rgba(4,38,28,0.55)",
+      }}
     >
       <Icon size={15} stroke={2} />
       <span className="text-[11.5px] font-medium leading-none">{label}</span>

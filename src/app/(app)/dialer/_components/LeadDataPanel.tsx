@@ -26,7 +26,7 @@ export function LeadDataPanel({
   onOpenTimeline: () => void;
 }) {
   return (
-    <aside className="flex w-[340px] shrink-0 flex-col overflow-y-auto bg-white">
+    <aside className="flex h-full w-full flex-col overflow-y-auto bg-white">
       <Section title="Case Details">
         <dl className="space-y-2">
           {lead.caseDetails.map((d) => (

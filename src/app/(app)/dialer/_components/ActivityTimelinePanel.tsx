@@ -31,7 +31,7 @@ export function ActivityTimelinePanel({
       />
       <aside
         className={[
-          "absolute right-0 top-0 z-50 flex h-full w-[420px] flex-col bg-white shadow-[-12px_0_28px_-12px_rgba(15,23,41,0.18)] transition-transform duration-200",
+          "absolute inset-0 z-50 flex h-full w-full flex-col bg-white shadow-[-12px_0_28px_-12px_rgba(15,23,41,0.18)] transition-transform duration-200",
           open ? "translate-x-0" : "translate-x-full",
         ].join(" ")}
       >

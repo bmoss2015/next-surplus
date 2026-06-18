@@ -157,21 +157,21 @@ export function DialerSession() {
             activeLeadId={activeLeadId}
             onSelect={selectLead}
           />
-          <div className="relative flex flex-1 overflow-hidden">
-            <CallHero
-              lead={activeLead}
-              contactIndex={contactIndex}
-              totalContacts={activeLead.contacts.length}
-              state={state}
-              onEndCall={endCall}
-              onOutcome={pickOutcome}
-              selectedOutcome={selectedOutcome}
-              quickNote={quickNote}
-              setQuickNote={setQuickNote}
-              skipFollowUp={skipFollowUp}
-              setSkipFollowUp={setSkipFollowUp}
-              onNoteFocusChange={setNoteFocused}
-            />
+          <CallHero
+            lead={activeLead}
+            contactIndex={contactIndex}
+            totalContacts={activeLead.contacts.length}
+            state={state}
+            onEndCall={endCall}
+            onOutcome={pickOutcome}
+            selectedOutcome={selectedOutcome}
+            quickNote={quickNote}
+            setQuickNote={setQuickNote}
+            skipFollowUp={skipFollowUp}
+            setSkipFollowUp={setSkipFollowUp}
+            onNoteFocusChange={setNoteFocused}
+          />
+          <div className="relative w-[340px] shrink-0">
             <LeadDataPanel
               lead={activeLead}
               onOpenTimeline={() => setTimelineOpen(true)}
