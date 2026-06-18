@@ -8,6 +8,7 @@ const SAMPLE = {
   inviteUrl:
     "https://staging.nextsurplus.com/accept-invite?token_hash=4a0cfc47e3d487874779902250a6cd47&type=invite",
   logoLight: "/images/email-logo.png",
+  logoDark: "/images/email-logo-dark.png",
 };
 
 const FONT_STACK =
@@ -42,7 +43,7 @@ const VARIANTS: Array<{
     anchor:
       "The Next Surplus portal itself — the sign-in panel and sidebar use the same forest-to-emerald gradient.",
     notes:
-      "Full-bleed gradient hero (96px). Logo centered in the hero. Headline picks up the gradient as a colored display row underneath. Button is the portal's gradient pill, matches the in-app primary CTA. Most brand-forward of the five.",
+      "Tightened: 56px gradient hero, 8px card radius, 6px button radius, 32px body padding, 20px headline. White-on-dark logo asset (no CSS filter). Footer is just 'Next Surplus' — no tagline.",
     html: gradientHeroHtml(),
   },
   {
@@ -235,7 +236,7 @@ function linearDarkHtml(): string {
 }
 
 function gradientHeroHtml(): string {
-  const { inviteeFirstName, inviterName, orgName, inviteUrl, logoLight } = SAMPLE;
+  const { inviteeFirstName, inviterName, orgName, inviteUrl, logoDark } = SAMPLE;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -248,33 +249,32 @@ function gradientHeroHtml(): string {
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f5f5;padding:32px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
           <tr>
-            <td align="center" style="background-image:linear-gradient(135deg,#04261c 0%,#13644e 60%,#4a9c75 100%);background-color:#04261c;padding:28px 28px 30px;">
-              <img src="${logoLight}" alt="Next Surplus" width="180" style="display:block;border:0;outline:none;width:180px;height:auto;filter:brightness(0) invert(1);">
+            <td align="center" style="background-image:linear-gradient(135deg,#04261c 0%,#13644e 60%,#4a9c75 100%);background-color:#04261c;padding:18px 24px;">
+              <img src="${logoDark}" alt="Next Surplus" width="160" style="display:block;border:0;outline:none;width:160px;height:auto;">
             </td>
           </tr>
           <tr>
-            <td style="padding:36px 40px 8px;">
-              <h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.01em;color:#1a1a1a;line-height:1.25;">Hi ${inviteeFirstName}, you&rsquo;re invited</h1>
-              <p style="margin:14px 0 0;font-size:15px;line-height:1.65;color:#374151;">${inviterName} added you to <strong style="color:#04261c;">${orgName}</strong> on Next Surplus. Accept the invite to set your password and sign in.</p>
+            <td style="padding:28px 32px 4px;">
+              <h1 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-0.01em;color:#1a1a1a;line-height:1.3;">Hi ${inviteeFirstName}, you&rsquo;re invited</h1>
+              <p style="margin:10px 0 0;font-size:14px;line-height:1.6;color:#374151;">${inviterName} added you to <strong style="color:#04261c;">${orgName}</strong>. Accept the invite to set your password and sign in.</p>
             </td>
           </tr>
           <tr>
-            <td style="padding:24px 40px 0;">
+            <td style="padding:20px 32px 0;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="background-image:linear-gradient(90deg,#04261c 0%,#13644e 100%);background-color:#13644e;border-radius:10px;">
-                    <a href="${inviteUrl}" style="display:inline-block;padding:14px 28px;font-family:${FONT_STACK};font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Accept invite</a>
+                  <td style="background-image:linear-gradient(90deg,#04261c 0%,#13644e 100%);background-color:#13644e;border-radius:6px;">
+                    <a href="${inviteUrl}" style="display:inline-block;padding:11px 22px;font-family:${FONT_STACK};font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">Accept invite</a>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
           <tr>
-            <td style="padding:32px 40px 28px;">
-              <div style="height:2px;background-image:linear-gradient(90deg,rgba(4,38,28,0.0) 0%,rgba(19,100,78,0.4) 50%,rgba(4,38,28,0.0) 100%);"></div>
-              <p style="margin:18px 0 0;font-size:12px;line-height:1.5;color:#6b7280;">Next Surplus &middot; Surplus funds recovery, end to end.</p>
+            <td style="padding:24px 32px 22px;font-size:12px;line-height:1.5;color:#6b7280;border-top:1px solid #f0f0f0;margin-top:24px;">
+              Next Surplus
             </td>
           </tr>
         </table>
