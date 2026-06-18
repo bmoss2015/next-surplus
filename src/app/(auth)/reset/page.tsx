@@ -2,11 +2,23 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import {
+  PasswordRequirements,
+  passwordMeetsRequirements,
+} from "@/components/PasswordRequirements";
+import { InlineError } from "@/components/InlineError";
+
+function postResetDestination(): string {
+  if (typeof window === "undefined") return "/";
+  const host = window.location.host;
+  if (host === "nextsurplus.com" || host === "www.nextsurplus.com") {
+    return "https://app.nextsurplus.com/";
+  }
+  return "/";
+}
 
 export default function ResetPage() {
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [status, setStatus] = useState<"checking" | "ready" | "invalid">(
     "checking"
@@ -44,12 +56,12 @@ export default function ResetPage() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (password.length < 12) {
-      setError("Password must be at least 12 characters");
+    if (!passwordMeetsRequirements(password)) {
+      setError("Password does not meet the requirements");
       return;
     }
     if (password !== confirm) {
-      setError("Passwords don't match");
+      setError("Passwords do not match");
       return;
     }
     startTransition(async () => {
@@ -58,8 +70,7 @@ export default function ResetPage() {
         setError(updateErr.message);
         return;
       }
-      router.push("/");
-      router.refresh();
+      window.location.assign(postResetDestination());
     });
   }
 
@@ -96,7 +107,7 @@ export default function ResetPage() {
         Set New Password
       </h1>
       <p className="text-[12px] text-gray-500">
-        Choose a new password for your account. Must be at least 12 characters.
+        Choose a new password for your account.
       </p>
       <div>
         <label className="mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500">
@@ -110,6 +121,7 @@ export default function ResetPage() {
           onChange={(e) => setPassword(e.target.value)}
           className={inputClass}
         />
+        <PasswordRequirements password={password} />
       </div>
       <div>
         <label className="mb-1 block text-[10px] tracking-[0.5px] font-medium text-gray-500">
@@ -123,11 +135,7 @@ export default function ResetPage() {
           className={inputClass}
         />
       </div>
-      {error && (
-        <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
-          {error}
-        </div>
-      )}
+      <InlineError message={error} />
       <button
         type="submit"
         disabled={pending || !password || !confirm}
