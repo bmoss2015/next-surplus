@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { StepShell } from "./StepShell";
 import { inviteTeammates } from "../_actions";
+import { InlineError } from "@/components/InlineError";
 
 export function TeamStep() {
   const router = useRouter();
@@ -70,11 +71,7 @@ export function TeamStep() {
         </p>
       </div>
 
-      {error && (
-        <div className="mt-4 rounded-[6px] border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-[12px] text-[#b91c1c]">
-          {error}
-        </div>
-      )}
+      <InlineError message={error} />
     </StepShell>
   );
 }
