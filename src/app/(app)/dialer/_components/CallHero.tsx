@@ -13,6 +13,9 @@ import {
   IconListNumbers,
   IconArrowBack,
   IconArrowForward,
+  IconClock,
+  IconArrowRight,
+  IconChevronDown,
 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -22,11 +25,10 @@ import type { CallOutcome, DialerLead } from "../_mock-data";
 type CallState = "live" | "wrapup";
 
 const OUTCOMES: CallOutcome[] = [
-  "Interested",
-  "Callback Requested",
-  "Not Interested",
+  "Connected",
+  "Voicemail",
+  "No Answer",
   "Wrong Number",
-  "Do Not Contact",
 ];
 
 export function CallHero({
@@ -42,6 +44,9 @@ export function CallHero({
   skipFollowUp,
   setSkipFollowUp,
   onNoteFocusChange,
+  countdown,
+  totalCountdown,
+  onNextLead,
 }: {
   lead: DialerLead;
   contactIndex: number;
@@ -49,12 +54,15 @@ export function CallHero({
   state: CallState;
   onEndCall: () => void;
   onOutcome: (o: CallOutcome) => void;
-  selectedOutcome: CallOutcome | null;
+  selectedOutcome: CallOutcome;
   quickNote: string;
   setQuickNote: (s: string) => void;
   skipFollowUp: boolean;
   setSkipFollowUp: (b: boolean) => void;
   onNoteFocusChange: (focused: boolean) => void;
+  countdown: number;
+  totalCountdown: number;
+  onNextLead: () => void;
 }) {
   const [elapsed, setElapsed] = useState(272);
   const [liveNoteOpen, setLiveNoteOpen] = useState(false);
@@ -232,28 +240,39 @@ export function CallHero({
           </div>
         ) : (
           <div>
-            <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
-              Call Outcome
+            <div className="flex items-center justify-between">
+              <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
+                Wrap Up
+              </div>
+              <CountdownBadge
+                seconds={countdown}
+                total={totalCountdown}
+                running={selectedOutcome === "Connected"}
+              />
             </div>
-            <div className="mt-3 grid grid-cols-5 gap-2">
-              {OUTCOMES.map((o) => {
-                const sel = selectedOutcome === o;
-                return (
-                  <button
-                    key={o}
-                    type="button"
-                    onClick={() => onOutcome(o)}
-                    className={[
-                      "h-11 rounded-lg text-[12.5px] font-medium transition",
-                      sel
-                        ? "bg-white text-petrol-500"
-                        : "bg-[rgba(4,38,28,0.55)] text-white hover:bg-[rgba(4,38,28,0.40)]",
-                    ].join(" ")}
-                  >
-                    {o}
-                  </button>
-                );
-              })}
+
+            <div className="mt-4 grid grid-cols-[160px_minmax(0,1fr)] items-center gap-3">
+              <label className="text-[12.5px] font-medium text-white/85">
+                Call Outcome
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedOutcome}
+                  onChange={(e) => onOutcome(e.target.value as CallOutcome)}
+                  className="h-10 w-full appearance-none rounded-lg bg-[rgba(4,38,28,0.55)] pl-3.5 pr-9 text-[13.5px] font-medium text-white outline-none ring-1 ring-white/15 transition focus:bg-[rgba(4,38,28,0.70)] focus:ring-white/40"
+                >
+                  {OUTCOMES.map((o) => (
+                    <option key={o} value={o} className="text-ink">
+                      {o}
+                    </option>
+                  ))}
+                </select>
+                <IconChevronDown
+                  size={14}
+                  stroke={2}
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/70"
+                />
+              </div>
             </div>
 
             <div className="mt-5">
@@ -265,22 +284,62 @@ export function CallHero({
                 onChange={setQuickNote}
                 onFocusChange={onNoteFocusChange}
                 placeholder="Capture key details from this call"
+                autoFocus
               />
             </div>
 
-            <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-[12.5px] text-white/85">
-              <input
-                type="checkbox"
-                checked={skipFollowUp}
-                onChange={(e) => setSkipFollowUp(e.target.checked)}
-                className="h-3.5 w-3.5 accent-white"
-              />
-              Skip Follow Up This Call
-            </label>
+            <div className="mt-5 flex items-center justify-between gap-4">
+              <label className="inline-flex cursor-pointer items-center gap-2 text-[12.5px] text-white/85">
+                <input
+                  type="checkbox"
+                  checked={skipFollowUp}
+                  onChange={(e) => setSkipFollowUp(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-white"
+                />
+                Skip Follow Up This Call
+              </label>
+              <button
+                type="button"
+                onClick={onNextLead}
+                className="flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-[13.5px] font-semibold text-petrol-500 shadow-[0_2px_6px_rgba(0,0,0,0.18)] transition hover:bg-gray-100"
+              >
+                Next Lead
+                <IconArrowRight size={15} stroke={2.25} />
+              </button>
+            </div>
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+function CountdownBadge({
+  seconds,
+  total,
+  running,
+}: {
+  seconds: number;
+  total: number;
+  running: boolean;
+}) {
+  const pct = Math.max(0, Math.min(1, seconds / total));
+  return (
+    <div className="flex items-center gap-2 rounded-full bg-[rgba(4,38,28,0.55)] px-3 py-1.5 ring-1 ring-white/15">
+      <IconClock size={13} stroke={2} className="text-white/70" />
+      <div className="h-1 w-16 overflow-hidden rounded-full bg-white/15">
+        <div
+          className={[
+            "h-full rounded-full transition-all duration-200",
+            running ? "bg-white" : "bg-white/40",
+          ].join(" ")}
+          style={{ width: `${pct * 100}%` }}
+        />
+      </div>
+      <span className="text-[12px] font-semibold tabular-nums text-white">
+        {Math.max(0, Math.ceil(seconds))}s
+      </span>
+    </div>
   );
 }
 

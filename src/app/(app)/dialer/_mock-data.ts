@@ -1,10 +1,9 @@
 export type DialerContactStatus = "pending" | "active" | "done" | "skipped";
 export type CallOutcome =
-  | "Interested"
-  | "Callback Requested"
-  | "Not Interested"
-  | "Wrong Number"
-  | "Do Not Contact";
+  | "Connected"
+  | "Voicemail"
+  | "No Answer"
+  | "Wrong Number";
 
 export type DialerContact = {
   id: string;

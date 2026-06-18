@@ -56,11 +56,11 @@ export function DialerHeader({
   return (
     <header className="flex h-[68px] items-center justify-between border-b border-gray-200 bg-white px-6">
       <div className="flex items-center gap-8">
-        <div className="leading-tight">
-          <div className="text-[13px] font-semibold tracking-tight text-ink">
+        <div>
+          <div className="text-[13.5px] font-semibold tracking-tight text-ink">
             Power Dialer
           </div>
-          <div className="text-[11px] text-gray-500">
+          <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.10em] text-gray-500">
             {paused ? "Session Paused" : "Session In Progress"}
           </div>
         </div>
@@ -72,11 +72,16 @@ export function DialerHeader({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={onPause}
-          className="flex h-9 items-center gap-1.5 rounded-lg bg-white px-3.5 text-[13px] font-medium text-petrol-500 shadow-[0_1px_2px_rgba(15,23,41,0.06),0_2px_6px_-2px_rgba(15,23,41,0.10)] ring-1 ring-gray-200 transition hover:bg-gray-50"
+          className={[
+            "flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-medium transition",
+            paused
+              ? "text-petrol-500 hover:bg-gray-100"
+              : "text-petrol-500 hover:bg-gray-100",
+          ].join(" ")}
         >
           <IconPlayerPause size={15} stroke={2} />
           {paused ? "Resume Session" : "Pause Session"}

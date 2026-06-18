@@ -280,7 +280,7 @@ function StepCallSettings() {
   const [dialFrom, setDialFrom] = useState<"auto" | "specific">("auto");
   const [skipDnc, setSkipDnc] = useState(true);
   const [skipLitigated, setSkipLitigated] = useState(true);
-  const [wrapUp, setWrapUp] = useState(3);
+  const [wrapUp, setWrapUp] = useState(30);
   const [vmDrop, setVmDrop] = useState<"off" | "on">("off");
 
   return (
@@ -342,7 +342,8 @@ function StepCallSettings() {
           <input
             type="range"
             min={0}
-            max={10}
+            max={60}
+            step={5}
             value={wrapUp}
             onChange={(e) => setWrapUp(Number(e.target.value))}
             className="h-2 flex-1 cursor-pointer accent-petrol-500"
@@ -353,7 +354,7 @@ function StepCallSettings() {
           </div>
         </div>
         <div className="mt-2 text-[12px] text-gray-500">
-          Pause between calls to log the outcome before the next dial fires. The countdown auto pauses while you are typing a note.
+          Wrap up only runs after a connected call. The countdown pauses automatically while you are typing a note. Voicemail, No Answer, and Wrong Number skip wrap up entirely.
         </div>
       </div>
 
@@ -391,33 +392,27 @@ function StepCallSettings() {
 
 const OUTCOMES = [
   {
-    name: "Interested",
+    name: "Connected",
     color: "#13644e",
-    desc: "Send the prospect a follow up with our 1 page summary plus next steps.",
-    defaultTemplate: "Interested Lead Recap",
+    desc: "Live conversation. Send the prospect a follow up recap with next steps.",
+    defaultTemplate: "Connected Call Recap",
   },
   {
-    name: "Callback Requested",
-    color: "#13644e",
-    desc: "Confirm the callback time in writing so it doesn't slip.",
-    defaultTemplate: "Callback Confirmation",
-  },
-  {
-    name: "Not Interested",
+    name: "Voicemail",
     color: "#9ca3af",
-    desc: "Short polite recap with a way to reach us if they reconsider.",
-    defaultTemplate: "Polite Door Open",
+    desc: "Reached voicemail. Send a short follow up so they can read who called.",
+    defaultTemplate: "Voicemail Drop Recap",
+  },
+  {
+    name: "No Answer",
+    color: "#9ca3af",
+    desc: "Did not pick up. Optional follow up so the next attempt has context.",
+    defaultTemplate: "Do Not Send",
   },
   {
     name: "Wrong Number",
     color: "#9ca3af",
-    desc: "Usually no follow up. Pick a template only if you want to retain the contact.",
-    defaultTemplate: "Do Not Send",
-  },
-  {
-    name: "Do Not Contact",
-    color: "#b91c1c",
-    desc: "No email is sent. The contact is flagged as DNC immediately.",
+    desc: "Number does not belong to the contact. Flag and skip follow up.",
     defaultTemplate: "Do Not Send",
   },
 ];

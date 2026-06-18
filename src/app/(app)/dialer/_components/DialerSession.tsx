@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { IconPhone, IconPlayerSkipForward } from "@tabler/icons-react";
 import { DialerHeader } from "./DialerHeader";
 import { QueuePanel } from "./QueuePanel";
 import { CallHero } from "./CallHero";
@@ -11,6 +10,8 @@ import { FollowUpToast } from "./FollowUpToast";
 import { getQueueLeads, type CallOutcome } from "../_mock-data";
 
 type CallState = "live" | "wrapup";
+
+const WRAP_UP_DEFAULT = 30;
 
 export function DialerSession() {
   const queue = useMemo(() => getQueueLeads(), []);
@@ -22,10 +23,10 @@ export function DialerSession() {
   const [paused, setPaused] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
-  const [selectedOutcome, setSelectedOutcome] = useState<CallOutcome | null>(null);
+  const [selectedOutcome, setSelectedOutcome] = useState<CallOutcome>("Connected");
   const [quickNote, setQuickNote] = useState("");
   const [skipFollowUp, setSkipFollowUp] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<number>(WRAP_UP_DEFAULT);
   const [noteFocused, setNoteFocused] = useState(false);
 
   const activeLead = queue.find((l) => l.id === activeLeadId) ?? queue[0];
@@ -43,42 +44,50 @@ export function DialerSession() {
       }
     }
     setState("live");
-    setSelectedOutcome(null);
+    setSelectedOutcome("Connected");
     setQuickNote("");
     setSkipFollowUp(false);
-    setCountdown(null);
+    setCountdown(WRAP_UP_DEFAULT);
+    setNoteFocused(false);
   }, [activeLead, contactIndex, queue]);
 
   useEffect(() => {
-    if (state !== "wrapup" || !selectedOutcome || noteFocused) return;
+    if (state !== "wrapup" || selectedOutcome !== "Connected" || noteFocused) return;
     const start = Date.now();
+    const startFrom = countdown;
     const tick = setInterval(() => {
       const elapsed = Math.floor((Date.now() - start) / 1000);
-      const remaining = 3 - elapsed;
+      const remaining = startFrom - elapsed;
       if (remaining <= 0) {
         clearInterval(tick);
+        if (!skipFollowUp) setToastVisible(true);
         advance();
         return;
       }
       setCountdown(remaining);
-    }, 200);
+    }, 250);
     return () => clearInterval(tick);
-  }, [state, selectedOutcome, noteFocused, advance]);
+    // intentionally exclude countdown so it acts as start value, not reset trigger
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, selectedOutcome, noteFocused, advance, skipFollowUp]);
 
   function endCall() {
     setState("wrapup");
+    setSelectedOutcome("Connected");
+    setCountdown(WRAP_UP_DEFAULT);
   }
 
   function pickOutcome(o: CallOutcome) {
     setSelectedOutcome(o);
-    setCountdown(3);
-    if (!skipFollowUp && (o === "Interested" || o === "Callback Requested")) {
-      setToastVisible(true);
+    if (o !== "Connected") {
+      advance();
     }
   }
 
-  function skipCountdown() {
-    setCountdown(null);
+  function nextLead() {
+    if (selectedOutcome === "Connected" && !skipFollowUp) {
+      setToastVisible(true);
+    }
     advance();
   }
 
@@ -86,18 +95,11 @@ export function DialerSession() {
     setActiveLeadId(id);
     setContactIndex(0);
     setState("live");
-    setSelectedOutcome(null);
+    setSelectedOutcome("Connected");
     setQuickNote("");
-    setCountdown(null);
+    setCountdown(WRAP_UP_DEFAULT);
+    setNoteFocused(false);
   }
-
-  const nextContactPreview = (() => {
-    const next = activeLead.contacts[contactIndex + 1];
-    if (next) return next;
-    const idx = queue.findIndex((l) => l.id === activeLead.id);
-    const nl = queue.slice(idx + 1).find((l) => !l.completed);
-    return nl ? nl.contacts[0] : null;
-  })();
 
   return (
     <div className="flex h-full flex-col bg-canvas">
@@ -106,43 +108,6 @@ export function DialerSession() {
         onEnd={() => { /* end session */ }}
         paused={paused}
       />
-
-      {state === "wrapup" && selectedOutcome && countdown !== null && nextContactPreview && (
-        <div
-          className="sticky top-0 z-30 flex h-11 items-center justify-between px-6 text-[13px] text-white"
-          style={{
-            background: "linear-gradient(90deg, #04261c 0%, #0d4b3a 100%)",
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <span className="font-semibold">Next</span>
-            <span className="text-white/85">
-              {nextContactPreview.name} · {nextContactPreview.relationship}
-            </span>
-            <span className="tabular-nums text-white/85">
-              0:{String(countdown).padStart(2, "0")}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={skipCountdown}
-              className="flex h-7 items-center gap-1 rounded-md bg-white px-3 text-[12px] font-semibold text-petrol-500 transition hover:bg-gray-100"
-            >
-              <IconPhone size={13} stroke={2.25} />
-              Dial Now
-            </button>
-            <button
-              type="button"
-              onClick={advance}
-              className="flex h-7 items-center gap-1 rounded-md bg-[rgba(255,255,255,0.12)] px-3 text-[12px] font-semibold text-white transition hover:bg-[rgba(255,255,255,0.22)]"
-            >
-              <IconPlayerSkipForward size={13} stroke={2.25} />
-              Skip
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-1 items-stretch overflow-hidden px-6 py-6">
         <div
@@ -170,6 +135,9 @@ export function DialerSession() {
             skipFollowUp={skipFollowUp}
             setSkipFollowUp={setSkipFollowUp}
             onNoteFocusChange={setNoteFocused}
+            countdown={countdown}
+            totalCountdown={WRAP_UP_DEFAULT}
+            onNextLead={nextLead}
           />
           <div className="relative w-[340px] shrink-0">
             <LeadDataPanel
