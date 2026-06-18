@@ -4,11 +4,7 @@ import {
   IconMicrophone,
   IconHandStop,
   IconArrowsTransferUp,
-  IconNote,
   IconPhoneOff,
-  IconPhonePause,
-  IconMessageDots,
-  IconAlertCircle,
   IconNumber,
   IconBold,
   IconItalic,
@@ -39,13 +35,11 @@ export function CallHero({
   state,
   onEndCall,
   onOutcome,
-  selectedOutcome,
   quickNote,
   setQuickNote,
-  skipFollowUp,
-  setSkipFollowUp,
   countdown,
   onNextLead,
+  onSkipLead,
   paused,
 }: {
   lead: DialerLead;
@@ -57,14 +51,12 @@ export function CallHero({
   selectedOutcome: CallOutcome;
   quickNote: string;
   setQuickNote: (s: string) => void;
-  skipFollowUp: boolean;
-  setSkipFollowUp: (b: boolean) => void;
   countdown: number;
   onNextLead: () => void;
+  onSkipLead: () => void;
   paused: boolean;
 }) {
   const [elapsed, setElapsed] = useState(272);
-  const [liveNoteOpen, setLiveNoteOpen] = useState(false);
   const tickRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -97,20 +89,26 @@ export function CallHero({
     >
       <div className="flex items-start justify-between gap-8">
         <div className="min-w-0 flex-1">
-          <div className="text-[12px] font-medium text-white/70">
-            Contact {contactIndex + 1} of {totalContacts}
+          <div className="flex items-center gap-3">
+            <span className="text-[12px] font-medium text-white/70">
+              Contact {contactIndex + 1} of {totalContacts}
+            </span>
+            {state === "live" && contactIndex < lead.contacts.length - 1 && (
+              <button
+                type="button"
+                onClick={onSkipLead}
+                className="text-[11.5px] font-medium text-white/70 transition hover:text-white"
+              >
+                Skip To Next Lead →
+              </button>
+            )}
           </div>
           <div className="mt-2 flex items-center gap-2">
             <span
               className={[
                 "h-2 w-2 rounded-full",
-                state === "live" ? "bg-[#34d399]" : "bg-gray-300/70",
+                state === "live" ? "bg-[#34d399]" : "bg-gray-300",
               ].join(" ")}
-              style={
-                state === "live"
-                  ? { boxShadow: "0 0 0 4px rgba(52, 211, 153, 0.20)" }
-                  : undefined
-              }
             />
             <span className="text-[12.5px] text-white/85 tabular-nums">
               {state === "live"
@@ -163,140 +161,108 @@ export function CallHero({
         style={{ background: "rgba(255,255,255,0.20)" }}
       />
 
-      {state === "live" && (
-        <div>
-          <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
-            Lead Summary
-          </div>
-          <ul className="mt-3 space-y-2">
-            {lead.summary.map((s, i) => (
-              <li
-                key={i}
-                className="relative pl-4 text-[13.5px] leading-relaxed text-white/95"
-              >
-                <span
-                  aria-hidden
-                  className="absolute left-0 top-[9px] h-1 w-1 rounded-full bg-white/70"
-                />
-                {s}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div
-        className={[
-          state === "wrapup"
-            ? "flex flex-1 flex-col"
-            : "mt-auto pt-6",
-        ].join(" ")}
-      >
-        {state === "live" ? (
-          <div className="space-y-4">
-            {liveNoteOpen && (
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
-                    Call Note
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLiveNoteOpen(false)}
-                    className="text-[11.5px] font-medium text-white/70 hover:text-white"
+      {state === "live" ? (
+        <>
+          <div className="grid flex-1 min-h-0 grid-cols-[1fr_1.15fr] gap-6">
+            <div className="flex min-h-0 flex-col">
+              <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
+                Lead Summary
+              </div>
+              <ul className="mt-3 space-y-2.5 overflow-y-auto pr-1">
+                {lead.summary.map((s, i) => (
+                  <li
+                    key={i}
+                    className="relative pl-4 text-[13.5px] leading-relaxed text-white/95"
                   >
-                    Close
-                  </button>
-                </div>
+                    <span
+                      aria-hidden
+                      className="absolute left-0 top-[9px] h-1 w-1 rounded-full bg-white/70"
+                    />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex min-h-0 flex-col">
+              <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
+                Call Note
+              </div>
+              <div className="mt-3 flex flex-1 min-h-0 flex-col">
                 <NoteTextarea
                   value={quickNote}
                   onChange={setQuickNote}
                   placeholder="Capture key details from this call"
-                  autoFocus
+                  fill
                 />
               </div>
-            )}
+            </div>
+          </div>
 
+          <div className="mt-6 flex items-center gap-3">
             <div className="flex items-stretch gap-1">
               <ControlButton icon={IconMicrophone} label="Mute" />
               <ControlButton icon={IconNumber} label="Keypad" />
               <ControlButton icon={IconHandStop} label="Hold" />
               <ControlButton icon={IconArrowsTransferUp} label="Transfer" />
-              <ControlButton
-                icon={IconNote}
-                label="Add Note"
-                active={liveNoteOpen}
-                onClick={() => setLiveNoteOpen((o) => !o)}
-              />
-              <span className="mx-1 self-center h-7 w-px bg-white/15" />
-              <ControlButton
-                icon={IconPhonePause}
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <DispositionButton
                 label="No Answer"
                 onClick={() => onOutcome("No Answer")}
               />
-              <ControlButton
-                icon={IconMessageDots}
+              <DispositionButton
                 label="Voicemail"
                 onClick={() => onOutcome("Voicemail")}
               />
-              <ControlButton
-                icon={IconAlertCircle}
+              <DispositionButton
                 label="Wrong Number"
                 onClick={() => onOutcome("Wrong Number")}
               />
-              <div className="ml-auto">
-                <ControlButton
-                  icon={IconPhoneOff}
-                  label="End Call"
-                  onClick={onEndCall}
-                  danger
-                />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-1 flex-col">
-            <div className="flex items-center justify-between gap-4 px-1">
-              <span className="text-[12px] font-semibold uppercase tracking-[0.10em] text-white/60">
-                Call Note
-              </span>
-              <span className="text-[18px] font-medium tabular-nums text-white/90">
-                {paused ? "Paused" : `${formatCountdown(countdown)} remaining`}
-              </span>
-            </div>
-
-            <div className="mt-3 flex flex-1 flex-col min-h-0">
-              <NoteTextarea
-                value={quickNote}
-                onChange={setQuickNote}
-                placeholder="Capture key details from this call"
-                autoFocus
-                fill
-              />
-            </div>
-
-            <div className="mt-4 flex items-center justify-between gap-4">
-              <label className="inline-flex cursor-pointer items-center gap-2 text-[12.5px] text-white/85">
-                <input
-                  type="checkbox"
-                  checked={skipFollowUp}
-                  onChange={(e) => setSkipFollowUp(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-white"
-                />
-                Skip Follow Up
-              </label>
               <button
                 type="button"
-                onClick={onNextLead}
-                className="flex h-10 items-center gap-2 rounded-lg bg-[#13644e] px-5 text-[13.5px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.30),0_6px_16px_-4px_rgba(13,75,58,0.40)] transition hover:bg-[#0f5544]"
+                onClick={onEndCall}
+                className="ml-2 flex h-11 items-center gap-2 rounded-full bg-[#b91c1c] px-5 text-[13px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.20)] transition hover:bg-[#a01818]"
               >
-                Next Lead
-                <IconArrowRight size={15} stroke={2.25} />
+                <IconPhoneOff size={14} stroke={2.25} />
+                End Call
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <div className="flex flex-1 flex-col">
+          <div className="flex items-center justify-between gap-4 px-1">
+            <span className="text-[12px] font-semibold uppercase tracking-[0.10em] text-white/60">
+              Call Note
+            </span>
+            <span className="text-[18px] font-medium tabular-nums text-white/90">
+              {paused ? "Paused" : `${formatCountdown(countdown)} remaining`}
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-1 flex-col min-h-0">
+            <NoteTextarea
+              value={quickNote}
+              onChange={setQuickNote}
+              placeholder="Capture key details from this call"
+              autoFocus
+              fill
+            />
+          </div>
+
+          <div className="mt-4 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={onNextLead}
+              className="flex h-10 items-center gap-2 rounded-lg bg-[#13644e] px-5 text-[13.5px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.30),0_6px_16px_-4px_rgba(13,75,58,0.40)] transition hover:bg-[#0f5544]"
+            >
+              Next Lead
+              <IconArrowRight size={15} stroke={2.25} />
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -362,11 +328,11 @@ function NoteTextarea({
   return (
     <div
       className={[
-        "overflow-hidden rounded-lg bg-white/[0.06] transition focus-within:bg-white/[0.09]",
-        fill ? "flex flex-1 flex-col min-h-0" : "",
+        "flex flex-col gap-1.5",
+        fill ? "flex-1 min-h-0" : "",
       ].join(" ")}
     >
-      <div className="flex shrink-0 items-center gap-0.5 border-b border-white/10 px-2 py-1.5">
+      <div className="flex items-center gap-0.5">
         <NoteToolBtn
           icon={IconBold}
           label="Bold"
@@ -409,7 +375,7 @@ function NoteTextarea({
       </div>
       <div
         className={[
-          "relative overflow-y-auto px-3.5 py-2.5",
+          "relative overflow-y-auto rounded-lg bg-white/[0.06] px-3.5 py-2.5 transition focus-within:bg-white/[0.09]",
           fill ? "flex-1 min-h-0" : "max-h-[220px] min-h-[72px]",
         ].join(" ")}
       >
@@ -491,13 +457,11 @@ function ControlButton({
   icon: Icon,
   label,
   active,
-  danger,
   onClick,
 }: {
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
   label: string;
   active?: boolean;
-  danger?: boolean;
   onClick?: () => void;
 }) {
   return (
@@ -506,15 +470,31 @@ function ControlButton({
       onClick={onClick}
       className={[
         "flex h-11 w-[78px] flex-col items-center justify-center gap-1 rounded-lg px-1 transition",
-        danger
-          ? "bg-[#b91c1c] text-white shadow-[0_2px_6px_rgba(0,0,0,0.20)] hover:bg-[#a01818]"
-          : active
-            ? "bg-white/10 text-white"
-            : "text-white/70 hover:bg-white/[0.08] hover:text-white",
+        active
+          ? "bg-white/10 text-white"
+          : "text-white/70 hover:bg-white/[0.08] hover:text-white",
       ].join(" ")}
     >
       <Icon size={15} stroke={2} />
       <span className="whitespace-nowrap text-[10.5px] font-medium leading-none">{label}</span>
+    </button>
+  );
+}
+
+function DispositionButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-11 rounded-full bg-white px-4 text-[12.5px] font-semibold text-ink transition hover:bg-gray-100 active:bg-[#13644e] active:text-white"
+    >
+      {label}
     </button>
   );
 }

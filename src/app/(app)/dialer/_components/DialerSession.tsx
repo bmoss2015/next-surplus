@@ -25,7 +25,6 @@ export function DialerSession() {
   const [toastVisible, setToastVisible] = useState(false);
   const [selectedOutcome, setSelectedOutcome] = useState<CallOutcome>("Connected");
   const [quickNote, setQuickNote] = useState("");
-  const [skipFollowUp, setSkipFollowUp] = useState(false);
   const [countdown, setCountdown] = useState<number>(WRAP_UP_DEFAULT);
 
   const activeLead = queue.find((l) => l.id === activeLeadId) ?? queue[0];
@@ -45,9 +44,21 @@ export function DialerSession() {
     setState("live");
     setSelectedOutcome("Connected");
     setQuickNote("");
-    setSkipFollowUp(false);
     setCountdown(WRAP_UP_DEFAULT);
   }, [activeLead, contactIndex, queue]);
+
+  const skipLead = useCallback(() => {
+    const idx = queue.findIndex((l) => l.id === activeLead.id);
+    const next = queue.slice(idx + 1).find((l) => !l.completed);
+    if (next) {
+      setActiveLeadId(next.id);
+      setContactIndex(0);
+      setState("live");
+      setSelectedOutcome("Connected");
+      setQuickNote("");
+      setCountdown(WRAP_UP_DEFAULT);
+    }
+  }, [activeLead, queue]);
 
   useEffect(() => {
     if (state !== "wrapup" || selectedOutcome !== "Connected" || paused) return;
@@ -58,7 +69,7 @@ export function DialerSession() {
       const remaining = startFrom - elapsed;
       if (remaining <= 0) {
         clearInterval(tick);
-        if (!skipFollowUp) setToastVisible(true);
+        setToastVisible(true);
         advance();
         return;
       }
@@ -67,7 +78,7 @@ export function DialerSession() {
     return () => clearInterval(tick);
     // countdown intentionally read once as the start value, not in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, selectedOutcome, paused, advance, skipFollowUp]);
+  }, [state, selectedOutcome, paused, advance]);
 
   function endCall() {
     setState("wrapup");
@@ -83,7 +94,7 @@ export function DialerSession() {
   }
 
   function nextLead() {
-    if (selectedOutcome === "Connected" && !skipFollowUp) {
+    if (selectedOutcome === "Connected") {
       setToastVisible(true);
     }
     advance();
@@ -129,10 +140,9 @@ export function DialerSession() {
             selectedOutcome={selectedOutcome}
             quickNote={quickNote}
             setQuickNote={setQuickNote}
-            skipFollowUp={skipFollowUp}
-            setSkipFollowUp={setSkipFollowUp}
             countdown={countdown}
             onNextLead={nextLead}
+            onSkipLead={skipLead}
             paused={paused}
           />
           <div className="relative w-[340px] shrink-0">

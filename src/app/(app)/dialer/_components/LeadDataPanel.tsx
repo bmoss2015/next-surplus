@@ -95,11 +95,7 @@ export function LeadDataPanel({
                   <div className="truncate text-[13px] font-semibold text-ink">
                     {c.name}
                   </div>
-                  {c.status === "active" && (
-                    <span className="shrink-0 rounded-sm bg-petrol-500/10 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.10em] text-petrol-500">
-                      On Call
-                    </span>
-                  )}
+                  <ContactStatusPill status={c.status} />
                 </div>
                 <div className="mt-1">
                   <span className="inline-flex items-center rounded-sm bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600">
@@ -115,6 +111,30 @@ export function LeadDataPanel({
         </ul>
       </Section>
     </aside>
+  );
+}
+
+function ContactStatusPill({
+  status,
+}: {
+  status: "pending" | "active" | "done" | "skipped";
+}) {
+  const config = {
+    active: { label: "On Call", dot: "bg-petrol-500", text: "text-petrol-500" },
+    done: { label: "Called", dot: "bg-gray-400", text: "text-gray-500" },
+    skipped: { label: "Skipped", dot: "bg-gray-300", text: "text-gray-500" },
+    pending: { label: "Remaining", dot: "bg-gray-300", text: "text-gray-500" },
+  }[status];
+  return (
+    <span
+      className={[
+        "inline-flex shrink-0 items-center gap-1 rounded-sm border border-gray-200 bg-white px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.10em]",
+        config.text,
+      ].join(" ")}
+    >
+      <span className={["h-1.5 w-1.5 rounded-full", config.dot].join(" ")} />
+      {config.label}
+    </span>
   );
 }
 
