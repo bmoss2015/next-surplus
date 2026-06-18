@@ -32,7 +32,7 @@ For granular ship history, see `CHANGELOG.md`.
 | Staging Supabase | `qfanroxcoepunmrmjabo` | Test data. Source of truth for local dev. |
 | Production Supabase | `rsdmyydyhqgkkvwlklif` | Live database. Migrations 0080-0094 applied. |
 | Automations Supabase | `hkubwxpyyejxffncxrez` | Separate project (Maryland research agent). NEVER push web app migrations here. |
-| GitHub repo | `bmoss2015/MossEquityPartners` | main branch is source of truth |
+| GitHub repo | `bmoss2015/next-surplus` | main branch is source of truth |
 | Vercel production | `moss-equity-portal.vercel.app` | Aliased to portal.mossequitypartners.com |
 | Custom domain | `portal.mossequitypartners.com` | CNAME via Cloudflare, SSL active 2026-05-12 |
 | Local dev | `localhost:3000` | `npm run dev` from `C:\Users\info\moss-equity-portal` |

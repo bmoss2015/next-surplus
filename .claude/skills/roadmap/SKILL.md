@@ -19,7 +19,7 @@ The text AFTER the slash command is the content the user wants added.
 
 - **Product name:** Moss Equity Partners - Web App
 - **Legal entity:** Moss Equity Partners LLC (NOT Mossy Land LLC)
-- **Repo:** github.com/bmoss2015/MossEquityPartners
+- **Repo:** github.com/bmoss2015/next-surplus
 - **Two files this skill edits:**
   - `product-build-status-roadmap-content.md` (the Roadmap)
   - `ARCHITECTURE.md` (the Architecture doc)
