@@ -66,7 +66,12 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/images/") ||
     pathname.startsWith("/brand/") ||
-    pathname.includes("/favicon")
+    pathname.startsWith("/android-chrome-") ||
+    pathname.includes("/favicon") ||
+    pathname === "/apple-touch-icon.png" ||
+    pathname === "/manifest.json" ||
+    pathname === "/og-image.png" ||
+    pathname === "/robots.txt"
   ) {
     return NextResponse.next();
   }
