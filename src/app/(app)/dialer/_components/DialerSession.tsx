@@ -26,16 +26,24 @@ export function DialerSession() {
   const [selectedOutcome, setSelectedOutcome] = useState<CallOutcome>("Connected");
   const [quickNote, setQuickNote] = useState("");
   const [countdown, setCountdown] = useState<number>(WRAP_UP_DEFAULT);
+  const [contactOutcomes, setContactOutcomes] = useState<Record<string, CallOutcome>>({});
+  const [calledLeadIds, setCalledLeadIds] = useState<Set<string>>(new Set());
 
   const activeLead = queue.find((l) => l.id === activeLeadId) ?? queue[0];
 
   const advance = useCallback(() => {
+    const contactKey = `${activeLead.id}:${activeLead.contacts[contactIndex]?.id}`;
+    setContactOutcomes((prev) => ({ ...prev, [contactKey]: selectedOutcome }));
+
     const nextContact = activeLead.contacts[contactIndex + 1];
     if (nextContact) {
       setContactIndex((i) => i + 1);
     } else {
+      setCalledLeadIds((prev) => new Set(prev).add(activeLead.id));
       const idx = queue.findIndex((l) => l.id === activeLead.id);
-      const next = queue.slice(idx + 1).find((l) => !l.completed);
+      const next = queue.slice(idx + 1).find(
+        (l) => !l.completed && !calledLeadIds.has(l.id),
+      );
       if (next) {
         setActiveLeadId(next.id);
         setContactIndex(0);
@@ -45,11 +53,14 @@ export function DialerSession() {
     setSelectedOutcome("Connected");
     setQuickNote("");
     setCountdown(WRAP_UP_DEFAULT);
-  }, [activeLead, contactIndex, queue]);
+  }, [activeLead, contactIndex, queue, selectedOutcome, calledLeadIds]);
 
   const skipLead = useCallback(() => {
+    setCalledLeadIds((prev) => new Set(prev).add(activeLead.id));
     const idx = queue.findIndex((l) => l.id === activeLead.id);
-    const next = queue.slice(idx + 1).find((l) => !l.completed);
+    const next = queue.slice(idx + 1).find(
+      (l) => !l.completed && !calledLeadIds.has(l.id),
+    );
     if (next) {
       setActiveLeadId(next.id);
       setContactIndex(0);
@@ -58,7 +69,7 @@ export function DialerSession() {
       setQuickNote("");
       setCountdown(WRAP_UP_DEFAULT);
     }
-  }, [activeLead, queue]);
+  }, [activeLead, queue, calledLeadIds]);
 
   useEffect(() => {
     if (state !== "wrapup" || selectedOutcome !== "Connected" || paused) return;
@@ -129,6 +140,7 @@ export function DialerSession() {
             leads={queue}
             activeLeadId={activeLeadId}
             onSelect={selectLead}
+            calledLeadIds={calledLeadIds}
           />
           <CallHero
             lead={activeLead}
@@ -148,6 +160,8 @@ export function DialerSession() {
           <div className="relative w-[340px] shrink-0">
             <LeadDataPanel
               lead={activeLead}
+              activeContactIndex={contactIndex}
+              contactOutcomes={contactOutcomes}
               onOpenTimeline={() => setTimelineOpen(true)}
             />
             <ActivityTimelinePanel

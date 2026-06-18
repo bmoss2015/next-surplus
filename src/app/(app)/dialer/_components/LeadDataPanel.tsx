@@ -8,7 +8,11 @@ import {
   IconNote,
   IconFileText,
 } from "@tabler/icons-react";
-import type { DialerActivity, DialerLead } from "../_mock-data";
+import type {
+  CallOutcome,
+  DialerActivity,
+  DialerLead,
+} from "../_mock-data";
 
 const ACTIVITY_ICON: Record<DialerActivity["type"], React.ComponentType<{ size?: number; stroke?: number }>> = {
   Call: IconPhone,
@@ -20,9 +24,13 @@ const ACTIVITY_ICON: Record<DialerActivity["type"], React.ComponentType<{ size?:
 
 export function LeadDataPanel({
   lead,
+  activeContactIndex,
+  contactOutcomes,
   onOpenTimeline,
 }: {
   lead: DialerLead;
+  activeContactIndex: number;
+  contactOutcomes: Record<string, CallOutcome>;
   onOpenTimeline: () => void;
 }) {
   return (
@@ -81,64 +89,110 @@ export function LeadDataPanel({
 
       <Section title="Contact Tree">
         <ul className="divide-y divide-[rgba(15,23,41,0.06)]">
-          {lead.contacts.map((c, i) => (
-            <li
-              key={c.id}
-              className={[
-                "flex items-start gap-3 px-1.5 transition hover:bg-gray-50",
-                i === 0 ? "pb-3" : "py-3",
-              ].join(" ")}
-            >
-              <ContactAvatar name={c.name} active={c.status === "active"} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="truncate text-[13px] font-semibold text-ink">
-                    {c.name}
+          {lead.contacts.map((c, i) => {
+            const outcome = contactOutcomes[`${lead.id}:${c.id}`];
+            const isActive = i === activeContactIndex && !outcome;
+            const called = Boolean(outcome);
+            return (
+              <li
+                key={c.id}
+                className={[
+                  "flex items-start gap-3 px-1.5 transition hover:bg-gray-50",
+                  i === 0 ? "pb-3" : "py-3",
+                ].join(" ")}
+              >
+                <ContactAvatar name={c.name} active={isActive} called={called} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div
+                      className={[
+                        "truncate text-[13px] font-semibold",
+                        called ? "text-gray-500 line-through" : "text-ink",
+                      ].join(" ")}
+                    >
+                      {c.name}
+                    </div>
+                    <ContactOutcomePill
+                      outcome={outcome}
+                      active={isActive}
+                      pending={!called && !isActive}
+                    />
                   </div>
-                  <ContactStatusPill status={c.status} />
+                  <div className="mt-1">
+                    <span
+                      className={[
+                        "inline-flex items-center rounded-sm bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600",
+                        called ? "opacity-60" : "",
+                      ].join(" ")}
+                    >
+                      {c.relationship}
+                    </span>
+                  </div>
+                  <div
+                    className={[
+                      "mt-1 text-[11.5px] tabular-nums text-gray-500",
+                      called ? "line-through opacity-70" : "",
+                    ].join(" ")}
+                  >
+                    {c.phone}
+                  </div>
                 </div>
-                <div className="mt-1">
-                  <span className="inline-flex items-center rounded-sm bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600">
-                    {c.relationship}
-                  </span>
-                </div>
-                <div className="mt-1 text-[11.5px] tabular-nums text-gray-500">
-                  {c.phone}
-                </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </Section>
     </aside>
   );
 }
 
-function ContactStatusPill({
-  status,
+function ContactOutcomePill({
+  outcome,
+  active,
+  pending,
 }: {
-  status: "pending" | "active" | "done" | "skipped";
+  outcome: CallOutcome | undefined;
+  active: boolean;
+  pending: boolean;
 }) {
-  const config = {
-    active: { label: "On Call", dot: "bg-petrol-500", text: "text-petrol-500" },
-    done: { label: "Called", dot: "bg-gray-400", text: "text-gray-500" },
-    skipped: { label: "Skipped", dot: "bg-gray-300", text: "text-gray-500" },
-    pending: { label: "Remaining", dot: "bg-gray-300", text: "text-gray-500" },
-  }[status];
+  let label: string;
+  let dot: string;
+  let text: string;
+  if (active) {
+    label = "On Call";
+    dot = "bg-petrol-500";
+    text = "text-petrol-500";
+  } else if (pending) {
+    label = "Remaining";
+    dot = "bg-gray-300";
+    text = "text-gray-500";
+  } else {
+    label = outcome ?? "Called";
+    dot = "bg-gray-400";
+    text = "text-gray-500";
+  }
   return (
     <span
       className={[
         "inline-flex shrink-0 items-center gap-1 rounded-sm border border-gray-200 bg-white px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.10em]",
-        config.text,
+        text,
       ].join(" ")}
     >
-      <span className={["h-1.5 w-1.5 rounded-full", config.dot].join(" ")} />
-      {config.label}
+      <span className={["h-1.5 w-1.5 rounded-full", dot].join(" ")} />
+      {label}
     </span>
   );
 }
 
-function ContactAvatar({ name, active }: { name: string; active: boolean }) {
+function ContactAvatar({
+  name,
+  active,
+  called,
+}: {
+  name: string;
+  active: boolean;
+  called: boolean;
+}) {
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -151,7 +205,9 @@ function ContactAvatar({ name, active }: { name: string; active: boolean }) {
         "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
         active
           ? "bg-petrol-500 text-white"
-          : "bg-gray-100 text-gray-600 ring-1 ring-gray-200",
+          : called
+            ? "bg-gray-100 text-gray-400 line-through ring-1 ring-gray-200"
+            : "bg-gray-100 text-gray-600 ring-1 ring-gray-200",
       ].join(" ")}
     >
       {initials}

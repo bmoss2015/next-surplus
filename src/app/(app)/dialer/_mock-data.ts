@@ -3,7 +3,8 @@ export type CallOutcome =
   | "Connected"
   | "Voicemail"
   | "No Answer"
-  | "Wrong Number";
+  | "Wrong Number"
+  | "Disconnected";
 
 export type DialerContact = {
   id: string;

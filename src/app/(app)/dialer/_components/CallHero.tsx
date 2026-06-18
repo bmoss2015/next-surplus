@@ -206,7 +206,7 @@ export function CallHero({
               <ControlButton icon={IconHandStop} label="Hold" />
               <ControlButton icon={IconArrowsTransferUp} label="Transfer" />
             </div>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-1.5">
               <DispositionButton
                 label="No Answer"
                 onClick={() => onOutcome("No Answer")}
@@ -219,12 +219,16 @@ export function CallHero({
                 label="Wrong Number"
                 onClick={() => onOutcome("Wrong Number")}
               />
+              <DispositionButton
+                label="Disconnected"
+                onClick={() => onOutcome("Disconnected")}
+              />
               <button
                 type="button"
                 onClick={onEndCall}
-                className="ml-2 flex h-11 items-center gap-2 rounded-full bg-[#b91c1c] px-5 text-[13px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.20)] transition hover:bg-[#a01818]"
+                className="ml-1.5 flex h-9 items-center gap-1.5 rounded-full bg-[#b91c1c] px-4 text-[12.5px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.10),0_3px_8px_-2px_rgba(185,28,28,0.30)] transition hover:bg-[#a01818] hover:shadow-[0_2px_4px_rgba(0,0,0,0.15),0_4px_12px_-2px_rgba(185,28,28,0.40)]"
               >
-                <IconPhoneOff size={14} stroke={2.25} />
+                <IconPhoneOff size={13} stroke={2.25} />
                 End Call
               </button>
             </div>
@@ -233,10 +237,11 @@ export function CallHero({
       ) : (
         <div className="flex flex-1 flex-col">
           <div className="flex items-center justify-between gap-4 px-1">
-            <span className="text-[12px] font-semibold uppercase tracking-[0.10em] text-white/60">
-              Call Note
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 ring-1 ring-white/15">
+              <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
+              Wrap Up
             </span>
-            <span className="text-[18px] font-medium tabular-nums text-white/90">
+            <span className="text-[20px] font-medium tabular-nums text-white">
               {paused ? "Paused" : `${formatCountdown(countdown)} remaining`}
             </span>
           </div>
@@ -255,7 +260,7 @@ export function CallHero({
             <button
               type="button"
               onClick={onNextLead}
-              className="flex h-10 items-center gap-2 rounded-lg bg-[#13644e] px-5 text-[13.5px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.30),0_6px_16px_-4px_rgba(13,75,58,0.40)] transition hover:bg-[#0f5544]"
+              className="flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-[13.5px] font-semibold text-ink shadow-[0_2px_6px_rgba(0,0,0,0.18)] transition hover:bg-gray-100"
             >
               Next Lead
               <IconArrowRight size={15} stroke={2.25} />
@@ -374,8 +379,9 @@ function NoteTextarea({
         </div>
       </div>
       <div
+        onClick={() => editor.commands.focus()}
         className={[
-          "relative overflow-y-auto rounded-lg bg-white/[0.06] px-3.5 py-2.5 transition focus-within:bg-white/[0.09]",
+          "relative cursor-text overflow-y-auto rounded-lg bg-white/[0.06] px-3.5 py-2.5 transition focus-within:bg-white/[0.09]",
           fill ? "flex-1 min-h-0" : "max-h-[220px] min-h-[72px]",
         ].join(" ")}
       >
@@ -384,7 +390,7 @@ function NoteTextarea({
             {placeholder}
           </div>
         )}
-        <EditorContent editor={editor} />
+        <EditorContent editor={editor} className="min-h-full" />
       </div>
       <style jsx global>{`
         .dialer-note-editor p {
@@ -492,7 +498,7 @@ function DispositionButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-11 rounded-full bg-white px-4 text-[12.5px] font-semibold text-ink transition hover:bg-gray-100 active:bg-[#13644e] active:text-white"
+      className="h-9 rounded-full bg-white px-3.5 text-[12px] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)] transition hover:-translate-y-px hover:bg-gray-50 hover:shadow-[0_3px_8px_rgba(0,0,0,0.15)] active:translate-y-0 active:bg-[#13644e] active:text-white active:shadow-[0_1px_2px_rgba(13,75,58,0.30)]"
     >
       {label}
     </button>

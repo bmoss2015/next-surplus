@@ -8,10 +8,12 @@ export function QueuePanel({
   leads,
   activeLeadId,
   onSelect,
+  calledLeadIds,
 }: {
   leads: DialerLead[];
   activeLeadId: string;
   onSelect: (id: string) => void;
+  calledLeadIds: Set<string>;
 }) {
   const [q, setQ] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -77,38 +79,41 @@ export function QueuePanel({
         {filtered.map((lead, i) => {
           const idx = leads.findIndex((l) => l.id === lead.id) + 1;
           const isActive = lead.id === activeLeadId;
-          const isDone = lead.completed;
+          const isCalled = calledLeadIds.has(lead.id) || lead.completed;
           return (
             <button
               key={lead.id + "-" + i}
               type="button"
               onClick={() => onSelect(lead.id)}
               className={[
-                "group mx-1 mb-1 flex w-[calc(100%-8px)] items-start gap-2.5 rounded-md px-2.5 py-2.5 text-left transition",
-                isActive
-                  ? "bg-[#E8F0EE]"
-                  : isDone
-                    ? "opacity-50 hover:bg-gray-100"
-                    : "hover:bg-gray-100",
+                "group relative mx-1 mb-1 flex w-[calc(100%-8px)] items-start gap-2.5 rounded-md px-2.5 py-2.5 text-left transition",
+                isCalled && !isActive ? "opacity-55" : "",
+                isActive ? "bg-gray-50" : "hover:bg-gray-50",
               ].join(" ")}
             >
+              {isActive && (
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-sm bg-petrol-500"
+                />
+              )}
               <div
                 className={[
                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
                   isActive
                     ? "bg-petrol-500 text-white"
-                    : isDone
+                    : isCalled
                       ? "bg-petrol-500/80 text-white"
                       : "bg-gray-200 text-gray-600",
                 ].join(" ")}
               >
-                {isDone ? <IconCheck size={11} stroke={3} /> : idx}
+                {isCalled && !isActive ? <IconCheck size={11} stroke={3} /> : idx}
               </div>
               <div className="min-w-0 flex-1">
                 <div
                   className={[
                     "truncate text-[13px] font-medium",
-                    isDone ? "text-gray-500 line-through" : "text-ink",
+                    isCalled && !isActive ? "text-gray-500 line-through" : "text-ink",
                   ].join(" ")}
                 >
                   {lead.primaryName}
