@@ -127,8 +127,8 @@ export function IconSidebar({
               src="/brand/11-icon-dark-bg-transparent.svg"
               alt=""
               aria-hidden
-              width={22}
-              height={22}
+              width={30}
+              height={30}
               className="shrink-0"
             />
             <div
@@ -153,13 +153,13 @@ export function IconSidebar({
             onClick={toggle}
             aria-label="Expand sidebar"
             title="Expand"
-            className="mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-white/10"
+            className="mx-auto flex h-11 w-11 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-white/10"
           >
             <img
               src="/brand/11-icon-dark-bg-transparent.svg"
               alt="Next Surplus"
-              width={24}
-              height={24}
+              width={36}
+              height={36}
             />
           </button>
         )}
