@@ -6,10 +6,19 @@ type Variant = {
   layout: string;
   anchor: string;
   rationale: string;
-  round: "Round 1" | "Round 2";
+  round: "Round 1" | "Round 2" | "Locked";
 };
 
 const VARIANTS: Variant[] = [
+  {
+    slug: "v17",
+    name: "V17 (Locked Final)",
+    layout: "Split, Brand Left (Dark Green)",
+    anchor: "Bree spec, final lock",
+    rationale:
+      "All feedback from v11 through v16 applied. Inlined brand lockup on the white form side (no broken alt text). V11 dark green panel (no lightened gradient). Headline 'Built For Surplus Recovery.' single line. Founders Rate bottom bar with thin separator, no pills, no badges, Limited Time Offer as plain caps text.",
+    round: "Locked",
+  },
   {
     slug: "v1",
     name: "Linear",
@@ -103,6 +112,7 @@ const VARIANTS: Variant[] = [
 ];
 
 export default function SignupGallery() {
+  const locked = VARIANTS.filter((v) => v.round === "Locked");
   const round1 = VARIANTS.filter((v) => v.round === "Round 1");
   const round2 = VARIANTS.filter((v) => v.round === "Round 2");
 
@@ -113,14 +123,23 @@ export default function SignupGallery() {
           Signup Mockups
         </h1>
         <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-[#6b7280]">
-          Ten variants, anchored to real signup pages. Each variant renders as a
-          clickable page so proportions are visible in browser.
+          Eleven variants. V17 is the locked final per the V17 brief. Rounds 1
+          and 2 kept for comparison.
         </p>
       </div>
 
       <Section
-        title="Round 2 (Bree Feedback Applied)"
-        subtitle="Split screen, dark side opposite the form, no logo box on the dark side, check bullets and Founders Rate card. New anchors."
+        title="V17 (Locked Final)"
+        subtitle="The locked version. Inlined brand lockup so the logo always renders. V11 dark green panel. Headline 'Built For Surplus Recovery.' Founders Rate bottom bar with thin separator and Limited Time Offer as plain caps text (no pill, no badge)."
+      >
+        {locked.map((v) => (
+          <VariantCard key={v.slug} variant={v} />
+        ))}
+      </Section>
+
+      <Section
+        title="Round 2"
+        subtitle="Split screen, dark side opposite the form, no logo box on the dark side, check bullets and Founders Rate card. Kept for comparison."
       >
         {round2.map((v) => (
           <VariantCard key={v.slug} variant={v} />
@@ -138,15 +157,17 @@ export default function SignupGallery() {
 
       <div className="mt-10 rounded-[10px] border border-[#e5e7eb] bg-[#fafbfc] p-5">
         <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#04261c]">
-          Constraints Applied To Round 2
+          V17 Spec Compliance
         </div>
         <ul className="mt-3 grid grid-cols-1 gap-2 text-[12.5px] text-[#374151] md:grid-cols-2">
-          <li>Headline: Create Your Account</li>
-          <li>Subhead: Founders Rate. $49 a month, price held for 12 months.</li>
-          <li>Card required, no free tier, Stripe gated.</li>
-          <li>Single password rule (12 or more characters). No composition bars.</li>
-          <li>Wordmark only on dark sides. No square logo blob.</li>
-          <li>No Workflow Minds attribution anywhere.</li>
+          <li>Inlined SVG lockup, top-left of the white form side. Always renders.</li>
+          <li>V11 dark green panel (#02100c to #0a3d2d gradient), not the lightened v16 green.</li>
+          <li>Headline: Built For Surplus Recovery. (single line, period, title case).</li>
+          <li>Four bullets per V17 brief (no audit trail, IMAP, SMS, dialer, mail, templates).</li>
+          <li>Founders Rate bar: hairline separator + 3 col baseline aligned row.</li>
+          <li>Limited Time Offer as plain caps text. No pill, no border, no badge.</li>
+          <li>Continue To Checkout in #13644e brand green (lighter than panel).</li>
+          <li>Inter font, 13px body, 150ms ease hover on buttons + inputs.</li>
         </ul>
       </div>
     </div>
