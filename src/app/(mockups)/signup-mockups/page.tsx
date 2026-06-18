@@ -6,7 +6,7 @@ type Variant = {
   layout: string;
   anchor: string;
   rationale: string;
-  round: "Round 1" | "Round 2" | "Round 3";
+  round: "Round 1" | "Round 2" | "Round 3" | "V16";
 };
 
 const VARIANTS: Variant[] = [
@@ -145,12 +145,58 @@ const VARIANTS: Variant[] = [
       "Most minimalist. 'Now in beta' eyebrow + 56px 'Built for surplus recovery.' Three sparse assurances. Founders Rate as inline bottom row, no card.",
     round: "Round 3",
   },
+  {
+    slug: "v16-a",
+    name: "V16 A: Bottom Bar",
+    layout: "Split, Brand Left (Dark Green)",
+    anchor: "Bree spec, A/B/C/D/E Founders Rate study",
+    rationale:
+      "3 column row at bottom: price left, lock message center, Limited Time Offer outline pill right. Hairline divider above.",
+    round: "V16",
+  },
+  {
+    slug: "v16-b",
+    name: "V16 B: Contained Card",
+    layout: "Split, Brand Left (Dark Green)",
+    anchor: "Bree spec, A/B/C/D/E Founders Rate study",
+    rationale:
+      "Bordered card with subtle white/[0.05] background. $49 in 40px left, white-bg Limited Time Offer pill right, lock copy beneath.",
+    round: "V16",
+  },
+  {
+    slug: "v16-c",
+    name: "V16 C: Hairline Strip",
+    layout: "Split, Brand Left (Dark Green)",
+    anchor: "Bree spec, A/B/C/D/E Founders Rate study",
+    rationale:
+      "Compact single-line strip below a hairline divider. Everything inline. Lowest visual weight.",
+    round: "V16",
+  },
+  {
+    slug: "v16-d",
+    name: "V16 D: Eyebrow Badge",
+    layout: "Split, Brand Left (Dark Green)",
+    anchor: "Bree spec, A/B/C/D/E Founders Rate study",
+    rationale:
+      "Limited Time Offer pill at top with dot, then $49 in 44px, then lock copy beneath. Badge-led.",
+    round: "V16",
+  },
+  {
+    slug: "v16-e",
+    name: "V16 E: Pricing Block",
+    layout: "Split, Brand Left (Dark Green)",
+    anchor: "Bree spec, A/B/C/D/E Founders Rate study",
+    rationale:
+      "$49 in 64px hero, lock copy beneath, Limited Time Offer caps muted at bottom. Price-as-billboard.",
+    round: "V16",
+  },
 ];
 
 export default function SignupGallery() {
   const round1 = VARIANTS.filter((v) => v.round === "Round 1");
   const round2 = VARIANTS.filter((v) => v.round === "Round 2");
   const round3 = VARIANTS.filter((v) => v.round === "Round 3");
+  const v16 = VARIANTS.filter((v) => v.round === "V16");
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
@@ -159,13 +205,22 @@ export default function SignupGallery() {
           Signup Mockups
         </h1>
         <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-[#6b7280]">
-          Fifteen variants, anchored to real signup pages. Each variant renders
+          Twenty variants, anchored to real signup pages. Each variant renders
           as a clickable page so proportions are visible in browser.
         </p>
       </div>
 
       <Section
-        title="Round 3 (Latest)"
+        title="V16 (Latest, Founders Rate A/B/C/D/E Study)"
+        subtitle="Five mockups, same headline, copy, layout, colors, and form. Only the Founders Rate visual at the bottom of the dark panel changes. Headline 'The CRM For Surplus Recovery Firms.', logo on form side, Inter font, pulled-back dark green, brand emerald #13644e CTA."
+      >
+        {v16.map((v) => (
+          <VariantCard key={v.slug} variant={v} />
+        ))}
+      </Section>
+
+      <Section
+        title="Round 3"
         subtitle="Real logo from /brand. Headlines fill full panel width. Vertical single-column checks (no 2-column grids). Founders Rate sells harder: prominent number, lock-in copy, Limited Window pill. Trial assurances on most variants instead of 'What You Get' feature lists."
       >
         {round3.map((v) => (
