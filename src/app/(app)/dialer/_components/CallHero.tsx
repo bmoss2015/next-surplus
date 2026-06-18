@@ -7,8 +7,16 @@ import {
   IconNote,
   IconPhoneOff,
   IconNumber,
+  IconBold,
+  IconItalic,
+  IconList,
+  IconListNumbers,
+  IconArrowBack,
+  IconArrowForward,
 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
 import type { CallOutcome, DialerLead } from "../_mock-data";
 
 type CallState = "live" | "wrapup";
@@ -289,36 +297,150 @@ function NoteTextarea({
   placeholder?: string;
   autoFocus?: boolean;
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  function resize() {
-    const ta = ref.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    const next = Math.min(ta.scrollHeight, 220);
-    ta.style.height = `${next}px`;
-  }
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        codeBlock: false,
+        blockquote: false,
+        horizontalRule: false,
+        strike: false,
+        code: false,
+      }),
+    ],
+    content: value || "",
+    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onFocus: () => onFocusChange(true),
+    onBlur: () => onFocusChange(false),
+    editorProps: {
+      attributes: {
+        class:
+          "dialer-note-editor focus:outline-none text-[13.5px] leading-[1.65] text-white",
+      },
+    },
+    immediatelyRender: false,
+  });
 
   useEffect(() => {
-    resize();
-    if (autoFocus) ref.current?.focus();
-  }, [autoFocus]);
+    if (!editor) return;
+    if (autoFocus) editor.commands.focus("end");
+  }, [autoFocus, editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    if ((value || "") !== editor.getHTML()) {
+      editor.commands.setContent(value || "", { emitUpdate: false });
+    }
+  }, [value, editor]);
+
+  if (!editor) return null;
+
+  const isEmpty = editor.isEmpty;
 
   return (
-    <textarea
-      ref={ref}
-      value={value}
-      onChange={(e) => {
-        onChange(e.target.value);
-        resize();
-      }}
-      onFocus={() => onFocusChange(true)}
-      onBlur={() => onFocusChange(false)}
-      placeholder={placeholder}
-      rows={3}
-      className="w-full resize-none rounded-lg bg-[rgba(4,38,28,0.55)] px-3.5 py-2.5 text-[13.5px] leading-relaxed text-white placeholder:text-white/55 outline-none ring-1 ring-white/15 transition focus:bg-[rgba(4,38,28,0.70)] focus:ring-white/40"
-      style={{ maxHeight: 220, minHeight: 76 }}
-    />
+    <div className="rounded-lg bg-[rgba(4,38,28,0.55)] ring-1 ring-white/15 transition focus-within:bg-[rgba(4,38,28,0.70)] focus-within:ring-white/40">
+      <div className="flex items-center gap-0.5 border-b border-white/10 px-2 py-1.5">
+        <NoteToolBtn
+          icon={IconBold}
+          label="Bold"
+          active={editor.isActive("bold")}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+        />
+        <NoteToolBtn
+          icon={IconItalic}
+          label="Italic"
+          active={editor.isActive("italic")}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+        />
+        <span className="mx-0.5 h-3.5 w-px bg-white/20" />
+        <NoteToolBtn
+          icon={IconList}
+          label="Bullet list"
+          active={editor.isActive("bulletList")}
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+        />
+        <NoteToolBtn
+          icon={IconListNumbers}
+          label="Numbered list"
+          active={editor.isActive("orderedList")}
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        />
+        <div className="ml-auto flex items-center gap-0.5">
+          <NoteToolBtn
+            icon={IconArrowBack}
+            label="Undo"
+            onClick={() => editor.chain().focus().undo().run()}
+            disabled={!editor.can().undo()}
+          />
+          <NoteToolBtn
+            icon={IconArrowForward}
+            label="Redo"
+            onClick={() => editor.chain().focus().redo().run()}
+            disabled={!editor.can().redo()}
+          />
+        </div>
+      </div>
+      <div className="relative max-h-[220px] min-h-[72px] overflow-y-auto px-3.5 py-2.5">
+        {isEmpty && placeholder && (
+          <div className="pointer-events-none absolute left-3.5 top-2.5 text-[13.5px] text-white/55">
+            {placeholder}
+          </div>
+        )}
+        <EditorContent editor={editor} />
+      </div>
+      <style jsx global>{`
+        .dialer-note-editor p {
+          margin: 0.2em 0;
+        }
+        .dialer-note-editor ul {
+          list-style: disc;
+          padding-left: 1.4em;
+          margin: 0.3em 0;
+        }
+        .dialer-note-editor ol {
+          list-style: decimal;
+          padding-left: 1.6em;
+          margin: 0.3em 0;
+        }
+        .dialer-note-editor strong {
+          font-weight: 600;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function NoteToolBtn({
+  icon: Icon,
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  icon: React.ComponentType<{ size: number; stroke: number }>;
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={
+        "rounded-md p-1.5 transition-colors " +
+        (disabled
+          ? "text-white/25"
+          : active
+            ? "bg-white/20 text-white"
+            : "text-white/70 hover:bg-white/10 hover:text-white")
+      }
+    >
+      <Icon size={13} stroke={1.75} />
+    </button>
   );
 }
 
