@@ -115,16 +115,24 @@ export function IconSidebar({
           "linear-gradient(180deg, #04261c 0%, #0d4b3a 100%)",
       }}
     >
-      {/* Brand row — collapse toggle lives here at the top instead of buried
-          near the account menu. Collapsed: the ME monogram is the expand
-          button (one tap to expand). Expanded: full wordmark on the left,
-          dedicated collapse chevron on the right. Two states, never both
-          monogram + wordmark together. */}
+      {/* Brand row — diamond logomark renders directly on the dark chrome,
+          no container shape. Pattern matches Linear / Attio / Close which
+          render their logomark directly on the sidebar surface. Expanded:
+          diamond + "Next Surplus" white wordmark + collapse chevron.
+          Collapsed: diamond only, doubles as the expand button. */}
       <div className="flex h-14 shrink-0 items-center gap-2.5 px-[18px]">
         {expanded ? (
           <>
+            <img
+              src="/brand/11-icon-dark-bg-transparent.svg"
+              alt=""
+              aria-hidden
+              width={22}
+              height={22}
+              className="shrink-0"
+            />
             <div
-              className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-tight"
+              className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-tight text-white"
               title="Next Surplus"
             >
               Next Surplus
@@ -145,10 +153,14 @@ export function IconSidebar({
             onClick={toggle}
             aria-label="Expand sidebar"
             title="Expand"
-            className="mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-[11.5px] font-bold tracking-tight text-white transition-all hover:brightness-125"
-            style={{ background: "rgba(255,255,255,0.10)" }}
+            className="mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-white/10"
           >
-            ME
+            <img
+              src="/brand/11-icon-dark-bg-transparent.svg"
+              alt="Next Surplus"
+              width={24}
+              height={24}
+            />
           </button>
         )}
       </div>
