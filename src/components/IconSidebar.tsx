@@ -120,19 +120,26 @@ export function IconSidebar({
           render their logomark directly on the sidebar surface. Expanded:
           diamond + "Next Surplus" white wordmark + collapse chevron.
           Collapsed: diamond only, doubles as the expand button. */}
-      <div className="flex h-16 shrink-0 items-center gap-2 pl-[10px] pr-3">
+      <div className="flex h-16 shrink-0 items-center gap-2.5 pl-[14px] pr-3">
         {expanded ? (
           <>
             <img
               src="/brand/11-icon-dark-bg-transparent.svg"
               alt=""
               aria-hidden
-              width={10}
-              height={10}
+              width={24}
+              height={24}
               className="shrink-0"
             />
             <div
-              className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-tight text-white"
+              className="min-w-0 flex-1 truncate text-[15px] text-white"
+              style={{
+                fontFamily:
+                  "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
+                fontWeight: 500,
+                letterSpacing: "-0.012em",
+                wordSpacing: "0.14em",
+              }}
               title="Next Surplus"
             >
               Next Surplus
