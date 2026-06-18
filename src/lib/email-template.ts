@@ -15,35 +15,36 @@ function resolveLogoUrl(): string {
   return `${STAGING_APP_URL}/images/email-logo.png`;
 }
 
-function resolveAppUrl(): string {
-  if (process.env.VERCEL_ENV === "production") return PROD_APP_URL;
-  return STAGING_APP_URL;
-}
-
 const LOGO_URL = resolveLogoUrl();
-const APP_URL = resolveAppUrl();
 
-const HEADER_BG = "#04261c";
-const BODY_BG = "#ffffff";
-const FOOTER_BG = "#f5f5f5";
+const PAGE_BG = "#f5f5f5";
+const CARD_BG = "#ffffff";
+const FOOTER_BG = "#fafafa";
 const TEXT_PRIMARY = "#1a1a1a";
 const TEXT_SECONDARY = "#6b7280";
-const LINK = "#13644e";
+const TEXT_BODY = "#4b5563";
+const BRAND_DARK = "#04261c";
+const BRAND_MID = "#13644e";
+const BRAND_LIGHT = "#4a9c75";
 const BORDER = "#e5e7eb";
 
-const FONT_STACK = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const FONT_STACK =
+  "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 export function renderEmailShell({
   subject,
   bodyHtml,
   preheader,
+  footerLine,
 }: {
   subject: string;
   bodyHtml: string;
   preheader: string;
+  footerLine?: string;
 }): string {
   const safeSubject = escapeHtml(subject);
   const safePreheader = escapeHtml(preheader);
+  const footer = footerLine ?? "Next Surplus";
 
   return `<!doctype html>
 <html lang="en">
@@ -55,29 +56,32 @@ export function renderEmailShell({
   <title>${safeSubject}</title>
   <style>
     :root { color-scheme: light only; supported-color-schemes: light; }
-    a { color: ${LINK}; text-decoration: none; }
+    a { color: ${BRAND_MID}; text-decoration: none; }
     a:hover { text-decoration: underline; }
   </style>
 </head>
-<body style="margin:0;padding:0;background-color:${FOOTER_BG};font-family:${FONT_STACK};color:${TEXT_PRIMARY};">
-  <div style="display:none;font-size:1px;color:${FOOTER_BG};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${safePreheader}</div>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${FOOTER_BG};padding:32px 16px;">
+<body style="margin:0;padding:0;background-color:${PAGE_BG};font-family:${FONT_STACK};color:${TEXT_PRIMARY};">
+  <div style="display:none;font-size:1px;color:${PAGE_BG};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${safePreheader}</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${PAGE_BG};padding:40px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:${BODY_BG};border-radius:8px;overflow:hidden;border:1px solid ${BORDER};">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:${CARD_BG};border:1px solid ${BORDER};border-radius:6px;overflow:hidden;">
           <tr>
-            <td bgcolor="${HEADER_BG}" align="center" height="48" style="background-color:${HEADER_BG};height:48px;padding:10px 0;line-height:0;">
-              <img src="${LOGO_URL}" alt="Next Surplus" width="160" height="28" style="display:block;border:0;outline:none;text-decoration:none;width:160px;height:28px;margin:0 auto;">
+            <td height="4" style="height:4px;line-height:0;font-size:0;background-image:linear-gradient(90deg,${BRAND_DARK} 0%,${BRAND_MID} 50%,${BRAND_LIGHT} 100%);background-color:${BRAND_MID};">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:30px 40px 0;">
+              <img src="${LOGO_URL}" alt="Next Surplus" width="200" height="35" style="display:block;border:0;outline:none;text-decoration:none;width:200px;height:auto;">
             </td>
           </tr>
           <tr>
-            <td bgcolor="${BODY_BG}" style="background-color:${BODY_BG};padding:32px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${TEXT_PRIMARY};">
+            <td style="padding:24px 40px 32px;font-family:${FONT_STACK};font-size:14px;line-height:1.6;color:${TEXT_PRIMARY};">
               ${bodyHtml}
             </td>
           </tr>
           <tr>
-            <td bgcolor="${FOOTER_BG}" style="background-color:${FOOTER_BG};padding:20px 32px;border-top:1px solid ${BORDER};font-family:${FONT_STACK};font-size:12px;line-height:1.5;color:${TEXT_SECONDARY};">
-              <a href="${APP_URL}" style="color:${TEXT_SECONDARY};text-decoration:none;">Next Surplus</a>
+            <td style="padding:18px 40px;background-color:${FOOTER_BG};border-top:1px solid ${BORDER};font-family:${FONT_STACK};font-size:12px;line-height:1.5;color:${TEXT_SECONDARY};">
+              ${footer}
             </td>
           </tr>
         </table>
@@ -88,6 +92,31 @@ export function renderEmailShell({
 </html>`;
 }
 
+export function renderEmailEyebrow(label: string): string {
+  return `<div style="font-family:${FONT_STACK};font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${BRAND_MID};">${escapeHtml(label)}</div>`;
+}
+
+export function renderEmailHeadline(text: string): string {
+  return `<h1 style="margin:8px 0 0;font-family:${FONT_STACK};font-size:22px;font-weight:600;letter-spacing:-0.01em;color:${TEXT_PRIMARY};line-height:1.3;">${escapeHtml(text)}</h1>`;
+}
+
+export function renderEmailIntro(text: string): string {
+  return `<p style="margin:12px 0 0;font-family:${FONT_STACK};font-size:14px;line-height:1.6;color:${TEXT_BODY};">${text}</p>`;
+}
+
+export function renderEmailDataBlock(
+  rows: Array<{ label: string; value: string }>
+): string {
+  const rowHtml = rows
+    .map((r, i) => {
+      const topPad = i === 0 ? "14px" : "6px";
+      const bottomPad = i === rows.length - 1 ? "14px" : "6px";
+      return `<tr><td style="padding:${topPad} 0 ${bottomPad};font-family:${FONT_STACK};font-size:12px;color:${TEXT_SECONDARY};width:120px;vertical-align:top;">${escapeHtml(r.label)}</td><td style="padding:${topPad} 0 ${bottomPad};font-family:${FONT_STACK};font-size:14px;color:${TEXT_PRIMARY};vertical-align:top;">${escapeHtml(r.value)}</td></tr>`;
+    })
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:24px 0 0;border-top:1px solid ${BORDER};">${rowHtml}</table>`;
+}
+
 export function renderEmailButton({
   href,
   label,
@@ -95,10 +124,10 @@ export function renderEmailButton({
   href: string;
   label: string;
 }): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0;">
   <tr>
-    <td bgcolor="${LINK}" style="background-color:${LINK};border-radius:6px;">
-      <a href="${escapeHtml(href)}" style="display:inline-block;min-height:20px;padding:12px 24px;font-family:${FONT_STACK};font-size:15px;font-weight:500;color:#ffffff;text-decoration:none;border-radius:6px;line-height:20px;">${escapeHtml(label)}</a>
+    <td style="background-image:linear-gradient(90deg,${BRAND_DARK} 0%,${BRAND_MID} 100%);background-color:${BRAND_MID};border-radius:4px;">
+      <a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 22px;font-family:${FONT_STACK};font-size:14px;font-weight:500;color:#ffffff;text-decoration:none;border-radius:4px;line-height:1.2;">${escapeHtml(label)}</a>
     </td>
   </tr>
 </table>`;
@@ -114,11 +143,14 @@ export function escapeHtml(s: string): string {
 }
 
 export const EMAIL_COLORS = {
-  headerBg: HEADER_BG,
-  bodyBg: BODY_BG,
+  pageBg: PAGE_BG,
+  cardBg: CARD_BG,
   footerBg: FOOTER_BG,
   textPrimary: TEXT_PRIMARY,
   textSecondary: TEXT_SECONDARY,
-  link: LINK,
+  textBody: TEXT_BODY,
+  brandDark: BRAND_DARK,
+  brandMid: BRAND_MID,
+  brandLight: BRAND_LIGHT,
   border: BORDER,
 } as const;
