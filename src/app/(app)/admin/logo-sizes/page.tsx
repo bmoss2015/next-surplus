@@ -1,45 +1,12 @@
-const VARIANTS: { letter: string; height: number }[] = [
-  { letter: "A", height: 14 },
-  { letter: "B", height: 18 },
-  { letter: "C", height: 22 },
-  { letter: "D", height: 26 },
-  { letter: "E", height: 30 },
-  { letter: "F", height: 34 },
-  { letter: "G", height: 38 },
+const VARIANTS: { letter: string; icon: number; gap: number }[] = [
+  { letter: "A", icon: 24, gap: 10 },
+  { letter: "B", icon: 28, gap: 10 },
+  { letter: "C", icon: 32, gap: 12 },
+  { letter: "D", icon: 36, gap: 12 },
+  { letter: "E", icon: 40, gap: 14 },
+  { letter: "F", icon: 44, gap: 14 },
+  { letter: "G", icon: 48, gap: 16 },
 ];
-
-const LOCKUP_RATIO = 446 / 52;
-
-function Lockup({ height }: { height: number }) {
-  const width = Math.round(height * LOCKUP_RATIO);
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="14 14 446 52"
-      width={width}
-      height={height}
-      style={{
-        fontFamily:
-          "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
-      }}
-    >
-      <polygon points="40,26 54,40 40,54 26,40" fill="#ffffff" />
-      <polygon points="40,26 54,40 40,40" fill="#13644e" />
-      <polygon points="40,40 54,40 40,54" fill="#4a9c75" />
-      <text
-        x="90"
-        y="56"
-        fontSize="42"
-        fontWeight="500"
-        fill="#ffffff"
-        letterSpacing="-0.5"
-        wordSpacing="6"
-      >
-        Next Surplus
-      </text>
-    </svg>
-  );
-}
 
 export default function LogoSizesPage() {
   return (
@@ -60,42 +27,60 @@ export default function LogoSizesPage() {
             Sidebar Logo Sizing
           </h1>
           <p className="mt-2 max-w-2xl text-[13px] text-gray-600">
-            Seven candidates rendered from the real lockup geometry (matches
-            /brand/04-lockup-horizontal-dark.svg, white-square removed, white
-            left facet + green right facets). Each strip is 220px wide on the
-            actual sidebar gradient. Pick the letter you want and I will wire
-            it in.
+            Seven candidates of the actual file at
+            /brand/11-icon-dark-bg-transparent.svg rendered via &lt;img&gt;,
+            paired with the Next Surplus wordmark in Plus Jakarta Sans 500
+            (matches the brand wordmark spec). Each strip is 220px wide on
+            the real sidebar gradient. Pick a letter and I will wire it in.
           </p>
         </div>
         <div className="flex flex-col gap-6">
-          {VARIANTS.map((v) => {
-            const width = Math.round(v.height * LOCKUP_RATIO);
-            return (
-              <div key={v.letter} className="flex items-center gap-6">
-                <div className="w-28 shrink-0">
-                  <div className="text-[28px] font-bold tracking-tight text-ink">
-                    {v.letter}
-                  </div>
-                  <div className="text-[12px] text-gray-500">
-                    Height {v.height}px
-                  </div>
-                  <div className="text-[12px] text-gray-500">
-                    Width {width}px
-                  </div>
+          {VARIANTS.map((v) => (
+            <div key={v.letter} className="flex items-center gap-6">
+              <div className="w-28 shrink-0">
+                <div className="text-[28px] font-bold tracking-tight text-ink">
+                  {v.letter}
                 </div>
-                <div
-                  className="relative flex h-16 shrink-0 items-center pl-[10px] pr-3"
-                  style={{
-                    width: 220,
-                    background:
-                      "linear-gradient(180deg, #04261c 0%, #0d4b3a 100%)",
-                  }}
-                >
-                  <Lockup height={v.height} />
+                <div className="text-[12px] text-gray-500">
+                  Icon {v.icon}px
+                </div>
+                <div className="text-[12px] text-gray-500">
+                  Gap {v.gap}px
                 </div>
               </div>
-            );
-          })}
+              <div
+                className="relative flex h-16 shrink-0 items-center pl-[14px] pr-3 text-white"
+                style={{
+                  width: 220,
+                  gap: v.gap,
+                  background:
+                    "linear-gradient(180deg, #04261c 0%, #0d4b3a 100%)",
+                }}
+              >
+                <img
+                  src="/brand/11-icon-dark-bg-transparent.svg"
+                  alt=""
+                  aria-hidden
+                  width={v.icon}
+                  height={v.icon}
+                  className="shrink-0"
+                />
+                <div
+                  className="min-w-0 flex-1 truncate text-[15px] tracking-tight text-white"
+                  style={{
+                    fontFamily:
+                      "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
+                    fontWeight: 500,
+                    letterSpacing: "-0.012em",
+                    wordSpacing: "0.14em",
+                  }}
+                  title="Next Surplus"
+                >
+                  Next Surplus
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </>
