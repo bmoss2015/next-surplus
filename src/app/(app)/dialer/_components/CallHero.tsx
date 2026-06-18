@@ -247,10 +247,10 @@ export function CallHero({
                     type="button"
                     onClick={() => onOutcome(o)}
                     className={[
-                      "h-11 rounded-lg text-[13px] font-semibold transition",
+                      "h-10 rounded-full px-4 text-[13px] font-semibold transition",
                       sel
-                        ? "bg-white text-petrol-700 shadow-[0_2px_6px_rgba(0,0,0,0.18)]"
-                        : "bg-[rgba(255,255,255,0.10)] text-white ring-1 ring-white/25 hover:bg-[rgba(255,255,255,0.18)]",
+                        ? "bg-white text-ink"
+                        : "text-white/70 hover:bg-white/[0.08] hover:text-white",
                     ].join(" ")}
                   >
                     {o}
@@ -259,7 +259,20 @@ export function CallHero({
               })}
             </div>
 
-            <div className="mt-4 flex flex-1 flex-col min-h-0">
+            <div className="mt-4 flex items-center justify-between gap-4 px-1">
+              <span className="text-[12px] uppercase tracking-[0.10em] text-white/55">
+                {selectedOutcome === "Connected" ? "Wrap Up" : "Skipping Wrap Up"}
+              </span>
+              <span className="text-[16px] font-medium tabular-nums text-white/85">
+                {paused
+                  ? "Paused"
+                  : selectedOutcome === "Connected"
+                    ? `${formatCountdown(countdown)} remaining`
+                    : "Auto advancing"}
+              </span>
+            </div>
+
+            <div className="mt-3 flex flex-1 flex-col min-h-0">
               <NoteTextarea
                 value={quickNote}
                 onChange={setQuickNote}
@@ -277,25 +290,16 @@ export function CallHero({
                   onChange={(e) => setSkipFollowUp(e.target.checked)}
                   className="h-3.5 w-3.5 accent-white"
                 />
-                Skip Follow Up This Call
+                Skip Follow Up
               </label>
-              <div className="flex items-center gap-4">
-                <span className="text-[12.5px] tabular-nums text-white/60">
-                  {paused
-                    ? "Paused"
-                    : selectedOutcome === "Connected"
-                      ? `${formatCountdown(countdown)} remaining`
-                      : "Auto advance"}
-                </span>
-                <button
-                  type="button"
-                  onClick={onNextLead}
-                  className="flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-[13.5px] font-semibold text-petrol-700 shadow-[0_2px_6px_rgba(0,0,0,0.18)] transition hover:bg-gray-100"
-                >
-                  Next Lead
-                  <IconArrowRight size={15} stroke={2.25} />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onNextLead}
+                className="flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-[13.5px] font-semibold text-ink transition hover:bg-gray-100"
+              >
+                Next Lead
+                <IconArrowRight size={15} stroke={2.25} />
+              </button>
             </div>
           </div>
         )}
@@ -365,11 +369,11 @@ function NoteTextarea({
   return (
     <div
       className={[
-        "rounded-lg bg-[rgba(4,38,28,0.55)] ring-1 ring-white/15 transition focus-within:bg-[rgba(4,38,28,0.70)] focus-within:ring-white/40",
+        "rounded-lg bg-black/20 ring-1 ring-white/25 transition focus-within:bg-black/25 focus-within:ring-white/35",
         fill ? "flex flex-1 flex-col min-h-0" : "",
       ].join(" ")}
     >
-      <div className="flex shrink-0 items-center gap-0.5 border-b border-white/10 px-2 py-1.5">
+      <div className="flex shrink-0 items-center gap-0.5 border-b border-white/15 px-2 py-1.5">
         <NoteToolBtn
           icon={IconBold}
           label="Bold"
