@@ -1,10 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
-// Server-side Supabase client for Server Components, Route Handlers, and Server Actions.
-// Reads the auth session from the request cookies.
 export async function createClient() {
   const cookieStore = await cookies();
+  const headerList = await headers();
+  const host = (headerList.get("host") ?? "").toLowerCase().split(":")[0];
+  const isProdDomain =
+    host === "nextsurplus.com" ||
+    host === "www.nextsurplus.com" ||
+    host === "app.nextsurplus.com";
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,13 +20,13 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Called from a Server Component — cookies can't be set.
-            // The middleware refresh will handle it on the next request.
-          }
+            cookiesToSet.forEach(({ name, value, options }) => {
+              const finalOptions = isProdDomain
+                ? { ...options, domain: ".nextsurplus.com" }
+                : options;
+              cookieStore.set(name, value, finalOptions);
+            });
+          } catch {}
         },
       },
     }
