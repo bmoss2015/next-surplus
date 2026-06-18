@@ -33,13 +33,16 @@ export function TeamSection({
 }) {
   const [inviteOpen, setInviteOpen] = useState(false);
 
+  const isAdminRole = (m: OrgMemberRow) =>
+    m.role === "admin" || m.role === "owner";
+
   const total = initial.length;
   const active = initial.filter((m) => !m.pending).length;
   const pending = initial.filter((m) => m.pending).length;
-  const admins = initial.filter((m) => m.role === "admin").length;
+  const admins = initial.filter(isAdminRole).length;
 
-  const adminRows = initial.filter((m) => m.role === "admin");
-  const memberRows = initial.filter((m) => m.role !== "admin" && !m.pending);
+  const adminRows = initial.filter((m) => isAdminRole(m) && !m.pending);
+  const memberRows = initial.filter((m) => !isAdminRole(m) && !m.pending);
   const pendingRows = initial.filter((m) => m.pending);
 
   return (
@@ -128,12 +131,12 @@ export function TeamSection({
 }
 
 function Row({ m, isSelf }: { m: OrgMemberRow; isSelf: boolean }) {
-  const av =
-    m.role === "admin" ? "av-self" : m.pending ? "av-5" : "av-1";
-  const roleTab =
-    m.pending ? "PENDING" : m.role === "admin" ? "ADMIN" : "MEMBER";
+  const isAdminLike = m.role === "admin" || m.role === "owner";
+  const av = isAdminLike ? "av-self" : m.pending ? "av-5" : "av-1";
+  const roleTab = m.pending ? "PENDING" : isAdminLike ? "ADMIN" : "MEMBER";
+  const dataRole = m.pending ? "pending" : isAdminLike ? "admin" : "member";
   return (
-    <div className="list-row" data-role={m.pending ? "pending" : m.role}>
+    <div className="list-row" data-role={dataRole}>
       <div className={`avatar ${av} av-fill`}>{avatarInitials(m.full_name, m.email)}</div>
       <div className="flex-1 min-w-0">
         <div className="row-name text-[13.5px] font-medium">

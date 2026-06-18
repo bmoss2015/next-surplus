@@ -151,12 +151,12 @@ export function MemberOverflow({
     });
   }
 
-  if (isSelf) {
+  if (isSelf || member.role === "owner") {
     return (
       <div className="overflow">
         <div
           className="icon-btn"
-          title="That's you"
+          title={isSelf ? "That's you" : "Owner role can't be changed"}
           style={{ opacity: 0.3, pointerEvents: "none" }}
         >
           <IconDots size={16} stroke={1.75} />
