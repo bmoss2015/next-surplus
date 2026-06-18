@@ -23,7 +23,7 @@ export function DialerSession() {
   const [paused, setPaused] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
-  const [selectedOutcome, setSelectedOutcome] = useState<CallOutcome>("Spoke");
+  const [selectedOutcome, setSelectedOutcome] = useState<CallOutcome>("Called");
   const [quickNote, setQuickNote] = useState("");
   const [countdown, setCountdown] = useState<number>(WRAP_UP_DEFAULT);
   const [contactOutcomes, setContactOutcomes] = useState<Record<string, CallOutcome>>({});
@@ -50,7 +50,7 @@ export function DialerSession() {
       }
     }
     setState("live");
-    setSelectedOutcome("Spoke");
+    setSelectedOutcome("Called");
     setQuickNote("");
     setCountdown(WRAP_UP_DEFAULT);
   }, [activeLead, contactIndex, queue, selectedOutcome, calledLeadIds]);
@@ -65,14 +65,14 @@ export function DialerSession() {
       setActiveLeadId(next.id);
       setContactIndex(0);
       setState("live");
-      setSelectedOutcome("Spoke");
+      setSelectedOutcome("Called");
       setQuickNote("");
       setCountdown(WRAP_UP_DEFAULT);
     }
   }, [activeLead, queue, calledLeadIds]);
 
   useEffect(() => {
-    if (state !== "wrapup" || selectedOutcome !== "Spoke" || paused) return;
+    if (state !== "wrapup" || selectedOutcome !== "Called" || paused) return;
     const start = Date.now();
     const startFrom = countdown;
     const tick = setInterval(() => {
@@ -93,19 +93,19 @@ export function DialerSession() {
 
   function endCall() {
     setState("wrapup");
-    setSelectedOutcome("Spoke");
+    setSelectedOutcome("Called");
     setCountdown(WRAP_UP_DEFAULT);
   }
 
   function pickOutcome(o: CallOutcome) {
     setSelectedOutcome(o);
-    if (o !== "Spoke") {
+    if (o !== "Called") {
       advance();
     }
   }
 
   function nextLead() {
-    if (selectedOutcome === "Spoke") {
+    if (selectedOutcome === "Called") {
       setToastVisible(true);
     }
     advance();
@@ -115,7 +115,7 @@ export function DialerSession() {
     setActiveLeadId(id);
     setContactIndex(0);
     setState("live");
-    setSelectedOutcome("Spoke");
+    setSelectedOutcome("Called");
     setQuickNote("");
     setCountdown(WRAP_UP_DEFAULT);
   }

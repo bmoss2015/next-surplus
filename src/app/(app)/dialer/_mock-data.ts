@@ -1,6 +1,6 @@
 export type DialerContactStatus = "pending" | "active" | "done" | "skipped";
 export type CallOutcome =
-  | "Spoke"
+  | "Called"
   | "Voicemail"
   | "No Answer"
   | "Wrong Number"
