@@ -189,6 +189,13 @@ export default function LoginPage() {
           <Link href="/privacy" className="hover:text-[#04261c]">
             Privacy
           </Link>
+          <span aria-hidden>&middot;</span>
+          <a
+            href="mailto:support@nextsurplus.com"
+            className="hover:text-[#04261c]"
+          >
+            Support
+          </a>
         </div>
       </div>
     </div>
