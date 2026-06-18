@@ -58,51 +58,6 @@ const NAV: NavItem[] = [
   { label: "Owner",        href: "/owner",         Icon: ShieldCheck, ownerOnly: true },
 ];
 
-function NextSurplusLockup() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 460 80"
-      role="img"
-      aria-label="Next Surplus"
-      style={{ height: 28, width: "auto", display: "block" }}
-    >
-      <rect x="14" y="14" width="52" height="52" fill="#ffffff" />
-      <polygon points="40,26 54,40 40,54 26,40" fill="#04261c" />
-      <polygon points="40,26 54,40 40,40" fill="#4a9c75" />
-      <polygon points="40,40 54,40 40,54" fill="#13644e" />
-      <text
-        x="90"
-        y="56"
-        fontSize="42"
-        fontWeight="500"
-        fill="#ffffff"
-        letterSpacing="-0.5"
-        fontFamily="'Plus Jakarta Sans', system-ui, sans-serif"
-      >
-        Next Surplus
-      </text>
-    </svg>
-  );
-}
-
-function NextSurplusMark() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 64 64"
-      role="img"
-      aria-label="Next Surplus"
-      style={{ width: 32, height: 32, display: "block" }}
-    >
-      <rect x="6" y="6" width="52" height="52" fill="#ffffff" />
-      <polygon points="32,18 46,32 32,46 18,32" fill="#04261c" />
-      <polygon points="32,18 46,32 32,32" fill="#4a9c75" />
-      <polygon points="32,32 46,32 32,46" fill="#13644e" />
-    </svg>
-  );
-}
-
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -162,15 +117,34 @@ export function IconSidebar({
           "linear-gradient(180deg, #04261c 0%, #0d4b3a 100%)",
       }}
     >
-      {/* Brand row — collapse toggle lives here at the top instead of buried
-          near the account menu. Collapsed: the icon-only logo is the expand
-          button (one tap to expand). Expanded: full horizontal lockup on the
-          left, dedicated collapse chevron on the right. */}
-      <div className="flex h-14 shrink-0 items-center gap-2.5 px-[18px]">
+      {/* Brand row — diamond logomark renders directly on the dark chrome,
+          no container shape. Pattern matches Linear / Attio / Close which
+          render their logomark directly on the sidebar surface. Expanded:
+          diamond + "Next Surplus" white wordmark + collapse chevron.
+          Collapsed: diamond only, doubles as the expand button. */}
+      <div className="flex h-16 shrink-0 items-center gap-2.5 pl-[14px] pr-3">
         {expanded ? (
           <>
-            <div className="min-w-0 flex-1" title="Next Surplus">
-              <NextSurplusLockup />
+            <img
+              src="/brand/11-icon-dark-bg-transparent.svg"
+              alt=""
+              aria-hidden
+              width={20}
+              height={20}
+              className="shrink-0"
+            />
+            <div
+              className="min-w-0 flex-1 truncate text-[15px] text-white"
+              style={{
+                fontFamily:
+                  "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
+                fontWeight: 500,
+                letterSpacing: "-0.012em",
+                wordSpacing: "0.14em",
+              }}
+              title="Next Surplus"
+            >
+              Next Surplus
             </div>
             <button
               type="button"
@@ -188,9 +162,14 @@ export function IconSidebar({
             onClick={toggle}
             aria-label="Expand sidebar"
             title="Expand"
-            className="mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition-all hover:brightness-125"
+            className="mx-auto flex h-12 w-12 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-white/10"
           >
-            <NextSurplusMark />
+            <img
+              src="/brand/11-icon-dark-bg-transparent.svg"
+              alt="Next Surplus"
+              width={48}
+              height={48}
+            />
           </button>
         )}
       </div>

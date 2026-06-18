@@ -4,6 +4,20 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { completeInviteProfile } from "@/app/(app)/settings/_actions";
+import {
+  PasswordRequirements,
+  passwordMeetsRequirements,
+} from "@/components/PasswordRequirements";
+import { InlineError } from "@/components/InlineError";
+
+function postSetupDestination(): string {
+  if (typeof window === "undefined") return "/";
+  const host = window.location.host;
+  if (host === "nextsurplus.com" || host === "www.nextsurplus.com") {
+    return "https://app.nextsurplus.com/";
+  }
+  return "/";
+}
 
 function splitName(fullName: string | null | undefined): {
   first: string;
@@ -81,7 +95,7 @@ export default function AcceptInvitePage() {
   const namesReady =
     firstName.trim().length > 0 && lastName.trim().length > 0;
   const passwordsReady =
-    password.length >= 12 && password === confirm;
+    passwordMeetsRequirements(password) && password === confirm;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -90,12 +104,12 @@ export default function AcceptInvitePage() {
       setError("First and last name are required");
       return;
     }
-    if (password.length < 12) {
-      setError("Password must be at least 12 characters");
+    if (!passwordMeetsRequirements(password)) {
+      setError("Password does not meet the requirements");
       return;
     }
     if (password !== confirm) {
-      setError("Passwords don't match");
+      setError("Passwords do not match");
       return;
     }
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
@@ -110,7 +124,7 @@ export default function AcceptInvitePage() {
         setError(res.error);
         return;
       }
-      window.location.assign("/");
+      window.location.assign(postSetupDestination());
     });
   }
 
@@ -148,7 +162,6 @@ export default function AcceptInvitePage() {
       </h1>
       <p className="text-[12px] text-gray-500">
         Confirm your name and set a password to finish setting up your account.
-        Password must be at least 12 characters.
       </p>
       <div>
         <label className={labelClass}>Email</label>
@@ -186,6 +199,7 @@ export default function AcceptInvitePage() {
           onChange={(e) => setPassword(e.target.value)}
           className={inputClass}
         />
+        <PasswordRequirements password={password} />
       </div>
       <div>
         <label className={labelClass}>Confirm Password</label>
@@ -197,11 +211,7 @@ export default function AcceptInvitePage() {
           className={inputClass}
         />
       </div>
-      {error && (
-        <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger">
-          {error}
-        </div>
-      )}
+      <InlineError message={error} />
       <button
         type="submit"
         disabled={pending || !namesReady || !passwordsReady}

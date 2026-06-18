@@ -327,9 +327,33 @@ export default function LandingV1() {
 function Nav() {
   return (
     <header className="mx-auto flex max-w-6xl items-center justify-between px-8 py-6">
-      <div className="text-[15px] font-semibold tracking-tight">
-        Next Surplus
-      </div>
+      <Link
+        href="/"
+        aria-label="Next Surplus"
+        className="inline-flex items-center gap-2.5"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/11-icon-dark-bg-transparent.svg"
+          alt=""
+          aria-hidden
+          width={28}
+          height={28}
+          className="shrink-0"
+        />
+        <span
+          className="text-[21px] text-white"
+          style={{
+            fontFamily:
+              "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
+            fontWeight: 500,
+            letterSpacing: "-0.012em",
+            wordSpacing: "0.14em",
+          }}
+        >
+          Next Surplus
+        </span>
+      </Link>
       <nav className="flex items-center gap-8 text-[12.5px] text-white/70">
         <a href="#features" className="hover:text-white">
           Product

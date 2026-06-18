@@ -1,14 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import Link from "next/link";
-import { signUp } from "./_actions";
-import { createClient } from "@/lib/supabase/client";
-import {
-  PasswordRequirements,
-  passwordMeetsRequirements,
-} from "@/components/PasswordRequirements";
-import { InlineError } from "@/components/InlineError";
 
 const FONT =
   "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -20,10 +12,10 @@ const BULLETS = [
   "Team access at no additional cost per user",
 ];
 
-export default function SignupPage() {
+export default function SignupV17() {
   return (
     <div
-      className="grid min-h-screen grid-cols-1 lg:grid-cols-[1.05fr_1fr]"
+      className="grid min-h-[calc(100vh-49px)] grid-cols-1 lg:grid-cols-[1.05fr_1fr]"
       style={{ fontFamily: FONT }}
     >
       <DarkPanel />
@@ -119,46 +111,6 @@ function Check({ children }: { children: React.ReactNode }) {
 }
 
 function FormPanel() {
-  const [companyName, setCompanyName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  const [googlePending, setGooglePending] = useState(false);
-
-  const canSubmit =
-    companyName.trim() && email.trim() && passwordMeetsRequirements(password);
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    startTransition(async () => {
-      const result = await signUp({ email, password, firmName: companyName });
-      if (result.ok) {
-        window.location.assign(result.checkoutUrl);
-      } else {
-        setError(result.error);
-      }
-    });
-  }
-
-  async function continueWithGoogle() {
-    setError(null);
-    setGooglePending(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/onboarding/firm`,
-        scopes: "openid email profile",
-      },
-    });
-    if (error) {
-      setError(error.message);
-      setGooglePending(false);
-    }
-  }
-
   return (
     <div className="relative flex items-center justify-center bg-white px-10 py-16">
       <div className="absolute left-10 top-10">
@@ -175,7 +127,7 @@ function FormPanel() {
           </p>
         </div>
 
-        <GoogleButton onClick={continueWithGoogle} pending={googlePending} />
+        <GoogleButton />
 
         <div className="my-5 flex items-center gap-3">
           <span className="h-px flex-1 bg-[#e5e7eb]" />
@@ -185,53 +137,25 @@ function FormPanel() {
           <span className="h-px flex-1 bg-[#e5e7eb]" />
         </div>
 
-        <form onSubmit={submit} className="flex flex-col gap-4">
-          <Field
-            label="Company Name"
-            value={companyName}
-            onChange={setCompanyName}
-            autoFocus
-          />
-          <Field
-            label="Work Email"
-            type="email"
-            value={email}
-            onChange={setEmail}
-            autoComplete="email"
-          />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11.5px] font-medium text-[#374151]">
-              Password
-            </label>
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="h-[38px] w-full rounded-[6px] border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#04261c] outline-none transition-colors duration-150 ease-out focus:border-[#13644e]"
-            />
-            <PasswordRequirements password={password} />
-          </div>
-
-          <InlineError message={error} />
-
+        <form className="flex flex-col gap-4">
+          <Field label="Company Name" />
+          <Field label="Work Email" type="email" />
+          <PasswordField />
           <button
             type="submit"
-            disabled={pending || !canSubmit}
-            className="mt-2 inline-flex h-[40px] w-full items-center justify-center rounded-[6px] bg-[#13644e] text-[13.5px] font-medium text-white transition-colors duration-150 ease-out hover:bg-[#0d4b3a] disabled:opacity-50"
+            className="mt-2 inline-flex h-[40px] w-full items-center justify-center rounded-[6px] bg-[#13644e] text-[13.5px] font-medium text-white transition-colors duration-150 ease-out hover:bg-[#0d4b3a]"
           >
-            {pending ? "Creating Account" : "Continue To Checkout"}
+            Continue To Checkout
           </button>
         </form>
 
-        <div className="mt-8 flex items-center justify-center gap-2 text-[13px] text-[#6b7280]">
-          <span>Have An Account?</span>
+        <div className="mt-8 text-[13px] text-[#6b7280]">
+          Have an account?{" "}
           <Link
             href="/login"
-            className="font-semibold text-[#04261c] hover:underline"
+            className="font-medium text-[#04261c] hover:underline"
           >
-            Log In
+            Log in
           </Link>
         </div>
       </div>
@@ -268,19 +192,11 @@ function BrandLockupInline() {
   );
 }
 
-function GoogleButton({
-  onClick,
-  pending,
-}: {
-  onClick: () => void;
-  pending: boolean;
-}) {
+function GoogleButton() {
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={pending}
-      className="inline-flex h-[40px] w-full items-center justify-center gap-2 rounded-[6px] border border-[#e5e7eb] bg-white text-[13.5px] font-medium text-[#04261c] transition-colors duration-150 ease-out hover:bg-[#f5f5f5] disabled:opacity-50"
+      className="inline-flex h-[40px] w-full items-center justify-center gap-2 rounded-[6px] border border-[#e5e7eb] bg-white text-[13.5px] font-medium text-[#04261c] transition-colors duration-150 ease-out hover:bg-[#f5f5f5]"
     >
       <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden>
         <path
@@ -300,38 +216,32 @@ function GoogleButton({
           d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
         />
       </svg>
-      <span>{pending ? "Redirecting" : "Continue With Google"}</span>
+      <span>Continue With Google</span>
     </button>
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  autoComplete,
-  autoFocus,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  autoComplete?: string;
-  autoFocus?: boolean;
-}) {
+function Field({ label, type = "text" }: { label: string; type?: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-[11.5px] font-medium text-[#374151]">{label}</label>
       <input
         type={type}
-        autoComplete={autoComplete}
-        autoFocus={autoFocus}
-        required
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
         className="h-[38px] w-full rounded-[6px] border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#04261c] outline-none transition-colors duration-150 ease-out focus:border-[#13644e]"
       />
+    </div>
+  );
+}
+
+function PasswordField() {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[11.5px] font-medium text-[#374151]">Password</label>
+      <input
+        type="password"
+        className="h-[38px] w-full rounded-[6px] border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#04261c] outline-none transition-colors duration-150 ease-out focus:border-[#13644e]"
+      />
+      <p className="text-[11px] text-[#9ca3af]">12 characters or more.</p>
     </div>
   );
 }

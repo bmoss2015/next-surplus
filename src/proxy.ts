@@ -57,11 +57,21 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow Next internals + static assets + the OAuth/recovery callback.
+  // /images/* must stay open because Resend-rendered emails fetch the
+  // header logo from app.nextsurplus.com/images/email-logo.png.
+  // /brand/* serves the sidebar diamond + other static brand SVGs.
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/auth/callback") ||
-    pathname.includes("/favicon")
+    pathname.startsWith("/images/") ||
+    pathname.startsWith("/brand/") ||
+    pathname.startsWith("/android-chrome-") ||
+    pathname.includes("/favicon") ||
+    pathname === "/apple-touch-icon.png" ||
+    pathname === "/manifest.json" ||
+    pathname === "/og-image.png" ||
+    pathname === "/robots.txt"
   ) {
     return NextResponse.next();
   }
@@ -106,6 +116,8 @@ export async function proxy(request: NextRequest) {
   if (isOpen) return NextResponse.next();
 
   let response = NextResponse.next({ request });
+  const isProdDomain =
+    kind === "marketing" || kind === "app";
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -120,9 +132,12 @@ export async function proxy(request: NextRequest) {
             request.cookies.set(name, value)
           );
           response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const finalOptions = isProdDomain
+              ? { ...options, domain: ".nextsurplus.com" }
+              : options;
+            response.cookies.set(name, value, finalOptions);
+          });
         },
       },
     }
@@ -148,14 +163,7 @@ export async function proxy(request: NextRequest) {
 
   if (user && isPublic) {
     if (kind === "marketing") {
-      const url = request.nextUrl.clone();
-      url.host = APP_HOST;
-      url.protocol = "https:";
-      url.pathname = "/";
-      url.search = "";
-      const r = NextResponse.redirect(url);
-      response.cookies.getAll().forEach((c) => r.cookies.set(c));
-      return r;
+      return response;
     }
     return redirectTo("/");
   }

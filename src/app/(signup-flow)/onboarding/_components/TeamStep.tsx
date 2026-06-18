@@ -4,12 +4,23 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { StepShell } from "./StepShell";
 import { inviteTeammates } from "../_actions";
+import { InlineError } from "@/components/InlineError";
 
 export function TeamStep() {
   const router = useRouter();
   const [emails, setEmails] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  function landInApp() {
+    const host =
+      typeof window !== "undefined" ? window.location.host : "";
+    if (host === "nextsurplus.com" || host === "www.nextsurplus.com") {
+      window.location.assign("https://app.nextsurplus.com/");
+    } else {
+      router.push("/");
+    }
+  }
 
   function next() {
     setError(null);
@@ -19,14 +30,14 @@ export function TeamStep() {
       .filter((e) => e.includes("@"));
 
     if (list.length === 0) {
-      router.push("/");
+      landInApp();
       return;
     }
 
     startTransition(async () => {
       const result = await inviteTeammates({ emails: list });
       if (result.ok) {
-        router.push("/");
+        landInApp();
       } else {
         setError(result.error);
       }
@@ -41,7 +52,7 @@ export function TeamStep() {
       primaryLabel={emails.trim() ? "Send Invites" : "Finish"}
       onPrimary={next}
       primaryPending={pending}
-      skipHref="/"
+      skipHref="https://app.nextsurplus.com/"
     >
       <div className="flex flex-col gap-2">
         <label className="text-[11.5px] font-medium text-[#374151]">
@@ -60,11 +71,7 @@ export function TeamStep() {
         </p>
       </div>
 
-      {error && (
-        <div className="mt-4 rounded-[6px] border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-[12px] text-[#b91c1c]">
-          {error}
-        </div>
-      )}
+      <InlineError message={error} />
     </StepShell>
   );
 }

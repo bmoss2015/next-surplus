@@ -8,12 +8,29 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
 import { validateAllUntestedForOrg, previewBackfillCount, DEFAULT_CREDIT_COST_USD } from "@/lib/phone-validate";
+import {
+  renderEmailShell,
+  renderEmailButton,
+  renderEmailEyebrow,
+  renderEmailHeadline,
+  renderEmailIntro,
+  renderEmailDataBlock,
+  escapeHtml,
+} from "@/lib/email-template";
 
 function resolveSiteUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   if (explicit) return explicit;
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) return `https://${vercel.replace(/\/$/, "")}`;
+  if (process.env.VERCEL_ENV === "production") {
+    return "https://app.nextsurplus.com";
+  }
+  // Per-branch previews share the staging Supabase project, so the staging
+  // alias is a valid invite/callback host even when the email was emitted
+  // from a *.vercel.app preview. Prefer it over the per-deploy URL so the
+  // links in transactional emails stay clean and stable.
+  if (process.env.VERCEL_ENV) {
+    return "https://staging.nextsurplus.com";
+  }
   return "http://localhost:3000";
 }
 const SITE_URL = resolveSiteUrl();
@@ -234,20 +251,40 @@ export async function inviteMember(
   }
   const inviteUrl = `${SITE_URL}/accept-invite?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
 
+  const { data: orgRow } = await admin
+    .from("orgs")
+    .select("name")
+    .eq("id", profile.orgId)
+    .maybeSingle();
+  const orgName = (orgRow?.name as string | null)?.trim() || "your team";
+
   const resend = new Resend(process.env.RESEND_API_KEY);
+  const inviteSubject = `Join ${orgName} on Next Surplus`;
+  const inviteFirstName = cleanName.split(/\s+/)[0] || cleanName;
+  const invitePreheader = `${profile.fullName} invited you to join ${orgName} on Next Surplus.`;
+  const roleLabel = safeRole === "admin" ? "Admin" : "Member";
+  const inviteBody = `
+    ${renderEmailEyebrow("Team Invite")}
+    ${renderEmailHeadline(`You've Been Invited to ${orgName}`)}
+    ${renderEmailIntro(`${escapeHtml(profile.fullName)} added you to their workspace on Next Surplus. Accept the invite to set your password and sign in.`)}
+    ${renderEmailDataBlock([
+      { label: "Workspace", value: orgName },
+      { label: "Invited By", value: profile.fullName },
+      { label: "Your Role", value: roleLabel },
+    ])}
+    ${renderEmailButton({ href: inviteUrl, label: "Accept Invite" })}
+  `;
+  const inviteFooter = `You received this because ${escapeHtml(profile.fullName)} invited you to the ${escapeHtml(orgName)} team.`;
   const { error: emailError } = await resend.emails.send({
     from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
     to: cleanEmail,
-    subject: "You have been invited to Next Surplus",
-    html: `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
-  <h1 style="margin:0;font-size:20px;font-weight:600;color:#0d4b3a;">You Have Been Invited</h1>
-  <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">Hello ${cleanName},</p>
-  <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">An account has been created for you on Next Surplus using <strong>${cleanEmail}</strong>. Click the button below to set your password and finish signing in.</p>
-  <p style="margin:24px 0 0;">
-    <a href="${inviteUrl}" style="display:inline-block;background:linear-gradient(90deg,#0d4b3a,#13644e);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 20px;border-radius:6px;">Accept Invite</a>
-  </p>
-  <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#64748b;">If the button does not work, copy and paste this link into your browser:<br>${inviteUrl}</p>
-</div>`,
+    subject: inviteSubject,
+    html: renderEmailShell({
+      subject: inviteSubject,
+      bodyHtml: inviteBody,
+      preheader: invitePreheader,
+      footerLine: inviteFooter,
+    }),
   });
   if (emailError) {
     return {
@@ -394,20 +431,40 @@ export async function resendInvite(
   if (!tokenHash) return { ok: false, error: "Could not generate the invite link" };
   const inviteUrl = `${SITE_URL}/accept-invite?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
 
+  const { data: orgRow } = await admin
+    .from("orgs")
+    .select("name")
+    .eq("id", profile.orgId)
+    .maybeSingle();
+  const orgName = (orgRow?.name as string | null)?.trim() || "your team";
+
   const resend = new Resend(process.env.RESEND_API_KEY);
+  const inviteSubject = `Join ${orgName} on Next Surplus`;
+  const inviteFirstName = (cleanName || cleanEmail).split(/\s+/)[0] || cleanEmail;
+  const invitePreheader = `${profile.fullName} resent your invite to join ${orgName} on Next Surplus.`;
+  const roleLabel = safeRole === "admin" ? "Admin" : "Member";
+  const inviteBody = `
+    ${renderEmailEyebrow("Team Invite")}
+    ${renderEmailHeadline(`You've Been Invited to ${orgName}`)}
+    ${renderEmailIntro(`${escapeHtml(profile.fullName)} added you to their workspace on Next Surplus. Accept the invite to set your password and sign in.`)}
+    ${renderEmailDataBlock([
+      { label: "Workspace", value: orgName },
+      { label: "Invited By", value: profile.fullName },
+      { label: "Your Role", value: roleLabel },
+    ])}
+    ${renderEmailButton({ href: inviteUrl, label: "Accept Invite" })}
+  `;
+  const inviteFooter = `You received this because ${escapeHtml(profile.fullName)} invited you to the ${escapeHtml(orgName)} team.`;
   const { error: emailError } = await resend.emails.send({
     from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
     to: cleanEmail,
-    subject: "You have been invited to Next Surplus",
-    html: `<div style="font-family:Inter,Arial,sans-serif;color:#0f1729;max-width:480px;margin:0 auto;padding:24px;">
-  <h1 style="margin:0;font-size:20px;font-weight:600;color:#0d4b3a;">You Have Been Invited</h1>
-  <p style="margin:20px 0 0;font-size:14px;line-height:1.6;">Hello ${cleanName || cleanEmail},</p>
-  <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">An account has been created for you on Next Surplus using <strong>${cleanEmail}</strong>. Click the button below to set your password and finish signing in.</p>
-  <p style="margin:24px 0 0;">
-    <a href="${inviteUrl}" style="display:inline-block;background:linear-gradient(90deg,#0d4b3a,#13644e);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 20px;border-radius:6px;">Accept Invite</a>
-  </p>
-  <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#64748b;">If the button does not work, copy and paste this link into your browser:<br>${inviteUrl}</p>
-</div>`,
+    subject: inviteSubject,
+    html: renderEmailShell({
+      subject: inviteSubject,
+      bodyHtml: inviteBody,
+      preheader: invitePreheader,
+      footerLine: inviteFooter,
+    }),
   });
   if (emailError) {
     return {

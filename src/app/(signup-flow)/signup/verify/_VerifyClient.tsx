@@ -37,7 +37,20 @@ export function VerifyClient({ sessionId }: { sessionId: string | null }) {
           if (json.status === "active" || json.status === "trialing") {
             if (!cancelled) {
               setState("success");
-              setTimeout(() => router.push("/onboarding/firm"), 2000);
+              setTimeout(() => {
+                const host =
+                  typeof window !== "undefined" ? window.location.host : "";
+                if (
+                  host === "nextsurplus.com" ||
+                  host === "www.nextsurplus.com"
+                ) {
+                  window.location.assign(
+                    "https://app.nextsurplus.com/onboarding/firm"
+                  );
+                } else {
+                  router.push("/onboarding/firm");
+                }
+              }, 2000);
             }
             return;
           }
