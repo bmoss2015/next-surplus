@@ -537,7 +537,6 @@ function describeCostSource(provider: string, isCheck: boolean): string {
     return "Lob letter rate from app_pricing_config.wholesale_pricing_cents";
   }
   if (provider === "stub") return "stub fixture (Lob not configured)";
-  if (provider === "click2mail") return "legacy C2M row (provider deprecated)";
   return provider;
 }
 

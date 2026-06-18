@@ -1,14 +1,8 @@
-// Shared types for the mail module. Both Click2Mail (letters) and Lob
-// (checks) implement these same interfaces so callers don't have to know
-// which provider handled the send.
+// Shared types for the mail module. Lob handles both letters and checks.
 
 export type MailClass = "standard" | "first_class" | "certified";
 
 export type MailStatus =
-  // Lifecycle: processing (at Lob, being printed) -> in_transit
-  // (Lob attached USPS tracking_number) -> delivered/returned/failed.
-  // 'queued' is the pre-migration-0130 legacy status that we treat as
-  // an alias for processing throughout the UI and filters.
   | "processing"
   | "queued"
   | "in_transit"
@@ -16,7 +10,7 @@ export type MailStatus =
   | "returned"
   | "failed";
 
-export type MailProvider = "click2mail" | "lob" | "stub";
+export type MailProvider = "lob" | "stub";
 
 export type Address = {
   name: string;
@@ -75,11 +69,9 @@ export type SendLetterInput = {
   // What we charge the customer for this piece. Becomes mail_jobs.cost_cents.
   // Optional so non-org callers still work; missing → cost_cents = null.
   customer_pricing?: LobPricing;
-  // What the provider (Lob, C2M) actually charges us. Becomes
-  // mail_jobs.provider_cost_cents. For C2M, this is overridden by the
-  // totalCost returned in their submitJob response (which is the actual
-  // billed amount). For Lob, computed from this schedule since Lob's
-  // create-letter / create-check APIs don't return per-piece cost.
+  // What Lob actually charges us. Becomes mail_jobs.provider_cost_cents.
+  // Computed from this schedule since Lob's create-letter / create-check
+  // APIs don't return per-piece cost.
   wholesale_pricing?: LobPricing;
   // Total sheet count for this piece (cover + every additional sheet
   // from PDF attachments). Used to detect when the > 6-sheet USPS

@@ -1,13 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { Resend } from "resend";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
-import { validateAllUntestedForOrg, previewBackfillCount, DEFAULT_CREDIT_COST_USD } from "@/lib/phone-validate";
 import {
   renderEmailShell,
   renderEmailButton,
@@ -771,9 +769,9 @@ export async function updateMailSettings(input: {
 
 // Org admins upload a handwritten signature image (PNG/JPEG, <= 5 MB) into the
 // private `signatures` bucket. The path is stored on orgs.signature_image_path
-// and resolved to a short-lived signed URL at mail-send time so the printer
-// (Click2Mail / Lob) can fetch it during rendering. Files are namespaced by
-// org_id so a future tightening of storage RLS doesn't need any code changes.
+// and resolved to a short-lived signed URL at mail-send time so Lob can fetch
+// it during rendering. Files are namespaced by org_id so a future tightening
+// of storage RLS doesn't need any code changes.
 export async function uploadSignatureImage(
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -2176,63 +2174,5 @@ export async function duplicateResearchTemplate(
   revalidatePath("/settings");
   revalidatePath("/playbooks");
   return { ok: true, id: data.id as string };
-}
-
-// -- Phone validation backfill (Billing section) ----------------------------
-
-// Admin-only one-shot: validates every phone in the org with status='untested'
-// on leads that aren't marked lost. Runs in after() so the UI returns
-// immediately; progress shows up in the Billing meter as validations complete.
-// Whatever CLEAROUT_PHONE_API_KEY is set in the runtime env at trigger time
-// is what gets charged — swap it in Vercel before clicking if you want a
-// different Clearout account to absorb the cost.
-export async function runPhoneValidationBackfill(): Promise<
-  { ok: true } | { ok: false; error: string }
-> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard;
-  const profile = await getCurrentProfile();
-  if (!profile?.orgId) return { ok: false, error: "No org" };
-  const orgId = profile.orgId;
-  after(async () => {
-    try {
-      const result = await validateAllUntestedForOrg(orgId, { excludeLostLeads: true });
-      console.log(
-        `[phone-validate] backfill complete for org=${orgId}: ` +
-          `processed=${result.processed}, pending=${result.pending}`
-      );
-    } catch (e) {
-      console.error("[phone-validate] backfill failed:", e);
-    }
-  });
-  return { ok: true };
-}
-
-// Pre-count helper for the Run Backfill confirmation modal. Returns the
-// exact number of unique phones that would be sent to the validator + the
-// estimated USD cost, so admins see the real spend before committing.
-export async function previewPhoneValidationBackfill(): Promise<
-  | { ok: true; uniquePhones: number; totalRows: number; estimatedCostUsd: number; costPerCreditUsd: number }
-  | { ok: false; error: string }
-> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard;
-  const profile = await getCurrentProfile();
-  if (!profile?.orgId) return { ok: false, error: "No org" };
-  try {
-    const { uniquePhones, totalRows } = await previewBackfillCount(profile.orgId, {
-      excludeLostLeads: true,
-    });
-    return {
-      ok: true,
-      uniquePhones,
-      totalRows,
-      estimatedCostUsd: uniquePhones * DEFAULT_CREDIT_COST_USD,
-      costPerCreditUsd: DEFAULT_CREDIT_COST_USD,
-    };
-  } catch (e) {
-    console.error("[phone-validate] preview backfill failed:", e);
-    return { ok: false, error: "Couldn't read the validation queue. Try again." };
-  }
 }
 

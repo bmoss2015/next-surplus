@@ -3,10 +3,7 @@
 // Provider Costs panel.
 //
 // Read-only owner view of what Lob charges us per piece. The basis for
-// margin math against Customer Pricing. Click2Mail data is no longer
-// surfaced - all mail routes through Lob since May 2026 per
-// moss_equity_mail_provider_rules; C2M code is retained for rollback
-// but not referenced from the active path.
+// margin math against Customer Pricing.
 
 import type { ProviderCostsData } from "@/lib/owner/fetch";
 
@@ -35,8 +32,8 @@ export function ProviderCostsSection({ data }: { data: ProviderCostsData }) {
       <div className="mb-6">
         <h1 className="text-[22px] font-semibold text-ink">Provider Costs</h1>
         <p className="mt-1 text-[13px] text-gray-600">
-          What Lob and Click2Mail charge us per piece. Internal cost data,
-          not customer pricing. Customer pricing lives in Settings.
+          What the mail provider charges us per piece. Internal cost
+          data, not customer pricing. Customer pricing lives in Settings.
         </p>
       </div>
 

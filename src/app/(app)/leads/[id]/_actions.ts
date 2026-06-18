@@ -6,33 +6,23 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, getCurrentProfile } from "@/lib/auth/current-user";
 import { STAGES, type Stage } from "@/lib/leads/types";
 import { toProperCase } from "@/lib/format/proper-case";
-import { validateSpecificPhones, type RelativePhoneBase } from "@/lib/phone-validate";
+type RelativePhoneBase = "phone" | "phone_2" | "phone_3" | "phone_4" | "phone_5";
 
 // Phone slots on the relatives table — used to reset per-slot validation
 // state when a slot's value changes.
 const RELATIVE_PHONE_BASES = ["phone", "phone_2", "phone_3", "phone_4", "phone_5"] as const satisfies readonly RelativePhoneBase[];
 
-// Synchronous targeted validation for manual saves — validates ONLY the rows
-// passed in and AWAITS the result so the action response carries the final
-// status back to the client. ~500ms-1s per phone for Clearout, fast enough
-// to feel like part of the save instead of needing a background sweep.
-// (Bulk imports stay async via after() since they can't block on N×500ms.)
 async function runValidationFor(
-  orgId: string | null,
-  targets: {
+  _orgId: string | null,
+  _targets: {
     contactIds?: string[];
     relativeSlots?: Array<{ relativeId: string; base: RelativePhoneBase }>;
   }
 ): Promise<void> {
-  if (!orgId) return;
-  if ((!targets.contactIds || targets.contactIds.length === 0) && (!targets.relativeSlots || targets.relativeSlots.length === 0)) {
-    return;
-  }
-  try {
-    await validateSpecificPhones(orgId, targets);
-  } catch (e) {
-    console.error("[upsert] phone validation failed:", e);
-  }
+  // Phone validation provider was removed (R4). Function kept as a no-op
+  // so existing call sites still compile; phone numbers persist with
+  // their stored validation status untouched.
+  return;
 }
 
 // Resolves the signed-in user's id for activity attribution (null when there is

@@ -1610,10 +1610,6 @@ function dollarsToWords(n: number): string {
   return `${words} and ${String(cents).padStart(2, "0")}/100`;
 }
 
-// Renders every page of a PDF Blob to a stack of canvases via pdfjs-dist.
-// Used by the Send Mail preview pane to show the merged-and-PDF-rendered
-// letter exactly as Click2Mail will print it. pdfjs is already a project
-// dependency. Worker is configured via CDN so we don't need to bundle it.
 // Simple HTML-in-iframe preview for the mammoth-converted docx output.
 // Sandboxed so any inline styles inside can't escape into the host page.
 function HtmlDocxPreview({ blob }: { blob: Blob }) {

@@ -1,11 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile } from "@/lib/auth/current-user";
-import { validateSpecificPhones, type RelativePhoneBase } from "@/lib/phone-validate";
+type RelativePhoneBase = "phone" | "phone_2" | "phone_3" | "phone_4" | "phone_5";
 import { formatAddress, formatCity, normalizeAddressForMatch } from "@/lib/imports/format-address";
 import {
   parseAddressString,
@@ -1100,22 +1099,11 @@ export async function importLeads(
     };
   }
 
-  // Validate ONLY phones inserted during this run — runs after the response
-  // is sent so the user sees the import land immediately. Never sweeps the
-  // org's existing untested backlog: rows from prior imports stay as-is
-  // unless they get re-saved or the user explicitly triggers a backfill.
-  if (orgId && (newPhoneContactIds.length > 0 || newRelativeSlots.length > 0)) {
-    after(async () => {
-      try {
-        await validateSpecificPhones(orgId, {
-          contactIds: newPhoneContactIds,
-          relativeSlots: newRelativeSlots,
-        });
-      } catch (e) {
-        console.error("[import] phone validation failed:", e);
-      }
-    });
-  }
+  // Phone validation provider was removed (R4). Imported phones now persist
+  // with their stored validation status untouched; no background sweep runs.
+  void orgId;
+  void newPhoneContactIds;
+  void newRelativeSlots;
 
   return {
     ok: true,

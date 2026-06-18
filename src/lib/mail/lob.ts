@@ -91,10 +91,9 @@ function lobCheckCostPair(
   };
 }
 
-// Lob.com client. Used for two things:
-//   * Sending checks (Click2Mail has no check product)
-//   * Creating + verifying bank accounts (we never store the routing/account
-//     numbers ourselves — Lob holds them and gives us a bnk_xxx reference)
+// Lob.com client. Handles letters, checks, and bank-account
+// management. Bank account routing/account numbers are stored
+// only on Lob; we just keep the bnk_xxx reference.
 //
 // Auth: HTTP Basic with secret key as username, empty password. Test keys
 // look like test_xxx; live keys look like live_xxx. Lob enforces the
