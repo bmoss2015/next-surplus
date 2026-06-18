@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { fetchNotifications } from "@/lib/notifications/fetch";
+import { sendMentionEmail } from "@/lib/notifications/send-mention-email";
 import type {
   TeamMemberOption,
   DiscussionCommentRow,
@@ -162,31 +163,17 @@ export async function postComment(input: {
         ((leadRow?.lead_id as string | null) ?? "the");
       const link = `/leads/${input.leadId}?tab=notes#comment-${commentId}`;
       const actorFirstName = firstNameOf(profile.fullName, profile.email);
-      const appUrl = process.env.NEXT_PUBLIC_SITE_URL
-        ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-        : process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000";
       for (const recipientId of recipients) {
         const m = memberById.get(recipientId);
         if (!m?.email) continue;
         try {
-          await fetch(`${appUrl}/api/notifications/mention`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": process.env.INTERNAL_API_SECRET ?? "",
-            },
-            body: JSON.stringify({
-              recipientEmail: m.email,
-              recipientName: m.firstName,
-              actorName: profile.fullName,
-              actorFirstName,
-              leadId: input.leadId,
-              leadOwnerName,
-              commentText: body,
-              link,
-            }),
+          await sendMentionEmail({
+            recipientEmail: m.email,
+            actorName: profile.fullName,
+            actorFirstName,
+            leadOwnerName,
+            commentText: body,
+            link,
           });
         } catch {
           // swallow — failed email must not break posting
