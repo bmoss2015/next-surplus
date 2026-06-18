@@ -127,8 +127,8 @@ export function IconSidebar({
               src="/brand/11-icon-dark-bg-transparent.svg"
               alt=""
               aria-hidden
-              width={24}
-              height={24}
+              width={20}
+              height={20}
               className="shrink-0"
             />
             <div
