@@ -44,7 +44,7 @@ export function FirmStep({
   return (
     <StepShell
       step="firm"
-      title="Tell Us About Your Company"
+      title="Tell Us About Your Firm"
       subtitle="We use this to set defaults for filings, mail, and templates. You can change anything later in Settings."
       primaryLabel="Continue"
       onPrimary={next}
@@ -54,7 +54,7 @@ export function FirmStep({
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-1.5">
           <label className="text-[11.5px] font-medium text-[#374151]">
-            Company Name
+            Firm Name
           </label>
           <input
             value={name}
