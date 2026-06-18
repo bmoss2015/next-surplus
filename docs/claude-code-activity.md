@@ -41,3 +41,4 @@
 2026-06-16 | PR #132 | Archived standard_monthly Stripe price, removed env var, cleaned code refs
 2026-06-17 | PR #133 | Favicon, apple touch icon, android chrome, manifest, og-image, 10 brand SVGs
 2026-06-17 | PR #136 | Stripped Outlook from landing page feature card and pricing subtitle
+2026-06-17 | PR #146 | Fix M11: Support email link in login footer (Terms · Privacy · Support)
