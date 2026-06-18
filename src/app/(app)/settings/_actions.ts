@@ -8,7 +8,15 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth/current-user";
 import { validateAllUntestedForOrg, previewBackfillCount, DEFAULT_CREDIT_COST_USD } from "@/lib/phone-validate";
-import { renderEmailShell, renderEmailButton, escapeHtml } from "@/lib/email-template";
+import {
+  renderEmailShell,
+  renderEmailButton,
+  renderEmailEyebrow,
+  renderEmailHeadline,
+  renderEmailIntro,
+  renderEmailDataBlock,
+  escapeHtml,
+} from "@/lib/email-template";
 
 function resolveSiteUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
@@ -254,17 +262,29 @@ export async function inviteMember(
   const inviteSubject = `Join ${orgName} on Next Surplus`;
   const inviteFirstName = cleanName.split(/\s+/)[0] || cleanName;
   const invitePreheader = `${profile.fullName} invited you to join ${orgName} on Next Surplus.`;
+  const roleLabel = safeRole === "admin" ? "Admin" : "Member";
   const inviteBody = `
-    <p style="margin:0;font-size:15px;line-height:1.6;">Hi ${escapeHtml(inviteFirstName)},</p>
-    <p style="margin:16px 0 0;font-size:15px;line-height:1.6;">${escapeHtml(profile.fullName)} invited you to join <strong>${escapeHtml(orgName)}</strong> on Next Surplus. Click the button below to set your password and sign in.</p>
-    ${renderEmailButton({ href: inviteUrl, label: "Accept invite" })}
-    <p style="margin:0;font-size:12px;line-height:1.5;color:#6b7280;">If the button does not work, copy and paste this link into your browser:<br><a href="${escapeHtml(inviteUrl)}" style="color:#6b7280;">${escapeHtml(inviteUrl)}</a></p>
+    ${renderEmailEyebrow("Team Invite")}
+    ${renderEmailHeadline(`You've Been Invited to ${orgName}`)}
+    ${renderEmailIntro(`${escapeHtml(profile.fullName)} added you to their workspace on Next Surplus. Accept the invite to set your password and sign in.`)}
+    ${renderEmailDataBlock([
+      { label: "Workspace", value: orgName },
+      { label: "Invited By", value: profile.fullName },
+      { label: "Your Role", value: roleLabel },
+    ])}
+    ${renderEmailButton({ href: inviteUrl, label: "Accept Invite" })}
   `;
+  const inviteFooter = `You received this because ${escapeHtml(profile.fullName)} invited you to the ${escapeHtml(orgName)} team.`;
   const { error: emailError } = await resend.emails.send({
     from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
     to: cleanEmail,
     subject: inviteSubject,
-    html: renderEmailShell({ subject: inviteSubject, bodyHtml: inviteBody, preheader: invitePreheader }),
+    html: renderEmailShell({
+      subject: inviteSubject,
+      bodyHtml: inviteBody,
+      preheader: invitePreheader,
+      footerLine: inviteFooter,
+    }),
   });
   if (emailError) {
     return {
@@ -422,17 +442,29 @@ export async function resendInvite(
   const inviteSubject = `Join ${orgName} on Next Surplus`;
   const inviteFirstName = (cleanName || cleanEmail).split(/\s+/)[0] || cleanEmail;
   const invitePreheader = `${profile.fullName} resent your invite to join ${orgName} on Next Surplus.`;
+  const roleLabel = safeRole === "admin" ? "Admin" : "Member";
   const inviteBody = `
-    <p style="margin:0;font-size:15px;line-height:1.6;">Hi ${escapeHtml(inviteFirstName)},</p>
-    <p style="margin:16px 0 0;font-size:15px;line-height:1.6;">${escapeHtml(profile.fullName)} invited you to join <strong>${escapeHtml(orgName)}</strong> on Next Surplus. Click the button below to set your password and sign in.</p>
-    ${renderEmailButton({ href: inviteUrl, label: "Accept invite" })}
-    <p style="margin:0;font-size:12px;line-height:1.5;color:#6b7280;">If the button does not work, copy and paste this link into your browser:<br><a href="${escapeHtml(inviteUrl)}" style="color:#6b7280;">${escapeHtml(inviteUrl)}</a></p>
+    ${renderEmailEyebrow("Team Invite")}
+    ${renderEmailHeadline(`You've Been Invited to ${orgName}`)}
+    ${renderEmailIntro(`${escapeHtml(profile.fullName)} added you to their workspace on Next Surplus. Accept the invite to set your password and sign in.`)}
+    ${renderEmailDataBlock([
+      { label: "Workspace", value: orgName },
+      { label: "Invited By", value: profile.fullName },
+      { label: "Your Role", value: roleLabel },
+    ])}
+    ${renderEmailButton({ href: inviteUrl, label: "Accept Invite" })}
   `;
+  const inviteFooter = `You received this because ${escapeHtml(profile.fullName)} invited you to the ${escapeHtml(orgName)} team.`;
   const { error: emailError } = await resend.emails.send({
     from: process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>",
     to: cleanEmail,
     subject: inviteSubject,
-    html: renderEmailShell({ subject: inviteSubject, bodyHtml: inviteBody, preheader: invitePreheader }),
+    html: renderEmailShell({
+      subject: inviteSubject,
+      bodyHtml: inviteBody,
+      preheader: invitePreheader,
+      footerLine: inviteFooter,
+    }),
   });
   if (emailError) {
     return {
