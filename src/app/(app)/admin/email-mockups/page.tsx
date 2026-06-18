@@ -30,6 +30,14 @@ const VARIANTS: Array<{
     html: stripeReceiptHtml(),
   },
   {
+    id: "v1b",
+    title: "V1b — Stripe Receipt + Brand Color",
+    anchor: "V1 chrome, but with three calibrated splashes of the brand gradient.",
+    notes:
+      "Same editorial card as V1. Adds: (1) a 4px brand-gradient strip at the very top of the card, (2) a gradient pill CTA (replaces V1's flat dark button), (3) the 'Team Invite' eyebrow in brand teal. Everything else identical — same data block, same sharp typography.",
+    html: stripeReceiptColorHtml(),
+  },
+  {
     id: "v2",
     title: "V2 — Linear Dark",
     anchor: "Linear notification emails (issue/PR pings). Dark canvas, mono-accent.",
@@ -173,6 +181,69 @@ function stripeReceiptHtml(): string {
           </tr>
           <tr>
             <td style="padding:18px 40px;background-color:#fafafa;border-top:1px solid #e5e7eb;border-radius:0 0 6px 6px;font-size:12px;line-height:1.5;color:#6b7280;">
+              You received this because ${inviterName} invited you to ${orgName}. Questions? Reply to this email.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+function stripeReceiptColorHtml(): string {
+  const { inviterName, orgName, inviteUrl, logoLight } = SAMPLE;
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <title>Join ${orgName} on Next Surplus</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:${FONT_STACK};color:#1a1a1a;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f5f5;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+          <tr>
+            <td height="4" style="height:4px;line-height:0;font-size:0;background-image:linear-gradient(90deg,#04261c 0%,#13644e 50%,#4a9c75 100%);background-color:#13644e;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:30px 40px 0;">
+              <img src="${logoLight}" alt="Next Surplus" width="140" height="24" style="display:block;border:0;outline:none;width:140px;height:auto;">
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 40px 8px;">
+              <div style="font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#13644e;">Team Invite</div>
+              <h1 style="margin:8px 0 0;font-size:22px;font-weight:600;letter-spacing:-0.01em;color:#1a1a1a;">You&rsquo;ve been invited to ${orgName}</h1>
+              <p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:#4b5563;">${inviterName} added you to their workspace on Next Surplus. Accept the invite to set your password and sign in.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 40px 0;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #e5e7eb;">
+                <tr><td style="padding:14px 0 6px;font-size:12px;color:#6b7280;width:120px;">Workspace</td><td style="padding:14px 0 6px;font-size:14px;color:#1a1a1a;">${orgName}</td></tr>
+                <tr><td style="padding:6px 0;font-size:12px;color:#6b7280;">Invited by</td><td style="padding:6px 0;font-size:14px;color:#1a1a1a;">${inviterName}</td></tr>
+                <tr><td style="padding:6px 0 14px;font-size:12px;color:#6b7280;">Your role</td><td style="padding:6px 0 14px;font-size:14px;color:#1a1a1a;">Member</td></tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 40px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background-image:linear-gradient(90deg,#04261c 0%,#13644e 100%);background-color:#13644e;border-radius:4px;">
+                    <a href="${inviteUrl}" style="display:inline-block;padding:12px 22px;font-family:${FONT_STACK};font-size:14px;font-weight:500;color:#ffffff;text-decoration:none;border-radius:4px;">Accept invite</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 40px;background-color:#fafafa;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.5;color:#6b7280;">
               You received this because ${inviterName} invited you to ${orgName}. Questions? Reply to this email.
             </td>
           </tr>
