@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createServiceClient } from "@/lib/supabase/service";
-import { renderEmailShell, escapeHtml } from "@/lib/email-template";
+import {
+  renderEmailShell,
+  renderEmailEyebrow,
+  renderEmailHeadline,
+  renderEmailIntro,
+  escapeHtml,
+} from "@/lib/email-template";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -70,12 +76,13 @@ async function sendFounderNotice(org: {
   if (!apiKey || !org.email) return;
 
   const resend = new Resend(apiKey);
-  const subject = "Your founder rate is expiring";
+  const subject = "Your Founder Rate Is Expiring";
   const preheader = `Your founder rate for ${org.name} is approaching its twelfth month.`;
   const bodyHtml = `
-    <p style="margin:0;font-size:15px;line-height:1.6;">You've been on the founder rate for ten months. Reach out before month twelve if you'd like to confirm renewal terms for <strong>${escapeHtml(org.name)}</strong>.</p>
-    <p style="margin:16px 0 0;font-size:15px;line-height:1.6;">No action required, your access continues uninterrupted.</p>
-    <p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:#6b7280;">Manage billing anytime from Settings &rsaquo; Billing.</p>
+    ${renderEmailEyebrow("Billing Notice")}
+    ${renderEmailHeadline("Your Founder Rate Is Expiring")}
+    ${renderEmailIntro(`You've been on the founder rate for ten months on <strong>${escapeHtml(org.name)}</strong>. Reach out before month twelve if you'd like to confirm renewal terms.`)}
+    ${renderEmailIntro("No action required, your access continues uninterrupted. Manage billing anytime from Settings &rsaquo; Billing.")}
   `;
 
   await resend.emails.send({
