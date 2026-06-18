@@ -7,7 +7,7 @@ import {
   IconNote,
   IconPhoneOff,
   IconPhonePause,
-  IconVoicemail,
+  IconMessageDots,
   IconAlertCircle,
   IconNumber,
   IconBold,
@@ -235,7 +235,7 @@ export function CallHero({
                 onClick={() => onOutcome("No Answer")}
               />
               <ControlButton
-                icon={IconVoicemail}
+                icon={IconMessageDots}
                 label="Voicemail"
                 onClick={() => onOutcome("Voicemail")}
               />
