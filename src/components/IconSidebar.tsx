@@ -120,16 +120,17 @@ export function IconSidebar({
           render their logomark directly on the sidebar surface. Expanded:
           diamond + "Next Surplus" white wordmark + collapse chevron.
           Collapsed: diamond only, doubles as the expand button. */}
-      <div className="flex h-16 shrink-0 items-center gap-2.5 pl-[10px] pr-3">
+      <div className="flex h-16 shrink-0 items-center gap-2 pl-[10px] pr-3">
         {expanded ? (
           <>
             <img
               src="/brand/11-icon-dark-bg-transparent.svg"
               alt=""
               aria-hidden
-              width={44}
-              height={44}
+              width={18}
+              height={18}
               className="shrink-0"
+              style={{ transform: "translateY(1px)" }}
             />
             <div
               className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-tight text-white"
