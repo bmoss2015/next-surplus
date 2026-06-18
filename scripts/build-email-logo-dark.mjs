@@ -6,8 +6,8 @@ const SVG_PATH = "H:/My Drive/Business Ventures/Next Surplus - Web App/Logo & Fa
 const OUTPUT = path.resolve("public/images/email-logo-dark.png");
 
 const svg = readFileSync(SVG_PATH);
-const buf = await sharp(svg, { density: 600 })
-  .resize({ width: 640 })
+const buf = await sharp(svg, { density: 900 })
+  .resize({ width: 960 })
   .png()
   .toBuffer();
 await sharp(buf).toFile(OUTPUT);

@@ -8,8 +8,8 @@ const OUTPUT = path.resolve("public/images/email-logo.png");
 
 async function tryFromSvg() {
   const svg = readFileSync(SVG_PATH);
-  const buf = await sharp(svg, { density: 600 })
-    .resize({ width: 640 })
+  const buf = await sharp(svg, { density: 900 })
+    .resize({ width: 960 })
     .png()
     .toBuffer();
   return buf;
