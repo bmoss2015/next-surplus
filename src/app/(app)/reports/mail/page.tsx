@@ -114,11 +114,10 @@ export default async function MailActivityReportPage({
           <IconInfoCircle size={14} stroke={1.75} className="mt-[1px] shrink-0 text-gray-500" />
           <div>
             <span className="font-medium text-ink">Cost data sources:</span>{" "}
-            Click2Mail amounts are invoiced per piece (exact). Lob amounts
-            use the published Developer-tier rate schedule ($1.029 B&amp;W
-            letter, $1.159 check, etc.) since Lob doesn&apos;t return
-            per-piece cost in their API. Any volume discounts reconcile
-            on the monthly Lob invoice.
+            Per-piece amounts come from the published Developer-tier rate
+            schedule ($1.029 B&amp;W letter, $1.159 check, etc.) since the
+            mail provider doesn&apos;t return per-piece cost in its API.
+            Any volume discounts reconcile on the monthly invoice.
           </div>
         </div>
       )}

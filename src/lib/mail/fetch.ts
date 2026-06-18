@@ -25,7 +25,7 @@ export type MailJobListRow = {
   recipient_state: string;
   recipient_postal_code: string;
   mail_class: "standard" | "first_class" | "certified";
-  provider: "click2mail" | "lob" | "stub";
+  provider: "lob" | "stub";
   tracking_url: string | null;
   tracking_number: string | null;
   status: MailStatus;

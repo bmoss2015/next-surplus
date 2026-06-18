@@ -46,7 +46,6 @@ import type {
   TemplateRow,
 } from "@/lib/settings/fetch";
 import type { EmailAccountRow } from "@/lib/email/types";
-import type { PhoneValidationUsage } from "./BillingSection";
 
 export type CurrentUser = {
   id: string;
@@ -75,8 +74,6 @@ export type SettingsData = {
   emailTemplates: EmailTemplateRow[];
   emailTemplateFolders: EmailTemplateFolderRow[];
   research: ResearchTemplateRow[];
-  phoneUsage: PhoneValidationUsage | null;
-  phoneValidationEnabled: boolean;
   notificationPrefs: Record<string, boolean>;
   orgStages: import("@/lib/stages/types").OrgStage[];
 };
@@ -192,12 +189,8 @@ function renderPanel(
         <AdminGate />
       );
     case "billing":
-      return data.phoneUsage ? (
-        <BillingSection
-          phoneUsage={data.phoneUsage}
-          phoneValidationEnabled={data.phoneValidationEnabled}
-          invoiceEmail={currentUser.email}
-        />
+      return currentUser.isAdmin ? (
+        <BillingSection invoiceEmail={currentUser.email} />
       ) : (
         <AdminGate />
       );

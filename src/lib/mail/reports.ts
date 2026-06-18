@@ -19,8 +19,8 @@ export type MailMonthRow = {
   // Customer revenue (sum of mail_jobs.cost_cents — what we billed the
   // customer for each piece).
   spent_cents: number;
-  // Provider cost (sum of mail_jobs.provider_cost_cents — what Lob /
-  // C2M actually charged us). Populated on rows recorded after the
+  // Provider cost (sum of mail_jobs.provider_cost_cents — what Lob
+  // actually charged us). Populated on rows recorded after the
   // pricing split landed; older rows return 0 for this column.
   provider_cost_cents: number;
   // Derived: spent_cents - provider_cost_cents. Stored as a separate
@@ -43,7 +43,6 @@ export type MailReportData = {
   // are pulled from the provider and which are placeholders.
   cost_sources: {
     has_lob_pieces: boolean;
-    has_click2mail_pieces: boolean;
   };
 };
 
@@ -112,7 +111,6 @@ export async function fetchMailReport(opts: {
   }
 
   let hasLob = false;
-  let hasC2M = false;
 
   for (const row of data ?? []) {
     const created = new Date(row.created_at as string);
@@ -131,7 +129,6 @@ export async function fetchMailReport(opts: {
       (row.provider_cost_cents as number | null) ?? 0;
     const provider = row.provider as string;
     if (provider === "lob") hasLob = true;
-    if (provider === "click2mail") hasC2M = true;
   }
 
   const monthsArr = Array.from(byMonth.values());
@@ -168,7 +165,6 @@ export async function fetchMailReport(opts: {
     totals,
     cost_sources: {
       has_lob_pieces: hasLob,
-      has_click2mail_pieces: hasC2M,
     },
   };
 }

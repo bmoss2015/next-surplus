@@ -471,8 +471,7 @@ export async function previewMailJob(input: {
 // Fetches the rendered check PDF for a mail_job from Lob and returns
 // it as base64 so the client can display it in an iframe without
 // exposing the Lob URL or our API key. Only valid for mail_jobs where
-// include_check=true and provider="lob" — older click2mail rows or
-// non-check pieces return an error.
+// include_check=true and provider="lob".
 export async function previewCheckJob(input: {
   mail_job_id: string;
 }): Promise<
@@ -764,7 +763,7 @@ export type SendMailResult =
       ok: true;
       batch_id: string;
       job_ids: string[];
-      provider_letter: "click2mail" | "lob" | "stub";
+      provider_letter: "lob" | "stub";
       provider_check: "lob" | "stub";
     }
   | { ok: false; error: string };
@@ -797,7 +796,6 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
         job_ids: existing.map((r) => r.id as string),
         provider_letter:
           ((existing[0].provider as string | null) ?? "stub") as
-            | "click2mail"
             | "lob"
             | "stub",
         provider_check: "lob",
@@ -811,9 +809,9 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
 
   // Resolve the template (if any) upfront. A template with a docx_path
   // means we're sending file-based mail (Word + optional PDF attachments
-  // merged via C2M's /documents/create2), which doesn't need the
-  // body_html field at all. HTML-mode templates and ad-hoc body-only
-  // sends still require body to be non-empty.
+  // merged via Gotenberg → PDF → Lob), which doesn't need the body_html
+  // field. HTML-mode templates and ad-hoc body-only sends still require
+  // body to be non-empty.
   let templateRow: {
     id: string;
     docx_path: string | null;
@@ -839,10 +837,8 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   if (!isFileTemplate && !body) {
     return { ok: false, error: "Body is required" };
   }
-  // Docx + check is supported now that the docx → Gotenberg → PDF
-  // pipeline produces a clean PDF that Lob's /v1/checks endpoint
-  // accepts as the check_bottom (letter side of the check). Before
-  // the migration off Click2Mail this combination wasn't possible.
+  // Docx + check uses the docx → Gotenberg → PDF pipeline; the
+  // rendered PDF goes to Lob's /v1/checks as the check_bottom.
 
   if (input.include_check) {
     if (!input.bank_account_id) {
@@ -1106,8 +1102,8 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       correlation_id: correlationId,
       // customer_pricing = what we charge this org's customer. Stored on
       // mail_jobs.cost_cents and used by reports as revenue.
-      // wholesale_pricing = what Lob (or C2M) actually charges us. Stored
-      // on mail_jobs.provider_cost_cents and used for margin reporting.
+      // wholesale_pricing = what Lob actually charges us. Stored on
+      // mail_jobs.provider_cost_cents and used for margin reporting.
       customer_pricing: customerPricing,
       wholesale_pricing: wholesalePricing,
       // Pass the sheet count so lob.ts can add the > 6-sheet surcharge
@@ -1422,7 +1418,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     ok: true,
     batch_id: batchId,
     job_ids: jobIds,
-    provider_letter: activeLetterProvider() as "click2mail" | "lob" | "stub",
+    provider_letter: activeLetterProvider() as "lob" | "stub",
     provider_check: activeCheckProvider() as "lob" | "stub",
   };
 }

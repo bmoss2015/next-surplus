@@ -56,11 +56,6 @@ const CLASS_OPTIONS: Option[] = [
   { value: "standard", label: "Standard" },
 ];
 
-const PROVIDER_OPTIONS: Option[] = [
-  { value: "click2mail", label: "Click2Mail" },
-  { value: "lob", label: "Lob" },
-];
-
 const DATE_OPTIONS: { value: MailFilterState["dateRange"]; label: string }[] = [
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
