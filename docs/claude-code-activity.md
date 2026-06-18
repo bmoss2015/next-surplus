@@ -42,3 +42,9 @@
 2026-06-17 | PR #133 | Favicon, apple touch icon, android chrome, manifest, og-image, 10 brand SVGs
 2026-06-17 | PR #136 | Stripped Outlook from landing page feature card and pricing subtitle
 2026-06-17 | PR #146 | Fix M11: Support email link in login footer (Terms · Privacy · Support)
+2026-06-17 | PR #151 | M5 robots.txt + M4a public-asset middleware bypass for favicons, manifest, og-image, android-chrome icons
+2026-06-18 | PR #154 | Fix R6: Lob webhook verification fails closed (missing secret or bad signature → 401)
+2026-06-18 | PR #155 | Fix M7: CSP report-only + HSTS / nosniff / Permissions-Policy / Referrer-Policy / X-Frame-Options
+2026-06-18 | PR #156 | Fix M6: In-memory rate limit on signIn / signUp / requestPasswordReset (10/min) + Stripe webhook (100/min)
+2026-06-18 | PR #157 | Fix R7: Cookie consent banner mounted in root layout
+2026-06-18 | PR #158 | Fix M13: Floating Send Feedback widget → /api/feedback → Resend to support@nextsurplus.com
