@@ -60,22 +60,26 @@ function FoundersRateBar() {
   return (
     <div className="mt-12">
       <div className="h-px w-full bg-white/15" />
-      <div className="mt-5 flex items-baseline gap-6">
-        <span className="text-[10px] font-semibold uppercase leading-none tracking-[0.2em] text-white/55">
-          Founders Rate
-        </span>
-        <span className="flex items-baseline gap-1.5">
-          <span className="text-[32px] font-semibold leading-none tracking-[-0.02em] text-white">
-            $49
+      <div className="mt-5 flex flex-col gap-3">
+        <div className="flex items-baseline justify-between">
+          <span className="text-[10px] font-semibold uppercase leading-none tracking-[0.22em] text-white/55">
+            Founders Rate
           </span>
-          <span className="text-[13px] leading-none text-white/65">/month</span>
-        </span>
-        <span className="flex-1 text-[12.5px] leading-none text-white/75">
-          Lock in your price for 12 months.
-        </span>
-        <span className="text-[10px] font-semibold uppercase leading-none tracking-[0.2em] text-white/85">
-          Limited Time Offer
-        </span>
+          <span className="text-[10px] font-semibold uppercase leading-none tracking-[0.22em] text-white/85">
+            Limited Time Offer
+          </span>
+        </div>
+        <div className="flex items-baseline gap-5">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[34px] font-semibold leading-none tracking-[-0.02em] text-white">
+              $49
+            </span>
+            <span className="text-[13px] leading-none text-white/60">/month</span>
+          </span>
+          <span className="text-[13px] leading-none text-white/75">
+            Lock in your price for 12 months.
+          </span>
+        </div>
       </div>
     </div>
   );
