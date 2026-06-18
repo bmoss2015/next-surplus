@@ -145,14 +145,16 @@ export function DiscussionTabClient({
     const el = document.getElementById(`comment-${commentId}`);
     if (!el) return;
     el.scrollIntoView({ block: "center", behavior: "smooth" });
-    el.classList.add("ring-2", "ring-inset", "ring-petrol-500");
+    el.classList.remove("mention-highlight");
+    void el.offsetWidth;
+    el.classList.add("mention-highlight");
     if (highlightTimerRef.current !== null) {
       window.clearTimeout(highlightTimerRef.current);
     }
     highlightTimerRef.current = window.setTimeout(() => {
-      el.classList.remove("ring-2", "ring-inset", "ring-petrol-500");
+      el.classList.remove("mention-highlight");
       highlightTimerRef.current = null;
-    }, 1800);
+    }, 2400);
   }
 
   // Returns the body sliced to a short window around the first match, with
@@ -183,7 +185,9 @@ export function DiscussionTabClient({
     feedEndRef.current?.scrollIntoView({ block: "nearest" });
   }, [comments.length]);
 
-  // If the URL has a #comment-<id> anchor, scroll to it after render.
+  // If the URL has a #comment-<id> anchor, scroll to it after render and
+  // briefly flash the gradient highlight bar so a mention email landing
+  // tells the recipient which comment they were tagged in.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hash = window.location.hash;
@@ -191,10 +195,10 @@ export function DiscussionTabClient({
       const el = document.getElementById(hash.slice(1));
       if (el) {
         el.scrollIntoView({ block: "center" });
-        el.classList.add("ring-2", "ring-inset", "ring-petrol-500");
+        el.classList.add("mention-highlight");
         const t = setTimeout(
-          () => el.classList.remove("ring-2", "ring-inset", "ring-petrol-500"),
-          2500
+          () => el.classList.remove("mention-highlight"),
+          2400
         );
         return () => clearTimeout(t);
       }

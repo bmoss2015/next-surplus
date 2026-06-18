@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { fetchNotifications } from "@/lib/notifications/fetch";
+import { sendMentionEmail } from "@/lib/notifications/send-mention-email";
 import type {
   TeamMemberOption,
   DiscussionCommentRow,
@@ -166,19 +167,16 @@ export async function postComment(input: {
         const m = memberById.get(recipientId);
         if (!m?.email) continue;
         try {
-          await sb.functions.invoke("notify-mention", {
-            body: {
-              recipientEmail: m.email,
-              recipientName: m.firstName,
-              actorFirstName,
-              leadId: input.leadId,
-              leadOwnerName,
-              commentText: body,
-              link,
-            },
+          await sendMentionEmail({
+            recipientEmail: m.email,
+            actorName: profile.fullName,
+            actorFirstName,
+            leadOwnerName,
+            commentText: body,
+            link,
           });
         } catch {
-          // swallow — missing/failing edge function must not break posting
+          // swallow — failed email must not break posting
         }
       }
     } catch {
