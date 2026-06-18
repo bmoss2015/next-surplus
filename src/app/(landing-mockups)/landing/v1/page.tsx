@@ -337,8 +337,8 @@ function Nav() {
           src="/brand/11-icon-dark-bg-transparent.svg"
           alt=""
           aria-hidden
-          width={36}
-          height={36}
+          width={24}
+          height={24}
           className="shrink-0"
         />
         <span
