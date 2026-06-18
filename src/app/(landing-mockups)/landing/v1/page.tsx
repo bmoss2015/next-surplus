@@ -332,7 +332,7 @@ function Nav() {
         <img
           src="/brand/12-lockup-horizontal-dark-transparent.svg"
           alt="Next Surplus"
-          className="h-7 w-auto"
+          className="h-10 w-auto"
         />
       </Link>
       <nav className="flex items-center gap-8 text-[12.5px] text-white/70">
