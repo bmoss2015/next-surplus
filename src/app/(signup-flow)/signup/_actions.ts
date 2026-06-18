@@ -21,23 +21,30 @@ export async function signUp(input: {
   if (!email || !password || !firmName) {
     return { ok: false, error: "Company name, email, and password are required." };
   }
-  if (password.length < 8) {
-    return { ok: false, error: "Password must be at least 8 characters." };
+  if (password.length < 12) {
+    return { ok: false, error: "Password must be at least 12 characters." };
   }
 
   const sb = await createClient();
   const admin = createServiceClient();
 
-  const { data: signUpData, error: signUpErr } = await sb.auth.signUp({
+  const { data: createData, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
+    email_confirm: true,
   });
-  if (signUpErr || !signUpData.user) {
-    return {
-      ok: false,
-      error: signUpErr?.message ?? "Could not create your account.",
-    };
+  if (createErr || !createData.user) {
+    const msg = createErr?.message ?? "";
+    if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("exists")) {
+      return {
+        ok: false,
+        error: "An account with this email already exists. Try logging in.",
+      };
+    }
+    return { ok: false, error: msg || "Could not create your account." };
   }
+
+  const userId = createData.user.id;
 
   const { data: org, error: orgErr } = await admin
     .from("orgs")
@@ -45,6 +52,7 @@ export async function signUp(input: {
     .select("id")
     .single();
   if (orgErr || !org) {
+    await admin.auth.admin.deleteUser(userId);
     return {
       ok: false,
       error: orgErr?.message ?? "Could not create your workspace.",
@@ -52,13 +60,15 @@ export async function signUp(input: {
   }
 
   const { error: profileErr } = await admin.from("profiles").insert({
-    id: signUpData.user.id,
+    id: userId,
     org_id: org.id,
     email,
     full_name: firmName,
     role: "owner",
   });
   if (profileErr) {
+    await admin.from("orgs").delete().eq("id", org.id);
+    await admin.auth.admin.deleteUser(userId);
     return {
       ok: false,
       error: profileErr.message ?? "Could not finish setting up your workspace.",
@@ -73,14 +83,12 @@ export async function signUp(input: {
     return {
       ok: false,
       error:
-        "Account created but sign in failed. Try signing in from the login page.",
+        "Account created. Please sign in from the login page to continue.",
     };
   }
 
   const h = await headers();
-  const origin =
-    h.get("origin") ??
-    `https://${h.get("host") ?? "app.nextsurplus.com"}`;
+  const origin = `https://${h.get("host") ?? "app.nextsurplus.com"}`;
 
   const priceId = priceIdFor("beta_founder", "monthly");
 

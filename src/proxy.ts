@@ -111,6 +111,8 @@ export async function proxy(request: NextRequest) {
   if (isOpen) return NextResponse.next();
 
   let response = NextResponse.next({ request });
+  const isProdDomain =
+    kind === "marketing" || kind === "app";
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -125,9 +127,12 @@ export async function proxy(request: NextRequest) {
             request.cookies.set(name, value)
           );
           response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const finalOptions = isProdDomain
+              ? { ...options, domain: ".nextsurplus.com" }
+              : options;
+            response.cookies.set(name, value, finalOptions);
+          });
         },
       },
     }
