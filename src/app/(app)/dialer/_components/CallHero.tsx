@@ -13,9 +13,7 @@ import {
   IconListNumbers,
   IconArrowBack,
   IconArrowForward,
-  IconClock,
   IconArrowRight,
-  IconChevronDown,
 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -43,10 +41,9 @@ export function CallHero({
   setQuickNote,
   skipFollowUp,
   setSkipFollowUp,
-  onNoteFocusChange,
   countdown,
-  totalCountdown,
   onNextLead,
+  paused,
 }: {
   lead: DialerLead;
   contactIndex: number;
@@ -59,10 +56,9 @@ export function CallHero({
   setQuickNote: (s: string) => void;
   skipFollowUp: boolean;
   setSkipFollowUp: (b: boolean) => void;
-  onNoteFocusChange: (focused: boolean) => void;
   countdown: number;
-  totalCountdown: number;
   onNextLead: () => void;
+  paused: boolean;
 }) {
   const [elapsed, setElapsed] = useState(272);
   const [liveNoteOpen, setLiveNoteOpen] = useState(false);
@@ -164,32 +160,35 @@ export function CallHero({
         style={{ background: "rgba(255,255,255,0.20)" }}
       />
 
+      {state === "live" && (
+        <div>
+          <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
+            Lead Summary
+          </div>
+          <ul className="mt-3 space-y-2">
+            {lead.summary.map((s, i) => (
+              <li
+                key={i}
+                className="relative pl-4 text-[13.5px] leading-relaxed text-white/95"
+              >
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-[9px] h-1 w-1 rounded-full bg-white/70"
+                />
+                {s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div
         className={[
-          "transition-opacity",
-          state === "wrapup" ? "opacity-70" : "opacity-100",
+          state === "wrapup"
+            ? "flex flex-1 flex-col"
+            : "mt-auto pt-6",
         ].join(" ")}
       >
-        <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
-          Lead Summary
-        </div>
-        <ul className="mt-3 space-y-2">
-          {lead.summary.map((s, i) => (
-            <li
-              key={i}
-              className="relative pl-4 text-[13.5px] leading-relaxed text-white/95"
-            >
-              <span
-                aria-hidden
-                className="absolute left-0 top-[9px] h-1 w-1 rounded-full bg-white/70"
-              />
-              {s}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="mt-auto pt-6">
         {state === "live" ? (
           <div className="space-y-4">
             {liveNoteOpen && (
@@ -209,7 +208,6 @@ export function CallHero({
                 <NoteTextarea
                   value={quickNote}
                   onChange={setQuickNote}
-                  onFocusChange={onNoteFocusChange}
                   placeholder="Capture key details from this call"
                   autoFocus
                 />
@@ -239,56 +237,39 @@ export function CallHero({
             </div>
           </div>
         ) : (
-          <div>
-            <div className="flex items-center justify-between">
-              <div className="text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
-                Wrap Up
-              </div>
-              <CountdownBadge
-                seconds={countdown}
-                total={totalCountdown}
-                running={selectedOutcome === "Connected"}
-              />
+          <div className="flex flex-1 flex-col">
+            <div className="grid grid-cols-4 gap-2">
+              {OUTCOMES.map((o) => {
+                const sel = selectedOutcome === o;
+                return (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => onOutcome(o)}
+                    className={[
+                      "h-11 rounded-lg text-[13px] font-semibold transition",
+                      sel
+                        ? "bg-white text-petrol-700 shadow-[0_2px_6px_rgba(0,0,0,0.18)]"
+                        : "bg-[rgba(255,255,255,0.10)] text-white ring-1 ring-white/25 hover:bg-[rgba(255,255,255,0.18)]",
+                    ].join(" ")}
+                  >
+                    {o}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="mt-4 grid grid-cols-[160px_minmax(0,1fr)] items-center gap-3">
-              <label className="text-[12.5px] font-medium text-white/85">
-                Call Outcome
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedOutcome}
-                  onChange={(e) => onOutcome(e.target.value as CallOutcome)}
-                  className="h-10 w-full appearance-none rounded-lg bg-[rgba(4,38,28,0.55)] pl-3.5 pr-9 text-[13.5px] font-medium text-white outline-none ring-1 ring-white/15 transition focus:bg-[rgba(4,38,28,0.70)] focus:ring-white/40"
-                >
-                  {OUTCOMES.map((o) => (
-                    <option key={o} value={o} className="text-ink">
-                      {o}
-                    </option>
-                  ))}
-                </select>
-                <IconChevronDown
-                  size={14}
-                  stroke={2}
-                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/70"
-                />
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <div className="mb-1.5 text-[12.5px] font-semibold uppercase tracking-[0.10em] text-white/70">
-                Call Note
-              </div>
+            <div className="mt-4 flex flex-1 flex-col min-h-0">
               <NoteTextarea
                 value={quickNote}
                 onChange={setQuickNote}
-                onFocusChange={onNoteFocusChange}
                 placeholder="Capture key details from this call"
                 autoFocus
+                fill
               />
             </div>
 
-            <div className="mt-5 flex items-center justify-between gap-4">
+            <div className="mt-3 flex items-center justify-between gap-4">
               <label className="inline-flex cursor-pointer items-center gap-2 text-[12.5px] text-white/85">
                 <input
                   type="checkbox"
@@ -298,14 +279,23 @@ export function CallHero({
                 />
                 Skip Follow Up This Call
               </label>
-              <button
-                type="button"
-                onClick={onNextLead}
-                className="flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-[13.5px] font-semibold text-petrol-500 shadow-[0_2px_6px_rgba(0,0,0,0.18)] transition hover:bg-gray-100"
-              >
-                Next Lead
-                <IconArrowRight size={15} stroke={2.25} />
-              </button>
+              <div className="flex items-center gap-4">
+                <span className="text-[12.5px] tabular-nums text-white/60">
+                  {paused
+                    ? "Paused"
+                    : selectedOutcome === "Connected"
+                      ? `${formatCountdown(countdown)} remaining`
+                      : "Auto advance"}
+                </span>
+                <button
+                  type="button"
+                  onClick={onNextLead}
+                  className="flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-[13.5px] font-semibold text-petrol-700 shadow-[0_2px_6px_rgba(0,0,0,0.18)] transition hover:bg-gray-100"
+                >
+                  Next Lead
+                  <IconArrowRight size={15} stroke={2.25} />
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -314,47 +304,25 @@ export function CallHero({
   );
 }
 
-function CountdownBadge({
-  seconds,
-  total,
-  running,
-}: {
-  seconds: number;
-  total: number;
-  running: boolean;
-}) {
-  const pct = Math.max(0, Math.min(1, seconds / total));
-  return (
-    <div className="flex items-center gap-2 rounded-full bg-[rgba(4,38,28,0.55)] px-3 py-1.5 ring-1 ring-white/15">
-      <IconClock size={13} stroke={2} className="text-white/70" />
-      <div className="h-1 w-16 overflow-hidden rounded-full bg-white/15">
-        <div
-          className={[
-            "h-full rounded-full transition-all duration-200",
-            running ? "bg-white" : "bg-white/40",
-          ].join(" ")}
-          style={{ width: `${pct * 100}%` }}
-        />
-      </div>
-      <span className="text-[12px] font-semibold tabular-nums text-white">
-        {Math.max(0, Math.ceil(seconds))}s
-      </span>
-    </div>
-  );
+function formatCountdown(secs: number) {
+  const safe = Math.max(0, Math.ceil(secs));
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 function NoteTextarea({
   value,
   onChange,
-  onFocusChange,
   placeholder,
   autoFocus,
+  fill,
 }: {
   value: string;
   onChange: (s: string) => void;
-  onFocusChange: (focused: boolean) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  fill?: boolean;
 }) {
   const editor = useEditor({
     extensions: [
@@ -369,8 +337,6 @@ function NoteTextarea({
     ],
     content: value || "",
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
-    onFocus: () => onFocusChange(true),
-    onBlur: () => onFocusChange(false),
     editorProps: {
       attributes: {
         class:
@@ -397,8 +363,13 @@ function NoteTextarea({
   const isEmpty = editor.isEmpty;
 
   return (
-    <div className="rounded-lg bg-[rgba(4,38,28,0.55)] ring-1 ring-white/15 transition focus-within:bg-[rgba(4,38,28,0.70)] focus-within:ring-white/40">
-      <div className="flex items-center gap-0.5 border-b border-white/10 px-2 py-1.5">
+    <div
+      className={[
+        "rounded-lg bg-[rgba(4,38,28,0.55)] ring-1 ring-white/15 transition focus-within:bg-[rgba(4,38,28,0.70)] focus-within:ring-white/40",
+        fill ? "flex flex-1 flex-col min-h-0" : "",
+      ].join(" ")}
+    >
+      <div className="flex shrink-0 items-center gap-0.5 border-b border-white/10 px-2 py-1.5">
         <NoteToolBtn
           icon={IconBold}
           label="Bold"
@@ -439,7 +410,12 @@ function NoteTextarea({
           />
         </div>
       </div>
-      <div className="relative max-h-[220px] min-h-[72px] overflow-y-auto px-3.5 py-2.5">
+      <div
+        className={[
+          "relative overflow-y-auto px-3.5 py-2.5",
+          fill ? "flex-1 min-h-0" : "max-h-[220px] min-h-[72px]",
+        ].join(" ")}
+      >
         {isEmpty && placeholder && (
           <div className="pointer-events-none absolute left-3.5 top-2.5 text-[13.5px] text-white/55">
             {placeholder}

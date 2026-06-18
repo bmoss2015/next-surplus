@@ -27,7 +27,6 @@ export function DialerSession() {
   const [quickNote, setQuickNote] = useState("");
   const [skipFollowUp, setSkipFollowUp] = useState(false);
   const [countdown, setCountdown] = useState<number>(WRAP_UP_DEFAULT);
-  const [noteFocused, setNoteFocused] = useState(false);
 
   const activeLead = queue.find((l) => l.id === activeLeadId) ?? queue[0];
 
@@ -48,11 +47,10 @@ export function DialerSession() {
     setQuickNote("");
     setSkipFollowUp(false);
     setCountdown(WRAP_UP_DEFAULT);
-    setNoteFocused(false);
   }, [activeLead, contactIndex, queue]);
 
   useEffect(() => {
-    if (state !== "wrapup" || selectedOutcome !== "Connected" || noteFocused) return;
+    if (state !== "wrapup" || selectedOutcome !== "Connected" || paused) return;
     const start = Date.now();
     const startFrom = countdown;
     const tick = setInterval(() => {
@@ -67,9 +65,9 @@ export function DialerSession() {
       setCountdown(remaining);
     }, 250);
     return () => clearInterval(tick);
-    // intentionally exclude countdown so it acts as start value, not reset trigger
+    // countdown intentionally read once as the start value, not in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, selectedOutcome, noteFocused, advance, skipFollowUp]);
+  }, [state, selectedOutcome, paused, advance, skipFollowUp]);
 
   function endCall() {
     setState("wrapup");
@@ -98,7 +96,6 @@ export function DialerSession() {
     setSelectedOutcome("Connected");
     setQuickNote("");
     setCountdown(WRAP_UP_DEFAULT);
-    setNoteFocused(false);
   }
 
   return (
@@ -134,10 +131,9 @@ export function DialerSession() {
             setQuickNote={setQuickNote}
             skipFollowUp={skipFollowUp}
             setSkipFollowUp={setSkipFollowUp}
-            onNoteFocusChange={setNoteFocused}
             countdown={countdown}
-            totalCountdown={WRAP_UP_DEFAULT}
             onNextLead={nextLead}
+            paused={paused}
           />
           <div className="relative w-[340px] shrink-0">
             <LeadDataPanel

@@ -341,8 +341,8 @@ function StepCallSettings() {
         <div className="mt-3 flex items-center gap-4">
           <input
             type="range"
-            min={0}
-            max={60}
+            min={10}
+            max={300}
             step={5}
             value={wrapUp}
             onChange={(e) => setWrapUp(Number(e.target.value))}
@@ -350,11 +350,13 @@ function StepCallSettings() {
           />
           <div className="flex items-center gap-1.5 rounded-md bg-gray-100 px-3 py-1.5 text-[13px] font-semibold tabular-nums text-ink">
             <IconClock size={13} stroke={2} />
-            {wrapUp}s
+            {wrapUp < 60
+              ? `${wrapUp}s`
+              : `${Math.floor(wrapUp / 60)}m ${(wrapUp % 60).toString().padStart(2, "0")}s`}
           </div>
         </div>
         <div className="mt-2 text-[12px] text-gray-500">
-          Wrap up only runs after a connected call. The countdown pauses automatically while you are typing a note. Voicemail, No Answer, and Wrong Number skip wrap up entirely.
+          Wrap up only runs after a connected call. Voicemail, No Answer, and Wrong Number skip wrap up entirely. Use the Pause Session button in the header to freeze the countdown if you need more time. Range 10 seconds to 5 minutes.
         </div>
       </div>
 
