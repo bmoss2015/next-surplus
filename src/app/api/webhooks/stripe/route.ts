@@ -2,11 +2,21 @@ import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getStripe } from "@/lib/stripe/client";
+import { rateLimit, ipFromRequest } from "@/lib/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const ip = ipFromRequest(req);
+  const limit = rateLimit(`stripe-webhook:${ip}`, 100, 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } }
+    );
+  }
+
   const sig = req.headers.get("stripe-signature");
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!sig || !secret) {
