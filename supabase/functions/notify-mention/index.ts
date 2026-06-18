@@ -12,6 +12,97 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
+// EMAIL_LOGO_URL / NEXTSURPLUS_APP_URL are optional Supabase secrets that let
+// staging point at the staging origin and prod at app.nextsurplus.com. The
+// fallback assumes prod since that's the most common host for this function.
+const LOGO_URL =
+  Deno.env.get("EMAIL_LOGO_URL") ??
+  `${(Deno.env.get("NEXTSURPLUS_APP_URL") ?? "https://app.nextsurplus.com").replace(/\/$/, "")}/images/email-logo.png`;
+const APP_URL = (Deno.env.get("NEXTSURPLUS_APP_URL") ?? "https://app.nextsurplus.com").replace(/\/$/, "");
+const FONT_STACK = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
+function renderEmailShell({
+  subject,
+  bodyHtml,
+  preheader,
+  footerLine,
+}: {
+  subject: string;
+  bodyHtml: string;
+  preheader: string;
+  footerLine?: string;
+}): string {
+  const safeSubject = escapeHtml(subject);
+  const safePreheader = escapeHtml(preheader);
+  const footer = footerLine ?? `<a href="${APP_URL}" style="color:#6b7280;text-decoration:none;">Next Surplus</a>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light">
+  <title>${safeSubject}</title>
+  <style>
+    :root { color-scheme: light only; supported-color-schemes: light; }
+    a { color: #13644e; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:${FONT_STACK};color:#1a1a1a;">
+  <div style="display:none;font-size:1px;color:#f5f5f5;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${safePreheader}</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f5f5;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+          <tr>
+            <td height="4" style="height:4px;line-height:0;font-size:0;background-image:linear-gradient(90deg,#04261c 0%,#13644e 50%,#4a9c75 100%);background-color:#13644e;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:30px 40px 0;">
+              <img src="${LOGO_URL}" alt="Next Surplus" width="200" height="35" style="display:block;border:0;outline:none;text-decoration:none;width:200px;height:auto;">
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 40px 32px;font-family:${FONT_STACK};font-size:14px;line-height:1.6;color:#1a1a1a;">
+              ${bodyHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 40px;background-color:#fafafa;border-top:1px solid #e5e7eb;font-family:${FONT_STACK};font-size:12px;line-height:1.5;color:#6b7280;">
+              ${footer}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+function renderEmailEyebrow(label: string): string {
+  return `<div style="font-family:${FONT_STACK};font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#13644e;">${escapeHtml(label)}</div>`;
+}
+
+function renderEmailHeadline(text: string): string {
+  return `<h1 style="margin:8px 0 0;font-family:${FONT_STACK};font-size:22px;font-weight:600;letter-spacing:-0.01em;color:#1a1a1a;line-height:1.3;">${escapeHtml(text)}</h1>`;
+}
+
+function renderEmailIntro(text: string): string {
+  return `<p style="margin:12px 0 0;font-family:${FONT_STACK};font-size:14px;line-height:1.6;color:#4b5563;">${text}</p>`;
+}
+
+function renderEmailButton({ href, label }: { href: string; label: string }): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0;">
+  <tr>
+    <td style="background-image:linear-gradient(90deg,#04261c 0%,#13644e 100%);background-color:#13644e;border-radius:4px;">
+      <a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 22px;font-family:${FONT_STACK};font-size:14px;font-weight:500;color:#ffffff;text-decoration:none;border-radius:4px;line-height:1.2;">${escapeHtml(label)}</a>
+    </td>
+  </tr>
+</table>`;
+}
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -73,77 +164,37 @@ serve(async (req: Request) => {
   }
 
   const subject = leadOwnerName
-    ? `${actorFirstName} mentioned you on the ${leadOwnerName} Lead`
-    : `${actorFirstName} mentioned you on a lead`;
+    ? `${actorFirstName} Mentioned You in ${leadOwnerName}`
+    : `${actorFirstName} Mentioned You on a Lead`;
 
-  const safeActorFirst = escapeHtml(actorFirstName);
   const safeOwner = escapeHtml(leadOwnerName);
+  const safeActorName = escapeHtml(actorName);
   const safeComment = escapeHtml(commentText).replace(/\n/g, "<br/>");
-  const safeLink = escapeHtml(link);
 
-  // Gmail's documented opt-in: declare color-scheme: light dark + ship our own
-  // @media (prefers-color-scheme: dark) rules. With this, Gmail Web stops the
-  // aggressive auto-inversion and uses our overrides instead. The .keep-white
-  // class on the header texts and button label stays pure white in dark mode.
-  const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
-  <style>
-    :root { color-scheme: light dark; supported-color-schemes: light dark; }
-    .keep-white { color: #ffffff !important; }
-    @media (prefers-color-scheme: dark) {
-      .keep-white,
-      a.keep-white,
-      [data-ogsc] .keep-white {
-        color: #ffffff !important;
-      }
-    }
-  </style>
-</head>
-<body style="margin:0;padding:0;background-color:#f5f7fa;font-family:Inter,Helvetica,Arial,sans-serif;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f7fa;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background-color:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,41,0.06),0 4px 12px rgba(15,23,41,0.04);overflow:hidden;">
-          <tr>
-            <td bgcolor="#0d4b3a" style="background-color:#0d4b3a;padding:24px 28px;">
-              <div class="keep-white" style="font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:#ffffff;font-weight:600;"><font color="#ffffff">Moss Equity Partners</font></div>
-              <div class="keep-white" style="font-size:18px;line-height:1.3;color:#ffffff;font-weight:600;margin-top:6px;"><font color="#ffffff">${safeActorFirst} mentioned you${safeOwner ? ` on the ${safeOwner} Lead` : ""}</font></div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 24px;background-color:#f8fafc;border-radius:10px;">
-                <tr>
-                  <td style="padding:18px 22px;font-size:14px;line-height:1.7;color:#0f1729;">
-                    ${safeComment}
-                  </td>
-                </tr>
-              </table>
-              ${
-                link
-                  ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#0d4b3a" style="background-color:#0d4b3a;border-radius:6px;">
-                    <a href="${safeLink}" class="keep-white" style="display:inline-block;padding:11px 22px;font-size:13px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;letter-spacing:0.2px;"><font color="#ffffff">Open The Discussion</font></a>
-                  </td>
-                </tr>
-              </table>`
-                  : ""
-              }
-              <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#94a3b8;">You received this because you were @mentioned on a lead in the Moss Equity Operations Portal.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  const preheader = leadOwnerName
+    ? `${actorName} left a note for you on ${leadOwnerName}.`
+    : `${actorName} left a note for you on a lead.`;
+
+  const introCopy = leadOwnerName
+    ? `${safeActorName} left a note on <strong>${safeOwner}</strong>:`
+    : `${safeActorName} left a note for you:`;
+
+  const bodyHtml = `
+    ${renderEmailEyebrow("Mention")}
+    ${renderEmailHeadline(subject)}
+    ${renderEmailIntro(introCopy)}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:16px 0 0;background-color:#f5f5f5;border-radius:4px;">
+      <tr>
+        <td style="padding:16px 20px;font-family:${FONT_STACK};font-size:14px;line-height:1.6;color:#1a1a1a;">
+          ${safeComment}
+        </td>
+      </tr>
+    </table>
+    ${link ? renderEmailButton({ href: link, label: "Open the Discussion" }) : ""}
+  `;
+
+  const footerLine = `You received this because ${safeActorName} mentioned you on ${leadOwnerName ? `the ${safeOwner} lead` : "a lead"}.`;
+  const html = renderEmailShell({ subject, bodyHtml, preheader, footerLine });
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -153,7 +204,7 @@ serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Moss Equity Portal <notifications@mossequitypartners.com>",
+        from: Deno.env.get("RESEND_FROM") ?? "Next Surplus <notifications@nextsurplus.com>",
         to: [recipientEmail],
         subject,
         html,

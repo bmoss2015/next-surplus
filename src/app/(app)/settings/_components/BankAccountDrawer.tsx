@@ -176,16 +176,7 @@ function AddDrawer({
           style={{ width: "100%" }}
           value={holder}
           onChange={(e) => setHolder(e.target.value)}
-          onKeyDown={(e) => {
-            if (
-              holder === "" &&
-              (e.key === "ArrowRight" || e.key === "Tab")
-            ) {
-              e.preventDefault();
-              setHolder("Moss Equity Partners LLC");
-            }
-          }}
-          placeholder="Moss Equity Partners LLC  (→ to accept)"
+          placeholder="Legal entity name on the account"
           autoFocus
         />
       </div>
