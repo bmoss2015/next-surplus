@@ -337,12 +337,12 @@ function Nav() {
           src="/brand/11-icon-dark-bg-transparent.svg"
           alt=""
           aria-hidden
-          width={24}
-          height={24}
+          width={28}
+          height={28}
           className="shrink-0"
         />
         <span
-          className="text-[18px] text-white"
+          className="text-[21px] text-white"
           style={{
             fontFamily:
               "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
