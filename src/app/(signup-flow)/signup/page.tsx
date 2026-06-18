@@ -62,7 +62,7 @@ export default function SignupPage() {
 
         <form onSubmit={submit} className="flex flex-col gap-3.5">
           <Field
-            label="Firm Name"
+            label="Company Name"
             value={firmName}
             onChange={setFirmName}
             autoFocus
@@ -124,9 +124,6 @@ export default function SignupPage() {
           >
             {pending ? "Creating Account" : "Continue To Checkout"}
           </button>
-          <p className="mt-1 text-center text-[10.5px] leading-relaxed text-[#9ca3af]">
-            Card required at signup. Cancel anytime during the trial.
-          </p>
         </form>
 
         <div className="mt-8 text-center text-[12px] text-[#6b7280]">
@@ -135,7 +132,7 @@ export default function SignupPage() {
             href="/login"
             className="font-medium text-[#04261c] hover:underline"
           >
-            Sign In
+            Log in
           </Link>
         </div>
 

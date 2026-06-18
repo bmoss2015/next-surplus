@@ -123,7 +123,7 @@ function FormPanel() {
             Create Your Account
           </h1>
           <p className="mt-2 text-[13px] leading-relaxed text-[#6b7280]">
-            $49/month. 14 day free trial. Card required.
+            $49/month. 14 day free trial.
           </p>
         </div>
 
@@ -138,7 +138,7 @@ function FormPanel() {
         </div>
 
         <form className="flex flex-col gap-4">
-          <Field label="Firm Name" />
+          <Field label="Company Name" />
           <Field label="Work Email" type="email" />
           <PasswordField />
           <button

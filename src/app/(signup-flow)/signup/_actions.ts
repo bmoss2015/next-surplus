@@ -19,7 +19,7 @@ export async function signUp(input: {
   const firmName = input.firmName.trim();
 
   if (!email || !password || !firmName) {
-    return { ok: false, error: "Firm name, email, and password are required." };
+    return { ok: false, error: "Company name, email, and password are required." };
   }
   if (password.length < 8) {
     return { ok: false, error: "Password must be at least 8 characters." };
