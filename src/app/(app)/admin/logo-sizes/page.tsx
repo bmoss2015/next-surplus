@@ -63,7 +63,7 @@ export default function LogoSizesPage() {
             Seven candidates rendered from the real lockup geometry (matches
             /brand/04-lockup-horizontal-dark.svg, white-square removed, white
             left facet + green right facets). Each strip is 220px wide on the
-            actual sidebar gradient. Pick the letter you want and I'll wire
+            actual sidebar gradient. Pick the letter you want and I will wire
             it in.
           </p>
         </div>
