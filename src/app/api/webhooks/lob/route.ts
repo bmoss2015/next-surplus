@@ -83,10 +83,11 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const sig = req.headers.get("lob-signature");
 
-  // In sandbox/dev we may not have a secret set yet — allow if the env var
-  // is missing so the user can wire up signing later.
-  if (process.env.LOB_WEBHOOK_SECRET && !verifySignature(rawBody, sig)) {
-    return NextResponse.json({ error: "bad signature" }, { status: 401 });
+  if (!process.env.LOB_WEBHOOK_SECRET) {
+    return NextResponse.json({ error: "webhook_secret_unset" }, { status: 401 });
+  }
+  if (!verifySignature(rawBody, sig)) {
+    return NextResponse.json({ error: "bad_signature" }, { status: 401 });
   }
 
   let event: LobEvent;
