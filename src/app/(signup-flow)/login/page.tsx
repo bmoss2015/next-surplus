@@ -157,9 +157,9 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="rounded-[6px] border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-[12px] text-[#b91c1c]">
+            <p className="text-[12px] leading-relaxed text-[#b91c1c]">
               {error}
-            </div>
+            </p>
           )}
 
           <button

@@ -206,13 +206,13 @@ function FormPanel() {
               required
               className="h-[38px] w-full rounded-[6px] border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#04261c] outline-none transition-colors duration-150 ease-out focus:border-[#13644e]"
             />
-            <p className="text-[11px] text-[#9ca3af]">12 characters or more.</p>
+            <PasswordHelper length={password.length} />
           </div>
 
           {error && (
-            <div className="rounded-[6px] border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-[12px] text-[#b91c1c]">
+            <p className="text-[12px] leading-relaxed text-[#b91c1c]">
               {error}
-            </div>
+            </p>
           )}
 
           <button
@@ -301,6 +301,29 @@ function GoogleButton({
       </svg>
       <span>{pending ? "Redirecting" : "Continue With Google"}</span>
     </button>
+  );
+}
+
+function PasswordHelper({ length }: { length: number }) {
+  if (length === 0) {
+    return (
+      <p className="text-[12px] font-medium text-[#374151]">
+        Use 12 characters or more.
+      </p>
+    );
+  }
+  if (length < 12) {
+    const needed = 12 - length;
+    return (
+      <p className="text-[12px] font-medium text-[#b91c1c]">
+        {needed === 1 ? "1 more character needed." : `${needed} more characters needed.`}
+      </p>
+    );
+  }
+  return (
+    <p className="text-[12px] font-medium text-[#13644e]">
+      Password length is good.
+    </p>
   );
 }
 
