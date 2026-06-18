@@ -1,6 +1,7 @@
 import { IconSidebar } from "./IconSidebar";
 import { Topbar } from "./Topbar";
 import { RoleProvider } from "./RoleProvider";
+import { FeedbackWidget } from "./FeedbackWidget";
 
 // Portal chrome — modernized to match where 2024-2026 CRMs are. Icon
 // sidebar on the left (collapsed 60px → expanded 220px), slim utility
@@ -37,6 +38,7 @@ export function AppShell({
           <Topbar urgentOverdue={urgentOverdue ?? 0} urgentDueToday={urgentDueToday ?? 0} />
           <main className="flex-1 overflow-auto">{children}</main>
         </div>
+        <FeedbackWidget />
       </div>
     </RoleProvider>
   );
