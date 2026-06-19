@@ -42,3 +42,5 @@
 2026-06-17 | PR #133 | Favicon, apple touch icon, android chrome, manifest, og-image, 10 brand SVGs
 2026-06-17 | PR #136 | Stripped Outlook from landing page feature card and pricing subtitle
 2026-06-17 | PR #146 | Fix M11: Support email link in login footer (Terms · Privacy · Support)
+2026-06-18 | PR #153 | Replace notify-mention edge function with in-process send-mention-email helper; thinner gradient highlight bar on mentioned comment
+2026-06-19 | PR #170 | Fix OAUTH-001: Gmail Connect callback runs initial backfill via next/server after(), redirects to /settings immediately instead of blocking the user for 5-30s
