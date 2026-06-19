@@ -174,13 +174,14 @@ function KanbanColumn({
       onDragOver={onDragOver}
       onDrop={onDrop}
       className={cn(
-        "w-[240px] shrink-0 rounded-lg border bg-gray-100 transition-colors",
+        "w-[240px] shrink-0 rounded-lg border-x border-b bg-gray-100 transition-colors",
         isHover ? "border-petrol-500 bg-petrol-50" : "border-gray-200"
       )}
     >
       <div
         className={cn(
-          "sticky top-0 z-10 flex items-center justify-between rounded-t-lg border-b border-gray-200 px-3 py-[11px]",
+          "sticky top-0 z-10 flex items-center justify-between rounded-t-lg border-t border-b border-b-gray-200 px-3 py-[11px]",
+          isHover ? "border-t-petrol-500" : "border-t-gray-200",
           tintClass
         )}
       >
