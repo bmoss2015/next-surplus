@@ -1,39 +1,27 @@
 "use client";
 
-import { useSyncExternalStore, useState } from "react";
+import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "ns_cookie_consent";
 
-function readConsent(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-const subscribe = (onChange: () => void) => {
-  if (typeof window === "undefined") return () => {};
-  window.addEventListener("storage", onChange);
-  return () => window.removeEventListener("storage", onChange);
-};
-
 export function CookieConsent() {
-  const consent = useSyncExternalStore(
-    subscribe,
-    () => readConsent(),
-    () => null,
-  );
-  const [dismissed, setDismissed] = useState(false);
+  const [show, setShow] = useState(false);
 
-  if (dismissed || consent) return null;
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        setShow(true);
+      }
+    } catch {}
+  }, []);
+
+  if (!show) return null;
 
   function dismiss() {
     try {
       localStorage.setItem(STORAGE_KEY, "essential-only");
     } catch {}
-    setDismissed(true);
+    setShow(false);
   }
 
   return (
