@@ -181,6 +181,9 @@ function KanbanColumn({
       <div
         className={cn(
           "sticky top-0 z-10 flex items-center justify-between rounded-t-lg border-b border-gray-200 px-3 py-[11px]",
+          isHover
+            ? "shadow-[0_-1px_0_0_#13644e]"
+            : "shadow-[0_-1px_0_0_#e5e7eb]",
           tintClass
         )}
       >
