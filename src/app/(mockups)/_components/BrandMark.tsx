@@ -11,14 +11,12 @@ export function DiamondMark({
   tone?: Tone;
 }) {
   const px = SIZES[size];
-  const bg = tone === "light" ? "#04261c" : "#ffffff";
-  const tip = tone === "light" ? "#ffffff" : "#04261c";
+  const outer = tone === "light" ? "#04261c" : "#ffffff";
   return (
     <svg viewBox="0 0 68 68" width={px} height={px} aria-hidden>
-      <rect width="68" height="68" fill={bg} />
-      <polygon points="34,16 56,34 34,52 12,34" fill={tip} />
-      <polygon points="34,16 56,34 34,34" fill="#13644e" />
-      <polygon points="34,34 56,34 34,52" fill="#4a9c75" />
+      <polygon points="34,6 62,34 34,62 6,34" fill={outer} />
+      <polygon points="34,6 62,34 34,34" fill="#13644e" />
+      <polygon points="34,34 62,34 34,62" fill="#4a9c75" />
     </svg>
   );
 }
