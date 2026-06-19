@@ -97,6 +97,8 @@ Planned workstreams for July through September 2026. The telephony and monetizat
 - E-signature integration (provider to be determined, target capability beyond simple template e-signature). Status events fire workflow triggers when documents are sent, viewed, or signed.
 - Plaid instant bank verification, connect a funding account in seconds to skip the 1 to 3 business day microdeposit wait on the existing Lob mail flow.
 - AI assistant surface (case summaries on demand, outreach message drafts based on lead context, document review helpers, conversation summarization across email and SMS threads).
+- Tags on leads and cases. Operators create custom labels (for example "high priority", "needs attorney callback", "out of state owner") and apply them to any lead. Filter the leads kanban and table view by one or more tags. Tags are org scoped and managed under Settings.
+- In app Roadmap page at /roadmap. Phase 1 renders the shipped, in progress, and upcoming view from the same source of truth content the Cloudflare Worker uses today, so customers and the team can see direction without opening the Drive doc. Phase 2 (Q4 or later) adds in web editing that writes back to the source of truth and triggers the Worker to regenerate the Drive doc.
 
 ---
 
