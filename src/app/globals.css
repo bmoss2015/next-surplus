@@ -262,18 +262,22 @@ input[type="button"]:not(:disabled),
   scrollbar-color: #13644e #f1f5f9;
 }
 .kanban-scroll::-webkit-scrollbar {
-  height: 6px;
+  height: 8px;
+  width: 8px;
 }
 .kanban-scroll::-webkit-scrollbar-track {
   background: #f1f5f9;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 .kanban-scroll::-webkit-scrollbar-thumb {
   background: #13644e;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
   background: #0d4b3a;
+}
+.kanban-scroll::-webkit-scrollbar-corner {
+  background: #f1f5f9;
 }
 
 /* Fix TT — one section-subheader treatment for the whole portal. */
