@@ -10,6 +10,9 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Fixed
+- Fix OAUTH-001: Gmail Connect flow no longer leaves the user staring at a blank `/api/oauth/google/callback` URL during the initial 5-30s mailbox backfill. The callback handler now schedules `syncGmailAccount` via Next 16's `after()` and sends the redirect to `/settings?email_connect=success` immediately. Fluid Compute keeps the function instance alive past the redirect so the first sync still completes; if the instance is evicted, the existing per-minute sync cron catches the account up on its next run. Affects only the post-OAuth path, no schema or env changes. (2026-06-19T21:52:00-05:00)
+
 ### Added
 - Fix AUTOMATIONS-001: New Automations section in the portal under an owner-only sidebar entry. First module: Web Form. Owner configures a public inquiry form, picks an assignee (single user or round robin pool), chooses which pipeline stage new submissions drop into, and edits the success message shown after submit. Public form lives at `/f/<formId>` and is also reachable as a JSON API at `/api/form/<formId>` for cross-origin posts (CORS allows mossequitypartners.com, app.nextsurplus.com, staging.nextsurplus.com, and *.vercel.app). Submissions create a lead with `lead_source = website`, an owner row with the submitter's name, contact rows for the email and phone, an activity log entry, a high-priority follow-up task linked to the lead, and a Resend email to the assignee using the existing Next Surplus email shell. Spam protection = honeypot text input (positioned offscreen) plus per-IP per-form rate limit (default 5 / minute). New migration 0152_web_forms.sql adds three tables (`web_forms`, `web_form_submissions`, `web_form_rate_limits`), org-scoped RLS, and seeds one `web_forms` row per existing org so every workspace starts pre-configured. (2026-06-19T20:00:00-05:00)
 
