@@ -206,10 +206,16 @@ export function NotificationBell() {
                         />
                       )}
                       <span>
-                        <span className="font-medium">
-                          {n.actor_first_name ?? "Someone"}
-                        </span>{" "}
-                        Mentioned You
+                        {n.type === "web_form" ? (
+                          <span className="font-medium">New Web Form Submission</span>
+                        ) : (
+                          <>
+                            <span className="font-medium">
+                              {n.actor_first_name ?? "Someone"}
+                            </span>{" "}
+                            Mentioned You
+                          </>
+                        )}
                       </span>
                     </span>
                     <span className="flex-none text-[10.5px] text-gray-400">

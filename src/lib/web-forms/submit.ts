@@ -105,6 +105,31 @@ export async function submitWebForm(input: WebFormSubmission): Promise<SubmitRes
     assigneeId = (form.assigned_to as string | null) ?? null;
   }
 
+  // Fallback: if the form has no assignee configured, route to the org's
+  // owner (the SaaS operator's seat in this org). Without this, the
+  // submission silently creates a lead with no task and no email.
+  if (!assigneeId) {
+    const { data: ownerProfile } = await sb
+      .from("profiles")
+      .select("id")
+      .eq("org_id", form.org_id)
+      .eq("role", "owner")
+      .limit(1)
+      .maybeSingle();
+    if (ownerProfile?.id) {
+      assigneeId = ownerProfile.id as string;
+    } else {
+      const { data: adminProfile } = await sb
+        .from("profiles")
+        .select("id")
+        .eq("org_id", form.org_id)
+        .eq("role", "admin")
+        .limit(1)
+        .maybeSingle();
+      assigneeId = (adminProfile?.id as string | null) ?? null;
+    }
+  }
+
   const placeholderAddress = "Web Form Inquiry";
   const placeholderCity = "Unknown";
   const placeholderZip = "00000";
@@ -131,7 +156,7 @@ export async function submitWebForm(input: WebFormSubmission): Promise<SubmitRes
       city: placeholderCity,
       state,
       zip: placeholderZip,
-      sale_type: "MTG",
+      sale_type: "unknown",
       lead_source: form.lead_source ?? "Website",
       assigned_to: assigneeId,
       custom_data: customData,
@@ -193,6 +218,15 @@ export async function submitWebForm(input: WebFormSubmission): Promise<SubmitRes
       due_date: dueDate,
       priority: "high",
       source: "manual",
+    });
+
+    await sb.from("notifications").insert({
+      org_id: form.org_id,
+      recipient_id: assigneeId,
+      actor_id: null,
+      type: "web_form",
+      lead_id: lead.id,
+      body_preview: `${fullName} (${state ?? "—"})`,
     });
   }
 
