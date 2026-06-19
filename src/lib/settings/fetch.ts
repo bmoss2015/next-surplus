@@ -289,18 +289,34 @@ export type MailBankAccountRow = {
   account_last_four: string | null;
   status: "unverified" | "verified" | "disabled";
   verified_at: string | null;
+  verify_attempts: number;
+  last_verify_error: string | null;
+  last_verify_attempt_at: string | null;
+  created_at: string;
 };
 
 export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
   const sb = await createClient();
-  const { data, error } = await sb
+  let rows: Record<string, unknown>[] = [];
+  const withTracking = await sb
     .from("mail_bank_accounts")
     .select(
-      "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at"
+      "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at, verify_attempts, last_verify_error, last_verify_attempt_at, created_at"
     )
     .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((r) => ({
+  if (withTracking.error) {
+    const fallback = await sb
+      .from("mail_bank_accounts")
+      .select(
+        "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at, created_at"
+      )
+      .order("created_at", { ascending: false });
+    if (fallback.error) throw fallback.error;
+    rows = (fallback.data ?? []) as Record<string, unknown>[];
+  } else {
+    rows = (withTracking.data ?? []) as Record<string, unknown>[];
+  }
+  return rows.map((r) => ({
     id: r.id as string,
     bank_name: (r.bank_name as string | null) ?? null,
     account_holder_name: (r.account_holder_name as string | null) ?? "",
@@ -311,6 +327,10 @@ export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
         ? (r.status as "verified" | "disabled")
         : "unverified",
     verified_at: (r.verified_at as string | null) ?? null,
+    verify_attempts: (r.verify_attempts as number | null) ?? 0,
+    last_verify_error: (r.last_verify_error as string | null) ?? null,
+    last_verify_attempt_at: (r.last_verify_attempt_at as string | null) ?? null,
+    created_at: (r.created_at as string | null) ?? new Date().toISOString(),
   }));
 }
 

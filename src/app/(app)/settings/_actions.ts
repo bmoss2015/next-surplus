@@ -862,6 +862,7 @@ export async function removeSignatureImage(): Promise<
 import {
   lobCreateBankAccount,
   lobDeleteBankAccount,
+  lobVerifyBankAccount,
 } from "@/lib/mail";
 import {
   plaidClient,
@@ -1012,6 +1013,76 @@ export async function deleteMailBankAccount(
   }
   const { error } = await sb.from("mail_bank_accounts").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// Manual micro-deposit verification. Operator enters the two cent
+// amounts from their bank statement when the automated Plaid cron
+// hasn't picked them up (e.g. delayed second deposit, Plaid pending
+// state, name-filter miss). Both values are integer cents in 1-99.
+// Lob locks the bank account after 3 failed /verify calls. The cron
+// stops auto-trying at 2 attempts so this path always has the third
+// shot available to the operator.
+export async function verifyMailBankAccountManually(input: {
+  bank_account_id: string;
+  amount1_cents: number;
+  amount2_cents: number;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const a1 = Math.round(input.amount1_cents);
+  const a2 = Math.round(input.amount2_cents);
+  if (!Number.isFinite(a1) || !Number.isFinite(a2)) {
+    return { ok: false, error: "Both amounts are required" };
+  }
+  if (a1 < 1 || a1 > 99 || a2 < 1 || a2 > 99) {
+    return {
+      ok: false,
+      error: "Each amount must be between 1 and 99 cents",
+    };
+  }
+  const sb = await createClient();
+  const { data: row, error: lookupErr } = await sb
+    .from("mail_bank_accounts")
+    .select("lob_bank_account_id, status, verify_attempts")
+    .eq("id", input.bank_account_id)
+    .single();
+  if (lookupErr || !row) {
+    return { ok: false, error: "Bank account not found" };
+  }
+  if (row.status === "verified") {
+    return { ok: false, error: "This bank account is already verified" };
+  }
+  const lobId = (row.lob_bank_account_id as string | null) ?? "";
+  if (!lobId.startsWith("bank_")) {
+    return { ok: false, error: "Bank account is missing a Lob reference" };
+  }
+  const lobRes = await lobVerifyBankAccount(lobId, [a1, a2]);
+  const nowIso = new Date().toISOString();
+  if (!lobRes.ok) {
+    await sb
+      .from("mail_bank_accounts")
+      .update({
+        verify_attempts: ((row.verify_attempts as number | null) ?? 0) + 1,
+        last_verify_error: lobRes.error,
+        last_verify_attempt_at: nowIso,
+      })
+      .eq("id", input.bank_account_id);
+    revalidatePath("/settings");
+    return { ok: false, error: lobRes.error };
+  }
+  const { error: updateErr } = await sb
+    .from("mail_bank_accounts")
+    .update({
+      status: "verified",
+      verified_at: nowIso,
+      verify_attempts: ((row.verify_attempts as number | null) ?? 0) + 1,
+      last_verify_error: null,
+      last_verify_attempt_at: nowIso,
+    })
+    .eq("id", input.bank_account_id);
+  if (updateErr) return { ok: false, error: updateErr.message };
   revalidatePath("/settings");
   return { ok: true };
 }
