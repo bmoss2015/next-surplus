@@ -297,14 +297,26 @@ export type MailBankAccountRow = {
 
 export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
   const sb = await createClient();
-  const { data, error } = await sb
+  let rows: Record<string, unknown>[] = [];
+  const withTracking = await sb
     .from("mail_bank_accounts")
     .select(
       "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at, verify_attempts, last_verify_error, last_verify_attempt_at, created_at"
     )
     .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((r) => ({
+  if (withTracking.error) {
+    const fallback = await sb
+      .from("mail_bank_accounts")
+      .select(
+        "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at, created_at"
+      )
+      .order("created_at", { ascending: false });
+    if (fallback.error) throw fallback.error;
+    rows = (fallback.data ?? []) as Record<string, unknown>[];
+  } else {
+    rows = (withTracking.data ?? []) as Record<string, unknown>[];
+  }
+  return rows.map((r) => ({
     id: r.id as string,
     bank_name: (r.bank_name as string | null) ?? null,
     account_holder_name: (r.account_holder_name as string | null) ?? "",
