@@ -2,14 +2,11 @@
 
 // Settings · Bank Accounts.
 //
-// Add Bank Account opens BankAccountDrawer which launches Plaid Link.
-// Plaid Auth pulls the routing + account numbers, we submit them to Lob,
-// and Lob starts its 1-2 business day micro-deposit verification cycle.
-// Once both deposits land, the plaid-microdeposit-poll cron auto-calls
-// Lob /verify with the matching cent amounts and flips the row to
-// verified. If the cron can't auto-verify (delayed second deposit, name
-// filter miss, etc.) the operator can click Verify Manually and enter
-// the two cent amounts from their bank statement.
+// Add Bank Account opens BankAccountDrawer where the operator types
+// the routing + account numbers. Lob /bank_accounts creates the row;
+// two small test deposits arrive in 1-2 business days. The Verify
+// Manually modal on each unverified card collects the two cent amounts
+// and flips the row to verified.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -36,18 +33,6 @@ function formatDate(iso: string | null): string {
     day: "numeric",
     year: "numeric",
   });
-}
-
-function relativeTime(iso: string | null): string {
-  if (!iso) return "not checked yet";
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60_000) return "just now";
-  const mins = Math.floor(ms / 60_000);
-  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
 export function MailBankAccountsSection({
@@ -84,11 +69,9 @@ export function MailBankAccountsSection({
         <div>
           <h1 className="section-h1">Bank Accounts</h1>
           <p className="section-desc">
-            Bank accounts used to fund outgoing checks and certified mail.
-            ACH only, credit and debit cards aren&apos;t eligible since the
-            network won&apos;t draw checks against a credit line. Your
-            monthly Next Surplus subscription is billed separately in{" "}
-            <a href="#billing">Billing</a>.
+            Bank accounts that fund outgoing checks and certified mail.
+            Your monthly Next Surplus subscription is billed separately
+            in <a href="#billing">Billing</a>.
           </p>
         </div>
         <button
@@ -254,39 +237,29 @@ function BankCard({
           {formatDate(isVerified ? bank.verified_at : bank.created_at)}
         </span>
       </div>
-      {!isVerified && (
-        <>
-          <div className="bank-card-row">
-            <span className="l">Last Check</span>
-            <span className="v" style={{ fontSize: 11 }}>
-              {relativeTime(bank.last_verify_attempt_at)}
-            </span>
-          </div>
-          {attemptsUsed > 0 && (
-            <div className="bank-card-row">
-              <span className="l">Attempts</span>
-              <span className="v" style={{ fontSize: 11 }}>
-                {attemptsUsed} of {LOB_VERIFY_ATTEMPT_LIMIT} used
-              </span>
-            </div>
-          )}
-          {bank.last_verify_error && (
-            <div
-              style={{
-                marginTop: 8,
-                padding: "8px 10px",
-                background: "rgba(220, 38, 38, 0.06)",
-                border: "1px solid rgba(220, 38, 38, 0.2)",
-                borderRadius: 6,
-                fontSize: 11.5,
-                color: "var(--danger)",
-                lineHeight: 1.4,
-              }}
-            >
-              {bank.last_verify_error}
-            </div>
-          )}
-        </>
+      {!isVerified && attemptsUsed > 0 && (
+        <div className="bank-card-row">
+          <span className="l">Attempts</span>
+          <span className="v" style={{ fontSize: 11 }}>
+            {attemptsUsed} of {LOB_VERIFY_ATTEMPT_LIMIT} used
+          </span>
+        </div>
+      )}
+      {!isVerified && bank.last_verify_error && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: "8px 10px",
+            background: "rgba(220, 38, 38, 0.06)",
+            border: "1px solid rgba(220, 38, 38, 0.2)",
+            borderRadius: 6,
+            fontSize: 11.5,
+            color: "var(--danger)",
+            lineHeight: 1.4,
+          }}
+        >
+          {bank.last_verify_error}
+        </div>
       )}
       <div className="bank-card-foot">
         <span className="text-[11px] text-3">

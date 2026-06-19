@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
@@ -93,12 +93,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Trigger the initial backfill IN-LINE before redirecting back. Fire-and-
-  // forget here gets aborted by the Next runtime as soon as we send the
-  // redirect, which is why last_synced_at was staying null. Awaiting keeps
-  // the OAuth flow open until the first sync completes — slower (the OAuth
-  // response now takes 5-30s for a typical 90-day backfill), but reliable.
-  // Look up the account we just upserted to get its id.
+  // Background the backfill so the redirect fires immediately; awaiting it
+  // inline kept the user on a blank /callback URL for the 5-30s sync window.
   const { data: justConnected } = await svc
     .from("channel_accounts")
     .select("id")
@@ -107,13 +103,14 @@ export async function GET(req: NextRequest) {
     .eq("address", userInfo.email)
     .maybeSingle();
   if (justConnected?.id) {
-    try {
-      await syncGmailAccount(justConnected.id as string);
-    } catch (e) {
-      console.error("initial sync failed", e);
-      // Don't bail on the OAuth redirect — the account is connected, manual
-      // refresh in the inbox will retry.
-    }
+    const accountId = justConnected.id as string;
+    after(async () => {
+      try {
+        await syncGmailAccount(accountId);
+      } catch (e) {
+        console.error("initial sync failed", e);
+      }
+    });
   }
 
   const redirect = NextResponse.redirect(
