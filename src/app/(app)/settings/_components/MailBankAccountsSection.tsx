@@ -2,14 +2,11 @@
 
 // Settings · Bank Accounts.
 //
-// Add Bank Account opens BankAccountDrawer which launches Plaid Link.
-// Plaid Auth pulls the routing + account numbers, we submit them to Lob,
-// and Lob starts its 1-2 business day micro-deposit verification cycle.
-// Once both deposits land, the plaid-microdeposit-poll cron auto-calls
-// Lob /verify with the matching cent amounts and flips the row to
-// verified. If the cron can't auto-verify (delayed second deposit, name
-// filter miss, etc.) the operator can click Verify Manually and enter
-// the two cent amounts from their bank statement.
+// Add Bank Account opens BankAccountDrawer where the operator types
+// the routing + account numbers. Lob /bank_accounts creates the row;
+// two small test deposits arrive in 1-2 business days. The Verify
+// Manually modal on each unverified card collects the two cent amounts
+// and flips the row to verified.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
