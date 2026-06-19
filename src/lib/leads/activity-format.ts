@@ -36,15 +36,14 @@ export function firstNameFrom(
   return local && local.length > 0 ? local : null;
 }
 
-// Detects whether a lead was created by a CSV import vs. manual entry, based on
-// its lead_source. Manual entries use the source "Manual entry"; everything else
-// (and unknown) is treated as an import-only when it clearly isn't manual —
-// otherwise we default to "Created" to be safe.
-function leadWasImported(leadSource: string | null | undefined): boolean {
+type LeadOrigin = "manual" | "website" | "import";
+
+function leadOriginFromSource(leadSource: string | null | undefined): LeadOrigin {
   const src = (leadSource ?? "").trim().toLowerCase();
-  if (src.length === 0) return false; // unknown -> default to "Created"
-  if (src === "manual entry" || src === "manual") return false;
-  return true;
+  if (src.length === 0) return "manual";
+  if (src === "manual entry" || src === "manual") return "manual";
+  if (src === "website" || src === "web form" || src === "web_form") return "website";
+  return "import";
 }
 
 export function formatActivity(
@@ -56,11 +55,16 @@ export function formatActivity(
 } {
   const p = row.payload ?? {};
   switch (row.activity_type) {
-    case "lead_created":
-      return {
-        text: leadWasImported(opts?.leadSource) ? "Lead Imported" : "Lead Created",
-        icon: "create",
-      };
+    case "lead_created": {
+      const origin = leadOriginFromSource(opts?.leadSource);
+      const text =
+        origin === "website"
+          ? "Lead Created From Website Form"
+          : origin === "import"
+            ? "Lead Imported"
+            : "Lead Created";
+      return { text, icon: "create" };
+    }
     // Fix LLLL3 PART 3: when a duplicate import lands on an existing lead the
     // wizard now logs a `lead_updated` row instead of dropping a misleading
     // "Lead Imported" entry. The body text spells out which merge strategy ran
