@@ -353,9 +353,13 @@ export function buildRawMessage(opts: {
       out.push(opts.bodyHtml);
       out.push(`--${altBoundary}--`);
     } else if (opts.bodyHtml) {
+      // Ensure HTML has proper document structure if missing
+      const htmlContent = opts.bodyHtml.includes('<html')
+        ? opts.bodyHtml
+        : `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>${opts.bodyHtml}</body></html>`;
       out.push(`Content-Type: text/html; charset="UTF-8"`);
       out.push("");
-      out.push(opts.bodyHtml);
+      out.push(htmlContent);
     } else {
       out.push(`Content-Type: text/plain; charset="UTF-8"`);
       out.push("");
