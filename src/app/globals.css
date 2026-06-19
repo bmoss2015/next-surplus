@@ -255,29 +255,26 @@ input[type="button"]:not(:disabled),
   color: #ffffff;
 }
 
-/* Fix V — pill-shaped, always-visible horizontal scrollbar for the Kanban
-   board (the visible bottom track + the synced sticky mirror at the top). */
 .kanban-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #13644e #f1f5f9;
+  scrollbar-color: #d4d4d4 transparent;
 }
 .kanban-scroll::-webkit-scrollbar {
   height: 8px;
   width: 8px;
 }
 .kanban-scroll::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 4px;
+  background: transparent;
 }
 .kanban-scroll::-webkit-scrollbar-thumb {
-  background: #13644e;
+  background: #d4d4d4;
   border-radius: 4px;
 }
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
-  background: #0d4b3a;
+  background: #a3a3a3;
 }
 .kanban-scroll::-webkit-scrollbar-corner {
-  background: #f1f5f9;
+  background: transparent;
 }
 
 /* Fix TT — one section-subheader treatment for the whole portal. */

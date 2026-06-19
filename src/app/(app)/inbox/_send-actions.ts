@@ -84,13 +84,22 @@ export async function sendEmail(
     ? `"${acct.display_name}" <${acct.address}>`
     : acct.address;
 
+  const looksLikeHtml = /<[a-z][^>]*>/i.test(input.body);
+  const htmlBody = looksLikeHtml
+    ? input.body
+    : input.body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+  const textBody = looksLikeHtml
+    ? input.body.replace(/<[^>]+>/g, "")
+    : input.body;
+
   const raw = buildRawMessage({
     from: fromHeader,
     to: input.to,
     cc: input.cc,
     bcc: input.bcc,
     subject: input.subject,
-    bodyText: input.body,
+    bodyHtml: htmlBody,
+    bodyText: textBody,
     inReplyTo: input.inReplyTo ?? undefined,
     references: input.referencesChain,
     attachments: input.attachments,
