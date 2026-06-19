@@ -211,7 +211,6 @@ function BrandLockupInline() {
       aria-label="Next Surplus"
       style={{ display: "block" }}
     >
-      <rect x="14" y="14" width="52" height="52" fill="#04261c" />
       <polygon points="40,26 54,40 40,54 26,40" fill="#ffffff" />
       <polygon points="40,26 54,40 40,40" fill="#13644e" />
       <polygon points="40,40 54,40 40,54" fill="#4a9c75" />
