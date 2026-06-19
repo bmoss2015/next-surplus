@@ -257,7 +257,7 @@ input[type="button"]:not(:disabled),
 
 .kanban-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: #d4d4d4 transparent;
 }
 .kanban-scroll::-webkit-scrollbar {
   height: 8px;
@@ -267,11 +267,11 @@ input[type="button"]:not(:disabled),
   background: transparent;
 }
 .kanban-scroll::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d4d4d4;
   border-radius: 4px;
 }
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a3a3a3;
 }
 .kanban-scroll::-webkit-scrollbar-corner {
   background: transparent;
