@@ -26,10 +26,13 @@ type ThumbState =
 export function LetterThumbnail({
   jobId,
   bodyHtml,
+  color = true,
 }: {
   jobId: string;
   bodyHtml: string | null;
+  color?: boolean;
 }) {
+  const grayscaleStyle = color ? undefined : { filter: "grayscale(100%)" };
   const hasInlineHtml = !!bodyHtml && bodyHtml.trim().length > 0;
 
   const [state, setState] = useState<ThumbState>(() =>
@@ -134,15 +137,16 @@ export function LetterThumbnail({
         sandbox=""
         srcDoc={state.html}
         className="absolute left-0 top-0 origin-top-left h-[792px] w-[612px] scale-[0.327] bg-white"
+        style={grayscaleStyle}
       />
     );
   }
-  // Image (rendered PDF first page) — fills the thumbnail box.
   return (
     <img
       src={state.dataUrl}
       alt="Letter preview"
       className="absolute inset-0 h-full w-full object-cover object-top"
+      style={grayscaleStyle}
     />
   );
 }

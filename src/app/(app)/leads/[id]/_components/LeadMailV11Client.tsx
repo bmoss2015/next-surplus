@@ -499,7 +499,7 @@ function DetailPane({
         style={{ width: "200px", aspectRatio: "8.5 / 11" }}
         title="Click to view full letter"
       >
-        <LetterThumbnail jobId={piece.id} bodyHtml={bodyHtml} />
+        <LetterThumbnail jobId={piece.id} bodyHtml={bodyHtml} color={piece.color} />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/0 to-transparent group-hover:from-black/5" />
         <div className="absolute inset-x-0 bottom-0 border-t border-gray-200 bg-white px-2 py-1 text-center text-[10px] text-gray-500 group-hover:text-petrol-700">
           Click to view
