@@ -114,9 +114,9 @@ export function KanbanBoard({ initialData }: { initialData: KanbanData }) {
   }
 
   return (
-    <div>
-      <div className="kanban-scroll overflow-x-scroll pb-3">
-        <div className="flex w-max gap-[10px]">
+    <div className="flex h-full flex-col">
+      <div className="kanban-scroll min-h-0 flex-1 overflow-x-scroll overflow-y-hidden pb-3">
+        <div className="flex h-full w-max gap-[10px]">
           {stages.map((stage) => {
             const leads = grouped[stage.id] ?? [];
             const isHover = hoverStageId === stage.id;
@@ -174,13 +174,13 @@ function KanbanColumn({
       onDragOver={onDragOver}
       onDrop={onDrop}
       className={cn(
-        "w-[240px] shrink-0 overflow-hidden rounded-lg border bg-gray-100 transition-colors",
+        "flex h-full w-[240px] shrink-0 flex-col overflow-hidden rounded-lg border bg-gray-100 transition-colors",
         isHover ? "border-petrol-500 bg-petrol-50" : "border-gray-200"
       )}
     >
       <div
         className={cn(
-          "flex items-center justify-between border-b border-gray-200 px-3 py-[11px]",
+          "flex shrink-0 items-center justify-between border-b border-gray-200 px-3 py-[11px]",
           tintClass
         )}
       >
@@ -192,7 +192,7 @@ function KanbanColumn({
           {leads.length}
         </span>
       </div>
-      <div className="min-h-[460px] space-y-[7px] p-2">
+      <div className="min-h-0 flex-1 space-y-[7px] overflow-y-auto overscroll-contain p-2">
         {leads.map((lead) => (
           <KanbanCard
             key={lead.id}
