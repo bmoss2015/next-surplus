@@ -45,7 +45,8 @@ export function WebFormPanel({
     );
   }
 
-  const publicUrl = `${APP_BASE}/f/${form.id}`;
+  const formId = form.id;
+  const publicUrl = `${APP_BASE}/f/${formId}`;
   const embedCode = `<iframe src="${publicUrl}" width="100%" height="700" frameborder="0" style="border:0"></iframe>`;
 
   function copy(text: string, which: "url" | "embed") {
@@ -63,7 +64,7 @@ export function WebFormPanel({
     setSaved(false);
     setSaveError(null);
     startTransition(async () => {
-      const result = await saveWebForm({ id: form.id, ...partial });
+      const result = await saveWebForm({ id: formId, ...partial });
       if (result.ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
