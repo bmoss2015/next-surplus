@@ -22,6 +22,21 @@ export function WebFormPanel({
   members: OrgMemberRow[];
   stages: OrgStage[];
 }) {
+  const [isActive, setIsActive] = useState(form?.is_active ?? false);
+  const [assignmentType, setAssignmentType] = useState<"specific" | "round_robin">(
+    form?.assignment_type ?? "specific"
+  );
+  const [assignedTo, setAssignedTo] = useState(form?.assigned_to ?? "");
+  const [rrUsers, setRrUsers] = useState<string[]>(form?.round_robin_users ?? []);
+  const [defaultStage, setDefaultStage] = useState(form?.default_stage ?? "new_leads");
+  const [successMessage, setSuccessMessage] = useState(form?.success_message ?? "");
+  const [embedOpen, setEmbedOpen] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedEmbed, setCopiedEmbed] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
   if (!form) {
     return (
       <div className="rounded-md border border-gray-200 bg-white p-6 text-[13px] text-gray-600">
@@ -29,19 +44,6 @@ export function WebFormPanel({
       </div>
     );
   }
-
-  const [isActive, setIsActive] = useState(form.is_active);
-  const [assignmentType, setAssignmentType] = useState(form.assignment_type);
-  const [assignedTo, setAssignedTo] = useState(form.assigned_to ?? "");
-  const [rrUsers, setRrUsers] = useState<string[]>(form.round_robin_users ?? []);
-  const [defaultStage, setDefaultStage] = useState(form.default_stage);
-  const [successMessage, setSuccessMessage] = useState(form.success_message);
-  const [embedOpen, setEmbedOpen] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
-  const [copiedEmbed, setCopiedEmbed] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   const publicUrl = `${APP_BASE}/f/${form.id}`;
   const embedCode = `<iframe src="${publicUrl}" width="100%" height="700" frameborder="0" style="border:0"></iframe>`;
@@ -57,7 +59,7 @@ export function WebFormPanel({
     }
   }
 
-  function save(partial: Parameters<typeof saveWebForm>[0]) {
+  function save(partial: Omit<Parameters<typeof saveWebForm>[0], "id">) {
     setSaved(false);
     setSaveError(null);
     startTransition(async () => {
