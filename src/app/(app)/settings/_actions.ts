@@ -914,6 +914,60 @@ export async function createPlaidLinkToken(): Promise<
   }
 }
 
+// Manual entry path used when Plaid Link is unavailable (env not
+// configured, user prefers to type, etc). Operator types their
+// routing + account numbers from their checks; we send them to Lob
+// /bank_accounts the same way the Plaid path does, and the standard
+// micro-deposit flow runs after that. No plaid_access_token is stored,
+// so the auto-verify cron skips this row and verification flows
+// through the manual Verify Manually modal on the bank account card.
+export async function addMailBankAccountManually(input: {
+  routing_number: string;
+  account_number: string;
+  account_holder_name: string;
+  account_type: "company" | "individual";
+  bank_name?: string | null;
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const routing = input.routing_number.replace(/\D/g, "");
+  const account = input.account_number.replace(/\D/g, "");
+  const holder = input.account_holder_name.trim();
+  if (routing.length !== 9) {
+    return { ok: false, error: "Routing number must be 9 digits" };
+  }
+  if (account.length < 4 || account.length > 17) {
+    return { ok: false, error: "Account number must be 4 to 17 digits" };
+  }
+  if (!holder) {
+    return { ok: false, error: "Account holder name is required" };
+  }
+  const lobRes = await lobCreateBankAccount({
+    routing_number: routing,
+    account_number: account,
+    account_holder_name: holder,
+    account_type:
+      input.account_type === "individual" ? "individual" : "company",
+  });
+  if (!lobRes.ok) return { ok: false, error: lobRes.error };
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("mail_bank_accounts")
+    .insert({
+      lob_bank_account_id: lobRes.lob_bank_account_id,
+      bank_name: lobRes.bank_name ?? input.bank_name?.trim() ?? null,
+      account_holder_name: holder,
+      routing_last_four: lobRes.routing_last_four,
+      account_last_four: lobRes.account_last_four,
+      verified_via: "micro_deposits",
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true, id: data.id as string };
+}
+
 export async function exchangePlaidPublicTokenForBankAccount(input: {
   public_token: string;
   account_id: string;

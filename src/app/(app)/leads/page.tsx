@@ -11,8 +11,8 @@ export default async function LeadsPage() {
     data.unstaged.length;
 
   return (
-    <div className="px-7 py-6">
-      <div className="mb-[22px] flex items-start justify-between">
+    <div className="flex h-full flex-col px-7 py-6">
+      <div className="mb-[22px] flex shrink-0 items-start justify-between">
         <div>
           <h1 className="m-0 text-[22px] font-medium tracking-tight text-ink">
             Leads
@@ -23,7 +23,9 @@ export default async function LeadsPage() {
         </div>
         <ViewToggle active="kanban" />
       </div>
-      <KanbanBoard initialData={data} />
+      <div className="min-h-0 flex-1">
+        <KanbanBoard initialData={data} />
+      </div>
     </div>
   );
 }
