@@ -132,7 +132,7 @@ export async function submitWebForm(input: WebFormSubmission): Promise<SubmitRes
       state,
       zip: placeholderZip,
       sale_type: "MTG",
-      lead_source: form.lead_source ?? "website",
+      lead_source: form.lead_source ?? "Website",
       assigned_to: assigneeId,
       custom_data: customData,
     })

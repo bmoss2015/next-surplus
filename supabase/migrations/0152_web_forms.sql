@@ -34,7 +34,7 @@ create table public.web_forms (
   -- enum if no per-org stages are configured). lead_source becomes the
   -- string written to leads.lead_source.
   default_stage text not null default 'new_leads',
-  lead_source text not null default 'website',
+  lead_source text not null default 'Website',
 
   -- Form presentation.
   success_message text not null default
@@ -132,10 +132,10 @@ begin
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = 'lead_sources'
   ) then
-    insert into public.lead_sources (org_id, value, label)
-    select o.id, 'website', 'Website'
+    insert into public.lead_sources (org_id, name)
+    select o.id, 'Website'
       from public.orgs o
-     on conflict do nothing;
+     on conflict (org_id, name) do nothing;
   end if;
 end $$;
 
