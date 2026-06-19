@@ -180,17 +180,6 @@ export async function submitWebForm(input: WebFormSubmission): Promise<SubmitRes
     await sb.from("contacts").insert(contacts);
   }
 
-  await sb.from("activities").insert({
-    org_id: form.org_id,
-    lead_id: lead.id,
-    activity_type: "lead_created",
-    payload: {
-      source: "web_form",
-      form_name: form.name,
-      submitted_at: new Date().toISOString(),
-    },
-  });
-
   if (assigneeId) {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
