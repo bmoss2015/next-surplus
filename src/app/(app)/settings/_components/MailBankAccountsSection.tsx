@@ -35,18 +35,6 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function relativeTime(iso: string | null): string {
-  if (!iso) return "not checked yet";
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60_000) return "just now";
-  const mins = Math.floor(ms / 60_000);
-  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
-}
-
 export function MailBankAccountsSection({
   initial,
 }: {
@@ -249,39 +237,29 @@ function BankCard({
           {formatDate(isVerified ? bank.verified_at : bank.created_at)}
         </span>
       </div>
-      {!isVerified && (
-        <>
-          <div className="bank-card-row">
-            <span className="l">Last Check</span>
-            <span className="v" style={{ fontSize: 11 }}>
-              {relativeTime(bank.last_verify_attempt_at)}
-            </span>
-          </div>
-          {attemptsUsed > 0 && (
-            <div className="bank-card-row">
-              <span className="l">Attempts</span>
-              <span className="v" style={{ fontSize: 11 }}>
-                {attemptsUsed} of {LOB_VERIFY_ATTEMPT_LIMIT} used
-              </span>
-            </div>
-          )}
-          {bank.last_verify_error && (
-            <div
-              style={{
-                marginTop: 8,
-                padding: "8px 10px",
-                background: "rgba(220, 38, 38, 0.06)",
-                border: "1px solid rgba(220, 38, 38, 0.2)",
-                borderRadius: 6,
-                fontSize: 11.5,
-                color: "var(--danger)",
-                lineHeight: 1.4,
-              }}
-            >
-              {bank.last_verify_error}
-            </div>
-          )}
-        </>
+      {!isVerified && attemptsUsed > 0 && (
+        <div className="bank-card-row">
+          <span className="l">Attempts</span>
+          <span className="v" style={{ fontSize: 11 }}>
+            {attemptsUsed} of {LOB_VERIFY_ATTEMPT_LIMIT} used
+          </span>
+        </div>
+      )}
+      {!isVerified && bank.last_verify_error && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: "8px 10px",
+            background: "rgba(220, 38, 38, 0.06)",
+            border: "1px solid rgba(220, 38, 38, 0.2)",
+            borderRadius: 6,
+            fontSize: 11.5,
+            color: "var(--danger)",
+            lineHeight: 1.4,
+          }}
+        >
+          {bank.last_verify_error}
+        </div>
       )}
       <div className="bank-card-foot">
         <span className="text-[11px] text-3">
