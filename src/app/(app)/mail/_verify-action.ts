@@ -6,6 +6,8 @@ import {
   type AddressVerifyInput,
   type AddressVerifyResult,
 } from "@/lib/mail/verify-address";
+import { formatAddressForStorage } from "@/lib/mail/address";
+import { getCurrentProfile } from "@/lib/auth/current-user";
 
 // Server action wrapper around verifyAddressCached. When contact_id
 // is provided, returns the cached result if fresh (< 90 days) and
@@ -20,6 +22,46 @@ export async function verifyAddressAction(
     contactId: contact_id ?? null,
     force: force === true,
   });
+}
+
+// Persists a Lob-corrected address back to the contact row so the next
+// time the operator opens Send Mail for this recipient, the corrected
+// address is what loads, not the original undeliverable one. Writes the
+// canonical "line1, city, ST ZIP" form into contacts.value. The existing
+// BEFORE UPDATE trigger on public.contacts (migration 0133) clears the
+// address_verify_* cache fields automatically when value changes, so the
+// next verify call computes against the fresh address.
+export async function persistContactAddress(input: {
+  contact_id: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  const line1 = input.line1.trim();
+  const city = input.city.trim();
+  const state = input.state.trim();
+  const postal_code = input.postal_code.trim();
+  if (!line1 || !city || !state || !postal_code) {
+    return { ok: false, error: "Address is missing required fields" };
+  }
+  const value = formatAddressForStorage({
+    line1,
+    line2: input.line2?.trim() ? input.line2.trim() : null,
+    city,
+    state,
+    postal_code,
+  });
+  const admin = createServiceClient();
+  const { error } = await admin
+    .from("contacts")
+    .update({ value })
+    .eq("id", input.contact_id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 // Bulk-read the cached verification results for a list of contact
