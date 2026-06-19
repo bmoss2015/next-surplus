@@ -27,6 +27,7 @@ import {
   LogOut,
   ChevronsLeft,
   PhoneCall,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { signOut } from "@/app/(auth)/_actions";
@@ -54,6 +55,7 @@ const NAV: NavItem[] = [
   { label: "Imports",      href: "/imports",       Icon: FileUp },
   { label: "Reports",      href: "/reports",       Icon: BarChart3 },
   { label: "Power Dialer", href: "/dialer/setup",  Icon: PhoneCall, ownerOnly: true },
+  { label: "Automations",  href: "/automations",   Icon: Zap, ownerOnly: true },
   { label: "Settings",     href: "/settings",      Icon: Settings },
   { label: "Owner",        href: "/owner",         Icon: ShieldCheck, ownerOnly: true },
 ];
