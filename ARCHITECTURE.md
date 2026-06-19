@@ -305,3 +305,13 @@ Open questions to answer before building:
 - Cadence state machine: pause, resume, exit triggers
 - Compliance: TCPA, DNC, time-of-day per state
 - Transition plan to shut GHL off
+
+### RFC-005: In-app Roadmap Editing Write-Back Path
+
+Open questions to answer before building Phase 2 of the in-app `/roadmap` page:
+
+- Where does the source of truth live once editing moves in-app? Does git-tracked markdown remain canonical (commit via GitHub API on save), or does the source migrate into Supabase with the Cloudflare Worker exporting back to markdown?
+- Who can edit — owner only, admins, or any teammate? Public read for the `/roadmap` page, or auth-gated?
+- How does the in-app edit flow trigger the Cloudflare Worker rebuild — direct POST to `/regenerate`, a queued job, or rely on the Monday 14:00 UTC cron?
+- How are conflicts handled if a `/roadmap` slash-command edit lands at the same time as an in-web edit?
+- Versioning and rollback model — does each edit create a CHANGELOG-style audit row, and where does that audit log live?
