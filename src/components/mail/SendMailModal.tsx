@@ -12,6 +12,7 @@ import {
 import {
   verifyAddressAction,
   fetchCachedVerifyResults,
+  persistContactAddress,
 } from "@/app/(app)/mail/_verify-action";
 import type { AddressVerifyResult } from "@/lib/mail/verify-address";
 import { renderMerge, MERGE_FIELDS, MERGE_GROUP_LABELS } from "@/lib/mail/merge";
@@ -224,8 +225,10 @@ export function SendMailModal({
   }
 
   // Apply a Lob-suggested correction for this recipient. Stores it as
-  // an override + re-runs verify on the new address. The pill flips
-  // to Verified once Lob confirms the corrected version.
+  // an override, persists the corrected address back to the contact row
+  // (so the next Send Mail opens with the corrected address already in
+  // place), then re-runs verify against the new address so the cache is
+  // populated cleanly.
   async function applyAddressSuggestion(
     c: SendMailModalRecipient,
     suggested: {
@@ -238,11 +241,15 @@ export function SendMailModal({
   ) {
     setReVerifyingKey(c.key);
     setAddressOverrides((prev) => ({ ...prev, [c.key]: suggested }));
-    // Skip the per-contact cache when re-verifying an override —
-    // the corrected address isn't the contact's stored value, so
-    // we shouldn't write it to the contact's cache row. Cache
-    // only kicks in for the contact's own original address.
-    const res = await verifyAddressAction(suggested);
+    const contactId = contactIdOf(c);
+    if (contactId) {
+      await persistContactAddress({ contact_id: contactId, ...suggested });
+    }
+    const res = await verifyAddressAction({
+      ...suggested,
+      contact_id: contactId,
+      force: true,
+    });
     setVerifyResults((prev) => ({ ...prev, [c.key]: res }));
     setReVerifyingKey(null);
     setExpandedFixRecipient(null);
