@@ -81,11 +81,9 @@ export function MailBankAccountsSection({
         <div>
           <h1 className="section-h1">Bank Accounts</h1>
           <p className="section-desc">
-            Bank accounts used to fund outgoing checks and certified mail.
-            ACH only, credit and debit cards aren&apos;t eligible since the
-            network won&apos;t draw checks against a credit line. Your
-            monthly Next Surplus subscription is billed separately in{" "}
-            <a href="#billing">Billing</a>.
+            Bank accounts that fund outgoing checks and certified mail.
+            Your monthly Next Surplus subscription is billed separately
+            in <a href="#billing">Billing</a>.
           </p>
         </div>
         <button
