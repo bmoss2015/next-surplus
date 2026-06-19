@@ -1,19 +1,27 @@
 "use client";
 
-// Settings · Bank Accounts — Plaid Link add + delete.
+// Settings · Bank Accounts.
 //
-// Add Bank Account opens BankAccountDrawer which launches Plaid Link;
-// the bank account lands already verified, so there's no separate
-// verify step. Legacy rows added via the old Lob micro-deposit flow
-// may still display as unverified — they're read-only and should be
-// removed if their micro-deposits never landed.
+// Add Bank Account opens BankAccountDrawer which launches Plaid Link.
+// Plaid Auth pulls the routing + account numbers, we submit them to Lob,
+// and Lob starts its 1-2 business day micro-deposit verification cycle.
+// Once both deposits land, the plaid-microdeposit-poll cron auto-calls
+// Lob /verify with the matching cent amounts and flips the row to
+// verified. If the cron can't auto-verify (delayed second deposit, name
+// filter miss, etc.) the operator can click Verify Manually and enter
+// the two cent amounts from their bank statement.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { MailBankAccountRow } from "@/lib/settings/fetch";
-import { deleteMailBankAccount } from "@/app/(app)/settings/_actions";
+import {
+  deleteMailBankAccount,
+  verifyMailBankAccountManually,
+} from "@/app/(app)/settings/_actions";
 import { BankAccountDrawer, type BankDrawerState } from "./BankAccountDrawer";
 import { Modal } from "@/components/Modal";
+
+const LOB_VERIFY_ATTEMPT_LIMIT = 3;
 
 function maskLast4(last4: string | null): string {
   if (!last4) return "•••• ••••";
@@ -30,6 +38,18 @@ function formatDate(iso: string | null): string {
   });
 }
 
+function relativeTime(iso: string | null): string {
+  if (!iso) return "not checked yet";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 60_000) return "just now";
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 export function MailBankAccountsSection({
   initial,
 }: {
@@ -38,6 +58,7 @@ export function MailBankAccountsSection({
   const router = useRouter();
   const [drawer, setDrawer] = useState<BankDrawerState>({ kind: "closed" });
   const [confirmRow, setConfirmRow] = useState<MailBankAccountRow | null>(null);
+  const [verifyRow, setVerifyRow] = useState<MailBankAccountRow | null>(null);
   const [deleting, startDelete] = useTransition();
 
   function confirmDelete() {
@@ -63,11 +84,11 @@ export function MailBankAccountsSection({
         <div>
           <h1 className="section-h1">Bank Accounts</h1>
           <p className="section-desc">
-            Bank accounts used to fund outgoing checks and certified mail
-            through Lob. ACH only, credit and debit cards aren&apos;t
-            eligible since the network won&apos;t draw checks against a
-            credit line. Your monthly Next Surplus subscription is billed
-            separately in <a href="#billing">Billing</a>.
+            Bank accounts used to fund outgoing checks and certified mail.
+            ACH only, credit and debit cards aren&apos;t eligible since the
+            network won&apos;t draw checks against a credit line. Your
+            monthly Next Surplus subscription is billed separately in{" "}
+            <a href="#billing">Billing</a>.
           </p>
         </div>
         <button
@@ -102,6 +123,7 @@ export function MailBankAccountsSection({
               bank={b}
               isFirst={idx === 0}
               onRemove={() => setConfirmRow(b)}
+              onVerify={() => setVerifyRow(b)}
             />
           ))}
         </div>
@@ -110,6 +132,15 @@ export function MailBankAccountsSection({
       <BankAccountDrawer
         state={drawer}
         onClose={() => setDrawer({ kind: "closed" })}
+      />
+
+      <ManualVerifyModal
+        bank={verifyRow}
+        onClose={() => setVerifyRow(null)}
+        onVerified={() => {
+          setVerifyRow(null);
+          router.refresh();
+        }}
       />
 
       <Modal
@@ -160,12 +191,17 @@ function BankCard({
   bank,
   isFirst,
   onRemove,
+  onVerify,
 }: {
   bank: MailBankAccountRow;
   isFirst: boolean;
   onRemove: () => void;
+  onVerify: () => void;
 }) {
   const isVerified = bank.status === "verified";
+  const attemptsUsed = bank.verify_attempts ?? 0;
+  const attemptsRemaining = Math.max(0, LOB_VERIFY_ATTEMPT_LIMIT - attemptsUsed);
+  const locked = attemptsRemaining === 0;
 
   return (
     <div className="bank-card">
@@ -198,7 +234,7 @@ function BankCard({
               border: "1px solid var(--brand)",
               minWidth: 0,
             }}
-            title="Waiting for Lob's test deposits to land in your bank. We'll auto-verify via Plaid once they post (usually 1-2 business days). You don't need to do anything."
+            title="Two small test deposits (under $1 each) are on the way to this bank. We auto-verify within 4 hours of both posting. If only one shows up after 3 business days, click Verify Manually."
           >
             VERIFYING
           </span>
@@ -214,21 +250,256 @@ function BankCard({
       </div>
       <div className="bank-card-row">
         <span className="l">{isVerified ? "Verified" : "Added"}</span>
-        <span className="v">{formatDate(bank.verified_at)}</span>
+        <span className="v">
+          {formatDate(isVerified ? bank.verified_at : bank.created_at)}
+        </span>
       </div>
+      {!isVerified && (
+        <>
+          <div className="bank-card-row">
+            <span className="l">Last Check</span>
+            <span className="v" style={{ fontSize: 11 }}>
+              {relativeTime(bank.last_verify_attempt_at)}
+            </span>
+          </div>
+          {attemptsUsed > 0 && (
+            <div className="bank-card-row">
+              <span className="l">Attempts</span>
+              <span className="v" style={{ fontSize: 11 }}>
+                {attemptsUsed} of {LOB_VERIFY_ATTEMPT_LIMIT} used
+              </span>
+            </div>
+          )}
+          {bank.last_verify_error && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: "8px 10px",
+                background: "rgba(220, 38, 38, 0.06)",
+                border: "1px solid rgba(220, 38, 38, 0.2)",
+                borderRadius: 6,
+                fontSize: 11.5,
+                color: "var(--danger)",
+                lineHeight: 1.4,
+              }}
+            >
+              {bank.last_verify_error}
+            </div>
+          )}
+        </>
+      )}
       <div className="bank-card-foot">
         <span className="text-[11px] text-3">
           {isVerified && isFirst ? "Default for outgoing checks" : ""}
         </span>
-        <button
-          type="button"
-          className="icon-btn"
-          title="Remove"
-          onClick={onRemove}
-        >
-          <i className="icon icon-trash" />
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {!isVerified && !locked && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              style={{ fontSize: 11.5, padding: "4px 10px" }}
+              onClick={onVerify}
+            >
+              Verify Manually
+            </button>
+          )}
+          <button
+            type="button"
+            className="icon-btn"
+            title="Remove"
+            onClick={onRemove}
+          >
+            <i className="icon icon-trash" />
+          </button>
+        </div>
       </div>
     </div>
+  );
+}
+
+function ManualVerifyModal({
+  bank,
+  onClose,
+  onVerified,
+}: {
+  bank: MailBankAccountRow | null;
+  onClose: () => void;
+  onVerified: () => void;
+}) {
+  const [amount1, setAmount1] = useState("");
+  const [amount2, setAmount2] = useState("");
+  const [submitting, startSubmit] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+
+  function parseCents(input: string): number | null {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const dollarMatch = /^\$?0?\.(\d{1,2})$/.exec(trimmed);
+    if (dollarMatch) {
+      const digits = dollarMatch[1].padEnd(2, "0").slice(0, 2);
+      return Number.parseInt(digits, 10);
+    }
+    const centMatch = /^(\d{1,2})$/.exec(trimmed);
+    if (centMatch) return Number.parseInt(centMatch[1], 10);
+    return null;
+  }
+
+  function reset() {
+    setAmount1("");
+    setAmount2("");
+    setErr(null);
+  }
+
+  function submit() {
+    if (!bank) return;
+    const a1 = parseCents(amount1);
+    const a2 = parseCents(amount2);
+    if (a1 === null || a2 === null) {
+      setErr("Enter both amounts in cents (e.g. 7) or dollars (e.g. 0.07)");
+      return;
+    }
+    if (a1 < 1 || a1 > 99 || a2 < 1 || a2 > 99) {
+      setErr("Each amount must be between 1 and 99 cents");
+      return;
+    }
+    setErr(null);
+    startSubmit(async () => {
+      const res = await verifyMailBankAccountManually({
+        bank_account_id: bank.id,
+        amount1_cents: a1,
+        amount2_cents: a2,
+      });
+      if (!res.ok) {
+        setErr(res.error);
+        return;
+      }
+      reset();
+      onVerified();
+    });
+  }
+
+  if (!bank) return null;
+  const attemptsUsed = bank.verify_attempts ?? 0;
+  const attemptsRemaining = LOB_VERIFY_ATTEMPT_LIMIT - attemptsUsed;
+
+  return (
+    <Modal
+      open={true}
+      onClose={() => {
+        if (!submitting) {
+          reset();
+          onClose();
+        }
+      }}
+      title="Verify Bank Account"
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <p
+          className="m-0"
+          style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.5 }}
+        >
+          Enter the two small test deposit amounts you see on your bank
+          statement for <strong>{bank.bank_name ?? "this account"}</strong>{" "}
+          {maskLast4(bank.account_last_four)}. Each will be between 1 and 99
+          cents.
+        </p>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label
+              className="drawer-label"
+              style={{ fontSize: 11.5, marginBottom: 4 }}
+            >
+              Amount 1
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoFocus
+              placeholder="0.07"
+              value={amount1}
+              onChange={(e) => setAmount1(e.target.value)}
+              className="input"
+              style={{ width: "100%" }}
+              disabled={submitting}
+            />
+          </div>
+          <div>
+            <label
+              className="drawer-label"
+              style={{ fontSize: 11.5, marginBottom: 4 }}
+            >
+              Amount 2
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.23"
+              value={amount2}
+              onChange={(e) => setAmount2(e.target.value)}
+              className="input"
+              style={{ width: "100%" }}
+              disabled={submitting}
+            />
+          </div>
+        </div>
+
+        <p
+          className="m-0"
+          style={{ fontSize: 11.5, color: "var(--text-3)", lineHeight: 1.45 }}
+        >
+          You have <strong>{attemptsRemaining}</strong> of{" "}
+          {LOB_VERIFY_ATTEMPT_LIMIT} verification attempts remaining. After 3
+          failed attempts the account is locked and you&apos;ll need to remove
+          it and re-add.
+        </p>
+
+        {err && (
+          <div
+            style={{
+              padding: "10px 12px",
+              background: "rgba(220, 38, 38, 0.06)",
+              border: "1px solid rgba(220, 38, 38, 0.2)",
+              borderRadius: 6,
+              fontSize: 12,
+              color: "var(--danger)",
+              lineHeight: 1.4,
+            }}
+          >
+            {err}
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+          }}
+        >
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => {
+              reset();
+              onClose();
+            }}
+            disabled={submitting}
+            style={{ minWidth: 100 }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={submit}
+            disabled={submitting || !amount1.trim() || !amount2.trim()}
+            style={{ minWidth: 100 }}
+          >
+            {submitting ? "Verifying…" : "Verify"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
