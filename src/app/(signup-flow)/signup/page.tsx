@@ -242,20 +242,20 @@ function FormPanel() {
 function BrandLockupInline() {
   return (
     <svg
-      viewBox="0 0 460 80"
-      width="184"
-      height="32"
+      viewBox="0 0 340 60"
+      width="220"
+      height="40"
       aria-label="Next Surplus"
       style={{ display: "block" }}
     >
-      <polygon points="40,26 54,40 40,54 26,40" fill="#ffffff" />
-      <polygon points="40,26 54,40 40,40" fill="#13644e" />
-      <polygon points="40,40 54,40 40,54" fill="#4a9c75" />
+      <polygon points="30,8 56,30 30,52 4,30" fill="#04261c" />
+      <polygon points="30,8 56,30 30,30" fill="#13644e" />
+      <polygon points="30,30 56,30 30,52" fill="#4a9c75" />
       <text
-        x="90"
-        y="56"
+        x="70"
+        y="42"
         fontFamily="Inter, 'Plus Jakarta Sans', system-ui, sans-serif"
-        fontSize="42"
+        fontSize="34"
         fontWeight="500"
         fill="#04261c"
         letterSpacing="-0.5"

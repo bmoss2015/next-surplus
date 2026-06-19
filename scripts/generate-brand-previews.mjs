@@ -7,12 +7,12 @@ const PUBLIC = path.join(ROOT, "public");
 const PREVIEWS = path.join(PUBLIC, "previews");
 
 const LOCKUP = `
-  <svg viewBox="0 0 460 80" width="184" height="32" aria-label="Next Surplus" style="display:block">
-    <polygon points="40,26 54,40 40,54 26,40" fill="#ffffff" />
-    <polygon points="40,26 54,40 40,40" fill="#13644e" />
-    <polygon points="40,40 54,40 40,54" fill="#4a9c75" />
-    <text x="90" y="56" font-family="Inter, 'Plus Jakarta Sans', system-ui, sans-serif"
-          font-size="42" font-weight="500" fill="#04261c"
+  <svg viewBox="0 0 340 60" width="220" height="40" aria-label="Next Surplus" style="display:block">
+    <polygon points="30,8 56,30 30,52 4,30" fill="#04261c" />
+    <polygon points="30,8 56,30 30,30" fill="#13644e" />
+    <polygon points="30,30 56,30 30,52" fill="#4a9c75" />
+    <text x="70" y="42" font-family="Inter, 'Plus Jakarta Sans', system-ui, sans-serif"
+          font-size="34" font-weight="500" fill="#04261c"
           letter-spacing="-0.5" word-spacing="6">Next Surplus</text>
   </svg>`;
 
@@ -41,7 +41,7 @@ const LOGIN_HTML = `
 </style></head>
 <body><div class="panel">
   <div class="mark">${LOCKUP}</div>
-  <h1 class="h1">Log In To Next Surplus</h1>
+  <h1 class="h1">Welcome Back</h1>
 </div></body></html>`;
 
 const FAVICON_HTML = `
