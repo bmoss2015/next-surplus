@@ -139,7 +139,9 @@ export async function fetchKanbanLeads(): Promise<KanbanData> {
     const da = deadlineRank(a);
     const db = deadlineRank(b);
     if (da !== db) return da - db;
-    return (b.estimated_surplus ?? 0) - (a.estimated_surplus ?? 0);
+    const surplusDelta = (b.estimated_surplus ?? 0) - (a.estimated_surplus ?? 0);
+    if (surplusDelta !== 0) return surplusDelta;
+    return new Date(b.imported_at).getTime() - new Date(a.imported_at).getTime();
   }
   for (const sid of Object.keys(leadsByStage)) {
     leadsByStage[sid].sort(leadSortValue);
