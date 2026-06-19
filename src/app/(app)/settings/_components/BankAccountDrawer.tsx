@@ -66,7 +66,7 @@ function AddDrawer({
     (publicToken: string, metadata: PlaidLinkOnSuccessMetadata) => {
       const account = metadata.accounts[0];
       if (!account) {
-        setErrMsg("Plaid returned no selected account.");
+        setErrMsg("No account was selected.");
         return;
       }
       setExchanging(true);
@@ -136,10 +136,10 @@ function AddDrawer({
             onClick={fetchLinkTokenThenOpen}
           >
             {exchanging
-              ? "Submitting To Lob…"
+              ? "Submitting…"
               : pending
-                ? "Opening Plaid…"
-                : "Connect Bank With Plaid"}
+                ? "Opening…"
+                : "Connect Bank"}
           </button>
           <button
             type="button"
@@ -159,16 +159,9 @@ function AddDrawer({
     >
       <div className="drawer-field">
         <div className="drawer-hint">
-          Sign in to your bank through Plaid. We pull the routing and
-          account numbers from Plaid (you never type them) and send them
-          to LOB. LOB will deposit two small test amounts (under $1 each)
-          into your account over the next 1-2 business days. We poll your
-          transactions every 4 hours and auto-verify as soon as both
-          deposits post. If only one shows up after 3 business days, you
-          can enter both amounts from your bank statement manually on the
-          bank account card. Plaid never shares your password with us;
-          we store only the last four digits of the routing and account
-          numbers.
+          Sign in to your bank. Two small test deposits (under $1 each)
+          will arrive in 1-2 business days. We auto-verify as soon as
+          both post.
         </div>
       </div>
       <div className="drawer-field">

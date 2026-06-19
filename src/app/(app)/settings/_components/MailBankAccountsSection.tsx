@@ -234,7 +234,7 @@ function BankCard({
               border: "1px solid var(--brand)",
               minWidth: 0,
             }}
-            title="Two small test deposits are being sent to this bank from LOB (typically under $1 each). Watch your statement; the system auto-verifies within 4 hours of both posting. If only one shows up after 3 business days, click Verify Manually."
+            title="Two small test deposits (under $1 each) are on the way to this bank. We auto-verify within 4 hours of both posting. If only one shows up after 3 business days, click Verify Manually."
           >
             VERIFYING
           </span>
@@ -401,7 +401,7 @@ function ManualVerifyModal({
           Enter the two small test deposit amounts you see on your bank
           statement for <strong>{bank.bank_name ?? "this account"}</strong>{" "}
           {maskLast4(bank.account_last_four)}. Each will be between 1 and 99
-          cents and posted by &quot;LOB&quot; or similar.
+          cents.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
