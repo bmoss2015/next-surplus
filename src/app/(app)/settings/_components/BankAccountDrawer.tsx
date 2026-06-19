@@ -159,14 +159,16 @@ function AddDrawer({
     >
       <div className="drawer-field">
         <div className="drawer-hint">
-          You&apos;ll sign in to your bank through Plaid. We pull the
-          routing and account numbers from Plaid (you never type them)
-          and submit to Lob. Lob sends two small test deposits — we
-          watch your bank via Plaid and verify automatically when they
-          land (usually 1-2 business days). You don&apos;t need to
-          check your statement or come back. Plaid never shares your
-          password with us, and we only store the last four digits of
-          the routing and account numbers.
+          Sign in to your bank through Plaid. We pull the routing and
+          account numbers from Plaid (you never type them) and send them
+          to LOB. LOB will deposit two small test amounts (under $1 each)
+          into your account over the next 1-2 business days. We poll your
+          transactions every 4 hours and auto-verify as soon as both
+          deposits post. If only one shows up after 3 business days, you
+          can enter both amounts from your bank statement manually on the
+          bank account card. Plaid never shares your password with us;
+          we store only the last four digits of the routing and account
+          numbers.
         </div>
       </div>
       <div className="drawer-field">
