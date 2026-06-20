@@ -78,7 +78,7 @@ export default function InboxConnectV5() {
                 <BigCheckIcon />
               </div>
               <div className="mt-5 text-[20px] font-semibold tracking-[-0.02em] text-[#04261c]">
-                You're Connected
+                You&apos;re Connected
               </div>
               <div className="mt-2 max-w-[340px] text-[13.5px] leading-relaxed text-[#6b7280]">
                 bree@mossequitypartners.com is now syncing. Found 1,247

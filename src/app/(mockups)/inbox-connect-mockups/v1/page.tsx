@@ -25,7 +25,7 @@ export default function InboxConnectV1() {
                 className="mt-1.5 h-[40px] w-full rounded-[6px] border border-[#e5e7eb] bg-white px-3 text-[13.5px] text-[#04261c] outline-none transition-colors duration-150 ease-out focus:border-[#13644e]"
               />
               <p className="mt-2 text-[11.5px] text-[#9ca3af]">
-                We'll Detect Your Mail Server Automatically.
+                We&apos;ll Detect Your Mail Server Automatically.
               </p>
               <PrimaryButton disabled className="mt-6">
                 Connect

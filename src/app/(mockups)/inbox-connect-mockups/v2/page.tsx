@@ -261,7 +261,7 @@ function PreviewSide({ detected }: { detected: boolean }) {
           </div>
 
           <div className="mt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">
-            What You'll See In The Portal
+            What You&apos;ll See In The Portal
           </div>
           <div className="mt-2.5 flex flex-col gap-2">
             <PreviewRow>Inbox Threads</PreviewRow>
@@ -279,7 +279,7 @@ function PreviewSide({ detected }: { detected: boolean }) {
         </>
       ) : (
         <div className="mt-3 text-[12px] text-[#9ca3af]">
-          Type your email above. We'll auto detect your mail server and
+          Type your email above. We&apos;ll auto detect your mail server and
           show what the portal will access.
         </div>
       )}

@@ -25,7 +25,7 @@ export default function InboxConnectV3() {
             </FieldRow>
           </CommandShell>
           <HintBelow>
-            Type your work email. We'll do the rest.
+            Type your work email. We&apos;ll do the rest.
           </HintBelow>
         </StageWrap>
 
