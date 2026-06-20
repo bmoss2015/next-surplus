@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import {
   IconMail,
   IconMessage2,
@@ -14,11 +15,26 @@ import {
   IconRefresh,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
-import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
-import { archiveThread, markThreadRead, markThreadUnread } from "../_actions";
-import { ComposeBox } from "./ComposeBox";
+import type {
+  ThreadDetail,
+  ThreadMessage,
+  EmailAccountRow,
+} from "@/lib/email/types";
+import type { EmailTemplateRow } from "@/lib/settings/fetch";
+import type { EmailRecipientCandidate } from "@/lib/email/lead-recipients";
+import {
+  archiveThread,
+  markThreadRead,
+  markThreadUnread,
+  fetchInboxLeadCandidates,
+} from "../_actions";
 import { HtmlMessage } from "./HtmlMessage";
 import { LinkToLeadPicker } from "./LinkToLeadPicker";
+
+const SendEmailModal = dynamic(
+  () => import("@/components/email/SendEmailModal").then((m) => m.SendEmailModal),
+  { ssr: false }
+);
 
 type ReplyState =
   | { mode: "reply" | "replyAll" | "forward"; message: ThreadMessage }
@@ -37,14 +53,34 @@ function fmtTime(iso: string): string {
 
 export function ThreadReader({
   detail,
-  accountAddress,
+  accounts,
+  templates,
 }: {
   detail: ThreadDetail;
-  accountAddress: string;
+  accounts: EmailAccountRow[];
+  templates: EmailTemplateRow[];
 }) {
   const [reply, setReply] = useState<ReplyState>(null);
   const [showLinkPicker, setShowLinkPicker] = useState(false);
   const [, startTransition] = useTransition();
+  const [candidatesByLead, setCandidatesByLead] = useState<{
+    leadId: string | null;
+    list: EmailRecipientCandidate[];
+  }>({ leadId: null, list: [] });
+
+  useEffect(() => {
+    if (!detail.lead_id) return;
+    let alive = true;
+    fetchInboxLeadCandidates(detail.lead_id).then((c) => {
+      if (alive) setCandidatesByLead({ leadId: detail.lead_id, list: c });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [detail.lead_id]);
+
+  const leadCandidates =
+    candidatesByLead.leadId === detail.lead_id ? candidatesByLead.list : [];
 
   useEffect(() => {
     if (detail.messages.some((m) => !m.is_read && m.direction === "inbound")) {
@@ -74,9 +110,7 @@ export function ThreadReader({
 
   return (
     <div className="flex h-full flex-1 bg-canvas">
-      {/* LEFT: thread + messages (always full height, shrinks when compose opens) */}
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Header strip */}
         <div className="border-b border-gray-200 bg-surface px-6 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -110,9 +144,6 @@ export function ThreadReader({
           </div>
         </div>
 
-        {/* Link-to-lead banner — full row below the subject. The teal-gradient
-            chip is impossible to miss; unlinked threads get a softer dashed
-            prompt that opens the picker. */}
         <div className="flex items-center justify-between border-b border-gray-150 bg-gray-50 px-6 py-[10px]">
           {detail.lead_id ? (
             <a
@@ -131,7 +162,7 @@ export function ThreadReader({
               className="inline-flex items-center gap-2 rounded-md border border-dashed border-gray-300 bg-surface px-3 py-[6px] text-[12px] font-medium text-gray-600 hover:border-petrol-500 hover:text-petrol-700"
             >
               <IconLink size={12} stroke={2} />
-              Not linked — link to a lead
+              Not linked, link to a lead
             </button>
           )}
           {detail.lead_address && (
@@ -141,7 +172,6 @@ export function ThreadReader({
           )}
         </div>
 
-        {/* Message list */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="mx-auto flex max-w-[820px] flex-col gap-3">
             {detail.messages.map((m) => (
@@ -154,49 +184,80 @@ export function ThreadReader({
           </div>
         </div>
 
-        {/* Bottom action bar only when no compose is open */}
-        {!reply && (
-          <div className="flex items-center justify-end gap-2 border-t border-gray-200 bg-surface px-6 py-3">
-            <button
-              type="button"
-              onClick={() => setReply({ mode: "forward", message: last })}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
-            >
-              <IconArrowForwardUp size={13} stroke={2} />
-              Forward
-            </button>
-            <button
-              type="button"
-              onClick={() => setReply({ mode: "replyAll", message: last })}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
-            >
-              <IconArrowBackUpDouble size={13} stroke={2} />
-              Reply All
-            </button>
-            <button
-              type="button"
-              onClick={() => setReply({ mode: "reply", message: last })}
-              className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
-            >
-              <IconArrowBackUp size={13} stroke={2} />
-              Reply
-            </button>
-          </div>
-        )}
+        <div className="flex items-center justify-end gap-2 border-t border-gray-200 bg-surface px-6 py-3">
+          <button
+            type="button"
+            onClick={() => setReply({ mode: "forward", message: last })}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+          >
+            <IconArrowForwardUp size={13} stroke={2} />
+            Forward
+          </button>
+          <button
+            type="button"
+            onClick={() => setReply({ mode: "replyAll", message: last })}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-surface px-3 py-[6px] text-xs text-ink hover:border-petrol-500"
+          >
+            <IconArrowBackUpDouble size={13} stroke={2} />
+            Reply All
+          </button>
+          <button
+            type="button"
+            onClick={() => setReply({ mode: "reply", message: last })}
+            className="inline-flex items-center gap-1 rounded-md btn-primary px-3 py-[6px] text-xs font-medium text-white"
+          >
+            <IconArrowBackUp size={13} stroke={2} />
+            Reply
+          </button>
+        </div>
       </div>
 
-      {/* RIGHT: compose side panel — slides in next to the thread, full height */}
-      {reply && (
-        <aside className="flex w-[520px] shrink-0 flex-col border-l border-gray-200 bg-surface">
-          <ComposeBox
-            mode={reply.mode}
-            replyTo={reply.message}
-            thread={detail}
-            accountAddress={accountAddress}
+      {reply && (() => {
+        const m = reply.message;
+        const accountForReply =
+          accounts.find((a) => a.id === detail.channel_account_id) ?? accounts[0];
+        if (!accountForReply) return null;
+        const selfAddrs = new Set(accounts.map((a) => a.address.toLowerCase()));
+        const toList =
+          reply.mode === "forward"
+            ? []
+            : [{ name: m.from_name ?? m.from_address, email: m.from_address }];
+        const ccList =
+          reply.mode === "replyAll"
+            ? m.cc_addresses
+                .filter((e) => !selfAddrs.has(e.toLowerCase()))
+                .map((e) => ({ name: e, email: e }))
+            : [];
+        const quotedHtml = m.body_html
+          ? `<br/><br/><blockquote style="margin:0 0 0 0.8ex;border-left:1px solid #ccc;padding-left:1ex;">${m.body_html}</blockquote>`
+          : `<br/><br/>> ${(m.body_text ?? m.snippet ?? "").replace(/\n/g, "\n> ")}`;
+        return (
+          <SendEmailModal
+            open
             onClose={() => setReply(null)}
+            leadId={detail.lead_id}
+            candidates={leadCandidates}
+            templates={templates}
+            accounts={accounts}
+            replyContext={{
+              mode: reply.mode,
+              threadId: detail.provider_thread_key,
+              inReplyTo: m.provider_message_id ? `<${m.provider_message_id}>` : null,
+              referencesChain: [
+                ...(m.references_chain ?? []),
+                ...(m.provider_message_id ? [`<${m.provider_message_id}>`] : []),
+              ],
+              accountId: accountForReply.id,
+              defaultTo: toList,
+              defaultCc: ccList,
+              baseSubject: detail.subject ?? "",
+              quotedHtml,
+              originalFrom: { name: m.from_name, address: m.from_address },
+              originalSentAt: m.sent_at,
+            }}
           />
-        </aside>
-      )}
+        );
+      })()}
 
       {showLinkPicker && (
         <LinkToLeadPicker

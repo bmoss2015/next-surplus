@@ -13,6 +13,7 @@ import {
   IconFile,
 } from "@tabler/icons-react";
 import { sendLeadEmail } from "@/app/(app)/leads/[id]/_email-send-action";
+import { sendEmail as sendInboxEmail } from "@/app/(app)/inbox/_send-actions";
 import { upsertEmailTemplate } from "@/app/(app)/settings/_actions";
 import { renderMerge, type MergeContext } from "@/lib/mail/merge";
 import type { EmailRecipientCandidate } from "@/lib/email/lead-recipients";
@@ -56,7 +57,7 @@ export type SendEmailReplyContext = {
 export type SendEmailModalProps = {
   open: boolean;
   onClose: () => void;
-  leadId: string;
+  leadId: string | null;
   candidates: EmailRecipientCandidate[];
   templates: EmailTemplateRow[];
   accounts: EmailAccountRow[];
@@ -316,37 +317,71 @@ export function SendEmailModal({
       return;
     }
     startTransition(async () => {
-      for (const r of to) {
-        const ctx: MergeContext = r.mergeContext ?? {
-          "contact.first_name": r.name.split(/\s+/)[0] ?? "",
-          "contact.full_name": r.name,
-        };
-        const renderedSubject = renderMerge(subject, ctx);
-        const renderedBody = renderMerge(body, ctx);
-        const res = await sendLeadEmail({
-          leadId,
-          accountId,
-          to: [{ name: r.name, email: r.email, contactId: r.contactId }],
-          cc: cc.length > 0 ? cc.map((x) => x.email) : undefined,
-          bcc: bcc.length > 0 ? bcc.map((x) => x.email) : undefined,
-          subject: renderedSubject,
-          bodyHtml: renderedBody,
-          templateId,
-          threadId: replyContext?.threadId,
-          inReplyTo: replyContext?.inReplyTo ?? null,
-          referencesChain: replyContext?.referencesChain,
-          attachments: attachments.length > 0
-            ? attachments.map((a) => ({
-                filename: a.filename,
-                mimeType: a.mimeType,
-                base64: a.base64,
-              }))
-            : undefined,
-        });
-        if (!res.ok) {
-          setErr(res.error);
-          return;
+      if (leadId) {
+        for (const r of to) {
+          const ctx: MergeContext = r.mergeContext ?? {
+            "contact.first_name": r.name.split(/\s+/)[0] ?? "",
+            "contact.full_name": r.name,
+          };
+          const renderedSubject = renderMerge(subject, ctx);
+          const renderedBody = renderMerge(body, ctx);
+          const res = await sendLeadEmail({
+            leadId,
+            accountId,
+            to: [{ name: r.name, email: r.email, contactId: r.contactId }],
+            cc: cc.length > 0 ? cc.map((x) => x.email) : undefined,
+            bcc: bcc.length > 0 ? bcc.map((x) => x.email) : undefined,
+            subject: renderedSubject,
+            bodyHtml: renderedBody,
+            templateId,
+            threadId: replyContext?.threadId,
+            inReplyTo: replyContext?.inReplyTo ?? null,
+            referencesChain: replyContext?.referencesChain,
+            attachments: attachments.length > 0
+              ? attachments.map((a) => ({
+                  filename: a.filename,
+                  mimeType: a.mimeType,
+                  base64: a.base64,
+                }))
+              : undefined,
+          });
+          if (!res.ok) {
+            setErr(res.error);
+            return;
+          }
         }
+        onClose();
+        return;
+      }
+
+      const fallbackCtx: MergeContext = to[0]?.mergeContext ?? {
+        "contact.first_name": to[0]?.name.split(/\s+/)[0] ?? "",
+        "contact.full_name": to[0]?.name ?? "",
+      };
+      const renderedSubject = renderMerge(subject, fallbackCtx);
+      const renderedBody = renderMerge(body, fallbackCtx);
+      const res = await sendInboxEmail({
+        accountId,
+        to: to.map((r) => r.email),
+        cc: cc.length > 0 ? cc.map((x) => x.email) : undefined,
+        bcc: bcc.length > 0 ? bcc.map((x) => x.email) : undefined,
+        subject: renderedSubject,
+        body: renderedBody,
+        leadId: null,
+        threadId: replyContext?.threadId,
+        inReplyTo: replyContext?.inReplyTo ?? null,
+        referencesChain: replyContext?.referencesChain,
+        attachments: attachments.length > 0
+          ? attachments.map((a) => ({
+              filename: a.filename,
+              mimeType: a.mimeType,
+              base64: a.base64,
+            }))
+          : undefined,
+      });
+      if (!res.ok) {
+        setErr(res.error);
+        return;
       }
       onClose();
     });
