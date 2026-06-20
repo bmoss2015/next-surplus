@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -9,6 +10,7 @@ import {
   IconRefresh,
   IconSearch,
   IconCircleFilled,
+  IconPencilPlus,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
 import { triggerSync } from "../_actions";
@@ -16,7 +18,13 @@ import type {
   InboxThreadRow,
   InboxFilter,
   InboxFilterCounts,
+  EmailAccountRow,
 } from "@/lib/email/types";
+
+const ComposeNewModal = dynamic(
+  () => import("./ComposeNewModal").then((m) => m.ComposeNewModal),
+  { ssr: false }
+);
 
 const FILTERS: {
   value: InboxFilter;
@@ -63,6 +71,7 @@ export function ThreadList({
   selectedId,
   selfAddresses,
   counts,
+  accounts,
 }: {
   rows: InboxThreadRow[];
   filter: InboxFilter;
@@ -70,11 +79,14 @@ export function ThreadList({
   selectedId: string | null;
   selfAddresses: string[];
   counts: InboxFilterCounts;
+  accounts: EmailAccountRow[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const sp = useSearchParams();
   const [refreshing, startRefresh] = useTransition();
+  const [composeOpen, setComposeOpen] = useState(false);
+  const canCompose = accounts.some((a) => a.status === "active");
 
   function refresh() {
     startRefresh(async () => {
@@ -105,8 +117,19 @@ export function ThreadList({
   }
 
   return (
+    <>
     <div className="flex h-full w-[360px] flex-col border-r border-gray-200 bg-surface">
       <div className="border-b border-gray-200 px-4 pt-4 pb-3">
+        <button
+          type="button"
+          onClick={() => setComposeOpen(true)}
+          disabled={!canCompose}
+          title={canCompose ? "Write a New Email" : "Connect an Email Account in Settings First"}
+          className="btn-primary mb-3 inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md py-[7px] text-[12px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <IconPencilPlus size={13} stroke={1.75} />
+          New Email
+        </button>
         <div className="flex items-center gap-2">
           <form
             action={pathname}
@@ -257,5 +280,11 @@ export function ThreadList({
         )}
       </div>
     </div>
+    <ComposeNewModal
+      open={composeOpen}
+      onClose={() => setComposeOpen(false)}
+      accounts={accounts}
+    />
+    </>
   );
 }

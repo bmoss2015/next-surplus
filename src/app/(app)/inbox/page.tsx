@@ -69,6 +69,7 @@ export default async function InboxPage({
         selectedId={selectedId}
         selfAddresses={selfAddresses}
         counts={counts}
+        accounts={accounts}
       />
       <div className="flex h-full flex-1 min-w-0">
         {detail && accountForReader ? (
