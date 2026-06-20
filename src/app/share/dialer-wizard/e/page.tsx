@@ -1,5 +1,4 @@
 import {
-  IconChevronDown,
   IconArrowRight,
   IconCheck,
   IconPhone,
