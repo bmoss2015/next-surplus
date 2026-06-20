@@ -6,9 +6,19 @@ type Variant = {
   layout: string;
   anchor: string;
   rationale: string;
+  recommended?: boolean;
 };
 
 const VARIANTS: Variant[] = [
+  {
+    slug: "v6",
+    name: "Progressive Column + Google Walkthrough",
+    layout: "V1 Base + 2FA Pre Flight + Loom + Clipboard Pill",
+    anchor: "Hybrid · v1 + v2 + Notion/Slack install pattern",
+    rationale:
+      "Recommended hybrid. V1 base, style C success indicator (small petrol dot, no tinted background), provider preview collapsed into a chip, and a full Google walkthrough with 2 Step Verification pre flight, Loom video placeholder, annotated screenshot strip, and a clipboard auto detect pill.",
+    recommended: true,
+  },
   {
     slug: "v1",
     name: "Progressive Column",
@@ -109,11 +119,23 @@ function VariantCard({ variant: v }: { variant: Variant }) {
   return (
     <Link
       href={`/inbox-connect-mockups/${v.slug}`}
-      className="group block rounded-[10px] border border-[#e5e7eb] bg-white p-5 transition hover:border-[#04261c]"
+      className={`group block rounded-[10px] border bg-white p-5 transition ${
+        v.recommended
+          ? "border-[#13644e] ring-1 ring-[#13644e]/30 hover:border-[#0d4b3a]"
+          : "border-[#e5e7eb] hover:border-[#04261c]"
+      }`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
-          {v.slug.toUpperCase()}
+        <span className="inline-flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
+            {v.slug.toUpperCase()}
+          </span>
+          {v.recommended && (
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#13644e]">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#13644e]" />
+              Recommended
+            </span>
+          )}
         </span>
         <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#13644e]">
           {v.layout}
