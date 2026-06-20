@@ -18,7 +18,7 @@ async function loadEnv() {
 }
 
 const PREVIEW_BASE =
-  "https://moss-equity-portal-git-fix-logo-cleanup-t-ee4054-workflow-minds.vercel.app";
+  process.env.PREVIEW_BASE ?? "https://app.nextsurplus.com";
 const LOGO_URL = `${PREVIEW_BASE}/images/email-logo.png`;
 
 const PAGE_BG = "#f5f5f5";

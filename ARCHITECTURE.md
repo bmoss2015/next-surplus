@@ -203,6 +203,8 @@ Numbered, append-only record of major design choices. Each one would normally be
 
 ### ADR-011: Product Name and Legal Entity
 
+**Status:** Superseded by ADR-016 (2026-06-20).
+
 **Decision:** Customer-facing product name is "Moss Equity Partners - Web App". Legal entity is Moss Equity Partners LLC, a separate registered LLC. Mossy Land LLC is an unrelated company and never referenced in any product or web app context.
 
 **Why:** Eliminates confusion. The Supabase staging project label "Moss Equity Operations Portal" is internal only and predates the product naming decision.
@@ -248,6 +250,16 @@ Numbered, append-only record of major design choices. Each one would normally be
 **Trade off:** Adds a Plaid dependency (subscription cost, additional vendor in the integration surface) on top of Lob. Users connect through Plaid Link instead of typing routing/account numbers, which is faster but requires Plaid to support their bank.
 
 **Decided:** 2026-05-26
+
+### ADR-016: Brand Rename From Moss Equity Portal To Next Surplus
+
+**Decision:** Customer-facing product name is "Next Surplus", marketed at `nextsurplus.com` (landing) and `app.nextsurplus.com` (portal). Legal operating entity is Workflow Minds LLC, identified in ToS, Privacy, and billing only; never surfaced in app chrome, marketing, or product UI. Moss Equity Partners LLC is one customer/operator of Next Surplus, not the product owner.
+
+**Why:** ADR-011 named the product after the founder's recovery-firm business. The decision to market the platform as a standalone multi-tenant SaaS made that name a liability (it implied single-customer affiliation). Workflow Minds LLC was registered as the umbrella legal entity for all software products under this organization.
+
+**Supersedes:** ADR-011.
+
+**Decided:** 2026-06-20
 
 ---
 
