@@ -226,8 +226,8 @@ export async function sendEmail(
       cc_addresses: input.cc ?? [],
       bcc_addresses: input.bcc ?? [],
       subject,
-      body_text: bodies.text ?? input.body,
-      body_html: bodies.html ?? null,
+      body_text: bodies.text ?? textBody,
+      body_html: bodies.html ?? htmlBody,
       snippet: full.snippet ?? null,
       provider_message_id: sent.id,
       provider_thread_id: full.threadId,
@@ -309,6 +309,7 @@ async function persistOutboundImap({
 }): Promise<{ ok: true; messageId: string } | { ok: false; error: string }> {
   const sentAtIso = new Date().toISOString();
   const snippet = (input.body ?? "").slice(0, 240);
+  const looksLikeHtml = /<[a-z][^>]*>/i.test(input.body);
 
   const { data: existingConv } = await svc
     .from("conversations")
@@ -393,8 +394,8 @@ async function persistOutboundImap({
       cc_addresses: input.cc ?? [],
       bcc_addresses: input.bcc ?? [],
       subject: input.subject,
-      body_text: input.body,
-      body_html: null,
+      body_text: looksLikeHtml ? input.body.replace(/<[^>]+>/g, "") : input.body,
+      body_html: looksLikeHtml ? input.body : null,
       snippet,
       provider_message_id: providerMessageId,
       provider_thread_id: threadKey,
