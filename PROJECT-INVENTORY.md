@@ -174,7 +174,7 @@ All under `/settings`. Admin-only unless noted.
 - **Click-to-call:** Phone numbers are display-only, no dialer wired
 - **Plaid bank verification:** Planned, not built (would layer on Lob's existing microdeposit flow to skip the 1–3 business day wait)
 - **Stripe billing:** Code shipped (checkout session, signed webhook handler, customer portal handoff, founder-lock daily cron). Going live requires the Stripe Dashboard product + two recurring prices (beta_founder monthly $49, beta_founder annual $470) and the corresponding Vercel env vars (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, the two price IDs).
-- **Public marketing website:** Does not exist; `portal.mossequitypartners.com` is admin / app only, no marketing surface
+- **Public marketing website:** `nextsurplus.com` serves the marketing site; `app.nextsurplus.com` is the authenticated portal
 - **Onboarding flow for new orgs / new users:** Shipped Fix 15 (2026-06-17). 4-step `/onboarding/[step]` wizard (Firm / Import / Inbox / Team) with skip allowed on 2-4, runs once after a fresh signup, never after login. Paired with new `/signup` page, `/signup/verify` Stripe polling page, and 10 anchored auth mockup variants at `/signup-mockups` and `/login-mockups`.
 - **E-signature:** Not built, provider not yet chosen
 - **Outreach cadences (automated SMS sequences):** Not built

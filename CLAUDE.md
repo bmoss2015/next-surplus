@@ -15,7 +15,7 @@ Never assume the link state is correct. Always verify first. Every time. No exce
 
 
 
-\# Moss Equity Operations Portal — Standing Instructions
+\# Next Surplus — Standing Instructions
 
 
 
@@ -33,7 +33,7 @@ with no onboarding.
 
 \## Repo
 
-C:\\Users\\info\\moss-equity-portal
+C:\\Users\\info\\next-surplus
 
 
 
@@ -61,7 +61,7 @@ C:\\Users\\info\\moss-equity-portal
 
 \- Supabase project: rsdmyydyhqgkkvwlklif
 
-\- URL: moss-equity-portal.vercel.app
+\- URL: app.nextsurplus.com
 
 \- DB changes: `npm run db:push:prod` (uses SUPABASE_PAT, no relinking, no DB password drama)
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Technical reference for the Moss Equity Partners - Web App. Audience: developers, technical contractors, future engineering hires. Bree edits this through the `/architecture` slash command in Claude Code, not by direct file edits.
+Technical reference for Next Surplus. Audience: developers, technical contractors, future engineering hires. Bree edits this through the `/architecture` slash command in Claude Code, not by direct file edits.
 
 For product direction and timeline, see the Product Build Status & Roadmap in the Shared Drive (auto-generated weekly).
 
@@ -32,10 +32,10 @@ For granular ship history, see `CHANGELOG.md`.
 | Staging Supabase | `qfanroxcoepunmrmjabo` | Test data. Source of truth for local dev. |
 | Production Supabase | `rsdmyydyhqgkkvwlklif` | Live database. Migrations 0080-0094 applied. |
 | Automations Supabase | `hkubwxpyyejxffncxrez` | Separate project (Maryland research agent). NEVER push web app migrations here. |
-| GitHub repo | `bmoss2015/MossEquityPartners` | main branch is source of truth |
-| Vercel production | `moss-equity-portal.vercel.app` | Aliased to portal.mossequitypartners.com |
-| Custom domain | `portal.mossequitypartners.com` | CNAME via Cloudflare, SSL active 2026-05-12 |
-| Local dev | `localhost:3000` | `npm run dev` from `C:\Users\info\moss-equity-portal` |
+| GitHub repo | `bmoss2015/next-surplus` | main branch is source of truth |
+| Vercel production | `moss-equity-portal.vercel.app` (legacy slug, never renamed) | Serves nextsurplus.com (marketing) and app.nextsurplus.com (portal) |
+| Custom domains | `nextsurplus.com` (marketing) and `app.nextsurplus.com` (portal) | CNAME via Cloudflare, SSL active 2026-05-12 |
+| Local dev | `localhost:3000` | `npm run dev` from `C:\Users\info\next-surplus` |
 | Maryland research agent | `md-mortgage-research-production.up.railway.app` | Railway. FastAPI + Playwright + Anthropic + Supabase. |
 | Product Roadmap Worker | `moss-equity-living-doc.holy-thunder-2538.workers.dev` | Cloudflare Worker. Cron Mondays 14:00 UTC. |
 | Roadmap Shared Drive | `0AIdvxjnjcpkrUk9PVA` | Service account `living-doc-uploader@moss-equity-living-doc.iam.gserviceaccount.com` has Content Manager access. |
@@ -44,7 +44,7 @@ For granular ship history, see `CHANGELOG.md`.
 
 ## Deploy Process
 
-- **Local development:** `cd C:\Users\info\moss-equity-portal && npm run dev`. Points at staging Supabase by default.
+- **Local development:** `cd C:\Users\info\next-surplus && npm run dev`. Points at staging Supabase by default.
 - **Staging migration push:** verify `supabase/.temp/project-ref` reads `qfanroxcoepunmrmjabo`, then `npx supabase db push --linked`
 - **Production migration push:** relink to production project ref, push, then relink back to staging
 - **Production code deploy:** automatic on push to main via Vercel. Manual override: `npx vercel --prod`.
@@ -70,19 +70,19 @@ External services the platform depends on.
 
 - Transactional email (invite emails, @mention notifications, system messages)
 - Replaced Supabase SMTP after silent delivery failures (see ADR 002)
-- From address: `bree@mossequitypartners.com`
-- Domain `mossequitypartners.com` verified in Resend dashboard
+- From address: `noreply@nextsurplus.com` (set via `RESEND_FROM` env var per Fix RESEND-001)
+- Domain `nextsurplus.com` verified in Resend dashboard (legacy `mossequitypartners.com` also retained for historical sends)
 
 ### Vercel
 
-- Hosts the Next.js app at `moss-equity-portal.vercel.app`
-- Custom domain `portal.mossequitypartners.com` via Cloudflare CNAME
+- Hosts the Next.js app at `moss-equity-portal.vercel.app` (legacy slug, never renamed) which serves `nextsurplus.com` and `app.nextsurplus.com`
+- Custom domains `nextsurplus.com` and `app.nextsurplus.com` via Cloudflare CNAME
 - Hobby plan currently — function timeout limits apply (10 sec free, 60 sec on Pro)
 - Environment variables managed via Vercel dashboard
 
 ### Cloudflare
 
-- DNS for `mossequitypartners.com`
+- DNS for `nextsurplus.com` (and legacy `mossequitypartners.com` still routed for redirect compat)
 - Hosts the Product Roadmap Worker (`moss-equity-living-doc`)
 - R2 bucket `moss-equity-living-docs` stores the generated doc + 10 versioned archives
 - Worker secrets: `GITHUB_TOKEN`, `RESEND_API_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_DRIVE_FOLDER_ID`
