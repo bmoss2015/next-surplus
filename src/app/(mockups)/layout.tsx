@@ -37,7 +37,7 @@ export default function MockupsLayout({
               href="/signup-mockups"
               className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#04261c]"
             >
-              Next Surplus Auth Mockups
+              Next Surplus Mockups
             </Link>
             <div className="flex items-center gap-5 text-[12px] text-[#6b7280]">
               <Link href="/signup-mockups" className="hover:text-[#04261c]">
@@ -45,6 +45,12 @@ export default function MockupsLayout({
               </Link>
               <Link href="/login-mockups" className="hover:text-[#04261c]">
                 Login Gallery
+              </Link>
+              <Link
+                href="/inbox-connect-mockups"
+                className="hover:text-[#04261c]"
+              >
+                Inbox Connect Gallery
               </Link>
             </div>
           </div>
