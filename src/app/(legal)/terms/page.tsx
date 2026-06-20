@@ -24,11 +24,12 @@ export default function TermsPage() {
 
       <div className="mt-6 mb-10">
         <p>
-          These Terms of Service (&quot;Terms&quot;) govern your access to and
-          use of Next Surplus at app.nextsurplus.com (the &quot;Service&quot;),
-          a service operated by Workflow Minds LLC (&quot;Next Surplus,&quot;
-          &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;). By creating an
-          account or using the Service, you agree to be bound by these Terms.
+          These Terms of Service (&quot;Terms&quot;) govern your access to
+          and use of Next Surplus at app.nextsurplus.com (the
+          &quot;Service&quot;). &quot;Next Surplus,&quot; &quot;we,&quot;
+          &quot;us,&quot; and &quot;our&quot; refer to the Service. By
+          creating an account or using the Service, you agree to be bound by
+          these Terms.
         </p>
       </div>
 
@@ -256,7 +257,7 @@ export default function TermsPage() {
         <Sub title="7.1 Our Property">
           <p>
             The Service, including its design, code, features, documentation,
-            and branding, is owned by Workflow Minds LLC and protected by
+            and branding, is owned by Next Surplus and protected by
             intellectual property laws. These Terms do not grant you any
             rights to our intellectual property except the limited right to
             use the Service as a subscriber.
@@ -316,8 +317,8 @@ export default function TermsPage() {
 
       <Section title="10. Indemnification">
         <p>
-          You agree to indemnify, defend, and hold harmless Workflow Minds
-          LLC, its officers, directors, employees, and agents from any claims,
+          You agree to indemnify, defend, and hold harmless Next Surplus,
+          its officers, directors, employees, and agents from any claims,
           damages, losses, liabilities, and expenses (including reasonable
           attorneys&apos; fees) arising from:
         </p>
@@ -425,7 +426,7 @@ export default function TermsPage() {
       <Section title="16. Contact Us">
         <p>If you have questions about these Terms:</p>
         <p>
-          <strong>Workflow Minds LLC</strong>
+          <strong>Next Surplus</strong>
           <br />
           Email:{" "}
           <a href="mailto:support@nextsurplus.com">support@nextsurplus.com</a>
