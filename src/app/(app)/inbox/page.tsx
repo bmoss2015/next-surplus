@@ -7,6 +7,7 @@ import {
   type InboxFilter,
 } from "@/lib/email/inbox";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
+import { fetchEmailTemplates } from "@/lib/settings/fetch";
 import { ThreadList } from "./_components/ThreadList";
 import { ThreadReader } from "./_components/ThreadReader";
 import { InboxEmptyState } from "./_components/InboxEmptyState";
@@ -38,11 +39,12 @@ export default async function InboxPage({
   const q = typeof sp.q === "string" ? sp.q : "";
   const selectedId = typeof sp.c === "string" ? sp.c : null;
 
-  const [accounts, threads, detail, counts] = await Promise.all([
+  const [accounts, threads, detail, counts, templates] = await Promise.all([
     fetchMyEmailAccounts(),
     fetchInboxThreads({ filter, q }),
     selectedId ? fetchThreadDetail(selectedId) : Promise.resolve(null),
     fetchInboxFilterCounts(),
+    fetchEmailTemplates(),
   ]);
 
   const hasAccount = accounts.length > 0;
@@ -70,12 +72,14 @@ export default async function InboxPage({
         selfAddresses={selfAddresses}
         counts={counts}
         accounts={accounts}
+        templates={templates}
       />
       <div className="flex h-full flex-1 min-w-0">
         {detail && accountForReader ? (
           <ThreadReader
             detail={detail}
-            accountAddress={accountForReader.address}
+            accounts={accounts}
+            templates={templates}
           />
         ) : threads.length === 0 ? (
           <FilterEmptyState filter={filter} q={q} />

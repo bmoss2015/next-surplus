@@ -20,9 +20,10 @@ import type {
   InboxFilterCounts,
   EmailAccountRow,
 } from "@/lib/email/types";
+import type { EmailTemplateRow } from "@/lib/settings/fetch";
 
-const ComposeNewModal = dynamic(
-  () => import("./ComposeNewModal").then((m) => m.ComposeNewModal),
+const SendEmailModal = dynamic(
+  () => import("@/components/email/SendEmailModal").then((m) => m.SendEmailModal),
   { ssr: false }
 );
 
@@ -72,6 +73,7 @@ export function ThreadList({
   selfAddresses,
   counts,
   accounts,
+  templates,
 }: {
   rows: InboxThreadRow[];
   filter: InboxFilter;
@@ -80,6 +82,7 @@ export function ThreadList({
   selfAddresses: string[];
   counts: InboxFilterCounts;
   accounts: EmailAccountRow[];
+  templates: EmailTemplateRow[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -280,11 +283,16 @@ export function ThreadList({
         )}
       </div>
     </div>
-    <ComposeNewModal
-      open={composeOpen}
-      onClose={() => setComposeOpen(false)}
-      accounts={accounts}
-    />
+    {composeOpen && (
+      <SendEmailModal
+        open
+        onClose={() => setComposeOpen(false)}
+        leadId={null}
+        candidates={[]}
+        templates={templates}
+        accounts={accounts}
+      />
+    )}
     </>
   );
 }

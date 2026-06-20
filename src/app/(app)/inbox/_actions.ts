@@ -4,6 +4,17 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { markThreadRead as serverMarkRead } from "@/lib/email/inbox";
 import { syncGmailAccount } from "@/lib/email/sync";
+import {
+  buildLeadEmailCandidates,
+  type EmailRecipientCandidate,
+} from "@/lib/email/lead-recipients";
+
+export async function fetchInboxLeadCandidates(
+  leadId: string
+): Promise<EmailRecipientCandidate[]> {
+  const { candidates } = await buildLeadEmailCandidates(leadId);
+  return candidates;
+}
 
 export async function markThreadRead(threadId: string) {
   await serverMarkRead(threadId);
