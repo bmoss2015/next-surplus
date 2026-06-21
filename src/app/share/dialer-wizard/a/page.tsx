@@ -1,65 +1,78 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   IconChevronDown,
+  IconChevronUp,
   IconArrowRight,
   IconCheck,
   IconPlus,
+  IconSearch,
   IconUserCircle,
   IconInfoCircle,
   IconX,
+  IconArrowLeft,
 } from "@tabler/icons-react";
 
-type FilterValue = string | { min?: number; max?: number };
-type ActiveFilter = { type: string; value: FilterValue };
-
-type QuickPick = {
+type SavedList = {
   id: string;
   name: string;
-  filters: ActiveFilter[];
   count: number;
+  source: "import" | "system" | "saved";
+  importedOn?: string;
 };
 
-const QUICK_PICKS: QuickPick[] = [
-  {
-    id: "callback-today",
-    name: "Callback Today",
-    count: 8,
-    filters: [
-      { type: "Stage", value: "Callback Scheduled" },
-      { type: "Scheduled", value: "Today" },
-    ],
-  },
-  {
-    id: "first-contact-due",
-    name: "First Contact Due",
-    count: 47,
-    filters: [
-      { type: "Stage", value: "Researched" },
-      { type: "Has Phone", value: "Yes" },
-      { type: "Last Touched", value: "Never" },
-    ],
-  },
-  {
-    id: "no-contact-60",
-    name: "No Contact 60+ Days",
-    count: 34,
-    filters: [
-      { type: "Last Touched", value: "60+ Days Ago" },
-    ],
-  },
-  {
-    id: "high-surplus",
-    name: "High Surplus",
-    count: 23,
-    filters: [
-      { type: "Surplus", value: { min: 50000 } },
-    ],
-  },
+const INITIAL_LISTS: SavedList[] = [
+  { id: "tax-sales-travis", name: "Tax Sales · Travis TX", count: 47, source: "import", importedOn: "Jun 21" },
+  { id: "callback-today", name: "Callback Today", count: 8, source: "system" },
+  { id: "mortgage-fc-nc", name: "Mortgage Foreclosures · NC", count: 23, source: "import", importedOn: "Jun 19" },
+  { id: "first-contact", name: "First Contact Due", count: 47, source: "system" },
+  { id: "heir-research", name: "Heir Research Batch", count: 12, source: "import", importedOn: "Jun 17" },
+  { id: "high-surplus", name: "High Surplus", count: 23, source: "saved" },
+  { id: "no-contact-60", name: "No Contact 60+ Days", count: 34, source: "system" },
 ];
 
-const FILTER_TYPE_OPTIONS = [
+const PREVIEW_BY_LIST: Record<string, { name: string; county: string; surplus: string; status: string }[]> = {
+  "tax-sales-travis": [
+    { name: "Sarah Pemberton", county: "Travis, TX", surplus: "$48,200", status: "Living" },
+    { name: "Daniel Brooks Estate", county: "Travis, TX", surplus: "$19,420", status: "Deceased" },
+    { name: "Michael Ortiz", county: "Travis, TX", surplus: "$33,100", status: "Living" },
+  ],
+  "callback-today": [
+    { name: "Robert Alvarado", county: "Fulton, GA", surplus: "$54,800", status: "Living" },
+    { name: "Patricia Ng", county: "Cuyahoga, OH", surplus: "$27,300", status: "Living" },
+    { name: "Daniel Brooks Estate", county: "Travis, TX", surplus: "$19,420", status: "Deceased" },
+  ],
+  "mortgage-fc-nc": [
+    { name: "Marcus Hayes Estate", county: "Mecklenburg, NC", surplus: "$31,640", status: "Deceased" },
+    { name: "Thomas Whitfield", county: "Mecklenburg, NC", surplus: "$38,900", status: "Living" },
+    { name: "Karen Booth", county: "Wake, NC", surplus: "$26,140", status: "Living" },
+  ],
+  "first-contact": [
+    { name: "Sarah Pemberton", county: "Travis, TX", surplus: "$48,200", status: "Living" },
+    { name: "Marcus Hayes Estate", county: "Mecklenburg, NC", surplus: "$31,640", status: "Deceased" },
+    { name: "Linda Chen", county: "Maricopa, AZ", surplus: "$22,915", status: "Living" },
+  ],
+  "heir-research": [
+    { name: "Marcus Hayes Estate", county: "Mecklenburg, NC", surplus: "$31,640", status: "Deceased" },
+    { name: "Daniel Brooks Estate", county: "Travis, TX", surplus: "$19,420", status: "Deceased" },
+    { name: "Robert Pruitt Estate", county: "Maricopa, AZ", surplus: "$41,200", status: "Deceased" },
+  ],
+  "high-surplus": [
+    { name: "Elena Rodriguez", county: "Maricopa, AZ", surplus: "$62,150", status: "Living" },
+    { name: "Robert Alvarado", county: "Fulton, GA", surplus: "$54,800", status: "Living" },
+    { name: "Sarah Pemberton", county: "Travis, TX", surplus: "$48,200", status: "Living" },
+  ],
+  "no-contact-60": [
+    { name: "Patricia Ng", county: "Cuyahoga, OH", surplus: "$27,300", status: "Living" },
+    { name: "Thomas Whitfield", county: "Mecklenburg, NC", surplus: "$38,900", status: "Living" },
+    { name: "Linda Chen", county: "Maricopa, AZ", surplus: "$22,915", status: "Living" },
+  ],
+};
+
+type FilterChip = { type: string; value: string };
+
+const FILTER_TYPES = [
   "Stage",
   "State",
   "County",
@@ -71,7 +84,7 @@ const FILTER_TYPE_OPTIONS = [
   "Litigation",
 ];
 
-const FILTER_VALUE_OPTIONS: Record<string, string[]> = {
+const FILTER_VALUES: Record<string, string[]> = {
   "Stage": ["Researched", "First Contact", "Contact Made", "Awaiting Signature", "Signed", "Callback Scheduled"],
   "State": ["Texas", "North Carolina", "Arizona", "Georgia", "Ohio", "Florida"],
   "County": ["Travis", "Mecklenburg", "Maricopa", "Fulton", "Cuyahoga", "Harris"],
@@ -81,7 +94,6 @@ const FILTER_VALUE_OPTIONS: Record<string, string[]> = {
   "Last Touched": ["Never", "30+ Days Ago", "60+ Days Ago", "90+ Days Ago", "Any"],
   "Has Phone": ["Yes", "No", "Any"],
   "Litigation": ["Skip Litigated", "Include All"],
-  "Scheduled": ["Today", "This Week", "Any"],
 };
 
 const CALLER_IDS = [
@@ -98,54 +110,22 @@ const VOICEMAILS = [
   { id: "living", label: "Living Owner" },
 ];
 
-const PREVIEW_LEADS_BY_PICK: Record<string, { name: string; county: string; surplus: string; status: string }[]> = {
-  "callback-today": [
-    { name: "Robert Alvarado", county: "Fulton, GA", surplus: "$54,800", status: "Living" },
-    { name: "Patricia Ng", county: "Cuyahoga, OH", surplus: "$27,300", status: "Living" },
-    { name: "Daniel Brooks Estate", county: "Travis, TX", surplus: "$19,420", status: "Deceased" },
-  ],
-  "first-contact-due": [
-    { name: "Sarah Pemberton", county: "Travis, TX", surplus: "$48,200", status: "Living" },
-    { name: "Marcus Hayes Estate", county: "Mecklenburg, NC", surplus: "$31,640", status: "Deceased" },
-    { name: "Linda Chen", county: "Maricopa, AZ", surplus: "$22,915", status: "Living" },
-  ],
-  "no-contact-60": [
-    { name: "Patricia Ng", county: "Cuyahoga, OH", surplus: "$27,300", status: "Living" },
-    { name: "Thomas Whitfield", county: "Mecklenburg, NC", surplus: "$38,900", status: "Living" },
-    { name: "Linda Chen", county: "Maricopa, AZ", surplus: "$22,915", status: "Living" },
-  ],
-  "high-surplus": [
-    { name: "Elena Rodriguez", county: "Maricopa, AZ", surplus: "$62,150", status: "Living" },
-    { name: "Robert Alvarado", county: "Fulton, GA", surplus: "$54,800", status: "Living" },
-    { name: "Sarah Pemberton", county: "Travis, TX", surplus: "$48,200", status: "Living" },
-  ],
-  "custom": [
-    { name: "Sarah Pemberton", county: "Travis, TX", surplus: "$48,200", status: "Living" },
-    { name: "Robert Alvarado", county: "Fulton, GA", surplus: "$54,800", status: "Living" },
-    { name: "Elena Rodriguez", county: "Maricopa, AZ", surplus: "$62,150", status: "Living" },
-  ],
-};
-
-function filtersEqual(a: ActiveFilter[], b: ActiveFilter[]): boolean {
-  if (a.length !== b.length) return false;
-  const aSorted = [...a].sort((x, y) => x.type.localeCompare(y.type));
-  const bSorted = [...b].sort((x, y) => x.type.localeCompare(y.type));
-  return aSorted.every((f, i) => f.type === bSorted[i].type && JSON.stringify(f.value) === JSON.stringify(bSorted[i].value));
-}
-
-function formatFilterValue(v: FilterValue): string {
-  if (typeof v === "string") return v;
-  if (v.min && v.max) return `$${v.min.toLocaleString()} to $${v.max.toLocaleString()}`;
-  if (v.min) return `$${v.min.toLocaleString()}+`;
-  if (v.max) return `Up to $${v.max.toLocaleString()}`;
-  return "Any";
-}
+type Mode = "saved" | "building";
 
 export default function VariantA() {
-  const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>(QUICK_PICKS[1].filters);
+  const [lists, setLists] = useState<SavedList[]>(INITIAL_LISTS);
+  const [selectedId, setSelectedId] = useState<string>(INITIAL_LISTS[0].id);
+  const [mode, setMode] = useState<Mode>("saved");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const [buildFilters, setBuildFilters] = useState<FilterChip[]>([]);
   const [editingFilterIdx, setEditingFilterIdx] = useState<number | null>(null);
   const [addFilterOpen, setAddFilterOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [saveNameOpen, setSaveNameOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+
   const [editingDefaults, setEditingDefaults] = useState(false);
   const [callerId, setCallerId] = useState(CALLER_IDS[0].id);
   const [voicemail, setVoicemail] = useState(VOICEMAILS[0].id);
@@ -154,38 +134,33 @@ export default function VariantA() {
   const [wrapUp, setWrapUp] = useState(30);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [started, setStarted] = useState(false);
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [newListName, setNewListName] = useState("");
 
+  const pickerRef = useRef<HTMLDivElement>(null);
   const addFilterRef = useRef<HTMLDivElement>(null);
   const filterEditRef = useRef<HTMLDivElement>(null);
-  const voicemailInfoRef = useRef<HTMLDivElement>(null);
+  const voicemailInfoRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
       const t = e.target as Node;
-      if (addFilterRef.current && !addFilterRef.current.contains(t)) {
-        setAddFilterOpen(false);
-      }
-      if (filterEditRef.current && !filterEditRef.current.contains(t)) {
-        setEditingFilterIdx(null);
-      }
-      if (voicemailInfoRef.current && !voicemailInfoRef.current.contains(t)) {
-        setVoicemailInfoOpen(false);
-      }
+      if (pickerRef.current && !pickerRef.current.contains(t)) setPickerOpen(false);
+      if (addFilterRef.current && !addFilterRef.current.contains(t)) setAddFilterOpen(false);
+      if (filterEditRef.current && !filterEditRef.current.contains(t)) setEditingFilterIdx(null);
+      if (voicemailInfoRef.current && !voicemailInfoRef.current.contains(t)) setVoicemailInfoOpen(false);
     }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  const matchingPick = useMemo(
-    () => QUICK_PICKS.find((p) => filtersEqual(p.filters, activeFilters)) ?? null,
-    [activeFilters],
-  );
+  const selected = lists.find((l) => l.id === selectedId) ?? lists[0];
+  const filtered = lists.filter((l) => l.name.toLowerCase().includes(search.toLowerCase()));
 
-  const leadCount = matchingPick?.count ?? 124;
-  const previewKey = matchingPick?.id ?? "custom";
-  const previewLeads = PREVIEW_LEADS_BY_PICK[previewKey] ?? [];
+  const buildCount = buildFilters.length > 0 ? 38 : 124;
+  const buildPreview = PREVIEW_BY_LIST["first-contact"];
+
+  const displayCount = mode === "saved" ? selected.count : buildCount;
+  const previewLeads = mode === "saved" ? (PREVIEW_BY_LIST[selected.id] ?? []) : buildPreview;
+  const listLabelForStart = mode === "saved" ? selected.name : (buildFilters.length > 0 ? "Custom Filter" : "Any Lead");
 
   const callerIdLabel = CALLER_IDS.find((c) => c.id === callerId)?.label ?? "";
   const voicemailLabel = VOICEMAILS.find((v) => v.id === voicemail)?.label ?? "";
@@ -196,39 +171,70 @@ export default function VariantA() {
       ? `${wrapUp} Seconds`
       : `${Math.floor(wrapUp / 60)}m ${(wrapUp % 60).toString().padStart(2, "0")}s`;
 
-  function setQuickPick(p: QuickPick) {
-    setActiveFilters(p.filters);
+  function pickList(id: string) {
+    setSelectedId(id);
+    setPickerOpen(false);
+    setSearch("");
   }
 
-  function removeFilter(idx: number) {
-    setActiveFilters((f) => f.filter((_, i) => i !== idx));
+  function enterBuildMode() {
+    setMode("building");
+    setBuildFilters([]);
+    setPickerOpen(false);
+    setSearch("");
+  }
+
+  function cancelBuild() {
+    setMode("saved");
+    setBuildFilters([]);
+    setSaveNameOpen(false);
+    setNewListName("");
+  }
+
+  function saveBuiltList() {
+    const id = `user-${Date.now()}`;
+    const newList: SavedList = {
+      id,
+      name: newListName.trim(),
+      count: buildCount,
+      source: "saved",
+    };
+    setLists((prev) => [newList, ...prev]);
+    setSelectedId(id);
+    setMode("saved");
+    setBuildFilters([]);
+    setSaveNameOpen(false);
+    setNewListName("");
+  }
+
+  function removeBuildFilter(idx: number) {
+    setBuildFilters((f) => f.filter((_, i) => i !== idx));
     setEditingFilterIdx(null);
   }
 
-  function updateFilterValue(idx: number, val: string) {
-    setActiveFilters((f) => f.map((x, i) => (i === idx ? { ...x, value: val } : x)));
+  function updateBuildFilter(idx: number, value: string) {
+    setBuildFilters((f) => f.map((x, i) => (i === idx ? { ...x, value } : x)));
     setEditingFilterIdx(null);
   }
 
-  function addFilter(type: string) {
-    const options = FILTER_VALUE_OPTIONS[type];
-    const defaultVal = options?.[0] ?? "Any";
-    setActiveFilters((f) => [...f, { type, value: defaultVal }]);
+  function addBuildFilter(type: string) {
+    const defaultVal = FILTER_VALUES[type]?.[0] ?? "Any";
+    setBuildFilters((f) => [...f, { type, value: defaultVal }]);
     setAddFilterOpen(false);
   }
 
   return (
     <div className="flex min-h-[calc(100vh-49px)] items-start justify-center px-6 py-10">
-      <div className="w-full max-w-[620px]">
+      <div className="w-full max-w-[560px]">
         <div className="mb-6 text-center">
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">
-            Variant A · Just Pick A List · Interactive v2
+            Variant A · Just Pick A List · Interactive v3
           </div>
           <h1 className="mt-2 text-[26px] font-semibold tracking-[-0.02em] text-[#0f1729]">
             Start A Dialer Session
           </h1>
           <div className="mt-1.5 text-[13px] text-[#6b7280]">
-            Pick a quick list or build a filter. Everything stays on this card.
+            One picker. Recent imports, system lists, and saved combos all live in the same dropdown.
           </div>
         </div>
 
@@ -240,203 +246,278 @@ export default function VariantA() {
           }}
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-[14px] font-semibold tracking-[-0.005em] text-[#0f1729]">
+            <h2 className="text-[13.5px] font-semibold tracking-[-0.005em] text-[#0f1729]">
               Calling List
             </h2>
-            <button
-              type="button"
-              onClick={() => setPreviewOpen((o) => !o)}
-              className="cursor-pointer text-[12px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
-            >
-              {previewOpen ? "Hide Preview" : "Preview"}
-            </button>
+            {mode === "saved" && (
+              <button
+                type="button"
+                onClick={() => setPreviewOpen((o) => !o)}
+                className="cursor-pointer text-[12px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
+              >
+                {previewOpen ? "Hide Preview" : "Preview"}
+              </button>
+            )}
+            {mode === "building" && (
+              <button
+                type="button"
+                onClick={cancelBuild}
+                className="flex cursor-pointer items-center gap-1 text-[12px] font-medium text-[#6b7280] hover:text-[#0f1729]"
+              >
+                <IconArrowLeft size={12} stroke={2.25} />
+                Back To Saved Lists
+              </button>
+            )}
           </div>
 
-          <div className="mt-3">
-            <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#9ca3af]">
-              Quick Picks
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {QUICK_PICKS.map((p) => {
-                const active = matchingPick?.id === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setQuickPick(p)}
-                    className={[
-                      "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition",
-                      active
-                        ? "border-[#0f1729] bg-[#0f1729] text-white"
-                        : "border-[#e5e7eb] bg-white text-[#374151] hover:border-[#0f1729]",
-                    ].join(" ")}
-                  >
-                    {p.name}
-                    <span
-                      className={[
-                        "rounded px-1.5 py-0.5 text-[11px] tabular-nums",
-                        active ? "bg-white/15 text-white" : "bg-[#f1f2f4] text-[#6b7280]",
-                      ].join(" ")}
-                    >
-                      {p.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {mode === "saved" && (
+            <div className="relative mt-2" ref={pickerRef}>
+              <button
+                type="button"
+                onClick={() => setPickerOpen((o) => !o)}
+                className="flex w-full cursor-pointer items-center justify-between rounded-[10px] border border-[#e5e7eb] bg-white px-5 py-4 text-left transition hover:border-[#0f1729]"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-[16px] font-semibold tracking-[-0.005em] text-[#0f1729]">
+                    {selected.name}
+                  </div>
+                  {selected.importedOn && (
+                    <div className="mt-0.5 text-[12px] text-[#6b7280]">
+                      Imported {selected.importedOn}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="rounded-md bg-[#13644e] px-2.5 py-1 text-[12px] font-semibold tabular-nums text-white">
+                    {selected.count} Leads
+                  </span>
+                  {pickerOpen ? (
+                    <IconChevronUp size={16} stroke={2} className="text-[#9ca3af]" />
+                  ) : (
+                    <IconChevronDown size={16} stroke={2} className="text-[#9ca3af]" />
+                  )}
+                </div>
+              </button>
 
-          <div className="mt-5">
-            <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#9ca3af]">
-              Filters
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {activeFilters.map((f, i) => (
-                <div key={`${f.type}-${i}`} className="relative">
+              {pickerOpen && (
+                <div
+                  className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-[10px] border border-[#e5e7eb] bg-white"
+                  style={{ boxShadow: "0 12px 32px -8px rgba(15,23,41,0.18), 0 2px 6px rgba(15,23,41,0.08)" }}
+                >
+                  <div className="flex items-center gap-2 border-b border-[#f1f2f4] px-3 py-2.5">
+                    <IconSearch size={14} stroke={2} className="text-[#9ca3af]" />
+                    <input
+                      autoFocus
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search Lists"
+                      className="w-full bg-transparent text-[13px] text-[#0f1729] outline-none placeholder:text-[#9ca3af]"
+                    />
+                  </div>
+
+                  <div className="max-h-[320px] overflow-y-auto py-1">
+                    {filtered.map((l) => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => pickList(l.id)}
+                        className={[
+                          "flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-2 text-left transition",
+                          l.id === selected.id ? "bg-[#f7f8f9]" : "hover:bg-[#f7f8f9]",
+                        ].join(" ")}
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          {l.id === selected.id ? (
+                            <IconCheck size={13} stroke={2.5} className="shrink-0 text-[#13644e]" />
+                          ) : (
+                            <span className="w-[13px]" />
+                          )}
+                          <span
+                            className={[
+                              "truncate text-[13px]",
+                              l.id === selected.id ? "font-semibold text-[#0f1729]" : "font-medium text-[#374151]",
+                            ].join(" ")}
+                          >
+                            {l.name}
+                          </span>
+                          {l.importedOn && (
+                            <span className="text-[11px] text-[#9ca3af]">· {l.importedOn}</span>
+                          )}
+                        </div>
+                        <span className="shrink-0 text-[11.5px] tabular-nums text-[#6b7280]">
+                          {l.count}
+                        </span>
+                      </button>
+                    ))}
+                    {filtered.length === 0 && (
+                      <div className="px-4 py-6 text-center text-[12px] text-[#9ca3af]">
+                        No lists match &quot;{search}&quot;
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => setEditingFilterIdx(editingFilterIdx === i ? null : i)}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white py-1.5 pl-3 pr-2 text-[12px] text-[#374151] transition hover:border-[#0f1729]"
+                    onClick={enterBuildMode}
+                    className="flex w-full cursor-pointer items-center gap-2 border-t border-[#f1f2f4] px-4 py-3 text-left text-[12.5px] font-medium text-[#13644e] hover:bg-[#f7f8f9]"
                   >
-                    <span className="font-medium text-[#9ca3af]">{f.type}:</span>
-                    <span className="font-semibold text-[#0f1729]">{formatFilterValue(f.value)}</span>
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFilter(i);
-                      }}
-                      className="ml-0.5 inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-[#9ca3af] hover:bg-[#f1f2f4] hover:text-[#0f1729]"
+                    <IconPlus size={13} stroke={2.25} />
+                    Build A New List
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {mode === "building" && (
+            <div className="mt-2 rounded-[10px] border border-[#e5e7eb] bg-white p-4">
+              <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#9ca3af]">
+                Filters
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {buildFilters.map((f, i) => (
+                  <div key={`${f.type}-${i}`} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setEditingFilterIdx(editingFilterIdx === i ? null : i)}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white py-1.5 pl-3 pr-2 text-[12px] text-[#374151] transition hover:border-[#0f1729]"
                     >
-                      <IconX size={11} stroke={2.25} />
-                    </span>
+                      <span className="font-medium text-[#9ca3af]">{f.type}:</span>
+                      <span className="font-semibold text-[#0f1729]">{f.value}</span>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeBuildFilter(i);
+                        }}
+                        className="ml-0.5 inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-[#9ca3af] hover:bg-[#f1f2f4] hover:text-[#0f1729]"
+                      >
+                        <IconX size={11} stroke={2.25} />
+                      </span>
+                    </button>
+
+                    {editingFilterIdx === i && (
+                      <div
+                        ref={filterEditRef}
+                        className="absolute left-0 top-full z-30 mt-1 w-[200px] overflow-hidden rounded-[8px] border border-[#e5e7eb] bg-white"
+                        style={{ boxShadow: "0 12px 32px -8px rgba(15,23,41,0.18)" }}
+                      >
+                        <div className="border-b border-[#f1f2f4] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.10em] text-[#9ca3af]">
+                          {f.type}
+                        </div>
+                        <div className="max-h-[200px] overflow-y-auto py-1">
+                          {(FILTER_VALUES[f.type] ?? []).map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => updateBuildFilter(i, opt)}
+                              className="flex w-full cursor-pointer items-center justify-between px-3 py-1.5 text-left text-[12px] text-[#374151] transition hover:bg-[#f7f8f9]"
+                            >
+                              {opt}
+                              {f.value === opt && <IconCheck size={12} stroke={2.5} className="text-[#13644e]" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <div ref={addFilterRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAddFilterOpen((o) => !o)}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-[#9ca3af] px-2.5 py-1.5 text-[12px] font-medium text-[#6b7280] transition hover:border-[#0f1729] hover:text-[#0f1729]"
+                  >
+                    <IconPlus size={12} stroke={2.5} />
+                    Add Filter
                   </button>
 
-                  {editingFilterIdx === i && (
+                  {addFilterOpen && (
                     <div
-                      ref={filterEditRef}
-                      className="absolute left-0 top-full z-30 mt-1 w-[200px] overflow-hidden rounded-[8px] border border-[#e5e7eb] bg-white"
+                      className="absolute left-0 top-full z-30 mt-1 w-[180px] overflow-hidden rounded-[8px] border border-[#e5e7eb] bg-white"
                       style={{ boxShadow: "0 12px 32px -8px rgba(15,23,41,0.18)" }}
                     >
                       <div className="border-b border-[#f1f2f4] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.10em] text-[#9ca3af]">
-                        {f.type}
+                        Add A Filter
                       </div>
-                      <div className="max-h-[200px] overflow-y-auto py-1">
-                        {(FILTER_VALUE_OPTIONS[f.type] ?? []).map((opt) => (
+                      <div className="max-h-[240px] overflow-y-auto py-1">
+                        {FILTER_TYPES.filter((t) => !buildFilters.find((f) => f.type === t)).map((t) => (
                           <button
-                            key={opt}
+                            key={t}
                             type="button"
-                            onClick={() => updateFilterValue(i, opt)}
-                            className="flex w-full cursor-pointer items-center justify-between px-3 py-1.5 text-left text-[12px] text-[#374151] transition hover:bg-[#f7f8f9]"
+                            onClick={() => addBuildFilter(t)}
+                            className="flex w-full cursor-pointer items-center px-3 py-1.5 text-left text-[12px] text-[#374151] transition hover:bg-[#f7f8f9]"
                           >
-                            {opt}
-                            {formatFilterValue(f.value) === opt && <IconCheck size={12} stroke={2.5} className="text-[#13644e]" />}
+                            {t}
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
                 </div>
-              ))}
+              </div>
 
-              <div ref={addFilterRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setAddFilterOpen((o) => !o)}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-[#9ca3af] px-2.5 py-1.5 text-[12px] font-medium text-[#6b7280] transition hover:border-[#0f1729] hover:text-[#0f1729]"
-                >
-                  <IconPlus size={12} stroke={2.5} />
-                  Add Filter
-                </button>
-
-                {addFilterOpen && (
-                  <div
-                    className="absolute left-0 top-full z-30 mt-1 w-[180px] overflow-hidden rounded-[8px] border border-[#e5e7eb] bg-white"
-                    style={{ boxShadow: "0 12px 32px -8px rgba(15,23,41,0.18)" }}
+              <div className="mt-4 flex items-center justify-between border-t border-[#f1f2f4] pt-3">
+                <div className="text-[12.5px] text-[#6b7280]">
+                  <span className="font-semibold tabular-nums text-[#0f1729]">{buildCount}</span> Leads Match
+                </div>
+                {buildFilters.length > 0 && !saveNameOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setSaveNameOpen(true)}
+                    className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
                   >
-                    <div className="border-b border-[#f1f2f4] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.10em] text-[#9ca3af]">
-                      Add A Filter
-                    </div>
-                    <div className="max-h-[240px] overflow-y-auto py-1">
-                      {FILTER_TYPE_OPTIONS.filter((t) => !activeFilters.find((f) => f.type === t)).map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => addFilter(t)}
-                          className="flex w-full cursor-pointer items-center px-3 py-1.5 text-left text-[12px] text-[#374151] transition hover:bg-[#f7f8f9]"
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    <IconPlus size={12} stroke={2.5} />
+                    Save As A New List
+                  </button>
                 )}
               </div>
-            </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-[13px] text-[#6b7280]">
-                <span className="font-semibold tabular-nums text-[#0f1729]">{leadCount}</span> Leads Match
-              </div>
-              {!matchingPick && activeFilters.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSaveDialogOpen(true)}
-                  className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
-                >
-                  <IconPlus size={12} stroke={2.5} />
-                  Save As A New Calling List
-                </button>
+              {saveNameOpen && (
+                <div className="mt-3 rounded-[8px] border border-[#e5e7eb] bg-[#f7f8f9] p-3">
+                  <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#6b7280]">
+                    Name This List
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      autoFocus
+                      value={newListName}
+                      onChange={(e) => setNewListName(e.target.value)}
+                      placeholder="e.g. Texas Tax Sales, High Surplus"
+                      className="h-9 flex-1 rounded-md border border-[#e5e7eb] bg-white px-3 text-[12.5px] text-[#0f1729] outline-none transition focus:border-[#13644e] placeholder:text-[#9ca3af]"
+                    />
+                    <button
+                      type="button"
+                      onClick={saveBuiltList}
+                      disabled={!newListName.trim()}
+                      className="h-9 w-[80px] cursor-pointer rounded-md bg-[#0f1729] text-[12px] font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSaveNameOpen(false);
+                        setNewListName("");
+                      }}
+                      className="h-9 w-[80px] cursor-pointer rounded-md border border-[#e5e7eb] bg-white text-[12px] font-medium text-[#374151] transition hover:border-[#0f1729]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
+          )}
 
-            {saveDialogOpen && (
-              <div className="mt-3 rounded-[8px] border border-[#e5e7eb] bg-[#f7f8f9] p-3">
-                <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#6b7280]">
-                  Name This Calling List
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    autoFocus
-                    value={newListName}
-                    onChange={(e) => setNewListName(e.target.value)}
-                    placeholder="e.g. Texas Tax Sales, High Surplus"
-                    className="h-9 flex-1 rounded-md border border-[#e5e7eb] bg-white px-3 text-[12.5px] text-[#0f1729] outline-none transition focus:border-[#13644e] placeholder:text-[#9ca3af]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      alert(`Would save "${newListName}" as a Quick Pick with the current filter combo.`);
-                      setSaveDialogOpen(false);
-                      setNewListName("");
-                    }}
-                    disabled={!newListName.trim()}
-                    className="h-9 cursor-pointer rounded-md bg-[#0f1729] px-4 text-[12px] font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSaveDialogOpen(false);
-                      setNewListName("");
-                    }}
-                    className="h-9 cursor-pointer rounded-md border border-[#e5e7eb] bg-white px-3 text-[12px] font-medium text-[#374151] transition hover:border-[#0f1729]"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {previewOpen && (
-            <div className="mt-4 overflow-hidden rounded-[10px] border border-[#e5e7eb] bg-white">
+          {previewOpen && mode === "saved" && (
+            <div className="mt-3 overflow-hidden rounded-[10px] border border-[#e5e7eb] bg-white">
               <div className="flex items-center justify-between border-b border-[#f1f2f4] px-4 py-2">
                 <span className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9ca3af]">
                   First In Queue
                 </span>
                 <span className="text-[11px] text-[#6b7280]">
-                  Plus {Math.max(leadCount - previewLeads.length, 0)} More
+                  Plus {Math.max(displayCount - previewLeads.length, 0)} More
                 </span>
               </div>
               <div className="divide-y divide-[#f1f2f4]">
@@ -469,7 +550,7 @@ export default function VariantA() {
 
           <div className="mt-7 border-t border-[#f1f2f4] pt-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-[14px] font-semibold tracking-[-0.005em] text-[#0f1729]">
+              <h2 className="text-[13.5px] font-semibold tracking-[-0.005em] text-[#0f1729]">
                 Defaults
               </h2>
               <button
@@ -482,9 +563,9 @@ export default function VariantA() {
             </div>
 
             {!editingDefaults ? (
-              <div className="mt-3 divide-y divide-[#f1f2f4]">
-                <ReadRow label="Caller ID" value={callerIdLabel} />
-                <ReadRow
+              <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4">
+                <ReadCell label="Caller ID" value={callerIdLabel} />
+                <ReadCell
                   label={
                     <span className="inline-flex items-center gap-1">
                       Voicemail
@@ -494,7 +575,7 @@ export default function VariantA() {
                           onClick={() => setVoicemailInfoOpen((o) => !o)}
                           className="inline-flex h-4 w-4 cursor-pointer items-center justify-center text-[#9ca3af] hover:text-[#0f1729]"
                         >
-                          <IconInfoCircle size={13} stroke={2} />
+                          <IconInfoCircle size={12} stroke={2} />
                         </button>
                         {voicemailInfoOpen && (
                           <span
@@ -509,11 +590,11 @@ export default function VariantA() {
                   }
                   value={voicemailDisplay}
                 />
-                <ReadRow label="Wrap Up" value={wrapUpLabel} />
-                <ReadRow label="Email Followup" value="4 Templates Set" />
+                <ReadCell label="Wrap Up" value={wrapUpLabel} />
+                <ReadCell label="Email Followup" value="4 Templates Set" />
               </div>
             ) : (
-              <div className="mt-3 divide-y divide-[#f1f2f4]">
+              <div className="mt-3 space-y-3">
                 <EditRow label="Caller ID">
                   <select
                     value={callerId}
@@ -535,7 +616,7 @@ export default function VariantA() {
                           onClick={() => setVoicemailInfoOpen((o) => !o)}
                           className="inline-flex h-4 w-4 cursor-pointer items-center justify-center text-[#9ca3af] hover:text-[#0f1729]"
                         >
-                          <IconInfoCircle size={13} stroke={2} />
+                          <IconInfoCircle size={12} stroke={2} />
                         </button>
                         {voicemailInfoOpen && (
                           <span
@@ -618,7 +699,7 @@ export default function VariantA() {
             <div className="mt-4 rounded-[10px] border border-[#0f1729] bg-[#0f1729] px-4 py-3 text-[12.5px] text-white">
               <div className="font-semibold">Session Would Start Now</div>
               <div className="mt-1 text-[11.5px] text-[#9ca3af]">
-                {leadCount} Leads · {matchingPick?.name ?? "Custom Filter"} · Caller ID: {callerIdLabel} · Voicemail: {voicemailDisplay} · Wrap Up: {wrapUpLabel}
+                {displayCount} Leads · {listLabelForStart} · Caller ID: {callerIdLabel} · Voicemail: {voicemailDisplay} · Wrap Up: {wrapUpLabel}
               </div>
               <button
                 type="button"
@@ -643,11 +724,11 @@ export default function VariantA() {
   );
 }
 
-function ReadRow({ label, value }: { label: React.ReactNode; value: string }) {
+function ReadCell({ label, value }: { label: React.ReactNode; value: string }) {
   return (
-    <div className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-      <div className="text-[12.5px] text-[#6b7280]">{label}</div>
-      <div className="text-[12.5px] font-medium text-[#0f1729]">{value}</div>
+    <div>
+      <div className="text-[11.5px] font-medium text-[#6b7280]">{label}</div>
+      <div className="mt-1 text-[13px] font-medium text-[#0f1729]">{value}</div>
     </div>
   );
 }
@@ -660,8 +741,8 @@ function EditRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[140px_1fr] items-start gap-3 py-3 first:pt-0 last:pb-0">
-      <div className="pt-1.5 text-[12.5px] text-[#6b7280]">{label}</div>
+    <div className="grid grid-cols-[140px_1fr] items-start gap-3">
+      <div className="pt-2 text-[12.5px] font-medium text-[#6b7280]">{label}</div>
       {children}
     </div>
   );
@@ -695,7 +776,10 @@ function TemplatesPanel({ onClose }: { onClose: () => void }) {
         onClick={onClose}
         className="absolute inset-0 cursor-pointer bg-[#0f1729]/30"
       />
-      <div className="absolute right-0 top-0 flex h-full w-[420px] flex-col bg-white" style={{ boxShadow: "-12px 0 32px -8px rgba(15,23,41,0.18)" }}>
+      <div
+        className="absolute right-0 top-0 flex h-full w-[420px] flex-col bg-white"
+        style={{ boxShadow: "-12px 0 32px -8px rgba(15,23,41,0.18)" }}
+      >
         <div className="flex items-center justify-between border-b border-[#f1f2f4] px-5 py-4">
           <div>
             <h3 className="text-[15px] font-semibold tracking-[-0.005em] text-[#0f1729]">
