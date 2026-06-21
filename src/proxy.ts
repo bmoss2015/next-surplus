@@ -12,7 +12,6 @@ import { createServerClient } from "@supabase/ssr";
 const MARKETING_HOSTS = new Set([
   "nextsurplus.com",
   "www.nextsurplus.com",
-  "mossequitypartners.com",
 ]);
 const APP_HOST = "app.nextsurplus.com";
 

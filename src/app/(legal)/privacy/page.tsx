@@ -24,11 +24,11 @@ export default function PrivacyPage() {
 
       <div className="mt-6 mb-10 space-y-4">
         <p>
-          Moss Equity Partners, LLC, doing business as Next Surplus (&quot;Next
-          Surplus,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;)
-          operates Next Surplus at app.nextsurplus.com (the
-          &quot;Service&quot;). This Privacy Policy describes how we collect,
-          use, store, and share your information when you use our Service.
+          Next Surplus (&quot;Next Surplus,&quot; &quot;we,&quot;
+          &quot;us,&quot; or &quot;our&quot;) operates app.nextsurplus.com
+          (the &quot;Service&quot;). This Privacy Policy describes how we
+          collect, use, store, and share your information when you use our
+          Service.
         </p>
         <p>
           By using the Service, you agree to the collection and use of
@@ -474,7 +474,7 @@ export default function PrivacyPage() {
           your privacy rights:
         </p>
         <p>
-          <strong>Moss Equity Partners, LLC (d/b/a Next Surplus)</strong>
+          <strong>Next Surplus</strong>
           <br />
           Email:{" "}
           <a href="mailto:support@nextsurplus.com">support@nextsurplus.com</a>

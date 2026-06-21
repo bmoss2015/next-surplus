@@ -50,7 +50,7 @@ if ($len -eq 0) {
     exit 1
 }
 
-$uri = 'https://moss-equity-portal.vercel.app/api/cron/reconcile-mail'
+$uri = 'https://app.nextsurplus.com/api/cron/reconcile-mail'
 Write-Host "GET $uri"
 
 try {

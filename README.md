@@ -84,7 +84,7 @@ See `CLAUDE.md` for the full branch → PR → preview → merge → auto-deploy
 | | Staging | Production |
 |---|---|---|
 | Supabase project | qfanroxcoepunmrmjabo | rsdmyydyhqgkkvwlklif |
-| Dev URL | http://localhost:3000 (or Vercel preview) | https://portal.mossequitypartners.com |
+| Dev URL | http://localhost:3000 (or Vercel preview) | https://app.nextsurplus.com |
 | Vendor mode | Test / sandbox keys | Live keys |
 
 ## Related repos

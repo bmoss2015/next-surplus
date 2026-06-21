@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 const PRODUCTION_HOSTS = new Set([
   "nextsurplus.com",
   "www.nextsurplus.com",
-  "mossequitypartners.com",
 ]);
 
 export default async function LandingMockupsLayout({
