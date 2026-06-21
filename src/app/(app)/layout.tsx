@@ -21,6 +21,7 @@ export default async function AppGroupLayout({
       userEmail={profile.email}
       isAdmin={profile.isAdmin}
       isOwner={profile.isOwner}
+      canViewFeedback={profile.canViewFeedback}
       urgentOverdue={urgent.overdue}
       urgentDueToday={urgent.dueToday}
     >

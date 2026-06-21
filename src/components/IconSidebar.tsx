@@ -28,6 +28,7 @@ import {
   ChevronsLeft,
   PhoneCall,
   Zap,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import { signOut } from "@/app/(auth)/_actions";
@@ -42,6 +43,9 @@ type NavItem = {
   // Org admins never see them, even in expanded state. The role is set in
   // the database; no UI can promote a user to owner.
   ownerOnly?: boolean;
+  // platformAdminOnly items are visible only to internal Next Surplus team
+  // members (profiles.can_view_feedback = true). NOT tied to org roles.
+  platformAdminOnly?: boolean;
 };
 
 const NAV: NavItem[] = [
@@ -58,6 +62,7 @@ const NAV: NavItem[] = [
   { label: "Automations",  href: "/automations",   Icon: Zap, ownerOnly: true },
   { label: "Settings",     href: "/settings",      Icon: Settings },
   { label: "Owner",        href: "/owner",         Icon: ShieldCheck, ownerOnly: true },
+  { label: "Feedback",     href: "/admin/feedback", Icon: MessageSquare, platformAdminOnly: true },
 ];
 
 function initials(name: string): string {
@@ -74,16 +79,20 @@ export function IconSidebar({
   userEmail,
   isAdmin,
   isOwner,
+  canViewFeedback,
 }: {
   userName: string;
   userEmail: string | null;
   isAdmin: boolean;
   isOwner: boolean;
+  canViewFeedback?: boolean;
 }) {
   const pathname = usePathname();
   const items = NAV.filter(
     (item) =>
-      (isAdmin || !item.adminOnly) && (isOwner || !item.ownerOnly)
+      (isAdmin || !item.adminOnly) &&
+      (isOwner || !item.ownerOnly) &&
+      (canViewFeedback || !item.platformAdminOnly)
   );
   // Default expanded (matches Pipedrive / HubSpot / Attio conventions for
   // first-time users). Hydrate from localStorage on mount so returning users
