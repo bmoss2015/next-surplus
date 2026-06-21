@@ -1,3 +1,8 @@
+alter table public.profiles
+add column if not exists can_view_feedback boolean not null default false;
+
+create index if not exists profiles_can_view_feedback_idx on public.profiles (can_view_feedback) where can_view_feedback = true;
+
 create table if not exists public.feedback (
     id uuid primary key default gen_random_uuid(),
     user_id uuid references public.profiles(id) on delete set null,
@@ -22,12 +27,15 @@ create index if not exists feedback_created_at_idx on public.feedback (created_a
 
 alter table public.feedback enable row level security;
 
+drop policy if exists feedback_select_own on public.feedback;
 create policy feedback_select_own on public.feedback for select
 using (user_id = auth.uid());
 
+drop policy if exists feedback_insert_own on public.feedback;
 create policy feedback_insert_own on public.feedback for insert
 with check (user_id = auth.uid());
 
+drop policy if exists feedback_select_platform_admin on public.feedback;
 create policy feedback_select_platform_admin on public.feedback for select
 using (
     exists (
@@ -37,6 +45,7 @@ using (
     )
 );
 
+drop policy if exists feedback_update_platform_admin on public.feedback;
 create policy feedback_update_platform_admin on public.feedback for update
 using (
     exists (
@@ -52,11 +61,6 @@ with check (
         and coalesce(p.can_view_feedback, false) = true
     )
 );
-
-alter table public.profiles
-add column if not exists can_view_feedback boolean not null default false;
-
-create index if not exists profiles_can_view_feedback_idx on public.profiles (can_view_feedback) where can_view_feedback = true;
 
 create or replace function public.feedback_set_updated_at()
 returns trigger language plpgsql as $$
