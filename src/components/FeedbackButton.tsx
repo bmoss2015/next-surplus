@@ -7,10 +7,22 @@ import { Drawer } from "@/app/(app)/settings/_components/Drawer";
 
 type FeedbackType = "bug" | "idea" | "question";
 
-const TYPE_OPTIONS: { value: FeedbackType; label: string }[] = [
-  { value: "idea", label: "Idea" },
-  { value: "bug", label: "Bug" },
-  { value: "question", label: "Question" },
+const TYPE_OPTIONS: { value: FeedbackType; title: string; desc: string }[] = [
+  {
+    value: "idea",
+    title: "Idea",
+    desc: "A feature request, improvement, or something you wish existed.",
+  },
+  {
+    value: "bug",
+    title: "Bug",
+    desc: "Something is broken, looks wrong, or behaves unexpectedly.",
+  },
+  {
+    value: "question",
+    title: "Question",
+    desc: "How do I do something, or what does this mean?",
+  },
 ];
 
 export function FeedbackButton() {
@@ -84,7 +96,7 @@ export function FeedbackButton() {
         title={done ? "Got It" : "Send Feedback"}
         footer={
           done ? (
-            <div className="flex items-center justify-end">
+            <div className="flex w-full items-center justify-end">
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
@@ -131,16 +143,16 @@ export function FeedbackButton() {
           <>
             <div className="drawer-field">
               <label className="drawer-label">Type</label>
-              <div className="segmented">
+              <div className="role-choice">
                 {TYPE_OPTIONS.map((opt) => (
-                  <button
+                  <TypeCard
                     key={opt.value}
-                    type="button"
-                    className={type === opt.value ? "selected" : ""}
-                    onClick={() => setType(opt.value)}
-                  >
-                    {opt.label}
-                  </button>
+                    value={opt.value}
+                    checked={type === opt.value}
+                    onSelect={() => setType(opt.value)}
+                    title={opt.title}
+                    desc={opt.desc}
+                  />
                 ))}
               </div>
             </div>
@@ -174,5 +186,38 @@ export function FeedbackButton() {
         )}
       </Drawer>
     </>
+  );
+}
+
+function TypeCard({
+  value,
+  checked,
+  onSelect,
+  title,
+  desc,
+}: {
+  value: string;
+  checked: boolean;
+  onSelect: () => void;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <label
+      className={"role-choice-card" + (checked ? " selected" : "")}
+      onClick={onSelect}
+    >
+      <input
+        type="radio"
+        name="feedback-type"
+        value={value}
+        checked={checked}
+        onChange={onSelect}
+      />
+      <div>
+        <div className="role-choice-title">{title}</div>
+        <div className="role-choice-desc">{desc}</div>
+      </div>
+    </label>
   );
 }
