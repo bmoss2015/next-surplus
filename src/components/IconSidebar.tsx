@@ -80,12 +80,14 @@ export function IconSidebar({
   isAdmin,
   isOwner,
   canViewFeedback,
+  newFeedbackCount,
 }: {
   userName: string;
   userEmail: string | null;
   isAdmin: boolean;
   isOwner: boolean;
   canViewFeedback?: boolean;
+  newFeedbackCount?: number;
 }) {
   const pathname = usePathname();
   const items = NAV.filter(
@@ -233,6 +235,22 @@ export function IconSidebar({
                 className="shrink-0"
               />
               {expanded && <span className="truncate">{item.label}</span>}
+              {item.href === "/admin/feedback" &&
+                (newFeedbackCount ?? 0) > 0 &&
+                (expanded ? (
+                  <span
+                    className="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold text-white"
+                    style={{ background: "#5db98a" }}
+                  >
+                    {(newFeedbackCount ?? 0) > 99 ? "99+" : newFeedbackCount}
+                  </span>
+                ) : (
+                  <span
+                    aria-hidden
+                    className="absolute right-1.5 top-1.5 h-[8px] w-[8px] rounded-full"
+                    style={{ background: "#5db98a" }}
+                  />
+                ))}
             </Link>
           );
         })}

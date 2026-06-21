@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { fetchUrgentTaskCount } from "@/lib/tasks/fetch-urgent-count";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export default async function AppGroupLayout({
   children,
@@ -15,6 +16,16 @@ export default async function AppGroupLayout({
 
   const urgent = await fetchUrgentTaskCount();
 
+  let newFeedbackCount = 0;
+  if (profile.canViewFeedback) {
+    const admin = createServiceClient();
+    const { count } = await admin
+      .from("feedback")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "new");
+    newFeedbackCount = count ?? 0;
+  }
+
   return (
     <AppShell
       userName={profile.fullName}
@@ -22,6 +33,7 @@ export default async function AppGroupLayout({
       isAdmin={profile.isAdmin}
       isOwner={profile.isOwner}
       canViewFeedback={profile.canViewFeedback}
+      newFeedbackCount={newFeedbackCount}
       urgentOverdue={urgent.overdue}
       urgentDueToday={urgent.dueToday}
     >

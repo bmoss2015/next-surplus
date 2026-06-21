@@ -14,6 +14,7 @@ export function AppShell({
   isAdmin,
   isOwner,
   canViewFeedback,
+  newFeedbackCount,
   urgentOverdue,
   urgentDueToday,
 }: {
@@ -23,6 +24,7 @@ export function AppShell({
   isAdmin: boolean;
   isOwner: boolean;
   canViewFeedback?: boolean;
+  newFeedbackCount?: number;
   urgentOverdue?: number;
   urgentDueToday?: number;
 }) {
@@ -35,6 +37,7 @@ export function AppShell({
           isAdmin={isAdmin}
           isOwner={isOwner}
           canViewFeedback={canViewFeedback ?? false}
+          newFeedbackCount={newFeedbackCount ?? 0}
         />
         <div className="flex flex-1 flex-col overflow-hidden bg-surface-muted">
           <Topbar urgentOverdue={urgentOverdue ?? 0} urgentDueToday={urgentDueToday ?? 0} />

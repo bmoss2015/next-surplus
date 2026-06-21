@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { updateFeedbackStatus, replyToFeedback } from "../_actions";
 
 export type FeedbackStatus =
@@ -86,10 +87,28 @@ function timeAgo(iso: string): string {
 }
 
 export function FeedbackPanel({ rows }: { rows: FeedbackRow[] }) {
+  const searchParams = useSearchParams();
+  const initialId = searchParams.get("id");
+  const initialRow = initialId
+    ? rows.find((r) => r.id === initialId) ?? null
+    : null;
   const [selectedStatus, setSelectedStatus] = useState<FeedbackStatus | "all">(
-    "new"
+    initialRow ? initialRow.status : "new"
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialRow ? initialRow.id : null
+  );
+
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id && rows.some((r) => r.id === id)) {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setSelectedId(id);
+      const row = rows.find((r) => r.id === id);
+      if (row) setSelectedStatus(row.status);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    }
+  }, [searchParams, rows]);
 
   const counts = useMemo(() => {
     const acc: Record<string, number> = {
