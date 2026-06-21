@@ -9,6 +9,7 @@ export type CurrentProfile = {
   orgId: string;
   isAdmin: boolean;
   isOwner: boolean;
+  canViewFeedback: boolean;
   avatarUrl: string | null;
   timeZone: string | null;
 };
@@ -24,7 +25,7 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
 
   const { data, error } = await sb
     .from("profiles")
-    .select("id, email, full_name, role, org_id, avatar_url, time_zone")
+    .select("id, email, full_name, role, org_id, avatar_url, time_zone, can_view_feedback")
     .eq("id", user.id)
     .maybeSingle();
   if (error || !data) return null;
@@ -43,9 +44,21 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
     orgId: data.org_id as string,
     isAdmin,
     isOwner,
+    canViewFeedback: Boolean(data.can_view_feedback),
     avatarUrl: (data.avatar_url as string | null) ?? null,
     timeZone: (data.time_zone as string | null) ?? null,
   };
+}
+
+export async function requirePlatformAdmin(): Promise<
+  { ok: true } | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  if (!profile.canViewFeedback) {
+    return { ok: false, error: "Platform admin only" };
+  }
+  return { ok: true };
 }
 
 // For use in Server Actions: bails with a friendly error unless the caller is
