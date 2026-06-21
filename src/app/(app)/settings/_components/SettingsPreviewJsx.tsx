@@ -15,6 +15,7 @@ import { ProfileSection } from "./ProfileSection";
 import { SecuritySection } from "./SecuritySection";
 import { NotificationsSection } from "./NotificationsSection";
 import { EmailAccountsSection } from "./EmailAccountsSection";
+import { SendingDomainsSection } from "./SendingDomainsSection";
 import { CompanyProfileSection } from "./CompanyProfileSection";
 import { TeamSection } from "./TeamSection";
 import { BillingSection } from "./BillingSection";
@@ -46,6 +47,7 @@ import type {
   TemplateRow,
 } from "@/lib/settings/fetch";
 import type { EmailAccountRow } from "@/lib/email/types";
+import type { SendingDomainRow } from "@/lib/sending-domains/fetch";
 
 export type CurrentUser = {
   id: string;
@@ -66,6 +68,7 @@ export type SettingsData = {
   orgInfo: OrgInfo | null;
   orgName: string;
   emailAccounts: EmailAccountRow[];
+  sendingDomains: SendingDomainRow[];
   mailSettings: MailSettings | null;
   mailBank: MailBankAccountRow[];
   lobPricing: LobPricingSettings | null;
@@ -172,6 +175,8 @@ function renderPanel(
       return <NotificationsSection initial={data.notificationPrefs} />;
     case "email-accounts":
       return <EmailAccountsSection initial={data.emailAccounts} />;
+    case "sending-domains":
+      return <SendingDomainsSection initial={data.sendingDomains} />;
     case "company":
       return data.orgInfo ? (
         <CompanyProfileSection initial={data.orgInfo} />

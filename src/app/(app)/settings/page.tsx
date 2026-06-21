@@ -30,6 +30,7 @@ import {
   fetchMyNotificationPrefs,
 } from "@/lib/settings/fetch";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
+import { fetchSendingDomains } from "@/lib/sending-domains/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
 import { fetchOrgStages } from "@/lib/stages/fetch";
 import { SettingsPreviewJsx } from "./_components/SettingsPreviewJsx";
@@ -48,6 +49,7 @@ export default async function SettingsPreviewJsxPage() {
     attorneys,
     customContactRoles,
     emailAccounts,
+    sendingDomains,
     templates,
     emailTemplates,
     emailTemplateFolders,
@@ -59,6 +61,7 @@ export default async function SettingsPreviewJsxPage() {
     fetchAttorneys(),
     fetchOrgCustomRoles(),
     fetchMyEmailAccounts(),
+    fetchSendingDomains(),
     fetchTemplates(),
     fetchEmailTemplates(),
     fetchEmailTemplateFolders(),
@@ -153,6 +156,7 @@ export default async function SettingsPreviewJsxPage() {
           orgInfo,
           orgName: orgInfo?.name ?? "Your Organization",
           emailAccounts,
+          sendingDomains,
           mailSettings,
           mailBank,
           lobPricing,

@@ -33,6 +33,7 @@ export const GROUPS: RailGroup[] = [
       { key: "password", label: "Security" },
       { key: "notifications", label: "Notifications" },
       { key: "email-accounts", label: "Email Accounts" },
+      { key: "sending-domains", label: "Sending Domains" },
     ],
   },
   {
