@@ -11,13 +11,21 @@ type Variant = {
 
 const VARIANTS: Variant[] = [
   {
+    slug: "v7",
+    name: "Per Provider Flow + AWS SES Cost Panel",
+    layout: "Domain Wizard, One Flow Per DNS Provider",
+    anchor: "GoHighLevel pattern · Mailgun / Resend / AWS SES backbones",
+    rationale:
+      "Dedicated sending domain wizard, broken out by DNS provider so you can see exactly how many clicks each takes. Cloudflare and Vercel = 2 clicks. GoDaddy = 3. Namecheap = 4. Bluehost / Hostinger / HostGator (Newfold) and the long tail = copy paste fallback. Cost panel at top shows AWS SES at every volume.",
+    recommended: true,
+  },
+  {
     slug: "v6",
     name: "Progressive Column + Google Walkthrough",
     layout: "V1 Base + 2FA Pre Flight + Loom + Clipboard Pill",
     anchor: "Hybrid · v1 + v2 + Notion/Slack install pattern",
     rationale:
-      "Recommended hybrid. V1 base, style C success indicator (small petrol dot, no tinted background), provider preview collapsed into a chip, and a full Google walkthrough with 2 Step Verification pre flight, Loom video placeholder, annotated screenshot strip, and a clipboard auto detect pill.",
-    recommended: true,
+      "Progressive column hybrid for the IMAP / Gmail path (different product). V1 base, style C success indicator (small petrol dot, no tinted background), provider preview collapsed into a chip, and a full Google walkthrough with 2 Step Verification pre flight, Loom video placeholder, annotated screenshot strip, and a clipboard auto detect pill.",
   },
   {
     slug: "v1",
