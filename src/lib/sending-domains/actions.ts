@@ -4,6 +4,14 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { detectDnsProvider, subdomainFor } from "./detect";
+import {
+  awsConfigured,
+  createHostedZone,
+  createOrGetEmailIdentity,
+  writeDkimCnames,
+  getIdentityVerificationStatus,
+  deleteSendingDomainResources,
+} from "./aws";
 
 type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -69,9 +77,60 @@ export async function startSubdomainDelegation(
   if (detected.error) return { ok: false, error: detected.error };
 
   const subdomain = subdomainFor(detected.domain);
-  const nsRecords = await provisionRoute53Zone(subdomain);
-
   const svc = createServiceClient();
+
+  if (!awsConfigured()) {
+    const placeholderNs = [
+      "ns-100.awsdns-12.com",
+      "ns-1000.awsdns-34.org",
+      "ns-1500.awsdns-56.net",
+      "ns-2000.awsdns-78.co.uk",
+    ];
+    const { data: inserted, error } = await svc
+      .from("customer_sending_domains")
+      .upsert(
+        {
+          org_id: profile.org_id,
+          domain: detected.domain,
+          subdomain,
+          tier: "tier_c_delegation",
+          detected_provider: detected.provider.id,
+          status: "pending",
+          ns_records: placeholderNs,
+        },
+        { onConflict: "org_id,domain" }
+      )
+      .select("id")
+      .maybeSingle();
+    if (error || !inserted) {
+      return { ok: false, error: error?.message ?? "Insert failed" };
+    }
+    revalidatePath("/settings");
+    return {
+      ok: true,
+      data: {
+        id: inserted.id as string,
+        subdomain,
+        nsRecords: placeholderNs,
+      },
+    };
+  }
+
+  let zoneId: string;
+  let nameservers: string[];
+  let dkimTokens: string[];
+  try {
+    const zone = await createHostedZone(subdomain);
+    zoneId = zone.zoneId;
+    nameservers = zone.nameservers;
+    const identity = await createOrGetEmailIdentity(subdomain);
+    dkimTokens = identity.dkimTokens;
+    await writeDkimCnames(zoneId, subdomain, dkimTokens);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `AWS provisioning failed: ${msg}` };
+  }
+
   const { data: inserted, error } = await svc
     .from("customer_sending_domains")
     .upsert(
@@ -82,7 +141,10 @@ export async function startSubdomainDelegation(
         tier: "tier_c_delegation",
         detected_provider: detected.provider.id,
         status: "pending",
-        ns_records: nsRecords,
+        ns_records: nameservers,
+        route53_zone_id: zoneId,
+        aws_ses_identity_arn: subdomain,
+        written_records: { dkim_tokens: dkimTokens },
       },
       { onConflict: "org_id,domain" }
     )
@@ -98,7 +160,7 @@ export async function startSubdomainDelegation(
     data: {
       id: inserted.id as string,
       subdomain,
-      nsRecords,
+      nsRecords: nameservers,
     },
   };
 }
@@ -125,16 +187,38 @@ export async function checkDomainVerification(
     .maybeSingle();
   if (!row) return { ok: false, error: "Domain not found" };
 
-  const verified = await checkSesIdentityVerified(row.subdomain as string);
+  if (!awsConfigured()) {
+    await svc
+      .from("customer_sending_domains")
+      .update({ status: "verifying" })
+      .eq("id", id);
+    revalidatePath("/settings");
+    return { ok: true, data: { status: "verifying", lastError: null } };
+  }
 
-  const next: "verifying" | "verified" =
-    verified ? "verified" : "verifying";
+  let verified = false;
+  let dkimStatus = "NOT_STARTED";
+  try {
+    const ident = await getIdentityVerificationStatus(row.subdomain as string);
+    verified = ident.verified;
+    dkimStatus = ident.dkimStatus;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await svc
+      .from("customer_sending_domains")
+      .update({ status: "failed", last_error: msg })
+      .eq("id", id);
+    return { ok: false, error: msg };
+  }
+
+  const next: "verifying" | "verified" = verified ? "verified" : "verifying";
 
   await svc
     .from("customer_sending_domains")
     .update({
       status: next,
       verified_at: verified ? new Date().toISOString() : null,
+      last_error: verified ? null : `DKIM ${dkimStatus}`,
     })
     .eq("id", id);
 
@@ -152,6 +236,19 @@ export async function disconnectSendingDomain(
   if (!user) return { ok: false, error: "Not signed in" };
 
   const svc = createServiceClient();
+  const { data: row } = await svc
+    .from("customer_sending_domains")
+    .select("subdomain, route53_zone_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (row && awsConfigured()) {
+    await deleteSendingDomainResources(
+      row.subdomain as string,
+      (row.route53_zone_id as string | null) ?? null
+    );
+  }
+
   const { error } = await svc
     .from("customer_sending_domains")
     .delete()
@@ -160,33 +257,4 @@ export async function disconnectSendingDomain(
 
   revalidatePath("/settings");
   return { ok: true, data: undefined };
-}
-
-async function provisionRoute53Zone(subdomain: string): Promise<string[]> {
-  if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-    return realProvisionRoute53Zone(subdomain);
-  }
-  return [
-    "ns-100.awsdns-12.com",
-    "ns-1000.awsdns-34.org",
-    "ns-1500.awsdns-56.net",
-    "ns-2000.awsdns-78.co.uk",
-  ];
-}
-
-async function realProvisionRoute53Zone(subdomain: string): Promise<string[]> {
-  void subdomain;
-  throw new Error("AWS Route 53 integration not wired yet");
-}
-
-async function checkSesIdentityVerified(subdomain: string): Promise<boolean> {
-  if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-    return realCheckSesIdentity(subdomain);
-  }
-  return false;
-}
-
-async function realCheckSesIdentity(subdomain: string): Promise<boolean> {
-  void subdomain;
-  return false;
 }
