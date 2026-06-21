@@ -93,7 +93,7 @@ export function FeedbackButton() {
         open={open}
         onClose={() => setOpen(false)}
         eyebrow="Feedback"
-        title={done ? "Got It" : "Send Feedback"}
+        title={done ? "Thank You" : "Send Feedback"}
         footer={
           done ? (
             <div className="flex w-full items-center justify-end">
@@ -135,8 +135,8 @@ export function FeedbackButton() {
         {done ? (
           <div className="drawer-field">
             <p style={{ fontSize: 13.5, color: "var(--color-gray-700)", lineHeight: 1.55 }}>
-              Your feedback is logged. Bree reads every one and usually replies
-              within two days.
+              Your feedback has been received. Our team typically replies
+              within two business days.
             </p>
           </div>
         ) : (
