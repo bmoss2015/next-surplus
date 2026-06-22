@@ -1,33 +1,113 @@
 import { NextResponse } from "next/server";
+import { Resend } from "resend";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   fetchPublishedLobPricing,
   hasPricingDrifted,
+  pricingDiff,
+  type LobPricingSection,
 } from "@/lib/mail/fetch-lob-pricing";
 import type { LobPricing } from "@/lib/mail/types";
 
 export const dynamic = "force-dynamic";
 
 // Weekly cron (Mondays 04:00 UTC per vercel.json) that fetches Lob's
-// published Developer-tier rates, snapshots them onto every org's
-// lob_published_pricing_cents column, and:
+// published Developer-tier rates from their stable pricing-details
+// article and:
 //
-//   - If org.lob_pricing_auto_sync === true → updates the org's
-//     lob_pricing_cents to match published. The org has opted into
-//     "always pay list price; track Lob automatically".
+//   1. Refreshes app_pricing_config.wholesale_pricing_cents to match
+//      the current effective rates. Mail send cost calc reads from
+//      this row, so margin stays accurate without anyone editing JSON.
 //
-//   - If org.lob_pricing_auto_sync === false (default) and the
-//     published rates drifted from the org's configured rates →
-//     inserts a notification for every admin in the org so they can
-//     review and update lob_pricing_cents themselves via Settings.
+//   2. If Lob has announced future-effective rates on the same page,
+//      emails ops with the diff and effective date so we know what's
+//      coming before it hits our wholesale column.
+//
+//   3. On any failure (page fetch error, parse error, format change),
+//      emails ops one alert. Failure does NOT write into the customer-
+//      facing notifications bell. Ops health is internal.
 //
 // Auth: Vercel signs cron requests with CRON_SECRET. We check the
 // Authorization header against process.env.CRON_SECRET before running.
-//
-// Bree's "manual updates are 100% not acceptable" requirement is
-// satisfied here: the rates flow into the system without anyone
-// editing JSON. Orgs with custom enterprise contracts can leave
-// auto_sync off and get alerted on drift instead.
+
+const OPS_ALERT_TO =
+  process.env.OPS_ALERT_EMAIL ?? "bree@mossequitypartners.com";
+const OPS_ALERT_FROM =
+  process.env.RESEND_FROM ?? "Next Surplus <noreply@nextsurplus.com>";
+
+async function sendOpsAlert(subject: string, html: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+  try {
+    const resend = new Resend(apiKey);
+    await resend.emails.send({
+      from: OPS_ALERT_FROM,
+      to: OPS_ALERT_TO,
+      subject,
+      html,
+    });
+  } catch {
+    // Email-of-last-resort failed; nothing further to do, Vercel cron
+    // log + non-200 response are the next signals.
+  }
+}
+
+function dollars(cents: number | undefined): string {
+  if (cents == null) return "—";
+  return `$${(cents / 100).toFixed(3)}`;
+}
+
+function renderDiffHtml(
+  before: LobPricing,
+  after: LobPricing,
+  preheader: string
+): string {
+  const diff = pricingDiff(before, after);
+  const rows = diff
+    .map(
+      (d) =>
+        `<tr><td style="padding:4px 12px 4px 0;font-family:monospace;">${d.key}</td>` +
+        `<td style="padding:4px 12px;font-family:monospace;color:#666;">${dollars(d.before)}</td>` +
+        `<td style="padding:4px 0;font-family:monospace;color:#0a3d4a;font-weight:600;">${dollars(d.after)}</td></tr>`
+    )
+    .join("");
+  return `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#0f1729;">
+    <p style="margin:0 0 12px 0;color:#666;">${preheader}</p>
+    <table style="border-collapse:collapse;margin:8px 0;">
+      <thead><tr>
+        <th style="text-align:left;padding:4px 12px 4px 0;font-size:12px;color:#666;">Rate Key</th>
+        <th style="text-align:left;padding:4px 12px;font-size:12px;color:#666;">Before</th>
+        <th style="text-align:left;padding:4px 0;font-size:12px;color:#666;">After</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function sectionPreview(section: LobPricingSection, headerLabel: string): string {
+  const p = section.pricing;
+  const rows: Array<[string, number | undefined]> = [
+    ["First Class B&W Letter", p.letter_first_class_bw],
+    ["First Class Color Letter", p.letter_first_class_color],
+    ["Standard B&W Letter", p.letter_standard_bw],
+    ["Standard Color Letter", p.letter_standard_color],
+    ["Additional B&W Page", p.letter_extra_page_bw],
+    ["Additional Color Page", p.letter_extra_page_color],
+    ["Letter Over 6 Sheet Fee", p.letter_over_6_sheet_fee],
+    ["Certified Letter", p.letter_certified_bw],
+    ["Check Base", p.check_base],
+    ["Check Attachment Page", p.check_extra_attachment_page],
+  ];
+  const body = rows
+    .map(
+      ([label, cents]) =>
+        `<tr><td style="padding:4px 16px 4px 0;">${label}</td>` +
+        `<td style="padding:4px 0;font-family:monospace;">${dollars(cents)}</td></tr>`
+    )
+    .join("");
+  return `<h3 style="margin:16px 0 8px 0;font-size:14px;">${headerLabel}</h3>
+    <table style="border-collapse:collapse;font-size:13px;">${body}</table>`;
+}
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -40,45 +120,31 @@ export async function GET(req: Request) {
 
   const fetchRes = await fetchPublishedLobPricing();
   if (!fetchRes.ok) {
-    // Alert every owner so wholesale doesn't silently drift. Without
-    // this, a Lob docs page format change goes unnoticed for weeks and
-    // the customer pricing margin slowly stops matching reality. Best-
-    // effort notification insert; if it fails we still return 502 so
-    // Vercel marks the cron as errored in its dashboard.
-    try {
-      const admin = createServiceClient();
-      const { data: owners } = await admin
-        .from("profiles")
-        .select("id, org_id")
-        .eq("role", "owner");
-      const rows = (owners ?? []).map((o) => ({
-        org_id: o.org_id as string,
-        recipient_id: o.id as string,
-        actor_id: null,
-        type: "lob_pricing_sync_failed",
-        body_preview: `Lob pricing sync failed: ${fetchRes.error}. Wholesale rates may be stale.`,
-      }));
-      if (rows.length > 0) {
-        await admin.from("notifications").insert(rows);
-      }
-    } catch {
-      // Notification write itself failed — already in the error path,
-      // don't compound the problem. The Vercel cron log + 502 is the
-      // signal of last resort.
-    }
+    await sendOpsAlert(
+      "Next Surplus ops: published rate sync failed",
+      `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#0f1729;">
+        <p>The weekly published-rate sync could not parse the source page. Wholesale rates were not updated and may be stale until the parser is fixed.</p>
+        <p style="margin:12px 0 0 0;font-family:monospace;font-size:12px;color:#a30015;">${fetchRes.error}</p>
+        <p style="margin:16px 0 0 0;color:#666;font-size:12px;">Source: https://help.lob.com/print-and-mail/ready-to-get-started/pricing-details.md</p>
+      </div>`
+    );
     return NextResponse.json(
       { ok: false, stage: "fetch", error: fetchRes.error },
       { status: 502 }
     );
   }
-  const { pricing: published, fetched_at } = fetchRes;
+  const { current, upcoming, fetched_at } = fetchRes;
+  const published = current.pricing;
 
   const admin = createServiceClient();
 
-  // Mirror the published rates onto the SaaS-wide singleton so
-  // src/lib/mail/actions.ts has a single source of truth for wholesale
-  // at send time. The per-org snapshots below are still updated so the
-  // existing Provider Costs panel keeps working.
+  const { data: cfg } = await admin
+    .from("app_pricing_config")
+    .select("wholesale_pricing_cents")
+    .eq("id", 1)
+    .maybeSingle();
+  const previousWholesale = (cfg?.wholesale_pricing_cents as LobPricing | null) ?? null;
+
   await admin
     .from("app_pricing_config")
     .update({
@@ -87,93 +153,59 @@ export async function GET(req: Request) {
     })
     .eq("id", 1);
 
-  const { data: orgs, error: orgErr } = await admin
-    .from("orgs")
-    .select("id, lob_pricing_cents, lob_published_pricing_cents, lob_pricing_auto_sync");
-  if (orgErr) {
-    return NextResponse.json(
-      { ok: false, stage: "orgs", error: orgErr.message },
-      { status: 500 }
+  if (previousWholesale && hasPricingDrifted(previousWholesale, published)) {
+    await sendOpsAlert(
+      "Next Surplus ops: published wholesale rates changed",
+      `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#0f1729;">
+        <p>Lob's currently-effective Developer rates differ from the stored wholesale config. The wholesale column has been auto-updated.</p>
+        ${renderDiffHtml(
+          previousWholesale,
+          published,
+          "Diff (cents):"
+        )}
+      </div>`
     );
   }
 
-  type Outcome = {
-    org_id: string;
-    auto_synced: boolean;
-    drift_alert: boolean;
-  };
-  const outcomes: Outcome[] = [];
-
+  const { data: orgs } = await admin
+    .from("orgs")
+    .select("id, lob_pricing_cents, lob_pricing_auto_sync");
   for (const org of orgs ?? []) {
-    const orgId = org.id as string;
-    const current = (org.lob_pricing_cents as LobPricing | null) ?? null;
-    const lastPublished = (org.lob_published_pricing_cents as LobPricing | null) ?? null;
-    const autoSync = Boolean(org.lob_pricing_auto_sync);
-
-    // Always snapshot the latest published rates onto the org so the
-    // Settings UI can show "Lob published rate" alongside "your rate".
     const updates: Record<string, unknown> = {
       lob_published_pricing_cents: published,
       lob_pricing_last_checked_at: fetched_at,
     };
-
-    let autoSynced = false;
-    let driftAlert = false;
-    if (current && hasPricingDrifted(current, published)) {
-      if (autoSync) {
-        updates.lob_pricing_cents = published;
-        autoSynced = true;
-      } else {
-        driftAlert = true;
-      }
-    }
-    // If the published rates themselves changed since last fetch and
-    // this org isn't auto-syncing, also flag drift (so admin gets
-    // notified even when their configured rate happens to still match
-    // the new published rate — they probably want to see what changed).
+    const orgCurrent = (org.lob_pricing_cents as LobPricing | null) ?? null;
     if (
-      !autoSynced &&
-      !driftAlert &&
-      lastPublished &&
-      hasPricingDrifted(lastPublished, published)
+      org.lob_pricing_auto_sync &&
+      orgCurrent &&
+      hasPricingDrifted(orgCurrent, published)
     ) {
-      driftAlert = true;
+      updates.lob_pricing_cents = published;
     }
+    await admin.from("orgs").update(updates).eq("id", org.id as string);
+  }
 
-    await admin.from("orgs").update(updates).eq("id", orgId);
-
-    if (driftAlert) {
-      // Notify every admin in the org. Body links them to Settings to
-      // review the drift and either accept (update lob_pricing_cents)
-      // or dismiss (mark "I'm on a custom contract, ignore").
-      const { data: admins } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("org_id", orgId)
-        .eq("role", "admin");
-      const rows = (admins ?? []).map((a) => ({
-        org_id: orgId,
-        recipient_id: a.id as string,
-        actor_id: null,
-        type: "lob_pricing_drift",
-        body_preview:
-          "Lob published pricing changed. Review your mail cost rates in Settings.",
-      }));
-      if (rows.length > 0) {
-        await admin.from("notifications").insert(rows);
-      }
-    }
-
-    outcomes.push({ org_id: orgId, auto_synced: autoSynced, drift_alert: driftAlert });
+  for (const future of upcoming) {
+    if (future.missing.length > 0) continue;
+    await sendOpsAlert(
+      `Next Surplus ops: Lob announced rate change effective ${future.effective_date}`,
+      `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#0f1729;">
+        <p>Lob has published an upcoming Developer-tier rate change. The diff vs current rates is below. The wholesale column updates automatically once the effective date arrives.</p>
+        ${renderDiffHtml(
+          published,
+          future.pricing,
+          `Effective ${future.effective_date}:`
+        )}
+        ${sectionPreview(future, `Full table effective ${future.effective_date}`)}
+      </div>`
+    );
   }
 
   return NextResponse.json({
     ok: true,
     fetched_at,
-    published,
-    org_count: outcomes.length,
-    auto_synced_count: outcomes.filter((o) => o.auto_synced).length,
-    drift_alert_count: outcomes.filter((o) => o.drift_alert).length,
-    outcomes,
+    current,
+    upcoming,
   });
 }
