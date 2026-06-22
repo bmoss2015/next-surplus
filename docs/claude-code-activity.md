@@ -42,3 +42,5 @@
 2026-06-17 | PR #133 | Favicon, apple touch icon, android chrome, manifest, og-image, 10 brand SVGs
 2026-06-17 | PR #136 | Stripped Outlook from landing page feature card and pricing subtitle
 2026-06-17 | PR #146 | Fix M11: Support email link in login footer (Terms · Privacy · Support)
+2026-06-22 | PR #197 | Lob pricing scraper reworked: stable GitBook source, Resend ops alerts, future-effective-rate detection
+2026-06-22 | PR #198 | Removed dead Plaid integration code (cron, server actions, lib module, package deps)
