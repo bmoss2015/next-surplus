@@ -169,6 +169,7 @@ function EditableRow({
   subtitle,
   open,
   onToggle,
+  onClose,
   children,
 }: {
   label: string;
@@ -176,38 +177,54 @@ function EditableRow({
   subtitle: string;
   open: boolean;
   onToggle: () => void;
+  onClose: () => void;
   children: React.ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open, onClose]);
+
   return (
-    <div className="px-5 py-4">
+    <div
+      ref={ref}
+      className={[
+        "group px-5 py-4 transition",
+        open ? "bg-[#fbfbfc]" : "hover:bg-[#fbfbfc]",
+      ].join(" ")}
+    >
       <div className="grid grid-cols-[160px_1fr] items-start gap-4">
         <div className="pt-1 text-[12.5px] font-medium text-[#374151]">{label}</div>
         <div>
-          <button
-            type="button"
-            onClick={onToggle}
-            className="inline-flex cursor-pointer items-center gap-2 text-left text-[13px] font-medium text-[#0f1729] transition hover:opacity-70"
-          >
-            <span>{value}</span>
-            <IconChevronDown
-              size={12}
-              stroke={2}
-              className={["text-[#9ca3af] transition", open ? "rotate-180" : ""].join(" ")}
-            />
-          </button>
+          <div className="flex items-baseline justify-between gap-3">
+            <button
+              type="button"
+              onClick={onToggle}
+              className="cursor-pointer text-left text-[13px] font-medium text-[#0f1729] transition hover:opacity-70"
+            >
+              {value}
+            </button>
+            <button
+              type="button"
+              onClick={onToggle}
+              className={[
+                "shrink-0 cursor-pointer text-[11.5px] font-medium text-[#13644e] transition hover:text-[#0a3d4a]",
+                open ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+              ].join(" ")}
+            >
+              {open ? "Close" : "Edit"}
+            </button>
+          </div>
           <div className="mt-1 text-[11.5px] leading-relaxed text-[#6b7280]">{subtitle}</div>
           {open && (
-            <div className="mt-3 rounded-[10px] border border-[#e5e7eb] bg-[#fbfbfc] p-3.5">
+            <div className="mt-3 rounded-[10px] border border-[#e5e7eb] bg-white p-3.5">
               {children}
-              <div className="mt-3 flex justify-end border-t border-[#e5e7eb] pt-2.5">
-                <button
-                  type="button"
-                  onClick={onToggle}
-                  className="cursor-pointer rounded-md bg-[#0f1729] px-3.5 py-1.5 text-[11.5px] font-semibold text-white transition hover:opacity-90"
-                >
-                  Done
-                </button>
-              </div>
             </div>
           )}
         </div>
@@ -565,6 +582,7 @@ export default function VariantF() {
             subtitle="Picks a number local to each lead's state"
             open={openEditor === "caller"}
             onToggle={() => setOpenEditor(openEditor === "caller" ? null : "caller")}
+            onClose={() => setOpenEditor(null)}
           >
             <div className="space-y-2.5">
               <div className="flex h-9 overflow-hidden rounded-[8px] border border-[#e5e7eb] bg-white">
@@ -612,6 +630,7 @@ export default function VariantF() {
               : "Plays automatically when a call reaches voicemail."}
             open={openEditor === "voicemail"}
             onToggle={() => setOpenEditor(openEditor === "voicemail" ? null : "voicemail")}
+            onClose={() => setOpenEditor(null)}
           >
             <select
               value={voicemailMode}
@@ -640,6 +659,7 @@ export default function VariantF() {
             subtitle="Short pause after a live conversation so you can finish your notes before the next call."
             open={openEditor === "wrapup"}
             onToggle={() => setOpenEditor(openEditor === "wrapup" ? null : "wrapup")}
+            onClose={() => setOpenEditor(null)}
           >
             <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#374151]">
               <input
@@ -673,10 +693,11 @@ export default function VariantF() {
 
           <EditableRow
             label="Email Followup"
-            value="On · One Email Per Call Outcome"
-            subtitle="After each call, an email auto-sends based on whether it was a live conversation, voicemail, no answer, or wrong number. Configure templates in Settings → Email Templates."
+            value="On · Auto Sent After Each Call"
+            subtitle="An email auto-sends based on how the call went. Most operators configure one for live conversations, voicemails, and no-answers. Configure in Settings → Email Templates."
             open={openEditor === "email"}
             onToggle={() => setOpenEditor(openEditor === "email" ? null : "email")}
+            onClose={() => setOpenEditor(null)}
           >
             <div className="text-[12px] text-[#374151]">
               Templates are managed in Settings so the same set is reused across every session.
@@ -695,9 +716,10 @@ export default function VariantF() {
           <EditableRow
             label="SMS Followup"
             value="Not Set Up Yet"
-            subtitle="Send a different text after each call outcome (live conversation, voicemail, no answer, wrong number). Configure in Settings → SMS Templates."
+            subtitle="Optionally auto-text someone after a call (typically after a voicemail or no-answer). Configure in Settings → SMS Templates."
             open={openEditor === "sms"}
             onToggle={() => setOpenEditor(openEditor === "sms" ? null : "sms")}
+            onClose={() => setOpenEditor(null)}
           >
             <div className="text-[12px] text-[#374151]">
               SMS templates work the same way as email. Set them up once in Settings and they auto-send after each call.
