@@ -130,7 +130,10 @@ export async function POST(req: NextRequest) {
   const externalId = payload.data?.id ?? null;
   const headers = payload.data?.headers ?? {};
   const messageId =
-    (headers["Message-ID"] ?? headers["message-id"] ?? headers["Message-Id"]) ??
+    headers["Message-ID"] ??
+    headers["message-id"] ??
+    headers["Message-Id"] ??
+    payload.data?.id ??
     null;
   const admin = createServiceClient();
 
