@@ -1,0 +1,12 @@
+name = "next-surplus-reply-router"
+main = "src/index.ts"
+compatibility_date = "2025-12-01"
+
+[vars]
+PORTAL_WEBHOOK_URL = "https://app.nextsurplus.com/api/webhooks/email-inbound"
+
+# Secrets are set via:
+#   npx wrangler secret put EMAIL_INBOUND_SECRET
+#
+# The same value must be set in the Vercel portal project as EMAIL_INBOUND_SECRET
+# so the webhook route accepts requests from this worker.

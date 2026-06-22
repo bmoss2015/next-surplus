@@ -57,9 +57,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const secret = process.env.RESEND_INBOUND_SECRET;
+  const secret = process.env.EMAIL_INBOUND_SECRET;
   if (!secret) {
-    console.error("[resend-inbound] RESEND_INBOUND_SECRET not set");
+    console.error("[email-inbound] EMAIL_INBOUND_SECRET not set");
     return NextResponse.json({ error: "not_configured" }, { status: 500 });
   }
 
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
     if (insertError.code === "23505") {
       return NextResponse.json({ ok: true, dedup: true });
     }
-    console.error("[resend-inbound] insert failed:", insertError);
+    console.error("[email-inbound] insert failed:", insertError);
     return NextResponse.json({ error: "insert_failed" }, { status: 500 });
   }
 
