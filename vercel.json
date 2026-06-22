@@ -11,10 +11,6 @@
       "schedule": "0 8 * * *"
     },
     {
-      "path": "/api/cron/plaid-microdeposit-poll",
-      "schedule": "0 */4 * * *"
-    },
-    {
       "path": "/api/cron/founder-lock-expiration",
       "schedule": "0 12 * * *"
     }

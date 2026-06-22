@@ -864,63 +864,16 @@ import {
   lobDeleteBankAccount,
   lobVerifyBankAccount,
 } from "@/lib/mail";
-import {
-  plaidClient,
-  isPlaidConfigured,
-  formatPlaidError,
-} from "@/lib/plaid/client";
-import { CountryCode, Products } from "plaid";
 
-// Fix 6: bank account verification flows through Plaid Link. Lob no
-// longer accepts Plaid processor tokens, so Lob still requires its
-// own micro-deposit verification. We use Plaid for two things:
-//   1. Bank login (so the operator never types routing/account numbers).
-//      Plaid Auth returns the verified numbers, which we pass to Lob's
-//      normal /bank_accounts create.
-//   2. Auto-verification of the Lob micro-deposits (1-2 business days
-//      later) by polling the Plaid Transactions API for the two small
-//      ACH credits Lob sends. When we detect them we call Lob's verify
-//      endpoint on the operator's behalf. From the operator's POV they
-//      click Connect Bank once and the account flips to verified on
-//      its own.
+// Bank accounts are added by manual routing + account number entry.
+// Lob does not support Plaid processor tokens, and the Plaid Link UI
+// we briefly tried was removed because typing two numbers is simpler
+// than guiding users through an OAuth dance for the same end result.
+// After the row is inserted, Lob initiates two small micro-deposits
+// to the bank account. The operator enters those two cent amounts in
+// the Verify Manually modal on the bank card and the row flips to
+// verified once Lob accepts them.
 
-export async function createPlaidLinkToken(): Promise<
-  { ok: true; link_token: string } | { ok: false; error: string }
-> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard;
-  if (!isPlaidConfigured()) {
-    return {
-      ok: false,
-      error:
-        "Plaid is not configured yet. Add PLAID_CLIENT_ID and PLAID_SECRET to Vercel env vars.",
-    };
-  }
-  try {
-    const profile = await getCurrentProfile();
-    if (!profile) return { ok: false, error: "Not signed in" };
-    const res = await plaidClient().linkTokenCreate({
-      user: { client_user_id: profile.id },
-      client_name: "Next Surplus",
-      // Auth = routing/account numbers; Transactions = polling for
-      // micro-deposit auto-verify.
-      products: [Products.Auth, Products.Transactions],
-      country_codes: [CountryCode.Us],
-      language: "en",
-    });
-    return { ok: true, link_token: res.data.link_token };
-  } catch (err) {
-    return { ok: false, error: formatPlaidError(err) };
-  }
-}
-
-// Manual entry path used when Plaid Link is unavailable (env not
-// configured, user prefers to type, etc). Operator types their
-// routing + account numbers from their checks; we send them to Lob
-// /bank_accounts the same way the Plaid path does, and the standard
-// micro-deposit flow runs after that. No plaid_access_token is stored,
-// so the auto-verify cron skips this row and verification flows
-// through the manual Verify Manually modal on the bank account card.
 export async function addMailBankAccountManually(input: {
   routing_number: string;
   account_number: string;
@@ -968,84 +921,6 @@ export async function addMailBankAccountManually(input: {
   return { ok: true, id: data.id as string };
 }
 
-export async function exchangePlaidPublicTokenForBankAccount(input: {
-  public_token: string;
-  account_id: string;
-  account_holder_name: string;
-  account_type: "company" | "individual";
-  institution_name?: string | null;
-}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return guard;
-  if (!isPlaidConfigured()) {
-    return { ok: false, error: "Plaid is not configured" };
-  }
-  const holder = input.account_holder_name.trim();
-  if (!holder) return { ok: false, error: "Account holder name is required" };
-
-  let accessToken: string;
-  let itemId: string;
-  let routing: string;
-  let accountNumber: string;
-  try {
-    const exchange = await plaidClient().itemPublicTokenExchange({
-      public_token: input.public_token,
-    });
-    accessToken = exchange.data.access_token;
-    itemId = exchange.data.item_id;
-
-    // Plaid Auth returns the verified routing + account numbers for the
-    // chosen account. Lob takes them as if we'd typed them ourselves.
-    const auth = await plaidClient().authGet({
-      access_token: accessToken,
-      options: { account_ids: [input.account_id] },
-    });
-    const ach = auth.data.numbers.ach.find(
-      (n) => n.account_id === input.account_id
-    );
-    if (!ach) {
-      return {
-        ok: false,
-        error:
-          "Plaid did not return ACH numbers for that account — pick a checking account that supports ACH.",
-      };
-    }
-    routing = ach.routing;
-    accountNumber = ach.account;
-  } catch (err) {
-    return { ok: false, error: formatPlaidError(err) };
-  }
-
-  const lobRes = await lobCreateBankAccount({
-    routing_number: routing,
-    account_number: accountNumber,
-    account_holder_name: holder,
-    account_type: input.account_type === "individual" ? "individual" : "company",
-  });
-  if (!lobRes.ok) return { ok: false, error: lobRes.error };
-
-  // Inserted as 'unverified' — the cron polls Plaid Transactions for
-  // Lob's micro-deposits and auto-verifies once they land.
-  const sb = await createClient();
-  const { data, error } = await sb
-    .from("mail_bank_accounts")
-    .insert({
-      lob_bank_account_id: lobRes.lob_bank_account_id,
-      bank_name: lobRes.bank_name ?? input.institution_name ?? null,
-      account_holder_name: holder,
-      routing_last_four: lobRes.routing_last_four,
-      account_last_four: lobRes.account_last_four,
-      verified_via: "plaid",
-      plaid_access_token: accessToken,
-      plaid_item_id: itemId,
-    })
-    .select("id")
-    .single();
-  if (error) return { ok: false, error: error.message };
-  revalidatePath("/settings");
-  return { ok: true, id: data.id as string };
-}
-
 export async function deleteMailBankAccount(
   id: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -1071,13 +946,9 @@ export async function deleteMailBankAccount(
   return { ok: true };
 }
 
-// Manual micro-deposit verification. Operator enters the two cent
-// amounts from their bank statement when the automated Plaid cron
-// hasn't picked them up (e.g. delayed second deposit, Plaid pending
-// state, name-filter miss). Both values are integer cents in 1-99.
-// Lob locks the bank account after 3 failed /verify calls. The cron
-// stops auto-trying at 2 attempts so this path always has the third
-// shot available to the operator.
+// Micro-deposit verification. Operator enters the two cent amounts
+// from their bank statement. Both values are integer cents in 1-99.
+// Lob locks the bank account after 3 failed /verify calls.
 export async function verifyMailBankAccountManually(input: {
   bank_account_id: string;
   amount1_cents: number;
