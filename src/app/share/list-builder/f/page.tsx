@@ -164,6 +164,26 @@ function PopoverMultiSelect({
   );
 }
 
+function DefaultRow({
+  label,
+  value,
+  subtitle,
+}: {
+  label: string;
+  value: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="grid grid-cols-[160px_1fr] items-baseline gap-4 px-5 py-3.5">
+      <div className="text-[12.5px] font-medium text-[#374151]">{label}</div>
+      <div>
+        <div className="text-[13px] font-medium text-[#0f1729]">{value}</div>
+        <div className="mt-0.5 text-[11.5px] text-[#6b7280]">{subtitle}</div>
+      </div>
+    </div>
+  );
+}
+
 function BaseSetPicker({ value, onChange }: { value: BaseSet; onChange: (v: BaseSet) => void }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -515,37 +535,34 @@ export default function VariantF() {
         </div>
 
         {!editingDefaults ? (
-          <div className="grid grid-cols-2 gap-x-8 gap-y-5 px-5 py-5">
-            <div>
-              <div className="text-[11.5px] font-medium text-[#6b7280]">Caller ID</div>
-              <div className="mt-1 text-[13px] font-medium text-[#0f1729]">{callerIdLabel}</div>
-            </div>
-            <div>
-              <div className="flex items-center gap-1 text-[11.5px] font-medium text-[#6b7280]">
-                Voicemail
-                <button
-                  type="button"
-                  onClick={() => setVoicemailInfoOpen((o) => !o)}
-                  className="inline-flex h-4 w-4 cursor-pointer items-center justify-center text-[#9ca3af] hover:text-[#0f1729]"
-                >
-                  <IconInfoCircle size={12} stroke={2} />
-                </button>
-              </div>
-              <div className="mt-1 text-[13px] font-medium text-[#0f1729]">{voicemailLabel}</div>
-              {voicemailInfoOpen && (
-                <div className="mt-1.5 rounded-[8px] border border-[#e5e7eb] bg-white p-2.5 text-[11.5px] leading-relaxed text-[#374151]" style={{ boxShadow: "0 4px 12px -2px rgba(15,23,41,0.10)" }}>
-                  When the call reaches voicemail, your recording plays automatically and the dialer hangs up. Pick a recording or leave this off.
-                </div>
-              )}
-            </div>
-            <div>
-              <div className="text-[11.5px] font-medium text-[#6b7280]">Wrap Up</div>
-              <div className="mt-1 text-[13px] font-medium text-[#0f1729]">{wrapUpLabel}</div>
-            </div>
-            <div>
-              <div className="text-[11.5px] font-medium text-[#6b7280]">Email Followup</div>
-              <div className="mt-1 text-[13px] font-medium text-[#0f1729]">4 Templates Set</div>
-            </div>
+          <div className="divide-y divide-[#f1f2f4]">
+            <DefaultRow
+              label="Caller ID"
+              value={callerIdLabel}
+              subtitle="Picks a number local to each lead's state"
+            />
+            <DefaultRow
+              label="Voicemail"
+              value={voicemailLabel}
+              subtitle={voicemailMode === "off"
+                ? "If a call reaches voicemail, you decide whether to speak or hang up"
+                : "Your recording plays automatically when a call reaches voicemail"}
+            />
+            <DefaultRow
+              label="Wrap Up"
+              value={wrapUpLabel}
+              subtitle="Pause after a Spoke call so you can finish notes"
+            />
+            <DefaultRow
+              label="Email Followup"
+              value="Sends After Every Call"
+              subtitle="An email auto-sends based on the call outcome"
+            />
+            <DefaultRow
+              label="SMS Followup"
+              value="Off"
+              subtitle="A text auto-sends after each call (configure in Settings)"
+            />
           </div>
         ) : (
           <div className="space-y-4 px-5 py-5">
