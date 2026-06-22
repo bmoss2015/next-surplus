@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { updateFeedbackStatus, replyToFeedback } from "../_actions";
+import {
+  updateFeedbackStatus,
+  replyToFeedback,
+  markInboundRead,
+} from "../_actions";
 
 export type FeedbackStatus =
   | "new"
@@ -32,6 +36,7 @@ export type FeedbackRow = {
   responseBody: string | null;
   respondedAt: string | null;
   createdAt: string;
+  inboundUnread: boolean;
   user: {
     id: string;
     fullName: string;
@@ -285,6 +290,14 @@ function DetailPane({ row }: { row: FeedbackRow }) {
   const [pending, startTransition] = useTransition();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [replyMessage, setReplyMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (row.inboundUnread) {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      void markInboundRead({ id: row.id });
+      /* eslint-enable react-hooks/set-state-in-effect */
+    }
+  }, [row.id, row.inboundUnread]);
 
   function onStatusChange(next: FeedbackStatus) {
     setStatus(next);

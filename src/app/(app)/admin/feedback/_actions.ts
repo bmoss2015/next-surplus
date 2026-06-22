@@ -91,6 +91,17 @@ export async function replyToFeedback(input: {
     recipientName = ((user?.full_name as string | null) ?? "").split(" ")[0] || "there";
   }
 
+  const { data: lastInbound } = await admin
+    .from("feedback_messages")
+    .select("message_id")
+    .eq("feedback_id", input.id)
+    .eq("direction", "inbound")
+    .not("message_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const inReplyTo = (lastInbound?.message_id as string | null) ?? null;
+
   const apiKey = process.env.RESEND_API_KEY;
   if (apiKey && recipientEmail) {
     const replyDomain =
@@ -100,14 +111,10 @@ export async function replyToFeedback(input: {
     const html = `
       <div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.6;">
         <p>Hi ${escapeHtml(recipientName)},</p>
-        <p>Thanks for the feedback. Quick reply:</p>
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
-        <pre style="white-space:pre-wrap;font-family:Inter,Arial,sans-serif;font-size:14px;margin:0;">${escapeHtml(message)}</pre>
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
-        <p style="color:#6b7280;font-size:12.5px;margin:0;">Reply directly to this email and it lands in your ticket thread inside Next Surplus.</p>
+        <p style="white-space:pre-wrap;">${escapeHtml(message)}</p>
       </div>
     `;
-    const text = `Hi ${recipientName},\n\nThanks for the feedback. Quick reply:\n\n${message}\n\nNext Surplus`;
+    const text = `Hi ${recipientName},\n\n${message}\n\nNext Surplus`;
     const resend = new Resend(apiKey);
     await resend.emails.send({
       from: FROM_ADDRESS,
@@ -116,6 +123,9 @@ export async function replyToFeedback(input: {
       subject,
       html,
       text,
+      headers: inReplyTo
+        ? { "In-Reply-To": inReplyTo, References: inReplyTo }
+        : undefined,
     });
   }
 
@@ -140,6 +150,22 @@ export async function replyToFeedback(input: {
     body: message,
   });
 
+  revalidatePath("/admin/feedback");
+  return { ok: true };
+}
+
+export async function markInboundRead(input: {
+  id: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Not signed in" };
+  if (!profile.canViewFeedback) return { ok: false, error: "Platform admin only" };
+  const admin = createServiceClient();
+  const { error } = await admin
+    .from("feedback")
+    .update({ inbound_unread: false })
+    .eq("id", input.id);
+  if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/feedback");
   return { ok: true };
 }

@@ -1,9 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { Resend } from "resend";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit, ipFromRequest } from "@/lib/security/rate-limit";
+import {
+  renderEmailShell,
+  renderEmailEyebrow,
+  renderEmailHeadline,
+  renderEmailIntro,
+  renderEmailButton,
+  escapeHtml,
+} from "@/lib/email-template";
+import { stripQuotedReply } from "@/lib/email-quotes";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+const SUPPORT_INBOX = "support@nextsurplus.com";
+const FROM_ADDRESS =
+  process.env.RESEND_FROM ?? "Next Surplus <notifications@nextsurplus.com>";
 
 type ResendInboundPayload = {
   type?: string;
@@ -47,9 +61,23 @@ function timingSafeEqual(a: string, b: string): boolean {
   return result === 0;
 }
 
+function resolveAdminUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+  if (explicit) return `${explicit}/admin/feedback`;
+  if (process.env.VERCEL_ENV === "production") {
+    return "https://app.nextsurplus.com/admin/feedback";
+  }
+  const vercel = process.env.VERCEL_URL;
+  if (vercel) {
+    const base = vercel.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return `https://${base}/admin/feedback`;
+  }
+  return "https://staging.nextsurplus.com/admin/feedback";
+}
+
 export async function POST(req: NextRequest) {
   const ip = ipFromRequest(req);
-  const limit = rateLimit(`resend-inbound:${ip}`, 200, 60 * 1000);
+  const limit = rateLimit(`email-inbound:${ip}`, 200, 60 * 1000);
   if (!limit.ok) {
     return NextResponse.json(
       { error: "rate_limited" },
@@ -93,17 +121,22 @@ export async function POST(req: NextRequest) {
       ? fromRaw?.name ?? null
       : null;
 
-  const bodyText = (payload.data?.text ?? payload.data?.html ?? "").trim();
+  const rawBody = (payload.data?.text ?? payload.data?.html ?? "").trim();
+  const bodyText = stripQuotedReply(rawBody);
   if (!bodyText) {
     return NextResponse.json({ ok: true, skipped: "empty_body" });
   }
 
   const externalId = payload.data?.id ?? null;
+  const headers = payload.data?.headers ?? {};
+  const messageId =
+    (headers["Message-ID"] ?? headers["message-id"] ?? headers["Message-Id"]) ??
+    null;
   const admin = createServiceClient();
 
   const { data: ticket } = await admin
     .from("feedback")
-    .select("id")
+    .select("id, title, org_id, user_id")
     .eq("id", ticketId)
     .maybeSingle();
   if (!ticket) {
@@ -118,6 +151,7 @@ export async function POST(req: NextRequest) {
     sender_email: senderEmail,
     body: bodyText,
     external_message_id: externalId,
+    message_id: messageId,
   });
 
   if (insertError) {
@@ -126,6 +160,60 @@ export async function POST(req: NextRequest) {
     }
     console.error("[email-inbound] insert failed:", insertError);
     return NextResponse.json({ error: "insert_failed" }, { status: 500 });
+  }
+
+  await admin
+    .from("feedback")
+    .update({ inbound_unread: true })
+    .eq("id", ticketId);
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (apiKey) {
+    let orgName = "Unknown Org";
+    if (ticket.org_id) {
+      const { data: org } = await admin
+        .from("orgs")
+        .select("name")
+        .eq("id", ticket.org_id as string)
+        .maybeSingle();
+      orgName = (org?.name as string | null) ?? "Unknown Org";
+    }
+    const replierName = senderName ?? senderEmail ?? "A customer";
+    const subject = `New Reply: ${ticket.title as string}`;
+    const adminUrl = `${resolveAdminUrl()}?id=${ticketId}`;
+    const preheader = `${replierName} replied on ${ticket.title as string}`;
+    const safeBody = escapeHtml(bodyText).replace(/\n/g, "<br/>");
+    const bodyHtml = `
+      ${renderEmailEyebrow("Customer Reply")}
+      ${renderEmailHeadline(ticket.title as string)}
+      ${renderEmailIntro(`${escapeHtml(replierName)} at ${escapeHtml(orgName)} just replied.`)}
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:20px 0 0;background-color:#f5f5f5;border-radius:4px;">
+        <tr>
+          <td style="padding:16px 20px;font-family:Inter,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;">
+            ${safeBody}
+          </td>
+        </tr>
+      </table>
+      ${renderEmailButton({ href: adminUrl, label: "Open In Admin Panel" })}
+    `;
+    const html = renderEmailShell({
+      subject,
+      bodyHtml,
+      preheader,
+      footerLine: "Next Surplus",
+    });
+    const text = `${replierName} replied on "${ticket.title as string}":\n\n${bodyText}\n\nOpen: ${adminUrl}`;
+    const resend = new Resend(apiKey);
+    const { error: sendError } = await resend.emails.send({
+      from: FROM_ADDRESS,
+      to: SUPPORT_INBOX,
+      subject,
+      html,
+      text,
+    });
+    if (sendError) {
+      console.error("[email-inbound] notification email failed:", sendError);
+    }
   }
 
   return NextResponse.json({ ok: true });

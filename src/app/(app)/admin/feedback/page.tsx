@@ -22,7 +22,7 @@ export default async function AdminFeedbackPage() {
       id, type, title, body, page_url, surface, status,
       response_body, responded_at, responded_by,
       created_at, updated_at,
-      user_id, org_id
+      user_id, org_id, inbound_unread
       `
     )
     .order("created_at", { ascending: false })
@@ -51,6 +51,7 @@ export default async function AdminFeedbackPage() {
     updated_at: string;
     user_id: string | null;
     org_id: string | null;
+    inbound_unread: boolean | null;
   }>;
 
   const feedbackIds = rows.map((r) => r.id);
@@ -134,6 +135,7 @@ export default async function AdminFeedbackPage() {
     responseBody: r.response_body,
     respondedAt: r.responded_at,
     createdAt: r.created_at,
+    inboundUnread: Boolean(r.inbound_unread),
     user: r.user_id
       ? {
           id: r.user_id,
