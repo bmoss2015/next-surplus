@@ -93,6 +93,9 @@ export async function replyToFeedback(input: {
 
   const apiKey = process.env.RESEND_API_KEY;
   if (apiKey && recipientEmail) {
+    const replyDomain =
+      process.env.FEEDBACK_REPLY_DOMAIN ?? "replies.nextsurplus.com";
+    const ticketReplyTo = `ticket-${input.id}@${replyDomain}`;
     const subject = `Re: ${row.title as string}`;
     const html = `
       <div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.6;">
@@ -101,7 +104,7 @@ export async function replyToFeedback(input: {
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
         <pre style="white-space:pre-wrap;font-family:Inter,Arial,sans-serif;font-size:14px;margin:0;">${escapeHtml(message)}</pre>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
-        <p style="color:#6b7280;font-size:12.5px;margin:0;">Reply directly to this email and it lands in our support inbox.</p>
+        <p style="color:#6b7280;font-size:12.5px;margin:0;">Reply directly to this email and it lands in your ticket thread inside Next Surplus.</p>
       </div>
     `;
     const text = `Hi ${recipientName},\n\nThanks for the feedback. Quick reply:\n\n${message}\n\nNext Surplus`;
@@ -109,7 +112,7 @@ export async function replyToFeedback(input: {
     await resend.emails.send({
       from: FROM_ADDRESS,
       to: recipientEmail,
-      replyTo: "support@nextsurplus.com",
+      replyTo: ticketReplyTo,
       subject,
       html,
       text,
@@ -136,55 +139,6 @@ export async function replyToFeedback(input: {
     sender_email: profile.email,
     body: message,
   });
-
-  revalidatePath("/admin/feedback");
-  return { ok: true };
-}
-
-export async function logCustomerReply(input: {
-  id: string;
-  message: string;
-  senderName?: string;
-  senderEmail?: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const profile = await getCurrentProfile();
-  if (!profile) return { ok: false, error: "Not signed in" };
-  if (!profile.canViewFeedback) return { ok: false, error: "Platform admin only" };
-  const message = input.message.trim();
-  if (!message) return { ok: false, error: "Message is required" };
-  if (message.length > 12000) return { ok: false, error: "Message too long" };
-
-  const admin = createServiceClient();
-  const { data: row, error: loadError } = await admin
-    .from("feedback")
-    .select("id, user_id")
-    .eq("id", input.id)
-    .maybeSingle();
-  if (loadError || !row) {
-    return { ok: false, error: loadError?.message ?? "Not found" };
-  }
-
-  let senderName = input.senderName?.trim() || null;
-  let senderEmail = input.senderEmail?.trim() || null;
-  if ((!senderName || !senderEmail) && row.user_id) {
-    const { data: user } = await admin
-      .from("profiles")
-      .select("email, full_name")
-      .eq("id", row.user_id as string)
-      .maybeSingle();
-    senderName = senderName ?? ((user?.full_name as string | null) ?? null);
-    senderEmail = senderEmail ?? ((user?.email as string | null) ?? null);
-  }
-
-  const { error: insertError } = await admin.from("feedback_messages").insert({
-    feedback_id: input.id,
-    direction: "inbound",
-    sender_user_id: row.user_id ?? null,
-    sender_name: senderName,
-    sender_email: senderEmail,
-    body: message,
-  });
-  if (insertError) return { ok: false, error: insertError.message };
 
   revalidatePath("/admin/feedback");
   return { ok: true };
