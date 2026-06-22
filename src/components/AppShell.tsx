@@ -1,7 +1,6 @@
 import { IconSidebar } from "./IconSidebar";
 import { Topbar } from "./Topbar";
 import { RoleProvider } from "./RoleProvider";
-import { FeedbackWidget } from "./FeedbackWidget";
 
 // Portal chrome — modernized to match where 2024-2026 CRMs are. Icon
 // sidebar on the left (collapsed 60px → expanded 220px), slim utility
@@ -14,6 +13,8 @@ export function AppShell({
   userEmail,
   isAdmin,
   isOwner,
+  canViewFeedback,
+  newFeedbackCount,
   urgentOverdue,
   urgentDueToday,
 }: {
@@ -22,6 +23,8 @@ export function AppShell({
   userEmail: string | null;
   isAdmin: boolean;
   isOwner: boolean;
+  canViewFeedback?: boolean;
+  newFeedbackCount?: number;
   urgentOverdue?: number;
   urgentDueToday?: number;
 }) {
@@ -33,12 +36,13 @@ export function AppShell({
           userEmail={userEmail}
           isAdmin={isAdmin}
           isOwner={isOwner}
+          canViewFeedback={canViewFeedback ?? false}
+          newFeedbackCount={newFeedbackCount ?? 0}
         />
         <div className="flex flex-1 flex-col overflow-hidden bg-surface-muted">
           <Topbar urgentOverdue={urgentOverdue ?? 0} urgentDueToday={urgentDueToday ?? 0} />
           <main className="flex-1 overflow-auto">{children}</main>
         </div>
-        <FeedbackWidget />
       </div>
     </RoleProvider>
   );

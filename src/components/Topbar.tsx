@@ -11,6 +11,7 @@ import { Plus } from "lucide-react";
 import { IconAlarm } from "@tabler/icons-react";
 import { NotificationBell } from "./NotificationBell";
 import { GlobalSearch } from "./GlobalSearch";
+import { FeedbackButton } from "./FeedbackButton";
 
 // Page-title lookup. Lead detail, task detail, inbox thread, etc. all
 // land under their section's title so the bar always has something
@@ -76,6 +77,7 @@ export function Topbar({
           </Link>
         )}
         <NotificationBell />
+        <FeedbackButton />
         <Link
           href="/imports"
           className="btn btn-primary btn-sm inline-flex items-center gap-[6px]"
