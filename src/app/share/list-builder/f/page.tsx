@@ -543,25 +543,25 @@ export default function VariantF() {
             />
             <DefaultRow
               label="Voicemail"
-              value={voicemailLabel}
+              value={voicemailMode === "off" ? "Off · You'll Handle Voicemail Manually" : `${voicemailLabel} · Auto-Drops`}
               subtitle={voicemailMode === "off"
-                ? "If a call reaches voicemail, you decide whether to speak or hang up"
-                : "Your recording plays automatically when a call reaches voicemail"}
+                ? "Pre-record a voicemail to have it auto-play when a call reaches voicemail. Configure in Settings → Recordings."
+                : "Plays automatically when a call reaches voicemail."}
             />
             <DefaultRow
               label="Wrap Up"
               value={wrapUpLabel}
-              subtitle="Pause after a Spoke call so you can finish notes"
+              subtitle="Short pause after a live conversation so you can finish your notes before the next call."
             />
             <DefaultRow
               label="Email Followup"
-              value="Sends After Every Call"
-              subtitle="An email auto-sends based on the call outcome"
+              value="On · One Email Per Call Outcome"
+              subtitle="After each call, an email auto-sends based on whether it was a live conversation, voicemail, no answer, or wrong number. Configure templates in Settings → Email Templates."
             />
             <DefaultRow
               label="SMS Followup"
-              value="Off"
-              subtitle="A text auto-sends after each call (configure in Settings)"
+              value="Not Set Up Yet"
+              subtitle="Send a different text after each call outcome (live conversation, voicemail, no answer, wrong number). Configure in Settings → SMS Templates."
             />
           </div>
         ) : (
