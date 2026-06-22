@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createServiceClient } from "@/lib/supabase/service";
-import { escapeHtml } from "@/lib/email-template";
+import { escapeHtml, renderEmailShell } from "@/lib/email-template";
 
 const ALLOWED_STATUSES = [
   "new",
@@ -72,7 +72,7 @@ export async function replyToFeedback(input: {
   const admin = createServiceClient();
   const { data: row, error: loadError } = await admin
     .from("feedback")
-    .select("title, user_id")
+    .select("title, body, user_id, created_at")
     .eq("id", input.id)
     .maybeSingle();
   if (loadError || !row) {
@@ -81,6 +81,7 @@ export async function replyToFeedback(input: {
 
   let recipientEmail: string | null = null;
   let recipientName = "there";
+  let submitterFullName = "the customer";
   if (row.user_id) {
     const { data: user } = await admin
       .from("profiles")
@@ -88,7 +89,8 @@ export async function replyToFeedback(input: {
       .eq("id", row.user_id as string)
       .maybeSingle();
     recipientEmail = (user?.email as string | null) ?? null;
-    recipientName = ((user?.full_name as string | null) ?? "").split(" ")[0] || "there";
+    submitterFullName = (user?.full_name as string | null) ?? "the customer";
+    recipientName = submitterFullName.split(" ")[0] || "there";
   }
 
   const { data: lastInbound } = await admin
@@ -102,19 +104,56 @@ export async function replyToFeedback(input: {
     .maybeSingle();
   const inReplyTo = (lastInbound?.message_id as string | null) ?? null;
 
+  const { data: priorMessage } = await admin
+    .from("feedback_messages")
+    .select("body, sender_name, direction, created_at")
+    .eq("feedback_id", input.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const prior = priorMessage
+    ? {
+        body: (priorMessage.body as string) ?? "",
+        senderName:
+          ((priorMessage.sender_name as string | null) ?? null) ||
+          (priorMessage.direction === "outbound" ? "You" : submitterFullName),
+        createdAt: (priorMessage.created_at as string) ?? null,
+      }
+    : {
+        body: (row.body as string) ?? "",
+        senderName: submitterFullName,
+        createdAt: (row.created_at as string) ?? null,
+      };
+
   const apiKey = process.env.RESEND_API_KEY;
   if (apiKey && recipientEmail) {
     const replyDomain =
       process.env.FEEDBACK_REPLY_DOMAIN ?? "replies.nextsurplus.com";
     const ticketReplyTo = `ticket-${input.id}@${replyDomain}`;
     const subject = `Re: ${row.title as string}`;
-    const html = `
-      <div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.6;">
-        <p>Hi ${escapeHtml(recipientName)},</p>
-        <p style="white-space:pre-wrap;">${escapeHtml(message)}</p>
-      </div>
+    const preheader = message.slice(0, 120);
+    const quoteHeader = prior.createdAt
+      ? `On ${formatReplyDate(prior.createdAt)}, ${prior.senderName} wrote:`
+      : `${prior.senderName} wrote:`;
+    const safeMessage = escapeHtml(message).replace(/\n/g, "<br/>");
+    const safePriorBody = escapeHtml(prior.body).replace(/\n/g, "<br/>");
+    const bodyHtml = `
+      <p style="margin:0 0 16px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;">Hi ${escapeHtml(recipientName)},</p>
+      <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;">${safeMessage}</div>
+      <p style="margin:24px 0 6px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.5;color:#6b7280;">${escapeHtml(quoteHeader)}</p>
+      <blockquote style="margin:0;padding:0 0 0 14px;border-left:3px solid #e5e7eb;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13.5px;line-height:1.6;color:#6b7280;">${safePriorBody}</blockquote>
     `;
-    const text = `Hi ${recipientName},\n\n${message}\n\nNext Surplus`;
+    const html = renderEmailShell({
+      subject,
+      bodyHtml,
+      preheader,
+      footerLine: "Next Surplus",
+    });
+    const quotedText = prior.body
+      .split("\n")
+      .map((l) => `> ${l}`)
+      .join("\n");
+    const text = `Hi ${recipientName},\n\n${message}\n\n${quoteHeader}\n${quotedText}`;
     const resend = new Resend(apiKey);
     await resend.emails.send({
       from: FROM_ADDRESS,
@@ -168,6 +207,22 @@ export async function markInboundRead(input: {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/feedback");
   return { ok: true };
+}
+
+function formatReplyDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
 }
 
 async function sendShippedEmail(input: { userId: string; title: string }) {
