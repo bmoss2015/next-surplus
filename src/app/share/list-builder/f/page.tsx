@@ -18,16 +18,17 @@ type BaseSet = {
   count: number;
   kind: "all" | "import" | "saved";
   meta?: string;
+  states?: string[];
 };
 
 const BASE_SETS: BaseSet[] = [
-  { id: "all-leads", name: "All Leads", count: 412, kind: "all", meta: "Every lead in your database" },
-  { id: "fort-bend", name: "Fort Bend County, Texas", count: 47, kind: "import", meta: "Imported Jun 21, 2026" },
-  { id: "mecklenburg", name: "Mecklenburg County, North Carolina", count: 23, kind: "import", meta: "Imported Jun 19, 2026" },
-  { id: "heir-batch", name: "Heir Research Batch", count: 12, kind: "import", meta: "Imported Jun 17, 2026" },
-  { id: "travis-may", name: "Travis County, Texas", count: 31, kind: "import", meta: "Imported May 28, 2026" },
+  { id: "all-leads", name: "All Leads", count: 412, kind: "all" },
+  { id: "fort-bend", name: "Fort Bend County, Texas", count: 47, kind: "import", meta: "Imported Jun 21, 2026", states: ["Texas"] },
+  { id: "mecklenburg", name: "Mecklenburg County, North Carolina", count: 23, kind: "import", meta: "Imported Jun 19, 2026", states: ["North Carolina"] },
+  { id: "heir-batch", name: "Heir Research Batch", count: 12, kind: "import", meta: "Imported Jun 17, 2026", states: ["Texas", "North Carolina", "Arizona"] },
+  { id: "travis-may", name: "Travis County, Texas", count: 31, kind: "import", meta: "Imported May 28, 2026", states: ["Texas"] },
   { id: "high-surplus", name: "High Surplus All States", count: 38, kind: "saved" },
-  { id: "no-contact-60", name: "No Contact 60+ Days", count: 34, kind: "saved" },
+  { id: "no-contact-60", name: "No Contact 60+ Days", count: 34, kind: "saved", states: ["Texas", "North Carolina", "Arizona", "Georgia", "Ohio"] },
 ];
 
 const STAGES = ["New Lead", "Researched", "First Contact", "Contact Made", "Awaiting Signature", "Signed", "Closed Won", "Closed Lost", "Callback Scheduled", "Do Not Pursue"];
@@ -183,20 +184,12 @@ function BaseSetPicker({ value, onChange }: { value: BaseSet; onChange: (v: Base
         className="flex w-full cursor-pointer items-center justify-between rounded-[10px] border border-[#0f1729] bg-white px-5 py-4 text-left transition hover:bg-[#fbfbfc]"
       >
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9ca3af]">
-            Starting With
-          </div>
-          <div className="mt-1 truncate text-[17px] font-semibold tracking-[-0.005em] text-[#0f1729]">
+          <div className="truncate text-[17px] font-semibold tracking-[-0.005em] text-[#0f1729]">
             {value.name}
           </div>
           {value.meta && (
             <div className="mt-0.5 text-[12px] text-[#6b7280]">
-              {value.meta} &middot; {value.count} leads
-            </div>
-          )}
-          {!value.meta && (
-            <div className="mt-0.5 text-[12px] text-[#6b7280]">
-              {value.count} leads
+              {value.meta}
             </div>
           )}
         </div>
@@ -287,9 +280,11 @@ export default function VariantF() {
   const [dncAcknowledged, setDncAcknowledged] = useState(false);
   const [name, setName] = useState("");
 
-  const availableCounties = states.length === 0
-    ? Object.values(COUNTIES_BY_STATE).flat()
-    : states.flatMap((s) => (COUNTIES_BY_STATE[s] ?? []).map((c) => `${c}, ${s.slice(0, 2).toUpperCase()}`));
+  const availableStates = base.states ?? STATES;
+  const effectiveStates = states.filter((s) => availableStates.includes(s));
+  const availableCounties = effectiveStates.length === 0
+    ? availableStates.flatMap((s) => (COUNTIES_BY_STATE[s] ?? []).map((c) => `${c}, ${s.slice(0, 2).toUpperCase()}`))
+    : effectiveStates.flatMap((s) => (COUNTIES_BY_STATE[s] ?? []).map((c) => `${c}, ${s.slice(0, 2).toUpperCase()}`));
 
   const narrowCount = stage.length + states.length + counties.length + saleType.length + ownerStatus.length + (surplusMin || surplusMax ? 1 : 0) + (lastTouched !== "any" ? 1 : 0) + (skipLitigated ? 1 : 0);
   const narrowedTotal = narrowCount === 0 ? base.count : Math.max(Math.floor(base.count * 0.6), 4);
@@ -310,28 +305,35 @@ export default function VariantF() {
 
       <BaseSetPicker value={base} onChange={setBase} />
 
-      <div className="mt-5 flex items-center justify-between">
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">
-          Narrow By
-        </div>
-        <div className="flex items-center gap-2 text-[12px]">
-          <span className="text-[#6b7280]">{base.count}</span>
-          <IconArrowNarrowRight size={14} stroke={2} className="text-[#9ca3af]" />
-          <span className="font-semibold tabular-nums text-[#0f1729]">{narrowedTotal} Leads</span>
-        </div>
-      </div>
-
       <div
-        className="mt-3 overflow-hidden rounded-[12px] bg-white"
+        className="mt-5 overflow-hidden rounded-[12px] bg-white"
         style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 8px 24px -8px rgba(15,23,41,0.08)" }}
       >
+        <div className="flex items-center justify-between border-b border-[#f1f2f4] bg-[#fbfbfc] px-5 py-4">
+          <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
+            Narrow By
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[15px] tabular-nums text-[#9ca3af] line-through">{base.count}</span>
+            <IconArrowNarrowRight size={16} stroke={2} className="self-center text-[#9ca3af]" />
+            <span className="text-[22px] font-semibold tabular-nums tracking-[-0.01em] text-[#0f1729]">{narrowedTotal}</span>
+            <span className="text-[12.5px] font-medium text-[#6b7280]">Leads</span>
+          </div>
+        </div>
         <div className="grid grid-cols-[160px_1fr] gap-4 border-b border-[#f1f2f4] px-5 py-3.5 last:border-b-0">
           <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">Stage</div>
           <PopoverMultiSelect options={STAGES} values={stage} onChange={setStage} placeholder="Any Stage" />
         </div>
         <div className="grid grid-cols-[160px_1fr] gap-4 border-b border-[#f1f2f4] px-5 py-3.5">
-          <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">State</div>
-          <PopoverMultiSelect options={STATES} values={states} onChange={setStates} placeholder="Any State" />
+          <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">
+            State
+            {base.states && (
+              <div className="mt-0.5 text-[10.5px] text-[#9ca3af]">
+                Limited to this list&apos;s {base.states.length === 1 ? "state" : "states"}
+              </div>
+            )}
+          </div>
+          <PopoverMultiSelect options={availableStates} values={effectiveStates} onChange={setStates} placeholder={base.states && base.states.length === 1 ? `Any ${base.states[0]} Lead` : "Any State"} />
         </div>
         <div className="grid grid-cols-[160px_1fr] gap-4 border-b border-[#f1f2f4] px-5 py-3.5">
           <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">
