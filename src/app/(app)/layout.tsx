@@ -19,11 +19,17 @@ export default async function AppGroupLayout({
   let newFeedbackCount = 0;
   if (profile.canViewFeedback) {
     const admin = createServiceClient();
-    const { count } = await admin
-      .from("feedback")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "new");
-    newFeedbackCount = count ?? 0;
+    const [newRes, unreadRes] = await Promise.all([
+      admin
+        .from("feedback")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "new"),
+      admin
+        .from("feedback")
+        .select("id", { count: "exact", head: true })
+        .eq("inbound_unread", true),
+    ]);
+    newFeedbackCount = (newRes.count ?? 0) + (unreadRes.count ?? 0);
   }
 
   return (
