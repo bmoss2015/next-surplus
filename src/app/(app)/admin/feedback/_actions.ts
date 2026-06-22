@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createServiceClient } from "@/lib/supabase/service";
-import { escapeHtml, renderEmailShell } from "@/lib/email-template";
+import { escapeHtml } from "@/lib/email-template";
+import {
+  buildThreadHistory,
+  renderThreadedFeedbackEmail,
+} from "@/lib/feedback-thread-email";
 
 const ALLOWED_STATUSES = [
   "new",
@@ -104,26 +108,32 @@ export async function replyToFeedback(input: {
     .maybeSingle();
   const inReplyTo = (lastInbound?.message_id as string | null) ?? null;
 
-  const { data: priorMessage } = await admin
+  const { data: priorMessages } = await admin
     .from("feedback_messages")
     .select("body, sender_name, direction, created_at")
     .eq("feedback_id", input.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const prior = priorMessage
-    ? {
-        body: (priorMessage.body as string) ?? "",
-        senderName:
-          ((priorMessage.sender_name as string | null) ?? null) ||
-          (priorMessage.direction === "outbound" ? "You" : submitterFullName),
-        createdAt: (priorMessage.created_at as string) ?? null,
-      }
-    : {
-        body: (row.body as string) ?? "",
-        senderName: submitterFullName,
-        createdAt: (row.created_at as string) ?? null,
-      };
+    .order("created_at", { ascending: true });
+
+  const history = buildThreadHistory({
+    originalSubmission: {
+      body: (row.body as string) ?? "",
+      createdAt: (row.created_at as string) ?? new Date().toISOString(),
+      submitterName: submitterFullName,
+    },
+    messages: ((priorMessages ?? []) as Array<{
+      body: string;
+      sender_name: string | null;
+      direction: "outbound" | "inbound";
+      created_at: string;
+    }>).map((m) => ({
+      senderName:
+        (m.sender_name as string | null) ||
+        (m.direction === "outbound" ? "Next Surplus" : submitterFullName),
+      body: m.body,
+      createdAt: m.created_at,
+      direction: m.direction,
+    })),
+  });
 
   const apiKey = process.env.RESEND_API_KEY;
   if (apiKey && recipientEmail) {
@@ -131,29 +141,15 @@ export async function replyToFeedback(input: {
       process.env.FEEDBACK_REPLY_DOMAIN ?? "replies.nextsurplus.com";
     const ticketReplyTo = `ticket-${input.id}@${replyDomain}`;
     const subject = `Re: ${row.title as string}`;
-    const preheader = message.slice(0, 120);
-    const quoteHeader = prior.createdAt
-      ? `On ${formatReplyDate(prior.createdAt)}, ${prior.senderName} wrote:`
-      : `${prior.senderName} wrote:`;
-    const safeMessage = escapeHtml(message).replace(/\n/g, "<br/>");
-    const safePriorBody = escapeHtml(prior.body).replace(/\n/g, "<br/>");
-    const bodyHtml = `
-      <p style="margin:0 0 16px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;">Hi ${escapeHtml(recipientName)},</p>
-      <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;">${safeMessage}</div>
-      <p style="margin:24px 0 6px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.5;color:#6b7280;">${escapeHtml(quoteHeader)}</p>
-      <blockquote style="margin:0;padding:0 0 0 14px;border-left:3px solid #e5e7eb;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13.5px;line-height:1.6;color:#6b7280;">${safePriorBody}</blockquote>
-    `;
-    const html = renderEmailShell({
-      subject,
-      bodyHtml,
-      preheader,
-      footerLine: "Next Surplus",
+    const { html, text } = renderThreadedFeedbackEmail({
+      eyebrow: "Feedback Thread",
+      ticketTitle: row.title as string,
+      introText: `${profile.fullName} from Next Surplus just replied to your feedback.`,
+      greeting: `Hi ${recipientName},`,
+      currentMessage: message,
+      history,
+      replyHint: "customer",
     });
-    const quotedText = prior.body
-      .split("\n")
-      .map((l) => `> ${l}`)
-      .join("\n");
-    const text = `Hi ${recipientName},\n\n${message}\n\n${quoteHeader}\n${quotedText}`;
     const resend = new Resend(apiKey);
     await resend.emails.send({
       from: FROM_ADDRESS,
@@ -207,22 +203,6 @@ export async function markInboundRead(input: {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/feedback");
   return { ok: true };
-}
-
-function formatReplyDate(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
 }
 
 async function sendShippedEmail(input: { userId: string; title: string }) {

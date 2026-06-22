@@ -2,15 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { Resend } from "resend";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit, ipFromRequest } from "@/lib/security/rate-limit";
-import {
-  renderEmailShell,
-  renderEmailEyebrow,
-  renderEmailHeadline,
-  renderEmailIntro,
-  renderEmailButton,
-  escapeHtml,
-} from "@/lib/email-template";
 import { stripQuotedReply } from "@/lib/email-quotes";
+import {
+  buildThreadHistory,
+  renderThreadedFeedbackEmail,
+} from "@/lib/feedback-thread-email";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -139,7 +135,7 @@ export async function POST(req: NextRequest) {
 
   const { data: ticket } = await admin
     .from("feedback")
-    .select("id, title, org_id, user_id")
+    .select("id, title, body, org_id, user_id, created_at")
     .eq("id", ticketId)
     .maybeSingle();
   if (!ticket) {
@@ -181,31 +177,58 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       orgName = (org?.name as string | null) ?? "Unknown Org";
     }
-    const replierName = senderName ?? senderEmail ?? "A customer";
+
+    let submitterFullName = "the customer";
+    if (ticket.user_id) {
+      const { data: submitter } = await admin
+        .from("profiles")
+        .select("full_name")
+        .eq("id", ticket.user_id as string)
+        .maybeSingle();
+      submitterFullName =
+        (submitter?.full_name as string | null) ?? submitterFullName;
+    }
+
+    const { data: priorMessages } = await admin
+      .from("feedback_messages")
+      .select("body, sender_name, direction, created_at")
+      .eq("feedback_id", ticketId)
+      .order("created_at", { ascending: true });
+
+    const history = buildThreadHistory({
+      originalSubmission: {
+        body: (ticket.body as string) ?? "",
+        createdAt: (ticket.created_at as string) ?? new Date().toISOString(),
+        submitterName: submitterFullName,
+      },
+      messages: ((priorMessages ?? []) as Array<{
+        body: string;
+        sender_name: string | null;
+        direction: "outbound" | "inbound";
+        created_at: string;
+      }>).map((m) => ({
+        senderName:
+          (m.sender_name as string | null) ||
+          (m.direction === "outbound" ? "Next Surplus" : submitterFullName),
+        body: m.body,
+        createdAt: m.created_at,
+        direction: m.direction,
+      })),
+      excludeMessageBody: bodyText,
+    });
+
+    const replierName = senderName ?? senderEmail ?? submitterFullName;
     const subject = `New Reply: ${ticket.title as string}`;
     const adminUrl = `${resolveAdminUrl()}?id=${ticketId}`;
-    const preheader = `${replierName} replied on ${ticket.title as string}`;
-    const safeBody = escapeHtml(bodyText).replace(/\n/g, "<br/>");
-    const bodyHtml = `
-      ${renderEmailEyebrow("Customer Reply")}
-      ${renderEmailHeadline(ticket.title as string)}
-      ${renderEmailIntro(`${escapeHtml(replierName)} at ${escapeHtml(orgName)} just replied.`)}
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:20px 0 0;background-color:#f5f5f5;border-radius:4px;">
-        <tr>
-          <td style="padding:16px 20px;font-family:Inter,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;">
-            ${safeBody}
-          </td>
-        </tr>
-      </table>
-      ${renderEmailButton({ href: adminUrl, label: "Open In Admin Panel" })}
-    `;
-    const html = renderEmailShell({
-      subject,
-      bodyHtml,
-      preheader,
-      footerLine: "Next Surplus",
+    const { html, text } = renderThreadedFeedbackEmail({
+      eyebrow: "Customer Reply",
+      ticketTitle: ticket.title as string,
+      introText: `${replierName} at ${orgName} just replied to this feedback thread.`,
+      currentMessage: bodyText,
+      history,
+      replyHint: "admin",
+      cta: { href: adminUrl, label: "Open In Admin Panel" },
     });
-    const text = `${replierName} replied on "${ticket.title as string}":\n\n${bodyText}\n\nOpen: ${adminUrl}`;
     const resend = new Resend(apiKey);
     const { error: sendError } = await resend.emails.send({
       from: FROM_ADDRESS,
