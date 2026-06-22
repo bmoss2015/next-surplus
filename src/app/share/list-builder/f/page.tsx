@@ -11,7 +11,6 @@ import {
   IconWorld,
   IconArrowNarrowRight,
   IconArrowRight,
-  IconInfoCircle,
   IconExternalLink,
 } from "@tabler/icons-react";
 
@@ -164,21 +163,54 @@ function PopoverMultiSelect({
   );
 }
 
-function DefaultRow({
+function EditableRow({
   label,
   value,
   subtitle,
+  open,
+  onToggle,
+  children,
 }: {
   label: string;
   value: string;
   subtitle: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[160px_1fr] items-baseline gap-4 px-5 py-3.5">
-      <div className="text-[12.5px] font-medium text-[#374151]">{label}</div>
-      <div>
-        <div className="text-[13px] font-medium text-[#0f1729]">{value}</div>
-        <div className="mt-0.5 text-[11.5px] text-[#6b7280]">{subtitle}</div>
+    <div className="px-5 py-4">
+      <div className="grid grid-cols-[160px_1fr] items-start gap-4">
+        <div className="pt-1 text-[12.5px] font-medium text-[#374151]">{label}</div>
+        <div>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex cursor-pointer items-center gap-2 text-left text-[13px] font-medium text-[#0f1729] transition hover:opacity-70"
+          >
+            <span>{value}</span>
+            <IconChevronDown
+              size={12}
+              stroke={2}
+              className={["text-[#9ca3af] transition", open ? "rotate-180" : ""].join(" ")}
+            />
+          </button>
+          <div className="mt-1 text-[11.5px] leading-relaxed text-[#6b7280]">{subtitle}</div>
+          {open && (
+            <div className="mt-3 rounded-[10px] border border-[#e5e7eb] bg-[#fbfbfc] p-3.5">
+              {children}
+              <div className="mt-3 flex justify-end border-t border-[#e5e7eb] pt-2.5">
+                <button
+                  type="button"
+                  onClick={onToggle}
+                  className="cursor-pointer rounded-md bg-[#0f1729] px-3.5 py-1.5 text-[11.5px] font-semibold text-white transition hover:opacity-90"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -307,13 +339,12 @@ export default function VariantF() {
   const [skipLitigated, setSkipLitigated] = useState(true);
   const [skipDnc, setSkipDnc] = useState(true);
   const [dncAcknowledged, setDncAcknowledged] = useState(false);
-  const [editingDefaults, setEditingDefaults] = useState(false);
+  const [openEditor, setOpenEditor] = useState<null | "caller" | "voicemail" | "wrapup" | "email" | "sms">(null);
   const [callerIdMode, setCallerIdMode] = useState<"auto" | "specific">("auto");
   const [callerIdNumber, setCallerIdNumber] = useState("tx-1");
   const [voicemailMode, setVoicemailMode] = useState<"off" | "default" | "heir" | "living">("off");
   const [skipWrap, setSkipWrap] = useState(false);
   const [wrapUp, setWrapUp] = useState(30);
-  const [voicemailInfoOpen, setVoicemailInfoOpen] = useState(false);
   const [name, setName] = useState("");
 
   const availableStates = base.states ?? STATES;
@@ -521,167 +552,167 @@ export default function VariantF() {
         className="mt-5 overflow-hidden rounded-[12px] bg-white"
         style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 8px 24px -8px rgba(15,23,41,0.08)" }}
       >
-        <div className="flex items-center justify-between border-b border-[#f1f2f4] bg-[#fbfbfc] px-5 py-4">
+        <div className="border-b border-[#f1f2f4] bg-[#fbfbfc] px-5 py-4">
           <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
             Defaults
           </div>
-          <button
-            type="button"
-            onClick={() => setEditingDefaults((e) => !e)}
-            className="cursor-pointer text-[12px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
-          >
-            {editingDefaults ? "Use Defaults" : "Change For This Session"}
-          </button>
         </div>
 
-        {!editingDefaults ? (
-          <div className="divide-y divide-[#f1f2f4]">
-            <DefaultRow
-              label="Caller ID"
-              value={callerIdLabel}
-              subtitle="Picks a number local to each lead's state"
-            />
-            <DefaultRow
-              label="Voicemail"
-              value={voicemailMode === "off" ? "Off · You'll Handle Voicemail Manually" : `${voicemailLabel} · Auto-Drops`}
-              subtitle={voicemailMode === "off"
-                ? "Pre-record a voicemail to have it auto-play when a call reaches voicemail. Configure in Settings → Recordings."
-                : "Plays automatically when a call reaches voicemail."}
-            />
-            <DefaultRow
-              label="Wrap Up"
-              value={wrapUpLabel}
-              subtitle="Short pause after a live conversation so you can finish your notes before the next call."
-            />
-            <DefaultRow
-              label="Email Followup"
-              value="On · One Email Per Call Outcome"
-              subtitle="After each call, an email auto-sends based on whether it was a live conversation, voicemail, no answer, or wrong number. Configure templates in Settings → Email Templates."
-            />
-            <DefaultRow
-              label="SMS Followup"
-              value="Not Set Up Yet"
-              subtitle="Send a different text after each call outcome (live conversation, voicemail, no answer, wrong number). Configure in Settings → SMS Templates."
-            />
-          </div>
-        ) : (
-          <div className="space-y-4 px-5 py-5">
-            <div className="grid grid-cols-[160px_1fr] gap-4">
-              <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">Caller ID</div>
-              <div className="space-y-2">
-                <div className="flex h-9 overflow-hidden rounded-[8px] border border-[#e5e7eb] bg-white">
-                  <button
-                    type="button"
-                    onClick={() => setCallerIdMode("auto")}
-                    className={["flex-1 cursor-pointer text-[12px] font-medium transition", callerIdMode === "auto" ? "bg-[#0f1729] text-white" : "bg-white text-[#374151] hover:bg-[#f7f8f9]"].join(" ")}
-                  >
-                    Auto Map By State
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCallerIdMode("specific")}
-                    className={["flex-1 cursor-pointer border-l border-[#e5e7eb] text-[12px] font-medium transition", callerIdMode === "specific" ? "bg-[#0f1729] text-white" : "bg-white text-[#374151] hover:bg-[#f7f8f9]"].join(" ")}
-                  >
-                    Use One Number
-                  </button>
-                </div>
-                {callerIdMode === "specific" && (
-                  <select
-                    value={callerIdNumber}
-                    onChange={(e) => setCallerIdNumber(e.target.value)}
-                    className="h-9 w-full cursor-pointer rounded-[8px] border border-[#e5e7eb] bg-white px-3 text-[12.5px] text-[#0f1729] outline-none transition focus:border-[#13644e]"
-                  >
-                    {CALLER_ID_NUMBERS.map((n) => (
-                      <option key={n.id} value={n.id}>{n.label}</option>
-                    ))}
-                  </select>
-                )}
+        <div className="divide-y divide-[#f1f2f4]">
+          <EditableRow
+            label="Caller ID"
+            value={callerIdLabel}
+            subtitle="Picks a number local to each lead's state"
+            open={openEditor === "caller"}
+            onToggle={() => setOpenEditor(openEditor === "caller" ? null : "caller")}
+          >
+            <div className="space-y-2.5">
+              <div className="flex h-9 overflow-hidden rounded-[8px] border border-[#e5e7eb] bg-white">
                 <button
                   type="button"
-                  className="inline-flex cursor-pointer items-center gap-1 text-[11.5px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
+                  onClick={() => setCallerIdMode("auto")}
+                  className={["flex-1 cursor-pointer text-[12px] font-medium transition", callerIdMode === "auto" ? "bg-[#0f1729] text-white" : "bg-white text-[#374151] hover:bg-[#f7f8f9]"].join(" ")}
                 >
-                  Manage Numbers
-                  <IconExternalLink size={11} stroke={2} />
+                  Auto Map By State
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCallerIdMode("specific")}
+                  className={["flex-1 cursor-pointer border-l border-[#e5e7eb] text-[12px] font-medium transition", callerIdMode === "specific" ? "bg-[#0f1729] text-white" : "bg-white text-[#374151] hover:bg-[#f7f8f9]"].join(" ")}
+                >
+                  Use One Number
                 </button>
               </div>
-            </div>
-
-            <div className="grid grid-cols-[160px_1fr] gap-4">
-              <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">
-                <div className="inline-flex items-center gap-1">
-                  Voicemail
-                  <button
-                    type="button"
-                    onClick={() => setVoicemailInfoOpen((o) => !o)}
-                    className="inline-flex h-4 w-4 cursor-pointer items-center justify-center text-[#9ca3af] hover:text-[#0f1729]"
-                  >
-                    <IconInfoCircle size={12} stroke={2} />
-                  </button>
-                </div>
-                {voicemailInfoOpen && (
-                  <div className="mt-1.5 text-[10.5px] leading-relaxed text-[#9ca3af]">
-                    Auto plays your recording when the call reaches voicemail, then hangs up.
-                  </div>
-                )}
-              </div>
-              <select
-                value={voicemailMode}
-                onChange={(e) => setVoicemailMode(e.target.value as "off" | "default" | "heir" | "living")}
-                className="h-9 w-full cursor-pointer rounded-[8px] border border-[#e5e7eb] bg-white px-3 text-[12.5px] text-[#0f1729] outline-none transition focus:border-[#13644e]"
-              >
-                <option value="off">Don&apos;t Leave A Voicemail</option>
-                <option value="default">Default Outreach Recording</option>
-                <option value="heir">Heir Outreach Recording</option>
-                <option value="living">Living Owner Recording</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-[160px_1fr] gap-4">
-              <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">Wrap Up</div>
-              <div>
-                <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#374151]">
-                  <input
-                    type="checkbox"
-                    checked={skipWrap}
-                    onChange={(e) => setSkipWrap(e.target.checked)}
-                    className="h-4 w-4 cursor-pointer accent-[#13644e]"
-                  />
-                  Skip Wrap Up Entirely
-                </label>
-                {!skipWrap && (
-                  <div className="mt-2 flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={10}
-                      max={300}
-                      step={5}
-                      value={wrapUp}
-                      onChange={(e) => setWrapUp(Number(e.target.value))}
-                      className="h-2 flex-1 cursor-pointer accent-[#13644e]"
-                    />
-                    <span className="w-[72px] text-right text-[12px] font-semibold tabular-nums text-[#0f1729]">
-                      {wrapUpLabel}
-                    </span>
-                  </div>
-                )}
-                <div className="mt-1.5 text-[11px] leading-relaxed text-[#9ca3af]">
-                  Only runs after a Spoke call. Every other outcome advances right away. Hit Pause Session in the dialer header to extend.
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-[160px_1fr] gap-4">
-              <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">Email Followup</div>
+              {callerIdMode === "specific" && (
+                <select
+                  value={callerIdNumber}
+                  onChange={(e) => setCallerIdNumber(e.target.value)}
+                  className="h-9 w-full cursor-pointer rounded-[8px] border border-[#e5e7eb] bg-white px-3 text-[12.5px] text-[#0f1729] outline-none transition focus:border-[#13644e]"
+                >
+                  {CALLER_ID_NUMBERS.map((n) => (
+                    <option key={n.id} value={n.id}>{n.label}</option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
-                className="flex h-9 w-full cursor-pointer items-center justify-between rounded-[8px] border border-[#e5e7eb] bg-white px-3 text-left text-[12.5px] font-medium text-[#0f1729] transition hover:border-[#0f1729]"
+                className="inline-flex cursor-pointer items-center gap-1 text-[11.5px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
               >
-                4 Templates Set
-                <IconChevronDown size={12} stroke={2} className="text-[#9ca3af]" />
+                Manage Numbers
+                <IconExternalLink size={11} stroke={2} />
               </button>
             </div>
-          </div>
-        )}
+          </EditableRow>
+
+          <EditableRow
+            label="Voicemail"
+            value={voicemailMode === "off" ? "Off · You'll Handle Voicemail Manually" : `${voicemailLabel} · Auto-Drops`}
+            subtitle={voicemailMode === "off"
+              ? "Pre-record a voicemail to have it auto-play when a call reaches voicemail. Configure in Settings → Recordings."
+              : "Plays automatically when a call reaches voicemail."}
+            open={openEditor === "voicemail"}
+            onToggle={() => setOpenEditor(openEditor === "voicemail" ? null : "voicemail")}
+          >
+            <select
+              value={voicemailMode}
+              onChange={(e) => setVoicemailMode(e.target.value as "off" | "default" | "heir" | "living")}
+              className="h-9 w-full cursor-pointer rounded-[8px] border border-[#e5e7eb] bg-white px-3 text-[12.5px] text-[#0f1729] outline-none transition focus:border-[#13644e]"
+            >
+              <option value="off">Don&apos;t Leave A Voicemail (Handle Manually)</option>
+              <option value="default">Default Outreach Recording</option>
+              <option value="heir">Heir Outreach Recording</option>
+              <option value="living">Living Owner Recording</option>
+            </select>
+            <div className="mt-2">
+              <button
+                type="button"
+                className="inline-flex cursor-pointer items-center gap-1 text-[11.5px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
+              >
+                Upload A New Recording
+                <IconExternalLink size={11} stroke={2} />
+              </button>
+            </div>
+          </EditableRow>
+
+          <EditableRow
+            label="Wrap Up"
+            value={wrapUpLabel}
+            subtitle="Short pause after a live conversation so you can finish your notes before the next call."
+            open={openEditor === "wrapup"}
+            onToggle={() => setOpenEditor(openEditor === "wrapup" ? null : "wrapup")}
+          >
+            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#374151]">
+              <input
+                type="checkbox"
+                checked={skipWrap}
+                onChange={(e) => setSkipWrap(e.target.checked)}
+                className="h-4 w-4 cursor-pointer accent-[#13644e]"
+              />
+              Skip Wrap Up Entirely
+            </label>
+            {!skipWrap && (
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  type="range"
+                  min={10}
+                  max={300}
+                  step={5}
+                  value={wrapUp}
+                  onChange={(e) => setWrapUp(Number(e.target.value))}
+                  className="h-2 flex-1 cursor-pointer accent-[#13644e]"
+                />
+                <span className="w-[72px] text-right text-[12px] font-semibold tabular-nums text-[#0f1729]">
+                  {wrapUpLabel}
+                </span>
+              </div>
+            )}
+            <div className="mt-2 text-[11px] leading-relaxed text-[#9ca3af]">
+              Only runs after a live conversation. Voicemail, No Answer, and Wrong Number advance right away. Hit Pause Session in the dialer header to extend during a call.
+            </div>
+          </EditableRow>
+
+          <EditableRow
+            label="Email Followup"
+            value="On · One Email Per Call Outcome"
+            subtitle="After each call, an email auto-sends based on whether it was a live conversation, voicemail, no answer, or wrong number. Configure templates in Settings → Email Templates."
+            open={openEditor === "email"}
+            onToggle={() => setOpenEditor(openEditor === "email" ? null : "email")}
+          >
+            <div className="text-[12px] text-[#374151]">
+              Templates are managed in Settings so the same set is reused across every session.
+            </div>
+            <div className="mt-3">
+              <button
+                type="button"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white px-3 py-1.5 text-[12px] font-medium text-[#0f1729] transition hover:border-[#0f1729]"
+              >
+                Manage Email Templates
+                <IconExternalLink size={11} stroke={2} />
+              </button>
+            </div>
+          </EditableRow>
+
+          <EditableRow
+            label="SMS Followup"
+            value="Not Set Up Yet"
+            subtitle="Send a different text after each call outcome (live conversation, voicemail, no answer, wrong number). Configure in Settings → SMS Templates."
+            open={openEditor === "sms"}
+            onToggle={() => setOpenEditor(openEditor === "sms" ? null : "sms")}
+          >
+            <div className="text-[12px] text-[#374151]">
+              SMS templates work the same way as email. Set them up once in Settings and they auto-send after each call.
+            </div>
+            <div className="mt-3">
+              <button
+                type="button"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white px-3 py-1.5 text-[12px] font-medium text-[#0f1729] transition hover:border-[#0f1729]"
+              >
+                Set Up SMS Templates
+                <IconExternalLink size={11} stroke={2} />
+              </button>
+            </div>
+          </EditableRow>
+        </div>
       </div>
 
       <div className="mt-5 flex items-center gap-2">
