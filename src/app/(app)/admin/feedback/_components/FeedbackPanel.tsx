@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { updateFeedbackStatus, replyToFeedback } from "../_actions";
+import {
+  updateFeedbackStatus,
+  replyToFeedback,
+  logCustomerReply,
+} from "../_actions";
 
 export type FeedbackStatus =
   | "new"
@@ -11,6 +15,15 @@ export type FeedbackStatus =
   | "planned"
   | "shipped"
   | "wont_do";
+
+export type FeedbackMessage = {
+  id: string;
+  direction: "outbound" | "inbound";
+  senderName: string | null;
+  senderEmail: string | null;
+  body: string;
+  createdAt: string;
+};
 
 export type FeedbackRow = {
   id: string;
@@ -30,6 +43,7 @@ export type FeedbackRow = {
     role: string;
   } | null;
   org: { id: string; name: string } | null;
+  messages: FeedbackMessage[];
 };
 
 const STATUS_BUCKETS: { value: FeedbackStatus | "all"; label: string }[] = [
@@ -55,12 +69,28 @@ function typeLabel(t: FeedbackRow["type"]): string {
   return "Question";
 }
 
-function typeChipClasses(t: FeedbackRow["type"]): string {
-  const base =
-    "inline-flex h-5 items-center rounded px-2 text-[11px] font-medium";
-  if (t === "bug") return `${base} bg-danger text-white`;
-  if (t === "idea") return `${base} bg-ink text-white`;
-  return `${base} bg-petrol-600 text-white`;
+function typeDotColor(t: FeedbackRow["type"]): string {
+  if (t === "bug") return "var(--color-danger)";
+  if (t === "idea") return "var(--color-petrol-700)";
+  return "var(--color-gray-500)";
+}
+
+function TypeTag({ type }: { type: FeedbackRow["type"] }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-gray-700">
+      <span
+        aria-hidden
+        style={{
+          display: "inline-block",
+          width: 6,
+          height: 6,
+          borderRadius: 9999,
+          background: typeDotColor(type),
+        }}
+      />
+      {typeLabel(type)}
+    </span>
+  );
 }
 
 function formatDate(iso: string): string {
@@ -69,6 +99,17 @@ function formatDate(iso: string): string {
     month: "long",
     day: "numeric",
     year: "numeric",
+  });
+}
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
@@ -85,6 +126,12 @@ function timeAgo(iso: string): string {
   if (diffD < 14) return `${diffD}d ago`;
   return formatDate(iso);
 }
+
+const STATUS_ACTIVE_STYLE = {
+  background: "var(--color-petrol-700)",
+  boxShadow:
+    "0 1px 2px rgba(13,75,58,0.20), 0 4px 12px -4px rgba(13,75,58,0.30), inset 0 1px 0 rgba(255,255,255,0.10)",
+};
 
 export function FeedbackPanel({ rows }: { rows: FeedbackRow[] }) {
   const searchParams = useSearchParams();
@@ -150,15 +197,17 @@ export function FeedbackPanel({ rows }: { rows: FeedbackRow[] }) {
                 onClick={() => setSelectedStatus(b.value)}
                 className={
                   active
-                    ? "flex h-9 cursor-pointer items-center justify-between rounded-md bg-ink px-3 text-[13px] font-medium text-white"
-                    : "flex h-9 cursor-pointer items-center justify-between rounded-md px-3 text-[13px] font-medium text-ink hover:bg-gray-100"
+                    ? "flex h-9 cursor-pointer items-center justify-between rounded-md px-3 text-[13.25px] font-medium text-white"
+                    : "flex h-9 cursor-pointer items-center justify-between rounded-md px-3 text-[13.25px] text-gray-500 hover:bg-[rgba(12,13,16,0.04)] hover:text-ink"
                 }
+                style={active ? STATUS_ACTIVE_STYLE : undefined}
               >
                 <span>{b.label}</span>
                 <span
                   className={
-                    active ? "text-[12px] text-white/70" : "text-[12px] text-gray-500"
+                    active ? "text-[11px] text-white/55" : "text-[11px] text-gray-400"
                   }
+                  style={{ fontVariantNumeric: "tabular-nums" }}
                 >
                   {counts[b.value] ?? 0}
                 </span>
@@ -196,9 +245,7 @@ export function FeedbackPanel({ rows }: { rows: FeedbackRow[] }) {
                     }
                   >
                     <div className="flex items-center gap-2">
-                      <span className={typeChipClasses(r.type)}>
-                        {typeLabel(r.type)}
-                      </span>
+                      <TypeTag type={r.type} />
                       {r.surface && (
                         <span className="text-[11.5px] text-gray-500">
                           {r.surface}
@@ -239,9 +286,11 @@ export function FeedbackPanel({ rows }: { rows: FeedbackRow[] }) {
 function DetailPane({ row }: { row: FeedbackRow }) {
   const [status, setStatus] = useState<FeedbackStatus>(row.status);
   const [reply, setReply] = useState("");
+  const [inbound, setInbound] = useState("");
   const [pending, startTransition] = useTransition();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [replyMessage, setReplyMessage] = useState<string | null>(null);
+  const [inboundMessage, setInboundMessage] = useState<string | null>(null);
 
   function onStatusChange(next: FeedbackStatus) {
     setStatus(next);
@@ -271,11 +320,28 @@ function DetailPane({ row }: { row: FeedbackRow }) {
     });
   }
 
+  function onLogInbound() {
+    if (!inbound.trim()) return;
+    setInboundMessage(null);
+    startTransition(async () => {
+      const result = await logCustomerReply({
+        id: row.id,
+        message: inbound.trim(),
+      });
+      if (!result.ok) {
+        setInboundMessage(result.error);
+      } else {
+        setInboundMessage("Saved");
+        setInbound("");
+      }
+    });
+  }
+
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-gray-200 bg-white px-6 py-4">
         <div className="flex items-center gap-2">
-          <span className={typeChipClasses(row.type)}>{typeLabel(row.type)}</span>
+          <TypeTag type={row.type} />
           {row.surface && (
             <span className="text-[12px] text-gray-500">{row.surface}</span>
           )}
@@ -321,6 +387,9 @@ function DetailPane({ row }: { row: FeedbackRow }) {
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="rounded-md border border-gray-200 bg-white p-4">
+          <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-500">
+            Original Submission
+          </div>
           <pre className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">
             {row.body}
           </pre>
@@ -341,9 +410,10 @@ function DetailPane({ row }: { row: FeedbackRow }) {
                   disabled={pending && active}
                   className={
                     active
-                      ? "inline-flex h-8 cursor-pointer items-center justify-center rounded-md bg-ink px-3 text-[12.5px] font-medium text-white"
+                      ? "inline-flex h-8 cursor-pointer items-center justify-center rounded-md px-3 text-[12.5px] font-medium text-white"
                       : "inline-flex h-8 cursor-pointer items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-[12.5px] font-medium text-ink hover:border-petrol-300"
                   }
+                  style={active ? STATUS_ACTIVE_STYLE : undefined}
                 >
                   {opt.label}
                 </button>
@@ -356,30 +426,49 @@ function DetailPane({ row }: { row: FeedbackRow }) {
         </div>
 
         <div className="mt-6 rounded-md border border-gray-200 bg-white p-4">
-          <div className="mb-3 text-[12px] font-medium uppercase tracking-wider text-gray-500">
-            Reply
-          </div>
-          {row.responseBody && row.respondedAt && (
-            <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-              <div className="mb-1 text-[11px] uppercase tracking-wider text-gray-500">
-                Last Reply, {formatDate(row.respondedAt)}
-              </div>
-              <pre className="whitespace-pre-wrap text-[13px] text-ink">
-                {row.responseBody}
-              </pre>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-[12px] font-medium uppercase tracking-wider text-gray-500">
+              Conversation
             </div>
+            <div className="text-[11.5px] text-gray-400">
+              {row.messages.length}{" "}
+              {row.messages.length === 1 ? "Message" : "Messages"}
+            </div>
+          </div>
+          {row.messages.length === 0 ? (
+            <p className="text-[12.5px] text-gray-500">
+              No replies yet. Send the first reply below.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {row.messages.map((m) => (
+                <MessageBubble key={m.id} m={m} />
+              ))}
+            </ul>
           )}
+        </div>
+
+        <div className="mt-6 rounded-md border border-gray-200 bg-white p-4">
+          <div className="mb-2 text-[12px] font-medium uppercase tracking-wider text-gray-500">
+            Reply To Customer
+          </div>
+          <p className="mb-3 text-[12px] text-gray-500">
+            Sends an email from notifications@nextsurplus.com. Customer
+            replies land at support@nextsurplus.com in your Gmail. Paste them
+            back into the Log Customer Reply box below to keep the thread
+            complete inside the portal.
+          </p>
           <textarea
             rows={5}
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             placeholder={
               row.user?.email
-                ? `Reply to ${row.user.fullName}. Sent from support@nextsurplus.com.`
+                ? `Reply to ${row.user.fullName}.`
                 : "Reply (this submitter has no email on file)."
             }
             disabled={!row.user?.email}
-            className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13.5px] text-ink focus:border-petrol-500 focus:outline-none focus:ring-1 focus:ring-petrol-500 disabled:bg-gray-50"
+            className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13.5px] text-ink focus:border-petrol-700 focus:outline-none disabled:bg-gray-50"
           />
           <div className="mt-3 flex items-center justify-between">
             <p className="text-[12px] text-gray-500">{replyMessage ?? ""}</p>
@@ -387,13 +476,84 @@ function DetailPane({ row }: { row: FeedbackRow }) {
               type="button"
               onClick={onSendReply}
               disabled={pending || !reply.trim() || !row.user?.email}
-              className="inline-flex h-9 w-28 cursor-pointer items-center justify-center rounded-md btn-primary text-[13px] font-medium text-white disabled:opacity-60"
+              className="btn btn-primary btn-sm"
             >
-              {pending ? "Sending" : "Send Reply"}
+              {pending ? "Sending…" : "Send Reply"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-md border border-gray-200 bg-white p-4">
+          <div className="mb-2 text-[12px] font-medium uppercase tracking-wider text-gray-500">
+            Log Customer Reply
+          </div>
+          <p className="mb-3 text-[12px] text-gray-500">
+            When the customer replies in Gmail, paste their message here. No
+            email is sent. The conversation thread above updates so this
+            ticket holds the full back-and-forth.
+          </p>
+          <textarea
+            rows={5}
+            value={inbound}
+            onChange={(e) => setInbound(e.target.value)}
+            placeholder="Paste the customer's reply"
+            className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13.5px] text-ink focus:border-petrol-700 focus:outline-none"
+          />
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-[12px] text-gray-500">{inboundMessage ?? ""}</p>
+            <button
+              type="button"
+              onClick={onLogInbound}
+              disabled={pending || !inbound.trim()}
+              className="btn btn-outline btn-sm"
+            >
+              {pending ? "Saving…" : "Save To Thread"}
             </button>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function MessageBubble({ m }: { m: FeedbackMessage }) {
+  const isOutbound = m.direction === "outbound";
+  return (
+    <li className="flex flex-col gap-1">
+      <div className="flex items-center gap-2 text-[11.5px]">
+        <span
+          aria-hidden
+          style={{
+            display: "inline-block",
+            width: 6,
+            height: 6,
+            borderRadius: 9999,
+            background: isOutbound
+              ? "var(--color-petrol-700)"
+              : "var(--color-gray-400)",
+          }}
+        />
+        <span className="font-medium text-ink">
+          {isOutbound ? "You" : m.senderName ?? "Customer"}
+        </span>
+        <span className="text-gray-500">
+          {isOutbound ? "replied via email" : "replied"}
+        </span>
+        <span className="ml-auto text-gray-400">
+          {formatDateTime(m.createdAt)}
+        </span>
+      </div>
+      <div
+        className="rounded-md border px-3 py-2"
+        style={{
+          borderColor: "var(--color-gray-200)",
+          background: isOutbound ? "var(--color-surface-muted)" : "#ffffff",
+        }}
+      >
+        <pre className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">
+          {m.body}
+        </pre>
+      </div>
+    </li>
   );
 }

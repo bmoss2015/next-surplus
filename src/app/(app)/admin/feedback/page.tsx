@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createServiceClient } from "@/lib/supabase/service";
-import { FeedbackPanel, type FeedbackRow } from "./_components/FeedbackPanel";
+import {
+  FeedbackPanel,
+  type FeedbackRow,
+  type FeedbackMessage,
+} from "./_components/FeedbackPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +53,7 @@ export default async function AdminFeedbackPage() {
     org_id: string | null;
   }>;
 
+  const feedbackIds = rows.map((r) => r.id);
   const userIds = Array.from(
     new Set(rows.map((r) => r.user_id).filter((v): v is string => Boolean(v)))
   );
@@ -56,7 +61,7 @@ export default async function AdminFeedbackPage() {
     new Set(rows.map((r) => r.org_id).filter((v): v is string => Boolean(v)))
   );
 
-  const [usersRes, orgsRes] = await Promise.all([
+  const [usersRes, orgsRes, messagesRes] = await Promise.all([
     userIds.length
       ? admin
           .from("profiles")
@@ -65,6 +70,15 @@ export default async function AdminFeedbackPage() {
       : Promise.resolve({ data: [], error: null }),
     orgIds.length
       ? admin.from("orgs").select("id, name").in("id", orgIds)
+      : Promise.resolve({ data: [], error: null }),
+    feedbackIds.length
+      ? admin
+          .from("feedback_messages")
+          .select(
+            "id, feedback_id, direction, sender_user_id, sender_name, sender_email, body, created_at"
+          )
+          .in("feedback_id", feedbackIds)
+          .order("created_at", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -84,6 +98,29 @@ export default async function AdminFeedbackPage() {
   const orgMap = new Map<string, { name: string }>();
   for (const o of (orgsRes.data ?? []) as Array<{ id: string; name: string | null }>) {
     orgMap.set(o.id, { name: o.name ?? "Unknown Org" });
+  }
+
+  const messagesByFeedback = new Map<string, FeedbackMessage[]>();
+  for (const m of (messagesRes.data ?? []) as Array<{
+    id: string;
+    feedback_id: string;
+    direction: "outbound" | "inbound";
+    sender_user_id: string | null;
+    sender_name: string | null;
+    sender_email: string | null;
+    body: string;
+    created_at: string;
+  }>) {
+    const list = messagesByFeedback.get(m.feedback_id) ?? [];
+    list.push({
+      id: m.id,
+      direction: m.direction,
+      senderName: m.sender_name,
+      senderEmail: m.sender_email,
+      body: m.body,
+      createdAt: m.created_at,
+    });
+    messagesByFeedback.set(m.feedback_id, list);
   }
 
   const enriched: FeedbackRow[] = rows.map((r) => ({
@@ -108,6 +145,7 @@ export default async function AdminFeedbackPage() {
     org: r.org_id
       ? { id: r.org_id, name: orgMap.get(r.org_id)?.name ?? "Unknown Org" }
       : null,
+    messages: messagesByFeedback.get(r.id) ?? [],
   }));
 
   return (
