@@ -34,6 +34,8 @@ export default function ListBuilderLayout({
             <Link href="/share/list-builder/c" className="hover:text-[#0f1729]">C</Link>
             <Link href="/share/list-builder/d" className="hover:text-[#0f1729]">D</Link>
             <Link href="/share/list-builder/e" className="hover:text-[#0f1729]">E</Link>
+            <span className="text-[#e5e7eb]">|</span>
+            <Link href="/share/list-builder/f" className="font-semibold text-[#0f1729] hover:text-[#13644e]">F</Link>
           </div>
         </div>
       </div>
