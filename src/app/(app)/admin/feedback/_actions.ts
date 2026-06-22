@@ -144,55 +144,6 @@ export async function replyToFeedback(input: {
   return { ok: true };
 }
 
-export async function logCustomerReply(input: {
-  id: string;
-  message: string;
-  senderName?: string;
-  senderEmail?: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const profile = await getCurrentProfile();
-  if (!profile) return { ok: false, error: "Not signed in" };
-  if (!profile.canViewFeedback) return { ok: false, error: "Platform admin only" };
-  const message = input.message.trim();
-  if (!message) return { ok: false, error: "Message is required" };
-  if (message.length > 12000) return { ok: false, error: "Message too long" };
-
-  const admin = createServiceClient();
-  const { data: row, error: loadError } = await admin
-    .from("feedback")
-    .select("id, user_id")
-    .eq("id", input.id)
-    .maybeSingle();
-  if (loadError || !row) {
-    return { ok: false, error: loadError?.message ?? "Not found" };
-  }
-
-  let senderName = input.senderName?.trim() || null;
-  let senderEmail = input.senderEmail?.trim() || null;
-  if ((!senderName || !senderEmail) && row.user_id) {
-    const { data: user } = await admin
-      .from("profiles")
-      .select("email, full_name")
-      .eq("id", row.user_id as string)
-      .maybeSingle();
-    senderName = senderName ?? ((user?.full_name as string | null) ?? null);
-    senderEmail = senderEmail ?? ((user?.email as string | null) ?? null);
-  }
-
-  const { error: insertError } = await admin.from("feedback_messages").insert({
-    feedback_id: input.id,
-    direction: "inbound",
-    sender_user_id: row.user_id ?? null,
-    sender_name: senderName,
-    sender_email: senderEmail,
-    body: message,
-  });
-  if (insertError) return { ok: false, error: insertError.message };
-
-  revalidatePath("/admin/feedback");
-  return { ok: true };
-}
-
 async function sendShippedEmail(input: { userId: string; title: string }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;

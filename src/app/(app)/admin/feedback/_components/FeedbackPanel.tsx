@@ -3,11 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  updateFeedbackStatus,
-  replyToFeedback,
-  logCustomerReply,
-} from "../_actions";
+import { updateFeedbackStatus, replyToFeedback } from "../_actions";
 
 export type FeedbackStatus =
   | "new"
@@ -286,11 +282,9 @@ export function FeedbackPanel({ rows }: { rows: FeedbackRow[] }) {
 function DetailPane({ row }: { row: FeedbackRow }) {
   const [status, setStatus] = useState<FeedbackStatus>(row.status);
   const [reply, setReply] = useState("");
-  const [inbound, setInbound] = useState("");
   const [pending, startTransition] = useTransition();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [replyMessage, setReplyMessage] = useState<string | null>(null);
-  const [inboundMessage, setInboundMessage] = useState<string | null>(null);
 
   function onStatusChange(next: FeedbackStatus) {
     setStatus(next);
@@ -316,23 +310,6 @@ function DetailPane({ row }: { row: FeedbackRow }) {
       } else {
         setReplyMessage("Reply Sent");
         setReply("");
-      }
-    });
-  }
-
-  function onLogInbound() {
-    if (!inbound.trim()) return;
-    setInboundMessage(null);
-    startTransition(async () => {
-      const result = await logCustomerReply({
-        id: row.id,
-        message: inbound.trim(),
-      });
-      if (!result.ok) {
-        setInboundMessage(result.error);
-      } else {
-        setInboundMessage("Saved");
-        setInbound("");
       }
     });
   }
@@ -453,10 +430,9 @@ function DetailPane({ row }: { row: FeedbackRow }) {
             Reply To Customer
           </div>
           <p className="mb-3 text-[12px] text-gray-500">
-            Sends an email from notifications@nextsurplus.com. Customer
-            replies land at support@nextsurplus.com in your Gmail. Paste them
-            back into the Log Customer Reply box below to keep the thread
-            complete inside the portal.
+            Sends an email from notifications@nextsurplus.com. When the
+            customer replies, their message lands directly back in this
+            thread.
           </p>
           <textarea
             rows={5}
@@ -483,34 +459,6 @@ function DetailPane({ row }: { row: FeedbackRow }) {
           </div>
         </div>
 
-        <div className="mt-6 rounded-md border border-gray-200 bg-white p-4">
-          <div className="mb-2 text-[12px] font-medium uppercase tracking-wider text-gray-500">
-            Log Customer Reply
-          </div>
-          <p className="mb-3 text-[12px] text-gray-500">
-            When the customer replies in Gmail, paste their message here. No
-            email is sent. The conversation thread above updates so this
-            ticket holds the full back-and-forth.
-          </p>
-          <textarea
-            rows={5}
-            value={inbound}
-            onChange={(e) => setInbound(e.target.value)}
-            placeholder="Paste the customer's reply"
-            className="w-full rounded-md border border-gray-200 px-3 py-2 text-[13.5px] text-ink focus:border-petrol-700 focus:outline-none"
-          />
-          <div className="mt-3 flex items-center justify-between">
-            <p className="text-[12px] text-gray-500">{inboundMessage ?? ""}</p>
-            <button
-              type="button"
-              onClick={onLogInbound}
-              disabled={pending || !inbound.trim()}
-              className="btn btn-outline btn-sm"
-            >
-              {pending ? "Saving…" : "Save To Thread"}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
