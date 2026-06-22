@@ -93,6 +93,9 @@ export async function replyToFeedback(input: {
 
   const apiKey = process.env.RESEND_API_KEY;
   if (apiKey && recipientEmail) {
+    const replyDomain =
+      process.env.FEEDBACK_REPLY_DOMAIN ?? "replies.nextsurplus.com";
+    const ticketReplyTo = `ticket-${input.id}@${replyDomain}`;
     const subject = `Re: ${row.title as string}`;
     const html = `
       <div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#1a1a1a;line-height:1.6;">
@@ -101,7 +104,7 @@ export async function replyToFeedback(input: {
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
         <pre style="white-space:pre-wrap;font-family:Inter,Arial,sans-serif;font-size:14px;margin:0;">${escapeHtml(message)}</pre>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
-        <p style="color:#6b7280;font-size:12.5px;margin:0;">Reply directly to this email and it lands in our support inbox.</p>
+        <p style="color:#6b7280;font-size:12.5px;margin:0;">Reply directly to this email and it lands in your ticket thread inside Next Surplus.</p>
       </div>
     `;
     const text = `Hi ${recipientName},\n\nThanks for the feedback. Quick reply:\n\n${message}\n\nNext Surplus`;
@@ -109,7 +112,7 @@ export async function replyToFeedback(input: {
     await resend.emails.send({
       from: FROM_ADDRESS,
       to: recipientEmail,
-      replyTo: "support@nextsurplus.com",
+      replyTo: ticketReplyTo,
       subject,
       html,
       text,
