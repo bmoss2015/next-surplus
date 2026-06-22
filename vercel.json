@@ -3,10 +3,6 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/cron/lob-pricing-sync",
-      "schedule": "0 4 * * 1"
-    },
-    {
       "path": "/api/cron/reconcile-mail",
       "schedule": "0 8 * * *"
     },

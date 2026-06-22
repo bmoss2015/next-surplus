@@ -82,9 +82,7 @@ export function ProviderCostsSection({ data }: { data: ProviderCostsData }) {
           </table>
         ) : (
           <div className="px-5 py-6 text-[13px] text-gray-600">
-            No Lob rates synced yet. The weekly cron will populate this on
-            its next run (Mondays 04:00 UTC). You can also trigger it
-            manually with a GET to /api/cron/lob-pricing-sync.
+            Wholesale rates not configured. Update app_pricing_config.wholesale_pricing_cents.
           </div>
         )}
       </section>
