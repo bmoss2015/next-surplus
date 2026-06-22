@@ -10,6 +10,9 @@ import {
   IconBookmark,
   IconWorld,
   IconArrowNarrowRight,
+  IconArrowRight,
+  IconInfoCircle,
+  IconExternalLink,
 } from "@tabler/icons-react";
 
 type BaseSet = {
@@ -43,6 +46,12 @@ const COUNTIES_BY_STATE: Record<string, string[]> = {
 };
 const SALE_TYPES = ["Tax Sale", "Mortgage Foreclosure"];
 const OWNER_STATUS = ["Living", "Deceased"];
+const CALLER_ID_NUMBERS = [
+  { id: "tx-1", label: "(512) 555 0188 · Austin TX" },
+  { id: "tx-2", label: "(713) 555 0244 · Houston TX" },
+  { id: "nc-1", label: "(704) 555 0212 · Charlotte NC" },
+  { id: "az-1", label: "(602) 555 0177 · Phoenix AZ" },
+];
 const LAST_TOUCHED = [
   { id: "any", label: "Any" },
   { id: "30", label: "30+ Days" },
@@ -278,6 +287,13 @@ export default function VariantF() {
   const [skipLitigated, setSkipLitigated] = useState(true);
   const [skipDnc, setSkipDnc] = useState(true);
   const [dncAcknowledged, setDncAcknowledged] = useState(false);
+  const [editingDefaults, setEditingDefaults] = useState(false);
+  const [callerIdMode, setCallerIdMode] = useState<"auto" | "specific">("auto");
+  const [callerIdNumber, setCallerIdNumber] = useState("tx-1");
+  const [voicemailMode, setVoicemailMode] = useState<"off" | "default" | "heir" | "living">("off");
+  const [skipWrap, setSkipWrap] = useState(false);
+  const [wrapUp, setWrapUp] = useState(30);
+  const [voicemailInfoOpen, setVoicemailInfoOpen] = useState(false);
   const [name, setName] = useState("");
 
   const availableStates = base.states ?? STATES;
@@ -289,18 +305,59 @@ export default function VariantF() {
   const narrowCount = stage.length + states.length + counties.length + saleType.length + ownerStatus.length + (surplusMin || surplusMax ? 1 : 0) + (lastTouched !== "any" ? 1 : 0) + (skipLitigated ? 1 : 0);
   const narrowedTotal = narrowCount === 0 ? base.count : Math.max(Math.floor(base.count * 0.6), 4);
 
+  const callerIdLabel = callerIdMode === "auto"
+    ? "Auto Map By State"
+    : CALLER_ID_NUMBERS.find((n) => n.id === callerIdNumber)?.label ?? "";
+  const voicemailLabel = voicemailMode === "off"
+    ? "Off"
+    : voicemailMode === "default"
+      ? "Default Outreach Recording"
+      : voicemailMode === "heir"
+        ? "Heir Outreach Recording"
+        : "Living Owner Recording";
+  const wrapUpLabel = skipWrap
+    ? "Off"
+    : wrapUp < 60
+      ? `${wrapUp} Seconds`
+      : `${Math.floor(wrapUp / 60)}m ${(wrapUp % 60).toString().padStart(2, "0")}s`;
+
   return (
     <div className="mx-auto max-w-[860px] px-6 py-12">
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">
           Variant F · Stripe Quiet Power
         </div>
         <h1 className="mt-1.5 text-[28px] font-semibold tracking-[-0.025em] text-[#0f1729]">
-          Build A Calling List
+          Start A Dialer Session
         </h1>
-        <div className="mt-1 text-[13.5px] text-[#6b7280]">
-          Pick a starting point. Narrow it down. Save it.
+      </div>
+
+      <div className="mb-7 flex items-center justify-between gap-4 rounded-[12px] border border-[#13644e] bg-white px-5 py-4">
+        <div className="min-w-0">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#13644e]">
+            Resume Last Session
+          </div>
+          <div className="mt-1 truncate text-[15.5px] font-semibold tracking-[-0.005em] text-[#0f1729]">
+            Fort Bend County, Texas
+          </div>
+          <div className="mt-0.5 text-[12px] text-[#6b7280]">
+            23 of 47 dialed &middot; Paused yesterday at 4:38pm
+          </div>
         </div>
+        <button
+          type="button"
+          className="flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[10px] bg-gradient-to-r from-[#0a3d4a] to-[#13644e] px-5 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.20),0_6px_16px_-4px_rgba(13,75,58,0.30)] transition hover:opacity-95"
+        >
+          Resume
+          <IconArrowRight size={14} stroke={2.25} />
+        </button>
+      </div>
+
+      <div className="mb-3 flex items-center gap-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9ca3af]">
+          Or Build A New Session
+        </div>
+        <div className="h-px flex-1 bg-[#e5e7eb]" />
       </div>
 
       <BaseSetPicker value={base} onChange={setBase} />
@@ -440,12 +497,182 @@ export default function VariantF() {
         </div>
       </div>
 
+      <div
+        className="mt-5 overflow-hidden rounded-[12px] bg-white"
+        style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 8px 24px -8px rgba(15,23,41,0.08)" }}
+      >
+        <div className="flex items-center justify-between border-b border-[#f1f2f4] bg-[#fbfbfc] px-5 py-4">
+          <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
+            Defaults
+          </div>
+          <button
+            type="button"
+            onClick={() => setEditingDefaults((e) => !e)}
+            className="cursor-pointer text-[12px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
+          >
+            {editingDefaults ? "Use Defaults" : "Change For This Session"}
+          </button>
+        </div>
+
+        {!editingDefaults ? (
+          <div className="grid grid-cols-2 gap-x-8 gap-y-5 px-5 py-5">
+            <div>
+              <div className="text-[11.5px] font-medium text-[#6b7280]">Caller ID</div>
+              <div className="mt-1 text-[13px] font-medium text-[#0f1729]">{callerIdLabel}</div>
+            </div>
+            <div>
+              <div className="flex items-center gap-1 text-[11.5px] font-medium text-[#6b7280]">
+                Voicemail
+                <button
+                  type="button"
+                  onClick={() => setVoicemailInfoOpen((o) => !o)}
+                  className="inline-flex h-4 w-4 cursor-pointer items-center justify-center text-[#9ca3af] hover:text-[#0f1729]"
+                >
+                  <IconInfoCircle size={12} stroke={2} />
+                </button>
+              </div>
+              <div className="mt-1 text-[13px] font-medium text-[#0f1729]">{voicemailLabel}</div>
+              {voicemailInfoOpen && (
+                <div className="mt-1.5 rounded-[8px] border border-[#e5e7eb] bg-white p-2.5 text-[11.5px] leading-relaxed text-[#374151]" style={{ boxShadow: "0 4px 12px -2px rgba(15,23,41,0.10)" }}>
+                  When the call reaches voicemail, your recording plays automatically and the dialer hangs up. Pick a recording or leave this off.
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-[11.5px] font-medium text-[#6b7280]">Wrap Up</div>
+              <div className="mt-1 text-[13px] font-medium text-[#0f1729]">{wrapUpLabel}</div>
+            </div>
+            <div>
+              <div className="text-[11.5px] font-medium text-[#6b7280]">Email Followup</div>
+              <div className="mt-1 text-[13px] font-medium text-[#0f1729]">4 Templates Set</div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 px-5 py-5">
+            <div className="grid grid-cols-[160px_1fr] gap-4">
+              <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">Caller ID</div>
+              <div className="space-y-2">
+                <div className="flex h-9 overflow-hidden rounded-[8px] border border-[#e5e7eb] bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setCallerIdMode("auto")}
+                    className={["flex-1 cursor-pointer text-[12px] font-medium transition", callerIdMode === "auto" ? "bg-[#0f1729] text-white" : "bg-white text-[#374151] hover:bg-[#f7f8f9]"].join(" ")}
+                  >
+                    Auto Map By State
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCallerIdMode("specific")}
+                    className={["flex-1 cursor-pointer border-l border-[#e5e7eb] text-[12px] font-medium transition", callerIdMode === "specific" ? "bg-[#0f1729] text-white" : "bg-white text-[#374151] hover:bg-[#f7f8f9]"].join(" ")}
+                  >
+                    Use One Number
+                  </button>
+                </div>
+                {callerIdMode === "specific" && (
+                  <select
+                    value={callerIdNumber}
+                    onChange={(e) => setCallerIdNumber(e.target.value)}
+                    className="h-9 w-full cursor-pointer rounded-[8px] border border-[#e5e7eb] bg-white px-3 text-[12.5px] text-[#0f1729] outline-none transition focus:border-[#13644e]"
+                  >
+                    {CALLER_ID_NUMBERS.map((n) => (
+                      <option key={n.id} value={n.id}>{n.label}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  className="inline-flex cursor-pointer items-center gap-1 text-[11.5px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
+                >
+                  Manage Numbers
+                  <IconExternalLink size={11} stroke={2} />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[160px_1fr] gap-4">
+              <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">
+                <div className="inline-flex items-center gap-1">
+                  Voicemail
+                  <button
+                    type="button"
+                    onClick={() => setVoicemailInfoOpen((o) => !o)}
+                    className="inline-flex h-4 w-4 cursor-pointer items-center justify-center text-[#9ca3af] hover:text-[#0f1729]"
+                  >
+                    <IconInfoCircle size={12} stroke={2} />
+                  </button>
+                </div>
+                {voicemailInfoOpen && (
+                  <div className="mt-1.5 text-[10.5px] leading-relaxed text-[#9ca3af]">
+                    Auto plays your recording when the call reaches voicemail, then hangs up.
+                  </div>
+                )}
+              </div>
+              <select
+                value={voicemailMode}
+                onChange={(e) => setVoicemailMode(e.target.value as "off" | "default" | "heir" | "living")}
+                className="h-9 w-full cursor-pointer rounded-[8px] border border-[#e5e7eb] bg-white px-3 text-[12.5px] text-[#0f1729] outline-none transition focus:border-[#13644e]"
+              >
+                <option value="off">Don&apos;t Leave A Voicemail</option>
+                <option value="default">Default Outreach Recording</option>
+                <option value="heir">Heir Outreach Recording</option>
+                <option value="living">Living Owner Recording</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-[160px_1fr] gap-4">
+              <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">Wrap Up</div>
+              <div>
+                <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#374151]">
+                  <input
+                    type="checkbox"
+                    checked={skipWrap}
+                    onChange={(e) => setSkipWrap(e.target.checked)}
+                    className="h-4 w-4 cursor-pointer accent-[#13644e]"
+                  />
+                  Skip Wrap Up Entirely
+                </label>
+                {!skipWrap && (
+                  <div className="mt-2 flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={10}
+                      max={300}
+                      step={5}
+                      value={wrapUp}
+                      onChange={(e) => setWrapUp(Number(e.target.value))}
+                      className="h-2 flex-1 cursor-pointer accent-[#13644e]"
+                    />
+                    <span className="w-[72px] text-right text-[12px] font-semibold tabular-nums text-[#0f1729]">
+                      {wrapUpLabel}
+                    </span>
+                  </div>
+                )}
+                <div className="mt-1.5 text-[11px] leading-relaxed text-[#9ca3af]">
+                  Only runs after a Spoke call. Every other outcome advances right away. Hit Pause Session in the dialer header to extend.
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[160px_1fr] gap-4">
+              <div className="pt-1.5 text-[12.5px] font-medium text-[#374151]">Email Followup</div>
+              <button
+                type="button"
+                className="flex h-9 w-full cursor-pointer items-center justify-between rounded-[8px] border border-[#e5e7eb] bg-white px-3 text-left text-[12.5px] font-medium text-[#0f1729] transition hover:border-[#0f1729]"
+              >
+                4 Templates Set
+                <IconChevronDown size={12} stroke={2} className="text-[#9ca3af]" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="mt-5 flex items-center gap-2">
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Name This List (e.g. Fort Bend Living Owners)"
+          placeholder="Name This List To Save It (Optional)"
           className="h-11 flex-1 rounded-[10px] border border-[#e5e7eb] bg-white px-4 text-[13px] text-[#0f1729] outline-none transition focus:border-[#13644e] placeholder:text-[#9ca3af]"
         />
         <button
@@ -456,10 +683,9 @@ export default function VariantF() {
         </button>
         <button
           type="button"
-          disabled={!name.trim()}
-          className="flex h-11 cursor-pointer items-center gap-2 rounded-[10px] bg-gradient-to-r from-[#0a3d4a] to-[#13644e] px-5 text-[13px] font-semibold text-white shadow-[0_2px_4px_rgba(13,75,58,0.20),0_8px_20px_-4px_rgba(13,75,58,0.30)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-11 cursor-pointer items-center gap-2 rounded-[10px] bg-gradient-to-r from-[#0a3d4a] to-[#13644e] px-5 text-[13px] font-semibold text-white shadow-[0_2px_4px_rgba(13,75,58,0.20),0_8px_20px_-4px_rgba(13,75,58,0.30)] transition hover:opacity-95"
         >
-          Save &amp; Use
+          Start Session
           <span className="rounded bg-white/20 px-1.5 py-0.5 text-[11px] tabular-nums">{narrowedTotal}</span>
         </button>
       </div>
