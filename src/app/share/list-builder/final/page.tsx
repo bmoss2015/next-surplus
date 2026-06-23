@@ -355,27 +355,23 @@ function FilterCell({ label, value, right, last }: { label: string; value: strin
   );
 }
 
-function DefaultRow({ label, value, subtitle, muted, accent }: { label: string; value: string; subtitle: string; muted?: boolean; accent?: string }) {
+function DefaultRow({ label, value, subtitle, muted }: { label: string; value: string; subtitle: string; muted?: boolean }) {
   return (
-    <div className="flex items-stretch gap-0 px-0 py-0">
-      <div className="w-[3px] shrink-0" style={{ background: accent ?? (muted ? "#ebedf0" : "#0d4b3a") }} />
-      <div className="grid flex-1 grid-cols-[160px_1fr_auto] items-start gap-6 px-7 py-5">
-        <div className="pt-1 text-[12.5px] font-medium text-[#0a0d14]">{label}</div>
-        <div>
-          <div className={["text-[13.5px] font-medium", muted ? "text-[#9298a3]" : "text-[#0a0d14]"].join(" ")}>
-            {value}
-          </div>
-          <div className="mt-1.5 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>
+    <div className="grid grid-cols-[160px_1fr_auto] items-start gap-6 px-7 py-5">
+      <div className="pt-1 text-[12.5px] font-medium text-[#0a0d14]">{label}</div>
+      <div>
+        <div className={["text-[13.5px] font-medium", muted ? "text-[#9298a3]" : "text-[#0a0d14]"].join(" ")}>
+          {value}
         </div>
-        <button
-          type="button"
-          className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] bg-white px-2.5 text-[12px] font-medium text-[#0d4b3a] transition hover:text-[#13644e]"
-          style={{ border: "1px solid #ebedf0" }}
-        >
-          Preview
-          <IconExternalLink size={11} stroke={2} />
-        </button>
+        <div className="mt-1.5 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>
       </div>
+      <button
+        type="button"
+        className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-semibold text-[#0d4b3a] transition hover:text-[#13644e]"
+      >
+        Preview
+        <IconExternalLink size={11} stroke={2} />
+      </button>
     </div>
   );
 }
