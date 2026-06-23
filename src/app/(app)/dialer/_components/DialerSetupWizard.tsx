@@ -1,614 +1,405 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  IconArrowLeft,
-  IconArrowRight,
-  IconCheck,
   IconChevronDown,
   IconChevronUp,
-  IconClock,
-  IconUpload,
+  IconArrowRight,
+  IconCheck,
+  IconExternalLink,
 } from "@tabler/icons-react";
-import Link from "next/link";
 
-type Step = 1 | 2 | 3;
+type Source = "import" | "saved" | "all";
+type ListOption = {
+  id: string;
+  name: string;
+  count: number;
+  source: Source;
+  meta?: string;
+};
 
-const STEPS = [
-  { n: 1, label: "Pick Leads" },
-  { n: 2, label: "Call Settings" },
-  { n: 3, label: "Auto Follow Up" },
-] as const;
-
-export function DialerSetupWizard() {
-  const [step, setStep] = useState<Step>(1);
-
-  return (
-    <div className="mx-auto flex max-w-[1080px] flex-col px-7 py-8">
-      <div className="mb-2">
-        <h1 className="text-[24px] font-semibold tracking-tight text-ink">
-          Start a Power Dialer Session
-        </h1>
-        <div className="mt-1 text-[13.5px] text-gray-500">
-          Pick a list, dial settings, and what to send after each call.
-        </div>
-      </div>
-
-      <ProgressDots step={step} />
-
-      <div className="mt-6 grid grid-cols-[1fr_280px] gap-6">
-        <div
-          className="rounded-2xl bg-white p-7"
-          style={{
-            boxShadow:
-              "0 1px 2px rgba(15,23,41,0.04), 0 8px 24px -8px rgba(15,23,41,0.10)",
-          }}
-        >
-          {step === 1 && <StepPickLeads />}
-          {step === 2 && <StepCallSettings />}
-          {step === 3 && <StepAutoFollowUp />}
-
-          <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-5">
-            <div>
-              {step > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setStep((s) => (s - 1) as Step)}
-                  className="flex h-10 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-medium text-gray-700 transition hover:bg-gray-100"
-                >
-                  <IconArrowLeft size={14} stroke={2} />
-                  Back
-                </button>
-              )}
-            </div>
-            <div>
-              {step < 3 ? (
-                <button
-                  type="button"
-                  onClick={() => setStep((s) => (s + 1) as Step)}
-                  className="flex h-10 items-center gap-1.5 rounded-lg bg-petrol-700 px-4 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.20),0_6px_16px_-4px_rgba(13,75,58,0.30)] transition hover:bg-petrol-500"
-                >
-                  {step === 1 ? "Continue to Call Settings" : "Continue to Auto Follow Up"}
-                  <IconArrowRight size={14} stroke={2.25} />
-                </button>
-              ) : (
-                <Link
-                  href="/dialer"
-                  className="flex h-10 items-center gap-1.5 rounded-lg bg-petrol-700 px-4 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.20),0_6px_16px_-4px_rgba(13,75,58,0.30)] transition hover:bg-petrol-500"
-                >
-                  Start Session · 47 Leads
-                  <IconArrowRight size={14} stroke={2.25} />
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <SummaryRail step={step} />
-      </div>
-    </div>
-  );
-}
-
-function ProgressDots({ step }: { step: Step }) {
-  return (
-    <div className="mt-6 flex items-center gap-2">
-      {STEPS.map((s, i) => {
-        const done = step > s.n;
-        const active = step === s.n;
-        return (
-          <div key={s.n} className="flex items-center gap-2">
-            <div
-              className={[
-                "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition",
-                done
-                  ? "bg-petrol-500 text-white"
-                  : active
-                    ? "bg-ink text-white"
-                    : "bg-gray-200 text-gray-500",
-              ].join(" ")}
-            >
-              {done ? <IconCheck size={12} stroke={3} /> : s.n}
-            </div>
-            <div
-              className={[
-                "text-[12.5px] font-medium",
-                active ? "text-ink" : done ? "text-gray-700" : "text-gray-400",
-              ].join(" ")}
-            >
-              {s.label}
-            </div>
-            {i < STEPS.length - 1 && (
-              <div className="mx-2 h-px w-10 bg-gray-200" />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function StepPickLeads() {
-  const [source, setSource] = useState<"crm" | "upload" | "combine">("crm");
-  const [skipLitigated, setSkipLitigated] = useState(true);
-  const [skipRecent, setSkipRecent] = useState(true);
-  const [skipDnc, setSkipDnc] = useState(true);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-
-  return (
-    <div className="space-y-7">
-      <div>
-        <h2 className="text-[16px] font-semibold tracking-tight text-ink">
-          Lead Source
-        </h2>
-        <div className="mt-3 space-y-2">
-          <RadioRow
-            checked={source === "crm"}
-            onClick={() => setSource("crm")}
-            label="Pick from CRM List"
-            trailing={
-              <select
-                onClick={(e) => e.stopPropagation()}
-                disabled={source !== "crm"}
-                className="h-9 rounded-md border border-gray-200 bg-white px-3 text-[12.5px] text-ink outline-none transition focus:border-petrol-500 disabled:opacity-40"
-              >
-                <option>All Researched Leads (124)</option>
-                <option>Awaiting Signature (12)</option>
-                <option>First Contact Due (47)</option>
-                <option>Callback Today (8)</option>
-              </select>
-            }
-          />
-          <RadioRow
-            checked={source === "upload"}
-            onClick={() => setSource("upload")}
-            label="Upload a New List"
-            trailing={
-              <button
-                type="button"
-                disabled={source !== "upload"}
-                className="flex h-9 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-[12.5px] font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-40"
-              >
-                <IconUpload size={13} stroke={2} />
-                Choose CSV
-              </button>
-            }
-          />
-          <RadioRow
-            checked={source === "combine"}
-            onClick={() => setSource("combine")}
-            label="Combine Sources"
-            trailing={
-              <button
-                type="button"
-                disabled={source !== "combine"}
-                className="h-9 rounded-md border border-gray-200 bg-white px-3 text-[12.5px] font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-40"
-              >
-                Include / Exclude Rules
-              </button>
-            }
-          />
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-[16px] font-semibold tracking-tight text-ink">
-          Quick Filters
-        </h2>
-        <div className="mt-3 space-y-2">
-          <CheckRow
-            checked={skipLitigated}
-            onChange={setSkipLitigated}
-            label="Skip Litigated Leads"
-            hint="Anything currently in active litigation."
-          />
-          <CheckRow
-            checked={skipRecent}
-            onChange={setSkipRecent}
-            label="Skip Recently Contacted (Less Than 30 Days)"
-            hint="Avoid burning warm leads with a second touch too soon."
-          />
-          <CheckRow
-            checked={skipDnc}
-            onChange={setSkipDnc}
-            label="Skip DNC Flagged"
-            hint="Required to stay compliant. We do not recommend unchecking."
-          />
-        </div>
-      </div>
-
-      <div>
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((o) => !o)}
-          className="flex items-center gap-1 text-[13px] font-semibold text-petrol-500 hover:text-petrol-700"
-        >
-          {advancedOpen ? (
-            <IconChevronUp size={14} stroke={2.25} />
-          ) : (
-            <IconChevronDown size={14} stroke={2.25} />
-          )}
-          Show Advanced
-        </button>
-
-        {advancedOpen && (
-          <div className="mt-4 grid grid-cols-2 gap-4 rounded-lg border border-gray-100 bg-gray-50 p-5">
-            <AdvancedField label="State">
-              <SelectInput options={["All States", "Texas", "North Carolina", "Arizona", "Georgia", "Ohio"]} />
-            </AdvancedField>
-            <AdvancedField label="County">
-              <SelectInput options={["All Counties", "Travis", "Mecklenburg", "Maricopa", "Fulton", "Cuyahoga"]} />
-            </AdvancedField>
-            <AdvancedField label="Case Type">
-              <SelectInput options={["All Types", "Tax Sale", "Mortgage Foreclosure", "Other"]} />
-            </AdvancedField>
-            <AdvancedField label="CRM Stage">
-              <SelectInput options={["All Stages", "Researched", "First Contact", "Contact Made", "Awaiting Signature", "Signed"]} />
-            </AdvancedField>
-            <AdvancedField label="Owner Status">
-              <SelectInput options={["Any", "Living", "Deceased"]} />
-            </AdvancedField>
-            <AdvancedField label="Surplus Range">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="$0"
-                  className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-[12.5px] outline-none focus:border-petrol-500"
-                />
-                <span className="text-gray-400">to</span>
-                <input
-                  type="text"
-                  placeholder="No max"
-                  className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-[12.5px] outline-none focus:border-petrol-500"
-                />
-              </div>
-            </AdvancedField>
-            <AdvancedField label="Last Touch Date">
-              <SelectInput options={["Any Time", "More Than 30 Days Ago", "More Than 60 Days Ago", "More Than 90 Days Ago"]} />
-            </AdvancedField>
-            <AdvancedField label="Call Attempts">
-              <SelectInput options={["Any", "0 Attempts", "1 to 2 Attempts", "3 to 5 Attempts", "6 or More"]} />
-            </AdvancedField>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StepCallSettings() {
-  const [dialFrom, setDialFrom] = useState<"auto" | "specific">("auto");
-  const [skipDnc, setSkipDnc] = useState(true);
-  const [skipLitigated, setSkipLitigated] = useState(true);
-  const [wrapUp, setWrapUp] = useState(30);
-  const [vmDrop, setVmDrop] = useState<"off" | "on">("off");
-
-  return (
-    <div className="space-y-7">
-      <div>
-        <h2 className="text-[16px] font-semibold tracking-tight text-ink">
-          Dial From Number
-        </h2>
-        <div className="mt-3 space-y-2">
-          <RadioRow
-            checked={dialFrom === "auto"}
-            onClick={() => setDialFrom("auto")}
-            label="Auto Map by State"
-            hint="Picks a caller ID local to the lead's state for higher pickup rates."
-          />
-          <RadioRow
-            checked={dialFrom === "specific"}
-            onClick={() => setDialFrom("specific")}
-            label="Use a Specific Number"
-            trailing={
-              <select
-                disabled={dialFrom !== "specific"}
-                className="h-9 rounded-md border border-gray-200 bg-white px-3 text-[12.5px] outline-none disabled:opacity-40"
-              >
-                <option>(512) 555 0188 · Austin TX</option>
-                <option>(704) 555 0212 · Charlotte NC</option>
-                <option>(602) 555 0177 · Phoenix AZ</option>
-              </select>
-            }
-          />
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-[16px] font-semibold tracking-tight text-ink">
-          Compliance
-        </h2>
-        <div className="mt-3 space-y-2">
-          <CheckRow
-            checked={skipDnc}
-            onChange={setSkipDnc}
-            label="Skip DNC"
-            hint="Required for compliance."
-          />
-          <CheckRow
-            checked={skipLitigated}
-            onChange={setSkipLitigated}
-            label="Skip Litigated"
-            hint="Skip any lead currently in active litigation."
-          />
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-[16px] font-semibold tracking-tight text-ink">
-          Wrap Up Time
-        </h2>
-        <div className="mt-3 flex items-center gap-4">
-          <input
-            type="range"
-            min={10}
-            max={300}
-            step={5}
-            value={wrapUp}
-            onChange={(e) => setWrapUp(Number(e.target.value))}
-            className="h-2 flex-1 cursor-pointer accent-petrol-500"
-          />
-          <div className="flex items-center gap-1.5 rounded-md bg-gray-100 px-3 py-1.5 text-[13px] font-semibold tabular-nums text-ink">
-            <IconClock size={13} stroke={2} />
-            {wrapUp < 60
-              ? `${wrapUp}s`
-              : `${Math.floor(wrapUp / 60)}m ${(wrapUp % 60).toString().padStart(2, "0")}s`}
-          </div>
-        </div>
-        <div className="mt-2 text-[12px] text-gray-500">
-          Wrap up only runs after a connected call. Voicemail, No Answer, and Wrong Number skip wrap up entirely. Use the Pause Session button in the header to freeze the countdown if you need more time. Range 10 seconds to 5 minutes.
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-[16px] font-semibold tracking-tight text-ink">
-          Voicemail Drop
-        </h2>
-        <div className="mt-3 space-y-2">
-          <RadioRow
-            checked={vmDrop === "off"}
-            onClick={() => setVmDrop("off")}
-            label="Don't Drop a Voicemail"
-            hint="Hang up if the call rolls to voicemail."
-          />
-          <RadioRow
-            checked={vmDrop === "on"}
-            onClick={() => setVmDrop("on")}
-            label="Drop a Voicemail"
-            trailing={
-              <select
-                disabled={vmDrop !== "on"}
-                className="h-9 rounded-md border border-gray-200 bg-white px-3 text-[12.5px] outline-none disabled:opacity-40"
-              >
-                <option>Default Outreach Voicemail</option>
-                <option>Heir Outreach Voicemail</option>
-                <option>Living Owner Voicemail</option>
-              </select>
-            }
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const OUTCOMES = [
-  {
-    name: "Called",
-    color: "#13644e",
-    desc: "Live conversation. Send the prospect a follow up recap with next steps.",
-    defaultTemplate: "Spoke Call Recap",
-  },
-  {
-    name: "Voicemail",
-    color: "#9ca3af",
-    desc: "Reached voicemail. Send a short follow up so they can read who called.",
-    defaultTemplate: "Voicemail Drop Recap",
-  },
-  {
-    name: "No Answer",
-    color: "#9ca3af",
-    desc: "Did not pick up. Optional follow up so the next attempt has context.",
-    defaultTemplate: "Do Not Send",
-  },
-  {
-    name: "Wrong Number",
-    color: "#9ca3af",
-    desc: "Number does not belong to the contact. Flag and skip follow up.",
-    defaultTemplate: "Do Not Send",
-  },
+const LIST_OPTIONS: ListOption[] = [
+  { id: "all", name: "All Leads", count: 412, source: "all" },
+  { id: "fort-bend", name: "Fort Bend County, Texas", count: 47, source: "import", meta: "Imported Jun 21, 2026" },
+  { id: "mecklenburg", name: "Mecklenburg County, North Carolina", count: 23, source: "import", meta: "Imported Jun 19, 2026" },
+  { id: "heir", name: "Heir Research Batch", count: 12, source: "import", meta: "Imported Jun 17, 2026" },
+  { id: "travis", name: "Travis County, Texas", count: 31, source: "import", meta: "Imported May 28, 2026" },
+  { id: "high-surplus", name: "High Surplus All States", count: 38, source: "saved" },
+  { id: "no-contact-60", name: "No Contact 60+ Days", count: 34, source: "saved" },
 ];
 
-function StepAutoFollowUp() {
-  return (
-    <div>
-      <h2 className="text-[16px] font-semibold tracking-tight text-ink">
-        Auto Follow Up
-      </h2>
-      <div className="mt-1 text-[13px] text-gray-500">
-        For each call outcome, pick the email template that auto sends to the
-        contact.
-      </div>
+export function DialerSetupWizard() {
+  const router = useRouter();
+  const [selected, setSelected] = useState<ListOption | null>(null);
+  const [listOpen, setListOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
+  const [name, setName] = useState("");
 
-      <div className="mt-5 space-y-3">
-        {OUTCOMES.map((o) => (
-          <div
-            key={o.name}
-            className="flex items-stretch gap-4 rounded-lg border border-gray-100 bg-white px-4 py-3"
-          >
-            <div
-              aria-hidden
-              className="w-1 shrink-0 rounded-sm"
-              style={{ background: o.color }}
-            />
-            <div className="flex flex-1 items-center gap-4">
-              <div className="w-[150px] shrink-0 text-[13.5px] font-semibold text-ink">
-                {o.name}
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!listOpen) return;
+    function onDown(e: MouseEvent) {
+      if (listRef.current && !listRef.current.contains(e.target as Node)) {
+        setListOpen(false);
+        setSearch("");
+      }
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [listOpen]);
+
+  const filteredOptions = LIST_OPTIONS.filter((o) =>
+    o.name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  function handleStart() {
+    router.push("/dialer");
+  }
+
+  return (
+    <div className="mx-auto max-w-[880px] px-14 pb-32 pt-12">
+      <h1 className="text-[30px] font-semibold leading-[1.15] tracking-[-0.028em] text-[#0a0d14]">
+        Start A Dialer Session
+      </h1>
+
+      <div
+        className="mt-8 flex overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+        style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02), 0 12px 32px -10px rgba(13,75,58,0.10)" }}
+      >
+        <div
+          className="w-[5px] shrink-0"
+          style={{ background: "linear-gradient(135deg, #0d4b3a 0%, #04261c 100%)" }}
+        />
+        <div className="flex flex-1 items-center justify-between gap-6 px-8 py-7">
+          <div>
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0d4b3a]">
+              Resume Last Session
+            </div>
+            <div className="mt-2.5 text-[20px] font-semibold leading-[1.2] tracking-[-0.022em] text-[#0a0d14]">
+              Fort Bend County, Texas
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-[13px] text-[#5b606a]">
+              <div className="flex h-[6px] w-[120px] overflow-hidden rounded-full bg-[#f1f2f4]">
+                <div className="h-full bg-[#0d4b3a]" style={{ width: "48.9%" }} />
               </div>
-              <select className="h-9 w-[240px] rounded-md border border-gray-200 bg-white px-3 text-[12.5px] outline-none focus:border-petrol-500">
-                <option>{o.defaultTemplate}</option>
-                <option>Do Not Send</option>
-                <option>Custom Template</option>
-              </select>
-              <button
-                type="button"
-                className="text-[12px] font-semibold text-petrol-500 hover:text-petrol-700"
-              >
-                Preview
-              </button>
-              <div className="ml-auto max-w-[260px] text-right text-[11.5px] text-gray-500">
-                {o.desc}
-              </div>
+              <span className="tabular-nums">
+                <span className="font-semibold text-[#0a0d14]">23</span>
+                <span className="text-[#9298a3]"> of </span>
+                <span className="font-semibold text-[#0a0d14]">47</span>
+                <span> Dialed</span>
+              </span>
+            </div>
+            <div className="mt-1.5 text-[12px] text-[#9298a3]">
+              Paused Yesterday At 4:38pm
             </div>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SummaryRail({ step }: { step: Step }) {
-  return (
-    <div
-      className="self-start rounded-2xl bg-white p-5"
-      style={{
-        boxShadow:
-          "0 1px 2px rgba(15,23,41,0.04), 0 8px 24px -8px rgba(15,23,41,0.10)",
-      }}
-    >
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-gray-500">
-        Session Preview
-      </div>
-      <div className="mt-2 text-[26px] font-semibold tabular-nums text-ink">
-        47
-      </div>
-      <div className="text-[12.5px] text-gray-500">Selected Leads</div>
-
-      <div className="mt-5 border-t border-gray-100 pt-4">
-        <div className="flex items-center justify-between text-[12.5px]">
-          <span className="text-gray-500">Estimated Time</span>
-          <span className="font-semibold text-ink tabular-nums">3h 45m</span>
-        </div>
-        <div className="mt-2 flex items-center justify-between text-[12.5px]">
-          <span className="text-gray-500">Avg Talk Per Call</span>
-          <span className="font-semibold text-ink tabular-nums">4m 10s</span>
-        </div>
-        <div className="mt-2 flex items-center justify-between text-[12.5px]">
-          <span className="text-gray-500">Expected Connects</span>
-          <span className="font-semibold text-ink tabular-nums">14</span>
+          <button
+            type="button"
+            onClick={handleStart}
+            className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-[7px] bg-[#0d4b3a] px-6 text-[14px] font-medium tracking-[-0.008em] text-white"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
+          >
+            Resume Session
+            <IconArrowRight size={14} stroke={2.25} />
+          </button>
         </div>
       </div>
 
-      <div className="mt-5 border-t border-gray-100 pt-4">
-        <div className="text-[11.5px] font-semibold uppercase tracking-[0.10em] text-gray-500">
-          Step {step} of 3
+      <div className="mt-12 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
+        Or Start A New Session
+        <span className="h-px flex-1 bg-[#ebedf0]" />
+      </div>
+
+      <div className="mt-6">
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+          Lead Source
         </div>
-        <div className="mt-1 text-[12.5px] text-gray-700">
-          {step === 1
-            ? "Pick the lead list and quick filters."
-            : step === 2
-              ? "Choose how the dialer behaves between calls."
-              : "Pick what auto sends after each outcome."}
+        <div className="relative mt-2" ref={listRef}>
+          <button
+            type="button"
+            onClick={() => setListOpen((o) => !o)}
+            className={[
+              "group flex w-full cursor-pointer items-center justify-between gap-4 rounded-[8px] px-3 py-2 -ml-3 -mt-1 text-left transition",
+              listOpen ? "bg-[#fafbfc]" : "hover:bg-[#fafbfc]",
+            ].join(" ")}
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-3">
+                {selected ? (
+                  <>
+                    <span className="text-[22px] font-semibold tracking-[-0.022em] text-[#0a0d14]">
+                      {selected.name}
+                    </span>
+                    <IconChevronDown
+                      size={18}
+                      stroke={2.25}
+                      className={["text-[#0d4b3a] transition", listOpen ? "rotate-180" : ""].join(" ")}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[22px] font-semibold tracking-[-0.022em] text-[#0a0d14]">
+                      Pick A List To Dial
+                    </span>
+                    <span
+                      className="inline-flex h-[28px] items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-3 text-[12px] font-semibold text-white"
+                      style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 4px 12px -2px rgba(13,75,58,0.28)" }}
+                    >
+                      Choose
+                      <IconChevronDown size={11} stroke={2.5} className={["transition", listOpen ? "rotate-180" : ""].join(" ")} />
+                    </span>
+                  </>
+                )}
+              </div>
+              {selected?.meta && (
+                <div className="mt-1.5 text-[12.5px] text-[#5b606a]">{selected.meta}</div>
+              )}
+              {!selected && (
+                <div className="mt-1.5 text-[12.5px] text-[#5b606a]">
+                  Pick a recent import, a saved list, or everyone in your database.
+                </div>
+              )}
+            </div>
+          </button>
+
+          {listOpen && (
+            <div
+              className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-[12px] border border-[#ebedf0] bg-white"
+              style={{ boxShadow: "0 16px 40px -8px rgba(15,23,41,0.18), 0 4px 8px rgba(15,23,41,0.06)" }}
+            >
+              <div className="border-b border-[#f1f2f4] px-4 py-3">
+                <input
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search Lists..."
+                  className="w-full bg-transparent text-[13.5px] text-[#0a0d14] outline-none placeholder:text-[#c2c5cc]"
+                />
+              </div>
+              <div className="max-h-[420px] overflow-y-auto">
+                <ListGroup label="Everyone In Your Database">
+                  {filteredOptions.filter((o) => o.source === "all").map((o) => (
+                    <ListRow key={o.id} option={o} selected={o.id === selected?.id} onSelect={() => { setSelected(o); setListOpen(false); setSearch(""); }} />
+                  ))}
+                </ListGroup>
+                <ListGroup label="Recent Imports">
+                  {filteredOptions.filter((o) => o.source === "import").map((o) => (
+                    <ListRow key={o.id} option={o} selected={o.id === selected?.id} onSelect={() => { setSelected(o); setListOpen(false); setSearch(""); }} />
+                  ))}
+                </ListGroup>
+                <ListGroup label="Saved Lists">
+                  {filteredOptions.filter((o) => o.source === "saved").map((o) => (
+                    <ListRow key={o.id} option={o} selected={o.id === selected?.id} onSelect={() => { setSelected(o); setListOpen(false); setSearch(""); }} />
+                  ))}
+                </ListGroup>
+                {filteredOptions.length === 0 && (
+                  <div className="px-4 py-8 text-center text-[12.5px] text-[#9298a3]">
+                    No lists match &quot;{search}&quot;
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  );
-}
 
-function RadioRow({
-  checked,
-  onClick,
-  label,
-  hint,
-  trailing,
-}: {
-  checked: boolean;
-  onClick: () => void;
-  label: string;
-  hint?: string;
-  trailing?: React.ReactNode;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      className={[
-        "flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition",
-        checked
-          ? "border-petrol-500 bg-[#F4F8F7]"
-          : "border-gray-200 bg-white hover:border-gray-300",
-      ].join(" ")}
-    >
       <div
-        className={[
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition",
-          checked ? "border-petrol-500" : "border-gray-300",
-        ].join(" ")}
+        className="mt-7 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+        style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
       >
-        {checked && <div className="h-2 w-2 rounded-full bg-petrol-500" />}
+        <div className="flex items-start justify-between gap-6 px-7 py-5">
+          <div>
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Quick Filters</div>
+            <div className="mt-1.5 text-[16px] font-semibold tracking-[-0.018em] text-[#0a0d14]">Trim The List</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[26px] font-semibold leading-none tabular-nums tracking-[-0.022em] text-[#0a0d14]">28</div>
+            <div className="mt-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
+              Leads Match
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 border-t border-[#f1f2f4]">
+          <FilterCell label="Stage" value="Researched, First Contact" right />
+          <FilterCell label="State" value="Texas" />
+          <FilterCell label="County" value="Fort Bend" right />
+          <FilterCell label="Sale Type" value="Tax Sale" />
+          <FilterCell label="Owner Status" value="Living" right />
+          <FilterCell label="Surplus" value="$20,000+" />
+          <FilterCell label="Last Touched" value="Never" right />
+          <FilterCell label="Has Notes" value="Any" last />
+        </div>
+        <div className="flex items-center gap-7 border-t border-[#f1f2f4] px-7 py-4">
+          <Toggle label="Skip DNC" on />
+          <Toggle label="Skip Litigated" on />
+        </div>
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[13.5px] font-medium text-ink">{label}</div>
-        {hint && (
-          <div className="mt-0.5 text-[12px] text-gray-500">{hint}</div>
+
+      <div
+        className="mt-5 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+        style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+      >
+        <div className="flex items-start justify-between gap-6 px-7 py-5">
+          <div>
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Defaults</div>
+            <div className="mt-1.5 max-w-[64ch] text-[13px] leading-[1.55] text-[#5b606a]">
+              Using your saved defaults for caller ID, voicemail, wrap up, email, and SMS. Customize any one for just this session.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDefaultsOpen((o) => !o)}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-[#0d4b3a] transition hover:text-[#13644e]"
+          >
+            {defaultsOpen ? "Hide" : "Customize For This Session"}
+            {defaultsOpen ? <IconChevronUp size={13} stroke={2.25} /> : <IconChevronDown size={13} stroke={2.25} />}
+          </button>
+        </div>
+        {defaultsOpen && (
+          <div className="border-t border-[#f1f2f4] divide-y divide-[#f1f2f4]">
+            <DefaultRow label="Caller ID" value="Auto Map By State" subtitle="Picks a number local to each lead's state if available, otherwise falls back to your default number." />
+            <DefaultRow label="Voicemail" value="Off · You'll Handle Voicemail Manually" subtitle="Pre-record a voicemail to have it auto-play when a call reaches voicemail. Configure in Settings → Recordings." />
+            <DefaultRow label="Wrap Up" value="30 Seconds" subtitle="Short pause after a live conversation so you can finish your notes before the next call." />
+            <DefaultRow label="Email Followup" value="On · Auto Sent After Each Call" subtitle="An email auto-sends based on how the call went. Configure in Settings → Email Templates." />
+            <DefaultRow label="SMS Followup" value="Not Ready Until Approved" subtitle="Send a different text after a call. Unlocks after A2P 10DLC brand approval. Configure in Settings → SMS Templates." muted />
+          </div>
         )}
       </div>
-      {trailing && <div onClick={(e) => e.stopPropagation()}>{trailing}</div>}
+
+      <div className="mt-8 flex items-center gap-3">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name This List To Save It"
+          className="h-11 flex-1 rounded-[7px] border border-[#ebedf0] bg-white px-4 text-[14px] text-[#0a0d14] outline-none transition focus:border-[#0d4b3a] placeholder:text-[#c2c5cc]"
+        />
+        <button
+          type="button"
+          className="h-11 cursor-pointer px-3 text-[13.5px] font-medium text-[#5b606a] transition hover:text-[#0a0d14]"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={!selected}
+          className="inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-[7px] bg-[#0d4b3a] px-6 text-[14px] font-medium tracking-[-0.008em] text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+          style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
+        >
+          Start Session
+          {selected && <span className="rounded-[5px] bg-white/15 px-2 py-0.5 text-[12px] tabular-nums">28</span>}
+        </button>
+      </div>
     </div>
   );
 }
 
-function CheckRow({
-  checked,
-  onChange,
-  label,
-  hint,
-}: {
-  checked: boolean;
-  onChange: (b: boolean) => void;
-  label: string;
-  hint?: string;
-}) {
+function ListGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  if (!children || (Array.isArray(children) && children.length === 0)) return null;
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 transition hover:border-gray-300">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 cursor-pointer accent-petrol-500"
-      />
-      <div>
-        <div className="text-[13.5px] font-medium text-ink">{label}</div>
-        {hint && <div className="mt-0.5 text-[12px] text-gray-500">{hint}</div>}
-      </div>
-    </label>
-  );
-}
-
-function AdvancedField({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="mb-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+    <div className="border-b border-[#f1f2f4] py-2 last:border-b-0">
+      <div className="px-4 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">
         {label}
       </div>
-      {children}
+      <div>{children}</div>
     </div>
   );
 }
 
-function SelectInput({ options }: { options: string[] }) {
+function ListRow({ option, selected, onSelect }: { option: ListOption; selected: boolean; onSelect: () => void }) {
   return (
-    <select className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-[12.5px] text-ink outline-none focus:border-petrol-500">
-      {options.map((o) => (
-        <option key={o}>{o}</option>
-      ))}
-    </select>
+    <button
+      type="button"
+      onClick={onSelect}
+      className={[
+        "flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-2 text-left transition",
+        selected ? "bg-[#fafbfc]" : "hover:bg-[#fafbfc]",
+      ].join(" ")}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        {selected ? (
+          <IconCheck size={13} stroke={2.5} className="shrink-0 text-[#0d4b3a]" />
+        ) : (
+          <span className="w-[13px]" />
+        )}
+        <div className="min-w-0">
+          <div className={["truncate text-[13px]", selected ? "font-semibold text-[#0a0d14]" : "font-medium text-[#374151]"].join(" ")}>
+            {option.name}
+          </div>
+          {option.meta && <div className="mt-0.5 truncate text-[11px] text-[#9298a3]">{option.meta}</div>}
+        </div>
+      </div>
+      <span className="shrink-0 text-[11.5px] tabular-nums text-[#5b606a]">{option.count}</span>
+    </button>
+  );
+}
+
+function FilterCell({ label, value, right, last }: { label: string; value: string; right?: boolean; last?: boolean }) {
+  return (
+    <button
+      type="button"
+      className={[
+        "group flex w-full cursor-pointer items-center justify-between gap-3 px-7 py-3.5 text-left transition hover:bg-[#fafbfc]",
+        right ? "border-r border-[#f1f2f4]" : "",
+        last ? "" : "border-b border-[#f1f2f4]",
+      ].join(" ")}
+    >
+      <div className="text-[12.5px] font-medium text-[#5b606a]">{label}</div>
+      <div className="inline-flex max-w-[65%] items-center gap-1.5 text-[12.5px] font-semibold text-[#0a0d14]">
+        <span className="truncate">{value}</span>
+        <IconChevronDown size={12} stroke={2.25} className="shrink-0 text-[#0d4b3a] opacity-60 transition group-hover:opacity-100" />
+      </div>
+    </button>
+  );
+}
+
+function DefaultRow({ label, value, subtitle, muted, accent }: { label: string; value: string; subtitle: string; muted?: boolean; accent?: string }) {
+  return (
+    <div className="flex items-stretch gap-0 px-0 py-0">
+      <div className="w-[3px] shrink-0" style={{ background: accent ?? (muted ? "#ebedf0" : "#0d4b3a") }} />
+      <div className="grid flex-1 grid-cols-[160px_1fr_auto] items-start gap-6 px-7 py-5">
+        <div className="pt-1 text-[12.5px] font-medium text-[#0a0d14]">{label}</div>
+        <div>
+          <div className={["text-[13.5px] font-medium", muted ? "text-[#9298a3]" : "text-[#0a0d14]"].join(" ")}>
+            {value}
+          </div>
+          <div className="mt-1.5 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>
+        </div>
+        <button
+          type="button"
+          className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] bg-white px-2.5 text-[12px] font-medium text-[#0d4b3a] transition hover:text-[#13644e]"
+          style={{ border: "1px solid #ebedf0" }}
+        >
+          Preview
+          <IconExternalLink size={11} stroke={2} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Toggle({ label, on }: { label: string; on: boolean }) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2.5">
+      <span
+        className={[
+          "relative inline-flex h-[20px] w-[36px] shrink-0 rounded-full transition",
+          on ? "bg-[#0d4b3a]" : "bg-[#d6d4cd]",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "absolute top-[2px] h-[16px] w-[16px] rounded-full bg-white transition",
+            on ? "left-[18px]" : "left-[2px]",
+          ].join(" ")}
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.20), 0 0 0 0.5px rgba(12,13,16,0.06)" }}
+        />
+      </span>
+      <span className="text-[12.5px] font-medium text-[#0a0d14]">{label}</span>
+    </label>
   );
 }
