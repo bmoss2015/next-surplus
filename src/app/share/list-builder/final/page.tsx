@@ -29,7 +29,7 @@ const LIST_OPTIONS: ListOption[] = [
 ];
 
 export default function FinalVariant() {
-  const [selected, setSelected] = useState<ListOption | null>(null);
+  const [selected, setSelected] = useState<ListOption | null>(LIST_OPTIONS[1]);
   const [listOpen, setListOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [defaultsOpen, setDefaultsOpen] = useState(false);
@@ -58,11 +58,21 @@ export default function FinalVariant() {
     <div className="min-h-screen bg-[#fafbfc]">
       <div className="mx-auto max-w-[880px] px-14 pb-32 pt-12">
         <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#9298a3]">
-          Picked Variant &middot; Resume From I + Filter From J + Defaults From G
+          Picked Variant &middot; V3 With Section Progression
         </div>
         <h1 className="mt-2.5 text-[30px] font-semibold leading-[1.15] tracking-[-0.028em] text-[#0a0d14]">
           Start A Dialer Session
         </h1>
+
+        <div className="mt-7 flex items-center gap-2.5">
+          <ProgressStep n={1} label="Lead Source" state={selected ? "done" : "active"} />
+          <span className="h-px w-10 bg-[#ebedf0]" />
+          <ProgressStep n={2} label="Quick Filters" state={selected ? "active" : "todo"} />
+          <span className="h-px w-10 bg-[#ebedf0]" />
+          <ProgressStep n={3} label="Defaults" state="todo" />
+          <span className="h-px w-10 bg-[#ebedf0]" />
+          <ProgressStep n={4} label="Start" state="todo" />
+        </div>
 
         <div
           className="mt-8 flex overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
@@ -113,7 +123,7 @@ export default function FinalVariant() {
 
         <div className="mt-6">
           <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-            Calling List
+            Lead Source
           </div>
           <div className="relative mt-2" ref={listRef}>
             <button
@@ -138,7 +148,7 @@ export default function FinalVariant() {
                     </>
                   ) : (
                     <>
-                      <span className="text-[22px] font-semibold tracking-[-0.022em] text-[#9298a3]">
+                      <span className="text-[22px] font-semibold tracking-[-0.022em] text-[#0a0d14]">
                         Choose A List To Dial
                       </span>
                       <span
@@ -215,7 +225,7 @@ export default function FinalVariant() {
         >
           <div className="flex items-start justify-between gap-6 px-7 py-5">
             <div>
-              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Filter</div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Quick Filters</div>
               <div className="mt-1.5 text-[16px] font-semibold tracking-[-0.018em] text-[#0a0d14]">Trim The List</div>
             </div>
             <div className="text-right">
@@ -300,6 +310,36 @@ export default function FinalVariant() {
   );
 }
 
+function ProgressStep({ n, label, state }: { n: number; label: string; state: "done" | "active" | "todo" }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={[
+          "inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition",
+          state === "done"
+            ? "bg-[#0d4b3a] text-white"
+            : state === "active"
+              ? "bg-white text-[#0d4b3a]"
+              : "bg-white text-[#9298a3]",
+        ].join(" ")}
+        style={{
+          border: state === "active" ? "2px solid #0d4b3a" : "1px solid #ebedf0",
+        }}
+      >
+        {state === "done" ? <IconCheck size={12} stroke={3} /> : n}
+      </span>
+      <span
+        className={[
+          "text-[12px] font-medium whitespace-nowrap",
+          state === "todo" ? "text-[#9298a3]" : "text-[#0a0d14]",
+        ].join(" ")}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   if (!children || (Array.isArray(children) && children.length === 0)) return null;
   const hasItems = Array.isArray(children) ? children.some((c) => c) : !!children;
@@ -361,24 +401,27 @@ function FilterCell({ label, value, right, last }: { label: string; value: strin
   );
 }
 
-function DefaultRow({ label, value, subtitle, muted }: { label: string; value: string; subtitle: string; muted?: boolean }) {
+function DefaultRow({ label, value, subtitle, muted, accent }: { label: string; value: string; subtitle: string; muted?: boolean; accent?: string }) {
   return (
-    <div className="grid grid-cols-[160px_1fr_auto] items-start gap-6 px-7 py-5">
-      <div className="pt-1 text-[12.5px] font-medium text-[#0a0d14]">{label}</div>
-      <div>
-        <div className={["text-[13.5px] font-medium", muted ? "text-[#9298a3]" : "text-[#0a0d14]"].join(" ")}>
-          {value}
+    <div className="flex items-stretch gap-0 px-0 py-0">
+      <div className="w-[3px] shrink-0" style={{ background: accent ?? (muted ? "#ebedf0" : "#0d4b3a") }} />
+      <div className="grid flex-1 grid-cols-[160px_1fr_auto] items-start gap-6 px-7 py-5">
+        <div className="pt-1 text-[12.5px] font-medium text-[#0a0d14]">{label}</div>
+        <div>
+          <div className={["text-[13.5px] font-medium", muted ? "text-[#9298a3]" : "text-[#0a0d14]"].join(" ")}>
+            {value}
+          </div>
+          <div className="mt-1.5 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>
         </div>
-        <div className="mt-1.5 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>
+        <button
+          type="button"
+          className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] bg-white px-2.5 text-[12px] font-medium text-[#0d4b3a] transition hover:text-[#13644e]"
+          style={{ border: "1px solid #ebedf0" }}
+        >
+          Preview
+          <IconExternalLink size={11} stroke={2} />
+        </button>
       </div>
-      <button
-        type="button"
-        className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] bg-white px-2.5 text-[12px] font-medium text-[#5b606a] transition hover:text-[#0a0d14]"
-        style={{ border: "1px solid #ebedf0" }}
-      >
-        Change
-        <IconExternalLink size={11} stroke={2} className="text-[#9298a3]" />
-      </button>
     </div>
   );
 }
