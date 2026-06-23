@@ -356,6 +356,7 @@ export default function VariantF() {
   const [skipLitigated, setSkipLitigated] = useState(true);
   const [skipDnc, setSkipDnc] = useState(true);
   const [dncAcknowledged, setDncAcknowledged] = useState(false);
+  const [defaultsExpanded, setDefaultsExpanded] = useState(false);
   const [openEditor, setOpenEditor] = useState<null | "caller" | "voicemail" | "wrapup" | "email" | "sms">(null);
   const [callerIdMode, setCallerIdMode] = useState<"auto" | "specific">("auto");
   const [callerIdNumber, setCallerIdNumber] = useState("tx-1");
@@ -569,12 +570,30 @@ export default function VariantF() {
         className="mt-5 overflow-hidden rounded-[12px] bg-white"
         style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 8px 24px -8px rgba(15,23,41,0.08)" }}
       >
-        <div className="border-b border-[#f1f2f4] bg-[#fbfbfc] px-5 py-4">
-          <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-            Defaults
+        <div className={["flex items-center justify-between bg-[#fbfbfc] px-5 py-4", defaultsExpanded ? "border-b border-[#f1f2f4]" : ""].join(" ")}>
+          <div>
+            <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
+              Defaults
+            </div>
+            {!defaultsExpanded && (
+              <div className="mt-1 text-[11.5px] text-[#6b7280]">
+                Using your saved defaults for caller ID, voicemail, wrap up, email, and SMS
+              </div>
+            )}
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDefaultsExpanded((e) => !e);
+              setOpenEditor(null);
+            }}
+            className="shrink-0 cursor-pointer text-[12px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
+          >
+            {defaultsExpanded ? "Hide" : "Update Defaults"}
+          </button>
         </div>
 
+        {defaultsExpanded && (
         <div className="divide-y divide-[#f1f2f4]">
           <EditableRow
             label="Caller ID"
@@ -735,6 +754,7 @@ export default function VariantF() {
             </div>
           </EditableRow>
         </div>
+        )}
       </div>
 
       <div className="mt-5 flex items-center gap-2">
