@@ -35,6 +35,10 @@ export default function PhoneNumbersLayout({
             <Link href="/share/phone-numbers/c" className="hover:text-[#0a0d14]">C</Link>
             <Link href="/share/phone-numbers/d" className="hover:text-[#0a0d14]">D</Link>
             <Link href="/share/phone-numbers/e" className="hover:text-[#0a0d14]">E</Link>
+            <span className="text-[#ebedf0]">|</span>
+            <Link href="/share/phone-numbers/f" className="font-semibold text-[#0d4b3a] hover:opacity-70">F</Link>
+            <Link href="/share/phone-numbers/g" className="font-semibold text-[#0d4b3a] hover:opacity-70">G</Link>
+            <Link href="/share/phone-numbers/h" className="font-semibold text-[#0d4b3a] hover:opacity-70">H</Link>
           </div>
         </div>
       </div>
