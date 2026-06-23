@@ -63,7 +63,7 @@ export default function VariantJ() {
           </div>
 
           <div className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
-            Or Build A New Session
+            Or Start A New Session
           </div>
 
           <button
@@ -87,7 +87,7 @@ export default function VariantJ() {
           <div className="mt-5 overflow-hidden rounded-[12px] border border-[#e5e7eb] bg-white">
             <div className="flex items-center justify-between border-b border-[#f1f2f4] px-6 py-3.5">
               <div className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-                Refine
+                Filter
               </div>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-[20px] font-semibold tabular-nums text-[#0f1729]">28</span>
@@ -133,7 +133,7 @@ export default function VariantJ() {
                 type="button"
                 className="h-9 cursor-pointer rounded-[8px] border border-[#e5e7eb] bg-white px-3.5 text-[12px] font-medium text-[#0f1729] transition hover:border-[#9ca3af]"
               >
-                Update Defaults
+                Edit
               </button>
             </div>
           </div>

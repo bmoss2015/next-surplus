@@ -71,7 +71,7 @@ export default function VariantH() {
 
       <div className="mb-2 flex items-center gap-3">
         <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
-          Or Build A New Session
+          Or Start A New Session
         </div>
         <div className="h-px flex-1 bg-[#e5e7eb]" />
       </div>
@@ -100,7 +100,7 @@ export default function VariantH() {
       <div className="mt-4 overflow-hidden rounded-[6px] bg-white ring-1 ring-[#e5e7eb]">
         <div className="flex items-center justify-between border-b border-[#f1f2f4] px-4 py-2.5">
           <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-            Refine
+            Filter
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-[16px] font-semibold tabular-nums text-[#0f1729]">28</span>
@@ -145,7 +145,7 @@ export default function VariantH() {
             type="button"
             className="h-8 cursor-pointer rounded-[6px] bg-white px-3 text-[11.5px] font-medium text-[#0f1729] ring-1 ring-[#e5e7eb] transition hover:ring-[#0f1729]"
           >
-            Update Defaults
+            Edit
           </button>
         </div>
       </div>

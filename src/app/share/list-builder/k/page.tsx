@@ -12,10 +12,8 @@ function CircleToggle({ checked, label }: { checked: boolean; label: string }) {
     <label className="inline-flex cursor-pointer items-center gap-2.5">
       <span
         className={[
-          "relative flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full transition",
-          checked
-            ? "bg-gradient-to-br from-[#13644e] to-[#0a3d4a] shadow-[0_2px_4px_rgba(13,75,58,0.30),inset_0_1px_0_rgba(255,255,255,0.10)]"
-            : "border-2 border-[#d1d5db] bg-white",
+          "relative flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full border-2 transition",
+          checked ? "border-[#13644e] bg-[#13644e]" : "border-[#d1d5db] bg-white",
         ].join(" ")}
       >
         {checked && <span className="h-[7px] w-[7px] rounded-full bg-white" />}
@@ -31,24 +29,18 @@ export default function VariantK() {
 
   return (
     <div className="min-h-screen pb-16">
-      <div className="bg-gradient-to-b from-[#0a3d4a] to-[#13644e] px-6 pb-16 pt-14">
-        <div className="mx-auto max-w-[900px]">
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-white/60">
+      <div className="mx-auto max-w-[900px] px-6 pt-12">
+        <div className="mb-8">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
             Variant K &middot; Brand Forward
           </div>
-          <h1 className="mt-2 text-[34px] font-semibold tracking-[-0.025em] text-white">
+          <h1 className="mt-2 text-[30px] font-semibold tracking-[-0.025em] text-[#0f1729]">
             Start A Dialer Session
           </h1>
-          <div className="mt-2 text-[14px] text-white/70">
-            Pick a starting point. Refine. Hit start.
-          </div>
         </div>
-      </div>
-
-      <div className="mx-auto -mt-10 max-w-[900px] px-6">
         <div
           className="flex items-center justify-between gap-4 rounded-[14px] bg-white px-6 py-5"
-          style={{ boxShadow: "0 12px 32px -8px rgba(10,61,74,0.18), 0 2px 6px rgba(15,23,41,0.06)" }}
+          style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 6px 18px -4px rgba(15,23,41,0.08)" }}
         >
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#13644e]">
@@ -72,7 +64,7 @@ export default function VariantK() {
 
         <div className="mt-8 mb-3 flex items-center gap-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
-            Or Build A New Session
+            Or Start A New Session
           </div>
           <div className="h-px flex-1 bg-[#e5e7eb]" />
         </div>
@@ -105,7 +97,7 @@ export default function VariantK() {
           <div className="flex items-center justify-between border-b border-[#f1f2f4] px-6 py-4">
             <div>
               <div className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-                Refine
+                Filter
               </div>
               <div className="mt-0.5 text-[11.5px] text-[#9ca3af]">
                 Trim the list before you dial
@@ -160,9 +152,9 @@ export default function VariantK() {
             </div>
             <button
               type="button"
-              className="h-9 cursor-pointer rounded-[8px] bg-gradient-to-b from-[#13644e] to-[#0a3d4a] px-4 text-[12px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25),inset_0_1px_0_rgba(255,255,255,0.10)] transition hover:opacity-95"
+              className="h-9 cursor-pointer rounded-[8px] bg-white px-4 text-[12px] font-semibold text-[#0f1729] ring-1 ring-[#e5e7eb] transition hover:ring-[#9ca3af]"
             >
-              Update Defaults
+              Edit
             </button>
           </div>
         </div>

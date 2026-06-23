@@ -62,7 +62,7 @@ export default function VariantI() {
       </div>
 
       <div className="mb-4 text-center text-[11px] font-medium uppercase tracking-[0.16em] text-[#9ca3af]">
-        Or Build A New Session
+        Or Start A New Session
       </div>
 
       <button
@@ -92,7 +92,7 @@ export default function VariantI() {
         <div className="flex items-baseline justify-between px-7 py-5">
           <div>
             <div className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-              Refine
+              Filter
             </div>
             <div className="mt-0.5 text-[12px] text-[#9ca3af]">
               Trim the list before you dial
@@ -149,7 +149,7 @@ export default function VariantI() {
             type="button"
             className="h-10 cursor-pointer rounded-[12px] bg-[#0f1729] px-4 text-[12.5px] font-medium text-white transition hover:opacity-90"
           >
-            Update Defaults
+            Edit
           </button>
         </div>
       </div>

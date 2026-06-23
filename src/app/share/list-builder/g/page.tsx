@@ -60,7 +60,7 @@ export default function VariantG() {
       </div>
 
       <div className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
-        Or Build A New Session
+        Or Start A New Session
       </div>
 
       <button
@@ -85,7 +85,7 @@ export default function VariantG() {
         <div className="flex items-center justify-between px-6 py-4">
           <div>
             <div className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-[#0a0a0a]">
-              Refine
+              Filter
             </div>
             <div className="mt-0.5 text-[11.5px] text-[#9ca3af]">
               Trim the list before you dial
@@ -142,7 +142,7 @@ export default function VariantG() {
             type="button"
             className="h-9 cursor-pointer rounded-[6px] bg-white px-3.5 text-[12px] font-medium text-[#0a0a0a] ring-1 ring-[#e5e7eb] transition hover:ring-[#d1d5db]"
           >
-            Update Defaults
+            Edit
           </button>
         </div>
       </div>
