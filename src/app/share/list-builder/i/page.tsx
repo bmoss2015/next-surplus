@@ -1,0 +1,314 @@
+"use client";
+
+import { useState } from "react";
+import {
+  IconChevronDown,
+  IconChevronUp,
+  IconArrowRight,
+  IconPlus,
+  IconX,
+  IconExternalLink,
+} from "@tabler/icons-react";
+
+export default function VariantI() {
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-[#fafbfc]">
+      <div className="mx-auto max-w-[880px] px-14 pb-32 pt-12">
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#9298a3]">
+          Variant I &middot; F Structure &middot; Featured Resume (Tightened)
+        </div>
+        <h1 className="mt-2.5 text-[30px] font-semibold leading-[1.15] tracking-[-0.028em] text-[#0a0d14]">
+          Start A Dialer Session
+        </h1>
+
+        <div
+          className="mt-8 flex overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02), 0 12px 32px -10px rgba(13,75,58,0.10)" }}
+        >
+          <div
+            className="w-[5px] shrink-0"
+            style={{ background: "linear-gradient(135deg, #0d4b3a 0%, #04261c 100%)" }}
+          />
+          <div className="flex flex-1 items-center justify-between gap-6 px-8 py-7">
+            <div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0d4b3a]">
+                Resume Last Session
+              </div>
+              <div className="mt-2.5 text-[20px] font-semibold leading-[1.2] tracking-[-0.022em] text-[#0a0d14]">
+                Fort Bend County, Texas
+              </div>
+              <div className="mt-3 flex items-center gap-2 text-[13px] text-[#5b606a]">
+                <div className="flex h-[6px] w-[120px] overflow-hidden rounded-full bg-[#f1f2f4]">
+                  <div className="h-full bg-[#0d4b3a]" style={{ width: "48.9%" }} />
+                </div>
+                <span className="tabular-nums">
+                  <span className="font-semibold text-[#0a0d14]">23</span>
+                  <span className="text-[#9298a3]"> of </span>
+                  <span className="font-semibold text-[#0a0d14]">47</span>
+                  <span> Dialed</span>
+                </span>
+              </div>
+              <div className="mt-1.5 text-[12px] text-[#9298a3]">
+                Paused Yesterday At 4:38pm
+              </div>
+            </div>
+            <button
+              type="button"
+              className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-[7px] bg-[#0d4b3a] px-6 text-[14px] font-medium tracking-[-0.008em] text-white"
+              style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
+            >
+              Resume Session
+              <IconArrowRight size={14} stroke={2.25} />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-12 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
+          Or Start A New Session
+          <span className="h-px flex-1 bg-[#ebedf0]" />
+        </div>
+
+        <div
+          className="mt-4 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+        >
+          <div className="flex items-start justify-between gap-6 px-7 py-6">
+            <div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+                Calling List
+              </div>
+              <div className="mt-2 text-[16px] font-semibold leading-[1.25] tracking-[-0.018em] text-[#0a0d14]">
+                Pick A Base Set
+              </div>
+              <div className="mt-1.5 max-w-[60ch] text-[12.5px] leading-[1.55] text-[#5b606a]">
+                Choose a recent import, a saved list, or everyone in your database.
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-[#f1f2f4] px-7 py-6">
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center justify-between rounded-[7px] border border-[#ebedf0] bg-white px-5 py-4 text-left transition hover:border-[#d8d6cf]"
+            >
+              <div>
+                <div className="text-[15px] font-semibold tracking-[-0.005em] text-[#0a0d14]">
+                  Fort Bend County, Texas
+                </div>
+                <div className="mt-1 text-[12.5px] text-[#5b606a]">Imported Jun 21, 2026</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[13.5px] font-medium tabular-nums text-[#5b606a]">47 Leads</span>
+                <IconChevronDown size={15} stroke={2} className="text-[#9298a3]" />
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <div
+          className="mt-5 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+        >
+          <div className="flex items-start justify-between gap-6 px-7 py-6">
+            <div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+                Filter
+              </div>
+              <div className="mt-2 text-[16px] font-semibold leading-[1.25] tracking-[-0.018em] text-[#0a0d14]">
+                Trim The List Before You Dial
+              </div>
+              <div className="mt-1.5 max-w-[60ch] text-[12.5px] leading-[1.55] text-[#5b606a]">
+                Each filter narrows the set. The count updates as you add or remove filters.
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <div className="text-[26px] font-semibold leading-[1.1] tabular-nums tracking-[-0.022em] text-[#0a0d14]">
+                28 Leads
+              </div>
+              <div className="mt-1 text-[11.5px] tabular-nums text-[#5b606a]">
+                Out Of 47 In This List
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-[#f1f2f4] px-7 py-6">
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                ["Stage", "Researched, First Contact"],
+                ["State", "Texas"],
+                ["Owner Status", "Living"],
+                ["Surplus", "$20k Plus"],
+                ["Last Touched", "Never"],
+              ].map(([l, v]) => (
+                <span
+                  key={l}
+                  className="inline-flex h-[28px] cursor-pointer items-center gap-1.5 rounded-[6px] border border-[#ebedf0] bg-white px-3 text-[12.5px] font-medium tabular-nums text-[#1a1d24] transition hover:border-[#d8d6cf]"
+                >
+                  <span className="text-[#9298a3]">{l}:</span>
+                  <span className="text-[#0a0d14]">{v}</span>
+                  <IconX size={11} stroke={2.25} className="text-[#9298a3] opacity-45" />
+                </span>
+              ))}
+              <button
+                type="button"
+                className="inline-flex h-[28px] cursor-pointer items-center gap-1 rounded-[6px] border border-dashed border-[#c2c5cc] bg-white px-2.5 text-[12px] font-medium text-[#5b606a] transition hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
+              >
+                <IconPlus size={11} stroke={2.5} />
+                Add Filter
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-8 border-t border-[#f1f2f4] px-7 py-5">
+            <Toggle label="Skip DNC" on />
+            <Toggle label="Skip Litigated" on />
+          </div>
+        </div>
+
+        <div
+          className="mt-5 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+        >
+          <div className="flex items-start justify-between gap-6 px-7 py-6">
+            <div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+                Defaults
+              </div>
+              <div className="mt-2 text-[16px] font-semibold leading-[1.25] tracking-[-0.018em] text-[#0a0d14]">
+                Caller ID, Voicemail, Wrap Up, Email, And SMS
+              </div>
+              <div className="mt-1.5 max-w-[60ch] text-[12.5px] leading-[1.55] text-[#5b606a]">
+                Using your saved defaults. Edit any one for just this session without changing the global default.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDefaultsOpen((o) => !o)}
+              className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[7px] bg-white px-4 text-[13.5px] font-medium text-[#0a0d14] transition hover:border-[#d8d6cf]"
+              style={{ border: "1px solid #ebedf0", boxShadow: "0 1px 1px rgba(12,13,16,0.02)" }}
+            >
+              {defaultsOpen ? (
+                <>
+                  Hide
+                  <IconChevronUp size={13} stroke={2} className="text-[#9298a3]" />
+                </>
+              ) : (
+                <>
+                  Edit Defaults
+                  <IconChevronDown size={13} stroke={2} className="text-[#9298a3]" />
+                </>
+              )}
+            </button>
+          </div>
+
+          {defaultsOpen && (
+            <div className="border-t border-[#f1f2f4] divide-y divide-[#f1f2f4]">
+              <DefaultRow
+                label="Caller ID"
+                value="Auto Map By State"
+                subtitle="Picks a number local to each lead's state if available, otherwise falls back to your default number."
+              />
+              <DefaultRow
+                label="Voicemail"
+                value="Off · You'll Handle Voicemail Manually"
+                subtitle="Pre-record a voicemail to have it auto-play when a call reaches voicemail. Configure in Settings → Recordings."
+              />
+              <DefaultRow
+                label="Wrap Up"
+                value="30 Seconds"
+                subtitle="Short pause after a live conversation so you can finish your notes before the next call."
+              />
+              <DefaultRow
+                label="Email Followup"
+                value="On · Auto Sent After Each Call"
+                subtitle="An email auto-sends based on how the call went. Most operators configure one for live conversations, voicemails, and no-answers. Configure in Settings → Email Templates."
+              />
+              <DefaultRow
+                label="SMS Followup"
+                value="Not Ready Until Approved"
+                subtitle="Send a different text after a call (typically after a voicemail or no-answer). SMS unlocks after A2P 10DLC brand approval. Configure in Settings → SMS Templates."
+                muted
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Name This List To Save It (Optional)"
+            className="h-11 flex-1 rounded-[7px] border border-[#ebedf0] bg-white px-4 text-[14px] text-[#0a0d14] outline-none transition focus:border-[#0d4b3a] placeholder:text-[#c2c5cc]"
+          />
+          <button
+            type="button"
+            className="h-11 cursor-pointer rounded-[7px] bg-white px-5 text-[13.5px] font-medium text-[#0a0d14] transition hover:border-[#d8d6cf]"
+            style={{ border: "1px solid #ebedf0", boxShadow: "0 1px 1px rgba(12,13,16,0.02)" }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-[7px] bg-[#0d4b3a] px-6 text-[14px] font-medium tracking-[-0.008em] text-white"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
+          >
+            Start Session
+            <span className="rounded-[5px] bg-white/15 px-2 py-0.5 text-[12px] tabular-nums">28</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DefaultRow({
+  label,
+  value,
+  subtitle,
+  muted,
+}: {
+  label: string;
+  value: string;
+  subtitle: string;
+  muted?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-[180px_1fr_auto] items-start gap-6 px-7 py-5">
+      <div className="pt-1 text-[12.5px] font-medium text-[#0a0d14]">{label}</div>
+      <div>
+        <div className={["text-[13.5px] font-medium", muted ? "text-[#9298a3]" : "text-[#0a0d14]"].join(" ")}>
+          {value}
+        </div>
+        <div className="mt-1.5 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>
+      </div>
+      <button
+        type="button"
+        className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] bg-white px-2.5 text-[12px] font-medium text-[#5b606a] transition hover:text-[#0a0d14]"
+        style={{ border: "1px solid #ebedf0" }}
+      >
+        Change
+        <IconExternalLink size={11} stroke={2} className="text-[#9298a3]" />
+      </button>
+    </div>
+  );
+}
+
+function Toggle({ label, on }: { label: string; on: boolean }) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-3">
+      <span
+        className={[
+          "relative inline-flex h-[22px] w-[40px] shrink-0 rounded-full transition",
+          on ? "bg-[#0d4b3a]" : "bg-[#d6d4cd]",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white transition",
+            on ? "left-[20px]" : "left-[2px]",
+          ].join(" ")}
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.20), 0 0 0 0.5px rgba(12,13,16,0.06)" }}
+        />
+      </span>
+      <span className="text-[13.5px] font-medium text-[#0a0d14]">{label}</span>
+    </label>
+  );
+}
