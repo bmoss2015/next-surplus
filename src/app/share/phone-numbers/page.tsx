@@ -1,309 +1,86 @@
-"use client";
+import Link from "next/link";
 
-import { useState } from "react";
-import {
-  IconPlus,
-  IconSearch,
-  IconPhone,
-  IconMessageCircle,
-  IconTrash,
-  IconClock,
-  IconCircleCheck,
-  IconWaveSine,
-  IconCalendarDollar,
-  IconShieldCheck,
-} from "@tabler/icons-react";
-
-type PhoneNumber = {
-  id: string;
-  number: string;
-  state: string;
-  city: string;
-  voice: boolean;
-  sms: boolean;
-  monthly: string;
-  status: "active" | "pending";
-  purchasedOn: string;
-};
-
-const NUMBERS: PhoneNumber[] = [
-  { id: "1", number: "(512) 555 0188", state: "Texas", city: "Austin", voice: true, sms: true, monthly: "$1.50", status: "active", purchasedOn: "Jun 03, 2026" },
-  { id: "2", number: "(713) 555 0244", state: "Texas", city: "Houston", voice: true, sms: false, monthly: "$1.50", status: "active", purchasedOn: "Jun 12, 2026" },
-  { id: "3", number: "(704) 555 0212", state: "North Carolina", city: "Charlotte", voice: true, sms: true, monthly: "$1.50", status: "active", purchasedOn: "May 18, 2026" },
-  { id: "4", number: "(602) 555 0177", state: "Arizona", city: "Phoenix", voice: true, sms: false, monthly: "$1.50", status: "pending", purchasedOn: "Jun 22, 2026" },
+const VARIANTS = [
+  {
+    slug: "a",
+    name: "Settings Card Standard",
+    anchor: "Portal · single grouped card",
+    rationale:
+      "Everything inside one settings-card surface. Eyebrow group headers between sections. Matches the AttorneysSection / EmailTemplatesSection layout in the portal.",
+  },
+  {
+    slug: "b",
+    name: "Multi-Card Stack",
+    anchor: "Portal · separate settings-cards per concern",
+    rationale:
+      "Each concern (Your Numbers, Buy A Number, Per State Rotation, SMS Setup) is its own settings-card with its own head. Most modular. Matches Notifications / Security panel layouts.",
+  },
+  {
+    slug: "c",
+    name: "Numbered Cards Grid",
+    anchor: "Portal · canvas-card pattern, attorney cards",
+    rationale:
+      "Each phone number is its own card in a 2-up grid with capability split inside. SMS A2P registration shown as a progress strip. Most visually distinct per-number.",
+  },
+  {
+    slug: "d",
+    name: "Two-Column List + Drawer",
+    anchor: "Portal · attorney/team list with right-side detail",
+    rationale:
+      "Left: scrollable number list. Right: 360px detail panel that updates with the selected number, or switches to Buy mode. Mirrors the AttorneysSection list + AttorneyDrawer pattern.",
+  },
+  {
+    slug: "e",
+    name: "Hero A2P Status",
+    anchor: "Portal · settings-card with progress strip",
+    rationale:
+      "Leads with the A2P registration as a 4-step progress strip across the top so SMS readiness is always visible. Numbers list and rotation sit below. Strongest framing for the SMS gating concern.",
+  },
 ];
 
-const SEARCH_RESULTS = [
-  { number: "(404) 555 0291", state: "Georgia", city: "Atlanta", voice: true, sms: true, monthly: "$1.50" },
-  { number: "(404) 555 0382", state: "Georgia", city: "Atlanta", voice: true, sms: true, monthly: "$1.50" },
-  { number: "(770) 555 0413", state: "Georgia", city: "Marietta", voice: true, sms: true, monthly: "$1.50" },
-  { number: "(678) 555 0509", state: "Georgia", city: "Roswell", voice: true, sms: true, monthly: "$1.50" },
-];
-
-export default function PhoneNumbersPage() {
-  const [search, setSearch] = useState("404");
-  const [showBuy, setShowBuy] = useState(false);
-
-  const activeCount = NUMBERS.filter((n) => n.status === "active").length;
-  const pendingCount = NUMBERS.filter((n) => n.status === "pending").length;
-  const totalMonthly = activeCount * 1.5;
-
+export default function PhoneNumbersGallery() {
   return (
-    <div className="mx-auto max-w-[1080px] px-6 py-12">
-      <div className="mb-10">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
-          Settings &middot; Phone Numbers
-        </div>
-        <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.025em] text-[#0f1729]">
-          Phone Numbers
+    <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mb-8 max-w-2xl">
+        <h1 className="m-0 text-[24px] font-semibold tracking-[-0.02em] text-[#0a0d14]">
+          Phone Numbers Mockups
         </h1>
-        <div className="mt-1.5 text-[13.5px] text-[#6b7280]">
-          Manage the numbers your dialer calls from. Buy local numbers to improve pickup rates.
-        </div>
+        <p className="mt-2 text-[13.5px] leading-relaxed text-[#5b606a]">
+          Five different layouts for the Phone Numbers settings page, all anchored to the
+          existing portal design tokens in <code className="text-[12px]">preview.css</code> (no monospace, 7px buttons,
+          14px cards, 12px stats-strip, iOS pill toggles, dot + glow status, brand #0d4b3a).
+          Same content, same functional surface, different structural treatment.
+        </p>
       </div>
 
-      <div className="mb-6 grid grid-cols-3 gap-4">
-        <StatCard
-          icon={<IconWaveSine size={16} stroke={2} />}
-          label="Active Numbers"
-          value={activeCount.toString()}
-          hint="Available To Dial"
-        />
-        <StatCard
-          icon={<IconClock size={16} stroke={2} />}
-          label="Pending Numbers"
-          value={pendingCount.toString()}
-          hint="Setup In Progress"
-        />
-        <StatCard
-          icon={<IconCalendarDollar size={16} stroke={2} />}
-          label="Monthly Cost"
-          value={`$${totalMonthly.toFixed(2)}`}
-          hint="Charged On The 1st"
-        />
-      </div>
-
-      <div
-        className="overflow-hidden rounded-[12px] bg-white"
-        style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 6px 18px -4px rgba(15,23,41,0.08)" }}
-      >
-        <div className="flex items-center justify-between border-b border-[#f1f2f4] px-6 py-4">
-          <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-            Your Numbers
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowBuy((s) => !s)}
-            className="flex h-9 cursor-pointer items-center gap-1.5 rounded-[8px] bg-gradient-to-b from-[#13644e] to-[#0a3d4a] px-4 text-[12.5px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25),inset_0_1px_0_rgba(255,255,255,0.10)] transition hover:opacity-95"
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {VARIANTS.map((v) => (
+          <Link
+            key={v.slug}
+            href={`/share/phone-numbers/${v.slug}`}
+            className="group block cursor-pointer rounded-[14px] border border-[#ebedf0] bg-white p-5 transition hover:border-[#d8d6cf]"
+            style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
           >
-            <IconPlus size={13} stroke={2.25} />
-            Buy A Number
-          </button>
-        </div>
-
-        <div className="grid grid-cols-[200px_180px_110px_140px_100px_50px] items-center gap-4 border-b border-[#f1f2f4] bg-[#fbfbfc] px-6 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9ca3af]">
-          <div>Number</div>
-          <div>Location</div>
-          <div>Capabilities</div>
-          <div>Status</div>
-          <div>Monthly</div>
-          <div></div>
-        </div>
-
-        <div className="divide-y divide-[#f1f2f4]">
-          {NUMBERS.map((n) => (
-            <div key={n.id} className="grid grid-cols-[200px_180px_110px_140px_100px_50px] items-center gap-4 px-6 py-3.5">
-              <div className="text-[14px] font-semibold tabular-nums text-[#0f1729]">{n.number}</div>
-              <div>
-                <div className="text-[13px] font-medium text-[#0f1729]">{n.city}</div>
-                <div className="text-[11.5px] text-[#6b7280]">{n.state}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <CapIcon active={n.voice} icon={<IconPhone size={14} stroke={2} />} title="Voice" />
-                <CapIcon active={n.sms} icon={<IconMessageCircle size={14} stroke={2} />} title="SMS" />
-              </div>
-              <div>
-                {n.status === "active" ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-white px-2 py-1 text-[11.5px] font-semibold text-[#13644e] ring-1 ring-[#13644e]">
-                    <IconCircleCheck size={12} stroke={2.25} />
-                    Active
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-white px-2 py-1 text-[11.5px] font-semibold text-[#6b7280] ring-1 ring-[#d1d5db]">
-                    <IconClock size={12} stroke={2.25} />
-                    Pending
-                  </span>
-                )}
-              </div>
-              <div className="text-[13px] font-medium tabular-nums text-[#0f1729]">{n.monthly}</div>
-              <div className="text-right">
-                <button
-                  type="button"
-                  className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[#9ca3af] transition hover:bg-[#f1f2f4] hover:text-[#0f1729]"
-                  title="Release This Number"
-                >
-                  <IconTrash size={13} stroke={2} />
-                </button>
-              </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9298a3]">
+                {v.slug.toUpperCase()}
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#0d4b3a]">
+                {v.anchor}
+              </span>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {showBuy && (
-        <div
-          className="mt-6 overflow-hidden rounded-[12px] bg-white"
-          style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 6px 18px -4px rgba(15,23,41,0.08)" }}
-        >
-          <div className="border-b border-[#f1f2f4] px-6 py-4">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-              Buy A Number
+            <div className="mt-3 text-[16px] font-semibold tracking-[-0.018em] text-[#0a0d14]">
+              {v.name}
             </div>
-            <div className="mt-0.5 text-[11.5px] text-[#6b7280]">
-              Search by area code, city, or state. Each number is $1.50 per month.
+            <p className="mt-3 text-[12.5px] leading-relaxed text-[#5b606a]">
+              {v.rationale}
+            </p>
+            <div className="mt-4 inline-flex items-center gap-1.5 text-[12px] font-medium text-[#0a0d14] group-hover:underline">
+              Open Variant
+              <span aria-hidden>&rarr;</span>
             </div>
-          </div>
-
-          <div className="px-6 py-4">
-            <div className="flex items-center gap-2 rounded-[8px] bg-white px-3 py-2.5 ring-1 ring-[#e5e7eb] transition focus-within:ring-[#13644e]">
-              <IconSearch size={14} stroke={2} className="text-[#9ca3af]" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Area code, city, or state"
-                className="w-full bg-transparent text-[13px] text-[#0f1729] outline-none placeholder:text-[#9ca3af]"
-              />
-            </div>
-
-            <div className="mt-4 text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9ca3af]">
-              4 Results In Georgia
-            </div>
-
-            <div className="mt-2 divide-y divide-[#f1f2f4]">
-              {SEARCH_RESULTS.map((r) => (
-                <div key={r.number} className="flex items-center justify-between gap-3 py-3">
-                  <div>
-                    <div className="text-[14px] font-semibold tabular-nums text-[#0f1729]">{r.number}</div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-[#6b7280]">
-                      <span>{r.city}, {r.state}</span>
-                      <span className="text-[#d1d5db]">&middot;</span>
-                      <span className="inline-flex items-center gap-0.5 text-[#13644e]">
-                        <IconPhone size={11} stroke={2} />
-                        <IconMessageCircle size={11} stroke={2} />
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[13px] font-medium tabular-nums text-[#0f1729]">{r.monthly}/mo</span>
-                    <button
-                      type="button"
-                      className="h-8 cursor-pointer rounded-[6px] bg-[#0f1729] px-3 text-[12px] font-semibold text-white transition hover:opacity-90"
-                    >
-                      Buy
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div
-        className="mt-6 overflow-hidden rounded-[12px] bg-white"
-        style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 6px 18px -4px rgba(15,23,41,0.08)" }}
-      >
-        <div className="border-b border-[#f1f2f4] px-6 py-4">
-          <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-            Per State Rotation
-          </div>
-          <div className="mt-0.5 text-[11.5px] text-[#6b7280]">
-            When you have multiple numbers in a state, the dialer rotates them to spread load.
-          </div>
-        </div>
-
-        <div className="divide-y divide-[#f1f2f4]">
-          <RotationRow state="Texas" numbers={2} mode="Rotate" />
-          <RotationRow state="North Carolina" numbers={1} mode="Single Number" />
-          <RotationRow state="Arizona" numbers={1} mode="Single Number" />
-        </div>
-      </div>
-
-      <div
-        className="mt-6 flex items-start gap-4 overflow-hidden rounded-[12px] bg-white pl-0"
-        style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 6px 18px -4px rgba(15,23,41,0.08)" }}
-      >
-        <div className="w-1 self-stretch bg-gradient-to-b from-[#13644e] to-[#0a3d4a]" />
-        <div className="flex flex-1 items-start gap-3.5 py-5 pr-6">
-          <div className="mt-0.5 text-[#13644e]">
-            <IconShieldCheck size={20} stroke={2} />
-          </div>
-          <div className="flex-1">
-            <div className="text-[13.5px] font-semibold text-[#0f1729]">
-              SMS Requires Brand Approval
-            </div>
-            <div className="mt-1 text-[12.5px] leading-relaxed text-[#374151]">
-              To send SMS from these numbers you need A2P 10DLC brand and campaign approval from the carriers. Typical timeline is 1 to 3 weeks. Voice works immediately on every number you buy.
-            </div>
-            <button
-              type="button"
-              className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[8px] bg-[#0f1729] px-3.5 text-[12px] font-semibold text-white transition hover:opacity-90"
-            >
-              Start A2P Registration
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: string; hint: string }) {
-  return (
-    <div
-      className="rounded-[12px] bg-white p-5"
-      style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 4px 12px -2px rgba(15,23,41,0.06)" }}
-    >
-      <div className="flex items-center justify-between">
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#9ca3af]">{label}</div>
-        <div className="flex h-7 w-7 items-center justify-center rounded-[6px] bg-white text-[#13644e] ring-1 ring-[#e5e7eb]">
-          {icon}
-        </div>
-      </div>
-      <div className="mt-3 text-[28px] font-semibold tabular-nums tracking-[-0.02em] text-[#0f1729]">{value}</div>
-      <div className="mt-0.5 text-[11.5px] text-[#6b7280]">{hint}</div>
-    </div>
-  );
-}
-
-function CapIcon({ active, icon, title }: { active: boolean; icon: React.ReactNode; title: string }) {
-  return (
-    <span
-      title={title}
-      className={[
-        "inline-flex h-7 w-7 items-center justify-center rounded-[6px] transition",
-        active ? "bg-white text-[#13644e] ring-1 ring-[#13644e]" : "bg-white text-[#d1d5db] ring-1 ring-[#e5e7eb]",
-      ].join(" ")}
-    >
-      {icon}
-    </span>
-  );
-}
-
-function RotationRow({ state, numbers, mode }: { state: string; numbers: number; mode: string }) {
-  return (
-    <div className="flex items-center justify-between px-6 py-3.5">
-      <div className="text-[13.5px] font-semibold text-[#0f1729]">{state}</div>
-      <div className="flex items-center gap-3">
-        <span className="text-[12.5px] font-medium text-[#0f1729]">{mode}</span>
-        {numbers > 1 && (
-          <button
-            type="button"
-            className="cursor-pointer text-[11.5px] font-semibold text-[#13644e] hover:text-[#0a3d4a]"
-          >
-            Edit
-          </button>
-        )}
+          </Link>
+        ))}
       </div>
     </div>
   );
