@@ -4,9 +4,7 @@ import { useState } from "react";
 import {
   IconChevronDown,
   IconArrowRight,
-  IconArrowNarrowRight,
   IconPlus,
-  IconX,
 } from "@tabler/icons-react";
 
 function CircleToggle({ checked, label }: { checked: boolean; label: string }) {
