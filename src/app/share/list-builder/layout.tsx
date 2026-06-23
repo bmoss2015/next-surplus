@@ -42,6 +42,8 @@ export default function ListBuilderLayout({
             <Link href="/share/list-builder/i" className="font-semibold text-[#13644e] hover:opacity-70">I</Link>
             <Link href="/share/list-builder/j" className="font-semibold text-[#13644e] hover:opacity-70">J</Link>
             <Link href="/share/list-builder/k" className="font-semibold text-[#13644e] hover:opacity-70">K</Link>
+            <span className="text-[#e5e7eb]">|</span>
+            <Link href="/share/list-builder/final" className="rounded-md bg-[#0d4b3a] px-2 py-0.5 font-semibold text-white hover:opacity-90">Picked</Link>
           </div>
         </div>
       </div>
