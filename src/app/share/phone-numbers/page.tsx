@@ -7,8 +7,11 @@ import {
   IconPhone,
   IconMessageCircle,
   IconTrash,
-  IconCheck,
-  IconAlertCircle,
+  IconClock,
+  IconCircleCheck,
+  IconWaveSine,
+  IconCalendarDollar,
+  IconShieldCheck,
 } from "@tabler/icons-react";
 
 type PhoneNumber = {
@@ -41,11 +44,13 @@ export default function PhoneNumbersPage() {
   const [search, setSearch] = useState("404");
   const [showBuy, setShowBuy] = useState(false);
 
-  const totalMonthly = NUMBERS.filter((n) => n.status === "active").length * 1.5;
+  const activeCount = NUMBERS.filter((n) => n.status === "active").length;
+  const pendingCount = NUMBERS.filter((n) => n.status === "pending").length;
+  const totalMonthly = activeCount * 1.5;
 
   return (
     <div className="mx-auto max-w-[1080px] px-6 py-12">
-      <div className="mb-8">
+      <div className="mb-10">
         <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
           Settings &middot; Phone Numbers
         </div>
@@ -53,40 +58,50 @@ export default function PhoneNumbersPage() {
           Phone Numbers
         </h1>
         <div className="mt-1.5 text-[13.5px] text-[#6b7280]">
-          Manage the numbers your dialer calls from. Each number is billed monthly. Buy local numbers to improve pickup rates.
+          Manage the numbers your dialer calls from. Buy local numbers to improve pickup rates.
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-3 gap-4">
-        <StatCard label="Active Numbers" value={NUMBERS.filter((n) => n.status === "active").length.toString()} hint="Available to dial" />
-        <StatCard label="Pending Numbers" value={NUMBERS.filter((n) => n.status === "pending").length.toString()} hint="Setup in progress" />
-        <StatCard label="Monthly Cost" value={`$${totalMonthly.toFixed(2)}`} hint="Charged on the 1st" />
+      <div className="mb-6 grid grid-cols-3 gap-4">
+        <StatCard
+          icon={<IconWaveSine size={16} stroke={2} />}
+          label="Active Numbers"
+          value={activeCount.toString()}
+          hint="Available To Dial"
+        />
+        <StatCard
+          icon={<IconClock size={16} stroke={2} />}
+          label="Pending Numbers"
+          value={pendingCount.toString()}
+          hint="Setup In Progress"
+        />
+        <StatCard
+          icon={<IconCalendarDollar size={16} stroke={2} />}
+          label="Monthly Cost"
+          value={`$${totalMonthly.toFixed(2)}`}
+          hint="Charged On The 1st"
+        />
       </div>
 
       <div
         className="overflow-hidden rounded-[12px] bg-white"
-        style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 4px 12px -2px rgba(15,23,41,0.06)" }}
+        style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 6px 18px -4px rgba(15,23,41,0.08)" }}
       >
-        <div className="flex items-center justify-between border-b border-[#f1f2f4] px-5 py-4">
-          <div>
-            <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-              Your Numbers
-            </div>
-            <div className="mt-0.5 text-[11.5px] text-[#6b7280]">
-              {NUMBERS.length} numbers across {new Set(NUMBERS.map((n) => n.state)).size} states
-            </div>
+        <div className="flex items-center justify-between border-b border-[#f1f2f4] px-6 py-4">
+          <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
+            Your Numbers
           </div>
           <button
             type="button"
             onClick={() => setShowBuy((s) => !s)}
-            className="flex h-9 cursor-pointer items-center gap-1.5 rounded-[8px] bg-gradient-to-b from-[#13644e] to-[#0a3d4a] px-3.5 text-[12.5px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25),inset_0_1px_0_rgba(255,255,255,0.10)] transition hover:opacity-95"
+            className="flex h-9 cursor-pointer items-center gap-1.5 rounded-[8px] bg-gradient-to-b from-[#13644e] to-[#0a3d4a] px-4 text-[12.5px] font-semibold text-white shadow-[0_1px_2px_rgba(13,75,58,0.25),inset_0_1px_0_rgba(255,255,255,0.10)] transition hover:opacity-95"
           >
             <IconPlus size={13} stroke={2.25} />
             Buy A Number
           </button>
         </div>
 
-        <div className="grid grid-cols-[180px_180px_120px_120px_120px_60px] items-center gap-3 border-b border-[#f1f2f4] bg-[#fbfbfc] px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9ca3af]">
+        <div className="grid grid-cols-[200px_180px_110px_140px_100px_50px] items-center gap-4 border-b border-[#f1f2f4] bg-[#fbfbfc] px-6 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9ca3af]">
           <div>Number</div>
           <div>Location</div>
           <div>Capabilities</div>
@@ -97,35 +112,35 @@ export default function PhoneNumbersPage() {
 
         <div className="divide-y divide-[#f1f2f4]">
           {NUMBERS.map((n) => (
-            <div key={n.id} className="grid grid-cols-[180px_180px_120px_120px_120px_60px] items-center gap-3 px-5 py-3.5">
-              <div className="font-mono text-[13px] tabular-nums text-[#0f1729]">{n.number}</div>
+            <div key={n.id} className="grid grid-cols-[200px_180px_110px_140px_100px_50px] items-center gap-4 px-6 py-3.5">
+              <div className="text-[14px] font-semibold tabular-nums text-[#0f1729]">{n.number}</div>
               <div>
-                <div className="text-[12.5px] font-medium text-[#0f1729]">{n.city}</div>
-                <div className="text-[11px] text-[#6b7280]">{n.state}</div>
+                <div className="text-[13px] font-medium text-[#0f1729]">{n.city}</div>
+                <div className="text-[11.5px] text-[#6b7280]">{n.state}</div>
               </div>
-              <div className="flex gap-1.5">
-                <CapabilityChip on={n.voice} icon={<IconPhone size={10} stroke={2.25} />} label="Voice" />
-                <CapabilityChip on={n.sms} icon={<IconMessageCircle size={10} stroke={2.25} />} label="SMS" />
+              <div className="flex items-center gap-2">
+                <CapIcon active={n.voice} icon={<IconPhone size={14} stroke={2} />} title="Voice" />
+                <CapIcon active={n.sms} icon={<IconMessageCircle size={14} stroke={2} />} title="SMS" />
               </div>
               <div>
                 {n.status === "active" ? (
-                  <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#0f1729]">
-                    <span className="h-2 w-2 rounded-full bg-[#13644e]" />
+                  <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-white px-2 py-1 text-[11.5px] font-semibold text-[#13644e] ring-1 ring-[#13644e]">
+                    <IconCircleCheck size={12} stroke={2.25} />
                     Active
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#6b7280]">
-                    <span className="h-2 w-2 rounded-full bg-[#9ca3af]" />
+                  <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-white px-2 py-1 text-[11.5px] font-semibold text-[#6b7280] ring-1 ring-[#d1d5db]">
+                    <IconClock size={12} stroke={2.25} />
                     Pending
                   </span>
                 )}
               </div>
-              <div className="text-[12.5px] tabular-nums text-[#0f1729]">{n.monthly}</div>
+              <div className="text-[13px] font-medium tabular-nums text-[#0f1729]">{n.monthly}</div>
               <div className="text-right">
                 <button
                   type="button"
-                  className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[#9ca3af] hover:bg-[#f1f2f4] hover:text-[#0f1729]"
-                  title="Release this number"
+                  className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[#9ca3af] transition hover:bg-[#f1f2f4] hover:text-[#0f1729]"
+                  title="Release This Number"
                 >
                   <IconTrash size={13} stroke={2} />
                 </button>
@@ -138,19 +153,19 @@ export default function PhoneNumbersPage() {
       {showBuy && (
         <div
           className="mt-6 overflow-hidden rounded-[12px] bg-white"
-          style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 4px 12px -2px rgba(15,23,41,0.06)" }}
+          style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 6px 18px -4px rgba(15,23,41,0.08)" }}
         >
-          <div className="border-b border-[#f1f2f4] px-5 py-4">
+          <div className="border-b border-[#f1f2f4] px-6 py-4">
             <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
               Buy A Number
             </div>
             <div className="mt-0.5 text-[11.5px] text-[#6b7280]">
-              Search by area code, city, or state. Numbers are billed $1.50 per month each.
+              Search by area code, city, or state. Each number is $1.50 per month.
             </div>
           </div>
 
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-2 rounded-[8px] border border-[#e5e7eb] bg-white px-3 py-2 transition focus-within:border-[#13644e]">
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-2 rounded-[8px] bg-white px-3 py-2.5 ring-1 ring-[#e5e7eb] transition focus-within:ring-[#13644e]">
               <IconSearch size={14} stroke={2} className="text-[#9ca3af]" />
               <input
                 value={search}
@@ -160,7 +175,7 @@ export default function PhoneNumbersPage() {
               />
             </div>
 
-            <div className="mt-4 text-[11px] uppercase tracking-[0.10em] text-[#9ca3af]">
+            <div className="mt-4 text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9ca3af]">
               4 Results In Georgia
             </div>
 
@@ -168,13 +183,18 @@ export default function PhoneNumbersPage() {
               {SEARCH_RESULTS.map((r) => (
                 <div key={r.number} className="flex items-center justify-between gap-3 py-3">
                   <div>
-                    <div className="font-mono text-[13.5px] tabular-nums text-[#0f1729]">{r.number}</div>
-                    <div className="mt-0.5 text-[11.5px] text-[#6b7280]">
-                      {r.city}, {r.state} &middot; Voice &amp; SMS
+                    <div className="text-[14px] font-semibold tabular-nums text-[#0f1729]">{r.number}</div>
+                    <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-[#6b7280]">
+                      <span>{r.city}, {r.state}</span>
+                      <span className="text-[#d1d5db]">&middot;</span>
+                      <span className="inline-flex items-center gap-0.5 text-[#13644e]">
+                        <IconPhone size={11} stroke={2} />
+                        <IconMessageCircle size={11} stroke={2} />
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[12.5px] tabular-nums text-[#0f1729]">{r.monthly}/mo</span>
+                    <span className="text-[13px] font-medium tabular-nums text-[#0f1729]">{r.monthly}/mo</span>
                     <button
                       type="button"
                       className="h-8 cursor-pointer rounded-[6px] bg-[#0f1729] px-3 text-[12px] font-semibold text-white transition hover:opacity-90"
@@ -191,43 +211,43 @@ export default function PhoneNumbersPage() {
 
       <div
         className="mt-6 overflow-hidden rounded-[12px] bg-white"
-        style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 4px 12px -2px rgba(15,23,41,0.06)" }}
+        style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 6px 18px -4px rgba(15,23,41,0.08)" }}
       >
-        <div className="flex items-center justify-between border-b border-[#f1f2f4] px-5 py-4">
-          <div>
-            <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-              Per State Rotation
-            </div>
-            <div className="mt-0.5 text-[11.5px] text-[#6b7280]">
-              When you have multiple numbers in a state, rotate them per call to spread load and avoid spam flagging.
-            </div>
+        <div className="border-b border-[#f1f2f4] px-6 py-4">
+          <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
+            Per State Rotation
+          </div>
+          <div className="mt-0.5 text-[11.5px] text-[#6b7280]">
+            When you have multiple numbers in a state, the dialer rotates them to spread load.
           </div>
         </div>
 
         <div className="divide-y divide-[#f1f2f4]">
-          <RotationRow state="Texas" numbers={2} mode="Rotate Evenly" />
+          <RotationRow state="Texas" numbers={2} mode="Rotate" />
           <RotationRow state="North Carolina" numbers={1} mode="Single Number" />
           <RotationRow state="Arizona" numbers={1} mode="Single Number" />
         </div>
       </div>
 
       <div
-        className="mt-6 rounded-[12px] border border-[#e5e7eb] bg-white p-5"
+        className="mt-6 flex items-start gap-4 overflow-hidden rounded-[12px] bg-white pl-0"
+        style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 6px 18px -4px rgba(15,23,41,0.08)" }}
       >
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 text-[#9ca3af]">
-            <IconAlertCircle size={18} stroke={2} />
+        <div className="w-1 self-stretch bg-gradient-to-b from-[#13644e] to-[#0a3d4a]" />
+        <div className="flex flex-1 items-start gap-3.5 py-5 pr-6">
+          <div className="mt-0.5 text-[#13644e]">
+            <IconShieldCheck size={20} stroke={2} />
           </div>
-          <div>
-            <div className="text-[13px] font-semibold text-[#0f1729]">
+          <div className="flex-1">
+            <div className="text-[13.5px] font-semibold text-[#0f1729]">
               SMS Requires Brand Approval
             </div>
-            <div className="mt-1 text-[12.5px] leading-relaxed text-[#6b7280]">
-              To send SMS from these numbers you need A2P 10DLC brand and campaign approval from the carriers. Typical timeline is 1 to 3 weeks. Voice works immediately on every number.
+            <div className="mt-1 text-[12.5px] leading-relaxed text-[#374151]">
+              To send SMS from these numbers you need A2P 10DLC brand and campaign approval from the carriers. Typical timeline is 1 to 3 weeks. Voice works immediately on every number you buy.
             </div>
             <button
               type="button"
-              className="mt-3 inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[6px] border border-[#e5e7eb] bg-white px-3 text-[12px] font-medium text-[#0f1729] transition hover:border-[#0f1729]"
+              className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[8px] bg-[#0f1729] px-3.5 text-[12px] font-semibold text-white transition hover:opacity-90"
             >
               Start A2P Registration
             </button>
@@ -238,49 +258,48 @@ export default function PhoneNumbersPage() {
   );
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+function StatCard({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: string; hint: string }) {
   return (
     <div
       className="rounded-[12px] bg-white p-5"
       style={{ boxShadow: "0 1px 2px rgba(15,23,41,0.04), 0 4px 12px -2px rgba(15,23,41,0.06)" }}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9ca3af]">{label}</div>
-      <div className="mt-1.5 text-[26px] font-semibold tabular-nums tracking-[-0.02em] text-[#0f1729]">{value}</div>
+      <div className="flex items-center justify-between">
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#9ca3af]">{label}</div>
+        <div className="flex h-7 w-7 items-center justify-center rounded-[6px] bg-white text-[#13644e] ring-1 ring-[#e5e7eb]">
+          {icon}
+        </div>
+      </div>
+      <div className="mt-3 text-[28px] font-semibold tabular-nums tracking-[-0.02em] text-[#0f1729]">{value}</div>
       <div className="mt-0.5 text-[11.5px] text-[#6b7280]">{hint}</div>
     </div>
   );
 }
 
-function CapabilityChip({ on, icon, label }: { on: boolean; icon: React.ReactNode; label: string }) {
+function CapIcon({ active, icon, title }: { active: boolean; icon: React.ReactNode; title: string }) {
   return (
     <span
+      title={title}
       className={[
-        "inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 text-[10.5px] font-semibold",
-        on ? "bg-[#0f1729] text-white" : "border border-[#e5e7eb] bg-white text-[#9ca3af]",
+        "inline-flex h-7 w-7 items-center justify-center rounded-[6px] transition",
+        active ? "bg-white text-[#13644e] ring-1 ring-[#13644e]" : "bg-white text-[#d1d5db] ring-1 ring-[#e5e7eb]",
       ].join(" ")}
     >
       {icon}
-      {label}
-      {on && <IconCheck size={9} stroke={2.5} />}
     </span>
   );
 }
 
 function RotationRow({ state, numbers, mode }: { state: string; numbers: number; mode: string }) {
   return (
-    <div className="flex items-center justify-between px-5 py-3.5">
-      <div>
-        <div className="text-[13px] font-semibold text-[#0f1729]">{state}</div>
-        <div className="mt-0.5 text-[11.5px] text-[#6b7280]">
-          {numbers} number{numbers === 1 ? "" : "s"}
-        </div>
-      </div>
+    <div className="flex items-center justify-between px-6 py-3.5">
+      <div className="text-[13.5px] font-semibold text-[#0f1729]">{state}</div>
       <div className="flex items-center gap-3">
         <span className="text-[12.5px] font-medium text-[#0f1729]">{mode}</span>
         {numbers > 1 && (
           <button
             type="button"
-            className="cursor-pointer text-[11.5px] font-medium text-[#13644e] hover:text-[#0a3d4a]"
+            className="cursor-pointer text-[11.5px] font-semibold text-[#13644e] hover:text-[#0a3d4a]"
           >
             Edit
           </button>
