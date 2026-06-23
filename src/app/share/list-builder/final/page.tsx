@@ -29,7 +29,7 @@ const LIST_OPTIONS: ListOption[] = [
 ];
 
 export default function FinalVariant() {
-  const [selected, setSelected] = useState<ListOption | null>(LIST_OPTIONS[1]);
+  const [selected, setSelected] = useState<ListOption | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [defaultsOpen, setDefaultsOpen] = useState(false);
@@ -64,15 +64,6 @@ export default function FinalVariant() {
           Start A Dialer Session
         </h1>
 
-        <div className="mt-7 flex items-center gap-2.5">
-          <ProgressStep n={1} label="Lead Source" state={selected ? "done" : "active"} />
-          <span className="h-px w-10 bg-[#ebedf0]" />
-          <ProgressStep n={2} label="Quick Filters" state={selected ? "active" : "todo"} />
-          <span className="h-px w-10 bg-[#ebedf0]" />
-          <ProgressStep n={3} label="Defaults" state="todo" />
-          <span className="h-px w-10 bg-[#ebedf0]" />
-          <ProgressStep n={4} label="Start" state="todo" />
-        </div>
 
         <div
           className="mt-8 flex overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
@@ -141,22 +132,23 @@ export default function FinalVariant() {
                       <span className="text-[22px] font-semibold tracking-[-0.022em] text-[#0a0d14]">
                         {selected.name}
                       </span>
-                      <span className="inline-flex h-[26px] items-center gap-1.5 rounded-[6px] border border-[#ebedf0] bg-white px-2.5 text-[11.5px] font-medium text-[#0d4b3a] transition group-hover:border-[#0d4b3a]">
-                        Change
-                        <IconChevronDown size={11} stroke={2} className={["transition", listOpen ? "rotate-180" : ""].join(" ")} />
-                      </span>
+                      <IconChevronDown
+                        size={18}
+                        stroke={2.25}
+                        className={["text-[#0d4b3a] transition", listOpen ? "rotate-180" : ""].join(" ")}
+                      />
                     </>
                   ) : (
                     <>
                       <span className="text-[22px] font-semibold tracking-[-0.022em] text-[#0a0d14]">
-                        Choose A List To Dial
+                        Pick A List To Dial
                       </span>
                       <span
-                        className="inline-flex h-[26px] items-center gap-1.5 rounded-[6px] bg-[#0d4b3a] px-2.5 text-[11.5px] font-semibold text-white"
-                        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20)" }}
+                        className="inline-flex h-[28px] items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-3 text-[12px] font-semibold text-white"
+                        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 4px 12px -2px rgba(13,75,58,0.28)" }}
                       >
-                        Pick
-                        <IconChevronDown size={11} stroke={2} className={["transition", listOpen ? "rotate-180" : ""].join(" ")} />
+                        Choose
+                        <IconChevronDown size={11} stroke={2.5} className={["transition", listOpen ? "rotate-180" : ""].join(" ")} />
                       </span>
                     </>
                   )}
@@ -170,12 +162,6 @@ export default function FinalVariant() {
                   </div>
                 )}
               </div>
-              {selected && (
-                <div className="shrink-0 text-right">
-                  <div className="text-[15px] font-semibold tabular-nums text-[#0a0d14]">{selected.count}</div>
-                  <div className="text-[11px] uppercase tracking-[0.08em] text-[#9298a3]">Leads</div>
-                </div>
-              )}
             </button>
 
             {listOpen && (
@@ -259,17 +245,16 @@ export default function FinalVariant() {
             <div>
               <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Defaults</div>
               <div className="mt-1.5 max-w-[64ch] text-[13px] leading-[1.55] text-[#5b606a]">
-                Using your saved defaults. Click Edit to change any one for just this session.
+                Using your saved defaults for caller ID, voicemail, wrap up, email, and SMS. Customize any one for just this session.
               </div>
             </div>
             <button
               type="button"
               onClick={() => setDefaultsOpen((o) => !o)}
-              className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[7px] bg-white px-4 text-[13.5px] font-medium text-[#0a0d14] transition hover:border-[#d8d6cf]"
-              style={{ border: "1px solid #ebedf0", boxShadow: "0 1px 1px rgba(12,13,16,0.02)" }}
+              className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-[#0d4b3a] transition hover:text-[#13644e]"
             >
-              {defaultsOpen ? "Hide" : "Edit"}
-              {defaultsOpen ? <IconChevronUp size={13} stroke={2} className="text-[#9298a3]" /> : <IconChevronDown size={13} stroke={2} className="text-[#9298a3]" />}
+              {defaultsOpen ? "Hide" : "Customize For This Session"}
+              {defaultsOpen ? <IconChevronUp size={13} stroke={2.25} /> : <IconChevronDown size={13} stroke={2.25} />}
             </button>
           </div>
           {defaultsOpen && (
@@ -291,8 +276,7 @@ export default function FinalVariant() {
           />
           <button
             type="button"
-            className="h-11 cursor-pointer rounded-[7px] bg-white px-5 text-[13.5px] font-medium text-[#0a0d14] transition hover:border-[#d8d6cf]"
-            style={{ border: "1px solid #ebedf0", boxShadow: "0 1px 1px rgba(12,13,16,0.02)" }}
+            className="h-11 cursor-pointer px-3 text-[13.5px] font-medium text-[#5b606a] transition hover:text-[#0a0d14]"
           >
             Cancel
           </button>
@@ -306,36 +290,6 @@ export default function FinalVariant() {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ProgressStep({ n, label, state }: { n: number; label: string; state: "done" | "active" | "todo" }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span
-        className={[
-          "inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition",
-          state === "done"
-            ? "bg-[#0d4b3a] text-white"
-            : state === "active"
-              ? "bg-white text-[#0d4b3a]"
-              : "bg-white text-[#9298a3]",
-        ].join(" ")}
-        style={{
-          border: state === "active" ? "2px solid #0d4b3a" : "1px solid #ebedf0",
-        }}
-      >
-        {state === "done" ? <IconCheck size={12} stroke={3} /> : n}
-      </span>
-      <span
-        className={[
-          "text-[12px] font-medium whitespace-nowrap",
-          state === "todo" ? "text-[#9298a3]" : "text-[#0a0d14]",
-        ].join(" ")}
-      >
-        {label}
-      </span>
     </div>
   );
 }
@@ -384,20 +338,20 @@ function Row({ option, selected, onSelect }: { option: ListOption; selected: boo
 
 function FilterCell({ label, value, right, last }: { label: string; value: string; right?: boolean; last?: boolean }) {
   return (
-    <div className={[
-      "flex items-center justify-between gap-3 px-7 py-3.5",
-      right ? "border-r border-[#f1f2f4]" : "",
-      last ? "" : "border-b border-[#f1f2f4]",
-    ].join(" ")}>
+    <button
+      type="button"
+      className={[
+        "group flex w-full cursor-pointer items-center justify-between gap-3 px-7 py-3.5 text-left transition hover:bg-[#fafbfc]",
+        right ? "border-r border-[#f1f2f4]" : "",
+        last ? "" : "border-b border-[#f1f2f4]",
+      ].join(" ")}
+    >
       <div className="text-[12.5px] font-medium text-[#5b606a]">{label}</div>
-      <button
-        type="button"
-        className="inline-flex max-w-[65%] cursor-pointer items-center gap-1.5 rounded-[6px] bg-[#fafbfc] px-2.5 py-1.5 text-[12px] font-medium text-[#0a0d14] transition hover:bg-white hover:shadow-[0_1px_2px_rgba(12,13,16,0.06)]"
-      >
+      <div className="inline-flex max-w-[65%] items-center gap-1.5 text-[12.5px] font-semibold text-[#0a0d14]">
         <span className="truncate">{value}</span>
-        <IconChevronDown size={11} stroke={2} className="shrink-0 text-[#9298a3]" />
-      </button>
-    </div>
+        <IconChevronDown size={12} stroke={2.25} className="shrink-0 text-[#0d4b3a] opacity-60 transition group-hover:opacity-100" />
+      </div>
+    </button>
   );
 }
 
