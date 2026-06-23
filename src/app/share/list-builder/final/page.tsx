@@ -7,9 +7,6 @@ import {
   IconArrowRight,
   IconCheck,
   IconExternalLink,
-  IconFileUpload,
-  IconBookmark,
-  IconWorld,
 } from "@tabler/icons-react";
 
 type Source = "import" | "saved" | "all";
@@ -32,8 +29,9 @@ const LIST_OPTIONS: ListOption[] = [
 ];
 
 export default function FinalVariant() {
-  const [selected, setSelected] = useState<ListOption>(LIST_OPTIONS[1]);
+  const [selected, setSelected] = useState<ListOption | null>(null);
   const [listOpen, setListOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const [defaultsOpen, setDefaultsOpen] = useState(false);
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -43,11 +41,18 @@ export default function FinalVariant() {
     function onDown(e: MouseEvent) {
       if (listRef.current && !listRef.current.contains(e.target as Node)) {
         setListOpen(false);
+        setSearch("");
       }
     }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [listOpen]);
+
+  const filteredOptions = LIST_OPTIONS.filter((o) =>
+    o.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filterDisabled = !selected;
 
   return (
     <div className="min-h-screen bg-[#fafbfc]">
@@ -114,50 +119,90 @@ export default function FinalVariant() {
             <button
               type="button"
               onClick={() => setListOpen((o) => !o)}
-              className="group flex w-full cursor-pointer items-baseline justify-between gap-4 py-1 text-left transition"
+              className={[
+                "group flex w-full cursor-pointer items-center justify-between gap-4 rounded-[8px] px-3 py-2 -ml-3 -mt-1 text-left transition",
+                listOpen ? "bg-[#fafbfc]" : "hover:bg-[#fafbfc]",
+              ].join(" ")}
             >
               <div className="min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[22px] font-semibold tracking-[-0.022em] text-[#0a0d14] transition group-hover:text-[#0d4b3a]">
-                    {selected.name}
-                  </span>
-                  <IconChevronDown
-                    size={16}
-                    stroke={2}
-                    className={["text-[#9298a3] transition", listOpen ? "rotate-180" : ""].join(" ")}
-                  />
+                <div className="flex items-center gap-3">
+                  {selected ? (
+                    <>
+                      <span className="text-[22px] font-semibold tracking-[-0.022em] text-[#0a0d14]">
+                        {selected.name}
+                      </span>
+                      <span className="inline-flex h-[26px] items-center gap-1.5 rounded-[6px] border border-[#ebedf0] bg-white px-2.5 text-[11.5px] font-medium text-[#0d4b3a] transition group-hover:border-[#0d4b3a]">
+                        Change
+                        <IconChevronDown size={11} stroke={2} className={["transition", listOpen ? "rotate-180" : ""].join(" ")} />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[22px] font-semibold tracking-[-0.022em] text-[#9298a3]">
+                        Choose A List To Dial
+                      </span>
+                      <span
+                        className="inline-flex h-[26px] items-center gap-1.5 rounded-[6px] bg-[#0d4b3a] px-2.5 text-[11.5px] font-semibold text-white"
+                        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20)" }}
+                      >
+                        Pick
+                        <IconChevronDown size={11} stroke={2} className={["transition", listOpen ? "rotate-180" : ""].join(" ")} />
+                      </span>
+                    </>
+                  )}
                 </div>
-                {selected.meta && (
-                  <div className="mt-1 text-[12.5px] text-[#5b606a]">{selected.meta}</div>
+                {selected?.meta && (
+                  <div className="mt-1.5 text-[12.5px] text-[#5b606a]">{selected.meta}</div>
+                )}
+                {!selected && (
+                  <div className="mt-1.5 text-[12.5px] text-[#5b606a]">
+                    Pick a recent import, a saved list, or everyone in your database.
+                  </div>
                 )}
               </div>
-              <div className="shrink-0 text-right">
-                <div className="text-[15px] font-semibold tabular-nums text-[#0a0d14]">{selected.count}</div>
-                <div className="text-[11px] uppercase tracking-[0.08em] text-[#9298a3]">Leads</div>
-              </div>
+              {selected && (
+                <div className="shrink-0 text-right">
+                  <div className="text-[15px] font-semibold tabular-nums text-[#0a0d14]">{selected.count}</div>
+                  <div className="text-[11px] uppercase tracking-[0.08em] text-[#9298a3]">Leads</div>
+                </div>
+              )}
             </button>
 
             {listOpen && (
               <div
-                className="absolute left-0 right-0 top-full z-30 mt-3 overflow-hidden rounded-[12px] border border-[#ebedf0] bg-white"
+                className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-[12px] border border-[#ebedf0] bg-white"
                 style={{ boxShadow: "0 16px 40px -8px rgba(15,23,41,0.18), 0 4px 8px rgba(15,23,41,0.06)" }}
               >
+                <div className="border-b border-[#f1f2f4] px-4 py-3">
+                  <input
+                    autoFocus
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search Lists..."
+                    className="w-full bg-transparent text-[13.5px] text-[#0a0d14] outline-none placeholder:text-[#c2c5cc]"
+                  />
+                </div>
                 <div className="max-h-[420px] overflow-y-auto">
-                  <Group icon={<IconWorld size={11} stroke={2.25} />} label="Everyone In Your Database">
-                    {LIST_OPTIONS.filter((o) => o.source === "all").map((o) => (
-                      <Row key={o.id} option={o} selected={o.id === selected.id} onSelect={() => { setSelected(o); setListOpen(false); }} />
+                  <Group label="Everyone In Your Database">
+                    {filteredOptions.filter((o) => o.source === "all").map((o) => (
+                      <Row key={o.id} option={o} selected={o.id === selected?.id} onSelect={() => { setSelected(o); setListOpen(false); setSearch(""); }} />
                     ))}
                   </Group>
-                  <Group icon={<IconFileUpload size={11} stroke={2.25} />} label="Recent Imports">
-                    {LIST_OPTIONS.filter((o) => o.source === "import").map((o) => (
-                      <Row key={o.id} option={o} selected={o.id === selected.id} onSelect={() => { setSelected(o); setListOpen(false); }} />
+                  <Group label="Recent Imports">
+                    {filteredOptions.filter((o) => o.source === "import").map((o) => (
+                      <Row key={o.id} option={o} selected={o.id === selected?.id} onSelect={() => { setSelected(o); setListOpen(false); setSearch(""); }} />
                     ))}
                   </Group>
-                  <Group icon={<IconBookmark size={11} stroke={2.25} />} label="Saved Lists">
-                    {LIST_OPTIONS.filter((o) => o.source === "saved").map((o) => (
-                      <Row key={o.id} option={o} selected={o.id === selected.id} onSelect={() => { setSelected(o); setListOpen(false); }} />
+                  <Group label="Saved Lists">
+                    {filteredOptions.filter((o) => o.source === "saved").map((o) => (
+                      <Row key={o.id} option={o} selected={o.id === selected?.id} onSelect={() => { setSelected(o); setListOpen(false); setSearch(""); }} />
                     ))}
                   </Group>
+                  {filteredOptions.length === 0 && (
+                    <div className="px-4 py-8 text-center text-[12.5px] text-[#9298a3]">
+                      No lists match &quot;{search}&quot;
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -255,11 +300,13 @@ export default function FinalVariant() {
   );
 }
 
-function Group({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
+  if (!children || (Array.isArray(children) && children.length === 0)) return null;
+  const hasItems = Array.isArray(children) ? children.some((c) => c) : !!children;
+  if (!hasItems) return null;
   return (
     <div className="border-b border-[#f1f2f4] py-2 last:border-b-0">
-      <div className="flex items-center gap-1.5 px-4 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">
-        {icon}
+      <div className="px-4 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">
         {label}
       </div>
       <div>{children}</div>
