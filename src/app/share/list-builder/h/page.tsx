@@ -1,187 +1,212 @@
 "use client";
 
-import { useState } from "react";
 import {
   IconChevronDown,
   IconArrowRight,
   IconPlus,
-  IconCommand,
+  IconX,
 } from "@tabler/icons-react";
 
-function CircleToggle({ checked, label }: { checked: boolean; label: string }) {
-  return (
-    <label className="inline-flex cursor-pointer items-center gap-2">
-      <span
-        className={[
-          "relative flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border transition",
-          checked ? "border-[#13644e] bg-[#13644e]" : "border-[#d1d5db] bg-white",
-        ].join(" ")}
-      >
-        {checked && <span className="h-[5px] w-[5px] rounded-full bg-white" />}
-      </span>
-      <span className="text-[12.5px] text-[#0f1729]">{label}</span>
-    </label>
-  );
-}
-
 export default function VariantH() {
-  const [skipDnc] = useState(true);
-  const [skipLitigated] = useState(true);
-
   return (
-    <div className="mx-auto max-w-[820px] px-6 py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
-            Variant H &middot; Linear Sharp
-          </div>
-          <h1 className="mt-1.5 text-[22px] font-semibold tracking-[-0.02em] text-[#0f1729]">
-            Start A Dialer Session
-          </h1>
+    <div className="min-h-screen bg-[#fafbfc]">
+      <div className="mx-auto max-w-[880px] px-14 pb-32 pt-11">
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#9298a3]">
+          Variant H &middot; F Structure &middot; Multi Card Stack
         </div>
-        <button
-          type="button"
-          className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-[6px] bg-white px-2.5 text-[11.5px] font-medium text-[#6b7280] ring-1 ring-[#e5e7eb] transition hover:text-[#0f1729]"
-        >
-          <IconCommand size={11} stroke={2} />
-          Search
-        </button>
-      </div>
+        <h1 className="mt-2 text-[30px] font-semibold leading-[1.15] tracking-[-0.028em] text-[#0a0d14]">
+          Start A Dialer Session
+        </h1>
 
-      <div className="mb-6 flex items-center justify-between gap-4 rounded-[6px] bg-white px-4 py-3 ring-1 ring-[#e5e7eb]">
-        <div className="flex items-center gap-3">
-          <div className="h-2 w-2 rounded-full bg-[#13644e]" />
+        <div
+          className="mt-7 flex items-center justify-between gap-4 rounded-[14px] border border-[#ebedf0] bg-white px-6 py-5"
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+        >
           <div>
-            <div className="text-[12.5px] font-semibold text-[#0f1729]">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0d4b3a]">
               Resume Last Session
             </div>
-            <div className="mt-0.5 text-[11.5px] text-[#6b7280]">
-              Fort Bend County, Texas &middot; 23 of 47 dialed &middot; Paused yesterday at 4:38pm
+            <div className="mt-1.5 text-[16px] font-semibold leading-[1.25] tracking-[-0.018em] text-[#0a0d14]">
+              Fort Bend County, Texas
+            </div>
+            <div className="mt-0.5 text-[12.5px] text-[#5b606a]">
+              <span className="font-semibold tabular-nums text-[#0a0d14]">23 of 47</span> dialed &middot; Paused yesterday at 4:38pm
             </div>
           </div>
+          <button
+            type="button"
+            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-4 text-[13px] font-medium tracking-[-0.008em] text-white"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
+          >
+            Resume
+            <IconArrowRight size={13} stroke={2.25} />
+          </button>
         </div>
-        <button
-          type="button"
-          className="flex h-8 cursor-pointer items-center gap-1 rounded-[6px] bg-[#0f1729] px-3 text-[12px] font-medium text-white transition hover:opacity-90"
-        >
-          Resume
-          <IconArrowRight size={12} stroke={2.25} />
-        </button>
-      </div>
 
-      <div className="mb-2 flex items-center gap-3">
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#9ca3af]">
+        <div className="mt-10 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
           Or Start A New Session
-        </div>
-        <div className="h-px flex-1 bg-[#e5e7eb]" />
-      </div>
-
-      <button
-        type="button"
-        className="flex w-full cursor-pointer items-center justify-between rounded-[6px] bg-white px-4 py-3 ring-1 ring-[#e5e7eb] transition hover:ring-[#0f1729]"
-      >
-        <div className="flex items-center gap-3">
-          <div className="rounded-[4px] bg-[#0f1729] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.10em] text-white">
-            Import
-          </div>
-          <span className="text-[13.5px] font-semibold text-[#0f1729]">
-            Fort Bend County, Texas
-          </span>
-          <span className="text-[11.5px] text-[#6b7280]">
-            Jun 21, 2026
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[12.5px] tabular-nums text-[#0f1729]">47 Leads</span>
-          <IconChevronDown size={13} stroke={2} className="text-[#9ca3af]" />
-        </div>
-      </button>
-
-      <div className="mt-4 overflow-hidden rounded-[6px] bg-white ring-1 ring-[#e5e7eb]">
-        <div className="flex items-center justify-between border-b border-[#f1f2f4] px-4 py-2.5">
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-            Filter
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-[16px] font-semibold tabular-nums text-[#0f1729]">28</span>
-            <span className="text-[11.5px] text-[#9ca3af]">
-              of <span className="tabular-nums">47</span>
-            </span>
-          </div>
+          <span className="h-px flex-1 bg-[#ebedf0]" />
         </div>
 
-        <div className="px-4 py-2">
-          <FilterPill label="Stage" value="Researched, First Contact" />
-          <FilterPill label="State" value="Texas" />
-          <FilterPill label="Owner Status" value="Living" />
-          <FilterPill label="Surplus" value="$20k Plus" />
-          <FilterPill label="Last Touched" value="Never" />
+        <SectionCard eyebrow="Calling List" title="Pick A Base Set">
           <button
             type="button"
-            className="mt-1.5 inline-flex cursor-pointer items-center gap-1 rounded-[4px] border border-dashed border-[#d1d5db] px-2 py-1 text-[11px] font-medium text-[#6b7280] transition hover:border-[#0f1729] hover:text-[#0f1729]"
+            className="flex w-full cursor-pointer items-center justify-between rounded-[7px] border border-[#ebedf0] bg-white px-4 py-3 text-left transition hover:border-[#d8d6cf]"
           >
-            <IconPlus size={10} stroke={2.5} />
-            Add Filter
+            <div>
+              <div className="text-[14.5px] font-semibold tracking-[-0.005em] text-[#0a0d14]">
+                Fort Bend County, Texas
+              </div>
+              <div className="mt-0.5 text-[11.5px] text-[#5b606a]">Imported Jun 21, 2026</div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className="text-[12.5px] font-medium tabular-nums text-[#5b606a]">47 Leads</span>
+              <IconChevronDown size={14} stroke={2} className="text-[#9298a3]" />
+            </div>
           </button>
-        </div>
+        </SectionCard>
 
-        <div className="flex items-center gap-5 border-t border-[#f1f2f4] px-4 py-2.5">
-          <CircleToggle checked={skipDnc} label="Skip DNC" />
-          <CircleToggle checked={skipLitigated} label="Skip Litigated" />
-        </div>
-      </div>
-
-      <div className="mt-4 overflow-hidden rounded-[6px] bg-white ring-1 ring-[#e5e7eb]">
-        <div className="flex items-center justify-between px-4 py-2.5">
-          <div>
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#0f1729]">
-              Defaults
+        <SectionCard
+          eyebrow="Filter"
+          title="Trim The List Before You Dial"
+          right={
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-[22px] font-semibold leading-[1.1] tabular-nums tracking-[-0.018em] text-[#0a0d14]">28</span>
+              <span className="text-[12px] text-[#9298a3]">From <span className="tabular-nums">47</span></span>
             </div>
-            <div className="mt-0.5 text-[11px] text-[#6b7280]">
-              Using your saved defaults for caller ID, voicemail, wrap up, email, and SMS
-            </div>
+          }
+        >
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { label: "Stage", value: "Researched, First Contact" },
+              { label: "State", value: "Texas" },
+              { label: "Owner Status", value: "Living" },
+              { label: "Surplus", value: "$20k Plus" },
+              { label: "Last Touched", value: "Never" },
+            ].map((f) => (
+              <button
+                key={f.label}
+                type="button"
+                className="inline-flex h-[24px] cursor-pointer items-center gap-1 rounded-[5px] border border-[#ebedf0] bg-white px-2.5 text-[11.75px] font-medium tabular-nums text-[#1a1d24] transition hover:border-[#d8d6cf]"
+              >
+                <span className="text-[#9298a3]">{f.label}:</span>
+                <span className="text-[#0a0d14]">{f.value}</span>
+                <IconX size={10} stroke={2.25} className="text-[#9298a3] opacity-45" />
+              </button>
+            ))}
+            <button
+              type="button"
+              className="inline-flex h-[24px] cursor-pointer items-center gap-1 rounded-[5px] border border-dashed border-[#c2c5cc] bg-white px-2 text-[11px] font-medium text-[#5b606a] transition hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
+            >
+              <IconPlus size={10} stroke={2.5} />
+              Add Filter
+            </button>
           </div>
-          <button
-            type="button"
-            className="h-8 cursor-pointer rounded-[6px] bg-white px-3 text-[11.5px] font-medium text-[#0f1729] ring-1 ring-[#e5e7eb] transition hover:ring-[#0f1729]"
-          >
-            Edit
-          </button>
-        </div>
-      </div>
+          <div className="mt-4 flex items-center gap-6 border-t border-[#f1f2f4] pt-4">
+            <Toggle label="Skip DNC" on />
+            <Toggle label="Skip Litigated" on />
+          </div>
+        </SectionCard>
 
-      <div className="mt-4 flex items-center gap-2">
-        <input
-          type="text"
-          placeholder="Name This List (Required To Save)"
-          className="h-10 flex-1 rounded-[6px] bg-white px-3 text-[12.5px] text-[#0f1729] outline-none ring-1 ring-[#e5e7eb] transition focus:ring-[#0f1729] placeholder:text-[#9ca3af]"
+        <SectionCard
+          eyebrow="Defaults"
+          title="Caller ID, Voicemail, Wrap Up, Email, And SMS"
+          description="Using your saved defaults. Edit any one for just this session."
+          right={
+            <button
+              type="button"
+              className="h-9 cursor-pointer rounded-[7px] bg-white px-4 text-[13px] font-medium text-[#0a0d14] transition hover:border-[#d8d6cf]"
+              style={{ border: "1px solid #ebedf0", boxShadow: "0 1px 1px rgba(12,13,16,0.02)" }}
+            >
+              Edit
+            </button>
+          }
         />
-        <button
-          type="button"
-          className="h-10 cursor-pointer rounded-[6px] bg-white px-4 text-[12.5px] font-medium text-[#374151] ring-1 ring-[#e5e7eb] transition hover:ring-[#0f1729]"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="flex h-10 cursor-pointer items-center gap-2 rounded-[6px] bg-[#0f1729] px-4 text-[12.5px] font-medium text-white transition hover:opacity-90"
-        >
-          Start Session
-          <span className="rounded bg-white/15 px-1.5 py-0.5 text-[11px] tabular-nums">28</span>
-        </button>
+
+        <div className="mt-6 flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Name This List To Save It (Optional)"
+            className="h-[38px] flex-1 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[13.5px] text-[#0a0d14] outline-none transition focus:border-[#0d4b3a] placeholder:text-[#c2c5cc]"
+          />
+          <button
+            type="button"
+            className="h-[38px] cursor-pointer rounded-[7px] bg-white px-4 text-[13px] font-medium text-[#0a0d14] transition hover:border-[#d8d6cf]"
+            style={{ border: "1px solid #ebedf0", boxShadow: "0 1px 1px rgba(12,13,16,0.02)" }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-[38px] cursor-pointer items-center gap-2 rounded-[7px] bg-[#0d4b3a] px-5 text-[13px] font-medium tracking-[-0.008em] text-white"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
+          >
+            Start Session
+            <span className="rounded-[4px] bg-white/15 px-1.5 py-0.5 text-[11px] tabular-nums">28</span>
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function FilterPill({ label, value }: { label: string; value: string }) {
+function SectionCard({
+  eyebrow,
+  title,
+  description,
+  right,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+  right?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
   return (
-    <button
-      type="button"
-      className="mr-1.5 mt-1.5 inline-flex cursor-pointer items-center gap-1.5 rounded-[4px] bg-white py-1 pl-2 pr-2.5 text-[11.5px] text-[#374151] ring-1 ring-[#e5e7eb] transition hover:ring-[#0f1729]"
+    <div
+      className="mt-5 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+      style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
-      <span className="text-[#9ca3af]">{label}</span>
-      <span className="font-medium text-[#0f1729]">{value}</span>
-    </button>
+      <div className="flex items-start justify-between gap-6 px-6 py-5">
+        <div className="min-w-0">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+            {eyebrow}
+          </div>
+          <div className="mt-1.5 text-[16px] font-semibold leading-[1.25] tracking-[-0.018em] text-[#0a0d14]">
+            {title}
+          </div>
+          {description && (
+            <div className="mt-1.5 max-w-[64ch] text-[12.5px] leading-[1.55] text-[#5b606a]">
+              {description}
+            </div>
+          )}
+        </div>
+        {right && <div className="shrink-0">{right}</div>}
+      </div>
+      {children && <div className="border-t border-[#f1f2f4] px-6 py-5">{children}</div>}
+    </div>
+  );
+}
+
+function Toggle({ label, on }: { label: string; on: boolean }) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2.5">
+      <span
+        className={[
+          "relative inline-flex h-[20px] w-[36px] shrink-0 rounded-full transition",
+          on ? "bg-[#0d4b3a]" : "bg-[#d6d4cd]",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "absolute top-[2px] h-[16px] w-[16px] rounded-full bg-white transition",
+            on ? "left-[18px]" : "left-[2px]",
+          ].join(" ")}
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.20), 0 0 0 0.5px rgba(12,13,16,0.06)" }}
+        />
+      </span>
+      <span className="text-[12.5px] font-medium text-[#0a0d14]">{label}</span>
+    </label>
   );
 }
