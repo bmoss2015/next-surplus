@@ -44,3 +44,4 @@
 2026-06-17 | PR #146 | Fix M11: Support email link in login footer (Terms · Privacy · Support)
 2026-06-22 | PR #197 | Lob pricing scraper reworked: stable GitBook source, Resend ops alerts, future-effective-rate detection
 2026-06-22 | PR #198 | Removed dead Plaid integration code (cron, server actions, lib module, package deps)
+2026-06-23 | PR #200 | Dialer wizard Phase 1: V4 design ported to /dialer/setup, DB schema migration 0160 (dialer_sessions, phone_numbers, session_calls), 5 phone numbers variants at /share/phone-numbers/{a..e}
