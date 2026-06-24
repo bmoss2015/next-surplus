@@ -68,6 +68,12 @@ export const GROUPS: RailGroup[] = [
     ],
   },
   {
+    name: "Dialer",
+    items: [
+      { key: "phone-numbers", label: "Phone Numbers", adminOnly: true },
+    ],
+  },
+  {
     name: "Playbooks",
     items: [{ key: "playbooks", label: "All Playbooks" }],
   },

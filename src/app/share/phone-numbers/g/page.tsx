@@ -24,6 +24,8 @@ export default function PNVariantG() {
   );
 }
 
+type ApprovedView = "default" | "A" | "B" | "C";
+
 function PNVariantGInner() {
   const sp = useSearchParams();
   const initial =
@@ -32,8 +34,13 @@ function PNVariantGInner() {
       : (sp.get("a2p") as A2PState | null) === "pending"
         ? "pending"
         : "in-progress";
+  const viewParam = sp.get("view") as ApprovedView | null;
+  const approvedView: ApprovedView =
+    viewParam === "A" || viewParam === "B" || viewParam === "C" ? viewParam : "default";
   const [a2pState, setA2pState] = useState<A2PState>(initial);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const numbersInStates = new Set(NUMBERS.map((n) => n.state)).size;
+  const activeNumbersCount = NUMBERS.filter((n) => n.status === "active").length;
 
   return (
     <div className="min-h-screen bg-[#fafbfc]">
@@ -50,11 +57,16 @@ function PNVariantGInner() {
               Phone Numbers
             </h1>
             <p className="mt-4 max-w-[60ch] text-[14px] leading-[1.55] text-[#5b606a]">
-              Variant G &middot; Wizard-style A2P up top (shrinks to chip after approval). Compact list below where clicking a row reveals per-number detail.
+              Variant G &middot; Wizard-style A2P up top. Approved-state view: <span className="font-semibold text-[#0a0d14]">{approvedView}</span> (try <code>?a2p=approved&amp;view=A</code>, <code>view=B</code>, or <code>view=C</code>)
             </p>
+            {a2pState === "approved" && approvedView === "B" && (
+              <p className="mt-2 text-[13px] text-[#5b606a]">
+                Voice and SMS active on every number.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {a2pState === "approved" && (
+            {a2pState === "approved" && approvedView === "default" && (
               <span className="inline-flex h-9 items-center gap-1.5 rounded-[7px] border border-[#0d4b3a] bg-white px-3 text-[12px] font-semibold text-[#0d4b3a]">
                 <IconCheck size={11} stroke={2.5} />
                 SMS Approved
@@ -70,6 +82,14 @@ function PNVariantGInner() {
             </button>
           </div>
         </div>
+
+        {a2pState === "approved" && approvedView === "C" && (
+          <div className="mt-7 grid grid-cols-3 gap-3">
+            <StatTile label="Active Numbers" value={String(activeNumbersCount)} sub="numbers" />
+            <StatTile label="Coverage" value={String(numbersInStates)} sub="states" />
+            <StatTile label="SMS Status" value="Live" sub="all numbers" emphasis />
+          </div>
+        )}
 
         {a2pState !== "approved" && (
           <div
@@ -214,6 +234,30 @@ function DetailCell({ label, value }: { label: string; value: string }) {
     <div>
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">{label}</div>
       <div className="mt-1 text-[13px] font-medium text-[#0a0d14]">{value}</div>
+    </div>
+  );
+}
+
+function StatTile({ label, value, sub, emphasis }: { label: string; value: string; sub: string; emphasis?: boolean }) {
+  return (
+    <div
+      className="rounded-[14px] border border-[#ebedf0] bg-white px-5 py-4"
+      style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+    >
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+        {label}
+      </div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <div
+          className={[
+            "text-[28px] font-semibold leading-none tabular-nums tracking-[-0.022em]",
+            emphasis ? "text-[#0d4b3a]" : "text-[#0a0d14]",
+          ].join(" ")}
+        >
+          {value}
+        </div>
+        <div className="text-[12px] text-[#5b606a]">{sub}</div>
+      </div>
     </div>
   );
 }

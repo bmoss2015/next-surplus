@@ -29,6 +29,7 @@ import { CustomerPricingViewSection } from "./CustomerPricingViewSection";
 import { TemplatesSection } from "./TemplatesSection";
 import { EmailTemplatesSection } from "./EmailTemplatesSection";
 import { PlaybooksSection } from "./PlaybooksSection";
+import { PhoneNumbersSection } from "./PhoneNumbersSection";
 
 import type {
   AppSettings,
@@ -239,6 +240,8 @@ function renderPanel(
           canEdit={currentUser.isAdmin}
         />
       );
+    case "phone-numbers":
+      return currentUser.isAdmin ? <PhoneNumbersSection /> : <AdminGate />;
     default:
       return <Placeholder panelKey={active} />;
   }
