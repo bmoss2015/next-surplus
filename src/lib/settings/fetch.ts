@@ -747,3 +747,118 @@ export async function fetchResearchTemplates(): Promise<ResearchTemplateRow[]> {
     steps: normalizeSteps(r.steps),
   }));
 }
+
+export type PhoneNumberRow = {
+  id: string;
+  telnyx_phone_number_id: string | null;
+  e164: string;
+  friendly_name: string | null;
+  state: string | null;
+  city: string | null;
+  voice_enabled: boolean;
+  sms_enabled: boolean;
+  status: "pending" | "active" | "released";
+  monthly_cost_cents: number;
+  telnyx_cost_at_purchase_cents: number | null;
+  purchased_at: string | null;
+};
+
+export async function fetchPhoneNumbers(): Promise<PhoneNumberRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("phone_numbers")
+    .select(
+      "id, telnyx_phone_number_id, e164, friendly_name, state, city, voice_enabled, sms_enabled, status, monthly_cost_cents, telnyx_cost_at_purchase_cents, purchased_at"
+    )
+    .neq("status", "released")
+    .order("purchased_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as PhoneNumberRow[];
+}
+
+export type TelnyxPricingSettings = {
+  org_id: string;
+  telnyx_phone_monthly_cents: number;
+  telnyx_voice_outbound_per_min_cents: number;
+  telnyx_sms_outbound_per_segment_cents: number;
+  customer_phone_monthly_cents: number;
+  customer_voice_outbound_per_min_cents: number;
+  customer_sms_outbound_per_segment_cents: number;
+  last_telnyx_price_check_at: string | null;
+  last_telnyx_price_drift_pct: number | null;
+};
+
+const DEFAULT_TELNYX_PRICING: Omit<TelnyxPricingSettings, "org_id"> = {
+  telnyx_phone_monthly_cents: 100,
+  telnyx_voice_outbound_per_min_cents: 0.7,
+  telnyx_sms_outbound_per_segment_cents: 0.5,
+  customer_phone_monthly_cents: 300,
+  customer_voice_outbound_per_min_cents: 2.0,
+  customer_sms_outbound_per_segment_cents: 2.0,
+  last_telnyx_price_check_at: null,
+  last_telnyx_price_drift_pct: null,
+};
+
+export async function fetchTelnyxPricingSettings(): Promise<TelnyxPricingSettings | null> {
+  const profile = await getCurrentProfile();
+  if (!profile?.orgId) return null;
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("telnyx_pricing_settings")
+    .select("*")
+    .eq("org_id", profile.orgId)
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return data as TelnyxPricingSettings;
+  return { org_id: profile.orgId, ...DEFAULT_TELNYX_PRICING };
+}
+
+export type A2pBrand = {
+  id: string;
+  status: "draft" | "submitted" | "in_review" | "approved" | "rejected" | "suspended";
+  telnyx_brand_id: string | null;
+  company_legal_name: string | null;
+  ein: string | null;
+  vertical: string | null;
+  company_website: string | null;
+  privacy_policy_url: string | null;
+  terms_url: string | null;
+  authorized_rep_name: string | null;
+  authorized_rep_email: string | null;
+  authorized_rep_phone: string | null;
+  rejection_reason: string | null;
+  vetting_tier: "standard" | "enhanced" | "sole_prop" | null;
+  submitted_at: string | null;
+  approved_at: string | null;
+};
+
+export async function fetchA2pBrand(): Promise<A2pBrand | null> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("a2p_brand_registrations")
+    .select(
+      "id, status, telnyx_brand_id, company_legal_name, ein, vertical, company_website, privacy_policy_url, terms_url, authorized_rep_name, authorized_rep_email, authorized_rep_phone, rejection_reason, vetting_tier, submitted_at, approved_at"
+    )
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as A2pBrand | null;
+}
+
+export type SavedListRow = {
+  id: string;
+  name: string;
+  filter_json: Record<string, unknown>;
+  last_run_at: string | null;
+  created_at: string;
+  created_by: string;
+};
+
+export async function fetchSavedLists(): Promise<SavedListRow[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("saved_lists")
+    .select("id, name, filter_json, last_run_at, created_at, created_by")
+    .order("last_run_at", { ascending: false, nullsFirst: false });
+  if (error) throw error;
+  return (data ?? []) as SavedListRow[];
+}

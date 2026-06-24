@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   IconPlus,
   IconPhone,
@@ -11,44 +12,65 @@ import {
   IconCheck,
   IconClock,
 } from "@tabler/icons-react";
+import type { PhoneNumberRow, A2pBrand } from "@/lib/settings/fetch";
 
-export type PhoneNumberRow = {
-  id: string;
-  number: string;
-  state: string;
-  city: string;
-  voice: boolean;
-  sms: boolean;
-  monthly: string;
-  status: "active" | "pending";
-  purchasedOn: string;
-};
+function formatE164(e164: string): string {
+  const cleaned = e164.replace(/[^\d]/g, "");
+  if (cleaned.length === 11 && cleaned.startsWith("1")) {
+    return `(${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+  }
+  return e164;
+}
 
-const MOCK_NUMBERS: PhoneNumberRow[] = [
-  { id: "1", number: "(512) 555 0188", state: "Texas", city: "Austin", voice: true, sms: false, monthly: "$1.00", status: "active", purchasedOn: "Jun 03, 2026" },
-  { id: "2", number: "(713) 555 0244", state: "Texas", city: "Houston", voice: true, sms: false, monthly: "$1.00", status: "active", purchasedOn: "Jun 12, 2026" },
-  { id: "3", number: "(404) 555 0212", state: "Georgia", city: "Atlanta", voice: true, sms: false, monthly: "$1.00", status: "active", purchasedOn: "May 18, 2026" },
-  { id: "4", number: "(602) 555 0177", state: "Arizona", city: "Phoenix", voice: true, sms: false, monthly: "$1.00", status: "pending", purchasedOn: "Jun 22, 2026" },
-];
+function formatMoney(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+}
 
 type A2PState = "pending" | "in-progress" | "approved";
 
-export function PhoneNumbersSection({ initial }: { initial?: PhoneNumberRow[] }) {
+function brandToA2pState(brand: A2pBrand | null): A2PState {
+  if (!brand) return "pending";
+  if (brand.status === "approved") return "approved";
+  if (brand.status === "draft" || brand.status === "rejected") return "pending";
+  return "in-progress";
+}
+
+export function PhoneNumbersSection({
+  initial,
+  a2pBrand,
+}: {
+  initial: PhoneNumberRow[];
+  a2pBrand: A2pBrand | null;
+}) {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#fafbfc]" />}>
-      <PhoneNumbersInner initial={initial ?? MOCK_NUMBERS} />
+      <PhoneNumbersInner initial={initial} a2pBrand={a2pBrand} />
     </Suspense>
   );
 }
 
-function PhoneNumbersInner({ initial }: { initial: PhoneNumberRow[] }) {
+function PhoneNumbersInner({
+  initial,
+  a2pBrand,
+}: {
+  initial: PhoneNumberRow[];
+  a2pBrand: A2pBrand | null;
+}) {
   const sp = useSearchParams();
   const initialState: A2PState =
     (sp.get("a2p") as A2PState | null) === "approved"
       ? "approved"
       : (sp.get("a2p") as A2PState | null) === "in-progress"
         ? "in-progress"
-        : "pending";
+        : sp.get("a2p") === "pending"
+          ? "pending"
+          : brandToA2pState(a2pBrand);
   const [a2pState] = useState<A2PState>(initialState);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const numbers = initial;
@@ -98,13 +120,13 @@ function PhoneNumbersInner({ initial }: { initial: PhoneNumberRow[] }) {
               <Stage n={4} label="Approved" status="todo" />
             </div>
             {a2pState === "pending" && (
-              <button
-                type="button"
+              <Link
+                href="/dialer/a2p"
                 className="mt-5 inline-flex h-10 cursor-pointer items-center rounded-[7px] bg-[#0d4b3a] px-4 text-[13px] font-medium text-white"
                 style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
               >
                 Start Registration
-              </button>
+              </Link>
             )}
           </div>
         </div>
@@ -139,12 +161,12 @@ function PhoneNumbersInner({ initial }: { initial: PhoneNumberRow[] }) {
                     ].join(" ")}
                   >
                     <div>
-                      <div className="text-[14px] font-semibold tabular-nums text-[#0a0d14]">{n.number}</div>
-                      <div className="mt-0.5 text-[11.5px] text-[#5b606a]">{n.city}, {n.state}</div>
+                      <div className="text-[14px] font-semibold tabular-nums text-[#0a0d14]">{formatE164(n.e164)}</div>
+                      <div className="mt-0.5 text-[11.5px] text-[#5b606a]">{n.city ?? "—"}{n.state ? `, ${n.state}` : ""}</div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <CapIndicator icon={<IconPhone size={12} stroke={2.25} />} label="Voice" status="live" />
-                      <CapIndicator icon={<IconMessageCircle size={12} stroke={2.25} />} label="SMS" status={a2pState === "approved" ? "live" : "pending"} />
+                      <CapIndicator icon={<IconPhone size={12} stroke={2.25} />} label="Voice" status={n.voice_enabled ? "live" : "pending"} />
+                      <CapIndicator icon={<IconMessageCircle size={12} stroke={2.25} />} label="SMS" status={n.sms_enabled ? "live" : "pending"} />
                     </div>
                     <div>
                       <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#5b606a]">
@@ -158,7 +180,7 @@ function PhoneNumbersInner({ initial }: { initial: PhoneNumberRow[] }) {
                       </span>
                     </div>
                     <div className="text-right text-[13.5px] font-semibold tabular-nums text-[#0a0d14]">
-                      {n.monthly}<span className="text-[11px] font-normal text-[#9298a3]">/mo</span>
+                      {formatMoney(n.monthly_cost_cents)}<span className="text-[11px] font-normal text-[#9298a3]">/mo</span>
                     </div>
                     <div className="text-right">
                       {expanded ? <IconChevronUp size={14} stroke={2} className="text-[#9298a3]" /> : <IconChevronDown size={14} stroke={2} className="text-[#9298a3]" />}
@@ -167,9 +189,9 @@ function PhoneNumbersInner({ initial }: { initial: PhoneNumberRow[] }) {
                   {expanded && (
                     <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-4">
                       <div className="grid grid-cols-3 gap-6">
-                        <DetailCell label="Purchased" value={n.purchasedOn} />
-                        <DetailCell label="Telnyx Id" value="Not Linked Yet" />
-                        <DetailCell label="Calls This Week" value="Coming Soon" />
+                        <DetailCell label="Purchased" value={formatDate(n.purchased_at)} />
+                        <DetailCell label="Telnyx Id" value={n.telnyx_phone_number_id ?? "—"} />
+                        <DetailCell label="Friendly Name" value={n.friendly_name ?? "—"} />
                       </div>
                       <div className="mt-4 flex items-center gap-2">
                         <button type="button" className="cursor-pointer text-[12px] font-medium text-[#0d4b3a] hover:text-[#13644e]">Rename</button>
@@ -184,7 +206,6 @@ function PhoneNumbersInner({ initial }: { initial: PhoneNumberRow[] }) {
           )}
         </div>
       </div>
-
     </div>
   );
 }

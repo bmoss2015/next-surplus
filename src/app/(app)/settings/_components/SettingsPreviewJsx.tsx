@@ -30,6 +30,12 @@ import { TemplatesSection } from "./TemplatesSection";
 import { EmailTemplatesSection } from "./EmailTemplatesSection";
 import { PlaybooksSection } from "./PlaybooksSection";
 import { PhoneNumbersSection } from "./PhoneNumbersSection";
+import { TelnyxPricingSection } from "./TelnyxPricingSection";
+import type {
+  PhoneNumberRow,
+  TelnyxPricingSettings,
+  A2pBrand,
+} from "@/lib/settings/fetch";
 
 import type {
   AppSettings,
@@ -77,6 +83,9 @@ export type SettingsData = {
   research: ResearchTemplateRow[];
   notificationPrefs: Record<string, boolean>;
   orgStages: import("@/lib/stages/types").OrgStage[];
+  phoneNumbers: PhoneNumberRow[];
+  telnyxPricing: TelnyxPricingSettings | null;
+  a2pBrand: A2pBrand | null;
 };
 
 const RAIL_KEYS = new Set(GROUPS.flatMap((g) => g.items.map((i) => i.key)));
@@ -241,7 +250,20 @@ function renderPanel(
         />
       );
     case "phone-numbers":
-      return currentUser.isAdmin ? <PhoneNumbersSection /> : <AdminGate />;
+      return currentUser.isAdmin ? (
+        <PhoneNumbersSection
+          initial={data.phoneNumbers}
+          a2pBrand={data.a2pBrand}
+        />
+      ) : (
+        <AdminGate />
+      );
+    case "telnyx-pricing":
+      return currentUser.isAdmin && data.telnyxPricing ? (
+        <TelnyxPricingSection initial={data.telnyxPricing} />
+      ) : (
+        <AdminGate />
+      );
     default:
       return <Placeholder panelKey={active} />;
   }
