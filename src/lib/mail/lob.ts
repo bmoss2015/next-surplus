@@ -73,11 +73,24 @@ function lobLetterCostPair(
     triggerSurcharge ? (customer?.letter_over_6_sheet_fee ?? 0) : 0;
   const wholesaleSurcharge =
     triggerSurcharge ? (wholesale?.letter_over_6_sheet_fee ?? 0) : 0;
+  // Every letter ships with address_placement=insert_blank_page so the
+  // user's template renders untouched on page 1. Lob bills the inserted
+  // blank addressing page as one additional page.
+  const customerInsertedPage = color
+    ? (customer?.letter_extra_page_color ?? 0)
+    : (customer?.letter_extra_page_bw ?? 0);
+  const wholesaleInsertedPage = color
+    ? (wholesale?.letter_extra_page_color ?? 0)
+    : (wholesale?.letter_extra_page_bw ?? 0);
   return {
     cost_cents:
-      baseCustomer == null ? null : baseCustomer + customerSurcharge,
+      baseCustomer == null
+        ? null
+        : baseCustomer + customerSurcharge + customerInsertedPage,
     provider_cost_cents:
-      baseWholesale == null ? null : baseWholesale + wholesaleSurcharge,
+      baseWholesale == null
+        ? null
+        : baseWholesale + wholesaleSurcharge + wholesaleInsertedPage,
   };
 }
 
@@ -377,6 +390,13 @@ export async function lobSendLetter(
       fd.append("color", String(input.color === true));
       fd.append("mail_type", lobMailType(input.mail_class));
       fd.append("use_type", "marketing");
+      // Lob's letter envelope is a #10 window. Default `top_first_page` mode
+      // overlays Lob's recipient address block + barcode + QR + return
+      // address onto the top of page 1, clobbering full-page template
+      // designs. `insert_blank_page` adds a blank addressing page in front
+      // of the user's PDF so page 1 renders untouched. Adds one extra page
+      // billed at the additional-page rate (~$0.10 B&W / $0.20 color).
+      fd.append("address_placement", "insert_blank_page");
       fd.append("metadata[correlation_id]", input.correlation_id);
       res = await lobFetch(`${LOB_BASE_URL}/letters`, {
         method: "POST",
@@ -410,6 +430,8 @@ export async function lobSendLetter(
         color: input.color === true,
         mail_type: lobMailType(input.mail_class),
         use_type: "marketing",
+        // See address_placement note in the multipart branch above.
+        address_placement: "insert_blank_page",
         metadata: { correlation_id: input.correlation_id },
       };
       res = await lobFetch(`${LOB_BASE_URL}/letters`, {
