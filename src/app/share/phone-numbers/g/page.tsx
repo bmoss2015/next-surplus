@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   IconPlus,
   IconPhone,
@@ -10,14 +11,20 @@ import {
   IconChevronUp,
   IconCheck,
   IconClock,
-  IconDots,
 } from "@tabler/icons-react";
 import { NUMBERS } from "../_data";
 
 type A2PState = "pending" | "in-progress" | "approved";
 
 export default function PNVariantG() {
-  const [a2pState, setA2pState] = useState<A2PState>("in-progress");
+  const sp = useSearchParams();
+  const initial =
+    (sp.get("a2p") as A2PState | null) === "approved"
+      ? "approved"
+      : (sp.get("a2p") as A2PState | null) === "pending"
+        ? "pending"
+        : "in-progress";
+  const [a2pState, setA2pState] = useState<A2PState>(initial);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
@@ -62,14 +69,11 @@ export default function PNVariantG() {
             style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
           >
             <div className="px-7 py-5">
-              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0d4b3a]">
-                Get SMS Working
-              </div>
-              <div className="mt-1.5 text-[17px] font-semibold tracking-[-0.018em] text-[#0a0d14]">
+              <div className="text-[17px] font-semibold tracking-[-0.018em] text-[#0a0d14]">
                 A2P 10DLC Registration
               </div>
               <div className="mt-1.5 text-[12.5px] text-[#5b606a]">
-                Carriers need to approve your brand and campaign before SMS unlocks. Voice already works on every number.
+                Carriers approve your brand and campaign before SMS unlocks. Voice already works on every number.
               </div>
             </div>
             <div className="border-t border-[#f1f2f4] px-7 py-5">
