@@ -24,7 +24,7 @@ export default function PNVariantG() {
   );
 }
 
-type ApprovedView = "default" | "A" | "B" | "C";
+type ApprovedView = "default" | "A" | "B" | "C" | "D" | "E" | "F";
 
 function PNVariantGInner() {
   const sp = useSearchParams();
@@ -36,7 +36,10 @@ function PNVariantGInner() {
         : "in-progress";
   const viewParam = sp.get("view") as ApprovedView | null;
   const approvedView: ApprovedView =
-    viewParam === "A" || viewParam === "B" || viewParam === "C" ? viewParam : "default";
+    viewParam === "A" || viewParam === "B" || viewParam === "C" ||
+    viewParam === "D" || viewParam === "E" || viewParam === "F"
+      ? viewParam
+      : "default";
   const [a2pState, setA2pState] = useState<A2PState>(initial);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const numbersInStates = new Set(NUMBERS.map((n) => n.state)).size;
@@ -53,12 +56,25 @@ function PNVariantGInner() {
 
         <div className="mt-3 flex items-start justify-between gap-6">
           <div>
-            <h1 className="text-[30px] font-semibold leading-[1.15] tracking-[-0.028em] text-[#0a0d14]">
-              Phone Numbers
-            </h1>
-            <p className="mt-4 max-w-[60ch] text-[14px] leading-[1.55] text-[#5b606a]">
-              Numbers your team dials from. Voice works immediately. SMS unlocks once your brand and campaign clear carrier review.
-            </p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-[30px] font-semibold leading-[1.15] tracking-[-0.028em] text-[#0a0d14]">
+                Phone Numbers
+              </h1>
+              {a2pState === "approved" && approvedView === "E" && (
+                <IconCheck size={16} stroke={2.5} className="text-[#0d4b3a]" />
+              )}
+            </div>
+
+            {a2pState === "approved" && approvedView === "D" ? (
+              <p className="mt-4 max-w-[60ch] text-[14px] leading-[1.55] text-[#5b606a]">
+                <span className="font-medium text-[#0a0d14]">{activeNumbersCount} numbers</span> across {Array.from(new Set(NUMBERS.map((n) => n.city))).slice(0, 3).join(", ")}. Voice and SMS both active.
+              </p>
+            ) : (
+              <p className="mt-4 max-w-[60ch] text-[14px] leading-[1.55] text-[#5b606a]">
+                Numbers your team dials from. Voice works immediately. SMS unlocks once your brand and campaign clear carrier review.
+              </p>
+            )}
+
             {a2pState === "approved" && approvedView === "B" && (
               <p className="mt-2 text-[13px] text-[#5b606a]">
                 Voice and SMS active on every number.
@@ -130,6 +146,11 @@ function PNVariantGInner() {
         <div className="mt-10 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
           Your Numbers
           <span className="h-px flex-1 bg-[#ebedf0]" />
+          {a2pState === "approved" && approvedView === "F" && (
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0d4b3a]">
+              Brand &middot; Campaign &middot; Approved May 18
+            </span>
+          )}
         </div>
 
         <div
