@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   IconPlus,
@@ -17,6 +17,14 @@ import { NUMBERS } from "../_data";
 type A2PState = "pending" | "in-progress" | "approved";
 
 export default function PNVariantG() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#fafbfc]" />}>
+      <PNVariantGInner />
+    </Suspense>
+  );
+}
+
+function PNVariantGInner() {
   const sp = useSearchParams();
   const initial =
     (sp.get("a2p") as A2PState | null) === "approved"
