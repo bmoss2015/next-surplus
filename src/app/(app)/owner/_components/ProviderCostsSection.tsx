@@ -1,9 +1,13 @@
 "use client";
 
-// Provider Costs panel.
+// Lob Rate panel.
 //
-// Read-only owner view of what Lob charges us per piece. The basis for
-// margin math against Customer Pricing.
+// Read-only owner view of what Lob charges us per piece. The Effective
+// Per-Letter Cost table below adds in the auto-inserted blank
+// addressing page that every letter ships with (required by the
+// windowed envelope; see lobSendLetter for the address_placement
+// wiring). The raw Published Rate Card section is Lob's own price
+// list with no per-letter aggregation applied.
 
 import type { ProviderCostsData } from "@/lib/owner/fetch";
 
@@ -30,21 +34,101 @@ export function ProviderCostsSection({ data }: { data: ProviderCostsData }) {
   return (
     <div className="mx-auto max-w-[920px] px-8 py-8">
       <div className="mb-6">
-        <h1 className="text-[22px] font-semibold text-ink">Provider Costs</h1>
+        <h1 className="text-[22px] font-semibold text-ink">Lob Rate</h1>
         <p className="mt-1 text-[13px] text-gray-600">
-          What the mail provider charges us per piece. Internal cost
-          data, not customer pricing. Customer pricing lives in Settings.
+          What Lob charges us per piece on the Developer (pay-as-you-go)
+          tier. Internal cost data, not customer pricing. Customer
+          pricing lives in Settings.
         </p>
       </div>
 
-      {/* Lob ---------------------------------------------------------- */}
+      {/* Effective Per Letter ----------------------------------------- */}
+      {lob && (
+        <section className="mb-6 rounded-lg border border-gray-200 bg-white">
+          <header className="border-b border-gray-200 px-5 py-3.5">
+            <div className="text-[14px] font-semibold text-ink">
+              Effective Cost Per Letter
+            </div>
+            <div className="mt-1 text-[11.5px] text-gray-600">
+              Every letter ships in a #10 double-window envelope. To keep
+              the user&apos;s template untouched, Lob inserts a blank
+              addressing page in front of the letter. We pay for that
+              inserted page on every send.
+            </div>
+          </header>
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-[11px] uppercase tracking-wider text-gray-500">
+                <th className="px-5 py-2 font-medium">Letter Type</th>
+                <th className="px-5 py-2 text-right font-medium">Base Page</th>
+                <th className="px-5 py-2 text-right font-medium">
+                  Address Page
+                </th>
+                <th className="px-5 py-2 text-right font-medium">
+                  Total Per Letter
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                {
+                  label: "First Class B&W",
+                  base: lob.letter_first_class_bw,
+                  extra: lob.letter_extra_page_bw,
+                },
+                {
+                  label: "First Class Color",
+                  base: lob.letter_first_class_color,
+                  extra: lob.letter_extra_page_color,
+                },
+                {
+                  label: "Standard Class B&W",
+                  base: lob.letter_standard_bw,
+                  extra: lob.letter_extra_page_bw,
+                },
+                {
+                  label: "Standard Class Color",
+                  base: lob.letter_standard_color,
+                  extra: lob.letter_extra_page_color,
+                },
+              ].map((row) => {
+                const total =
+                  typeof row.base === "number" && typeof row.extra === "number"
+                    ? row.base + row.extra
+                    : null;
+                return (
+                  <tr
+                    key={row.label}
+                    className="border-b border-gray-100 last:border-b-0"
+                  >
+                    <td className="px-5 py-2.5 text-ink">{row.label}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums text-gray-700">
+                      {dollars(row.base)}
+                    </td>
+                    <td className="px-5 py-2.5 text-right tabular-nums text-gray-700">
+                      +{dollars(row.extra)}
+                    </td>
+                    <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-ink">
+                      {dollars(total)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {/* Published Rate Card ----------------------------------------- */}
       <section className="mb-6 rounded-lg border border-gray-200 bg-white">
         <header className="flex items-center justify-between border-b border-gray-200 px-5 py-3.5">
           <div>
-            <div className="text-[14px] font-semibold text-ink">Lob</div>
+            <div className="text-[14px] font-semibold text-ink">
+              Lob Published Rate Card
+            </div>
             <div className="text-[11.5px] text-gray-500">
-              Developer tier (free). Rates are all inclusive (printing,
-              postage, envelope).
+              Developer tier (pay-as-you-go). Rates are all inclusive
+              (printing, postage, envelope).
             </div>
           </div>
           <div className="text-right text-[11.5px] text-gray-500">
@@ -57,7 +141,7 @@ export function ProviderCostsSection({ data }: { data: ProviderCostsData }) {
             <thead>
               <tr className="border-b border-gray-200 text-left text-[11px] uppercase tracking-wider text-gray-500">
                 <th className="px-5 py-2 font-medium">Product</th>
-                <th className="px-5 py-2 text-right font-medium">All-in Rate</th>
+                <th className="px-5 py-2 text-right font-medium">Lob Rate</th>
               </tr>
             </thead>
             <tbody>
