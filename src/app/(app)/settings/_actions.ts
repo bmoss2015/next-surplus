@@ -862,17 +862,24 @@ export async function removeSignatureImage(): Promise<
 import {
   lobCreateBankAccount,
   lobDeleteBankAccount,
+  lobGetBankAccount,
   lobVerifyBankAccount,
 } from "@/lib/mail";
 
 // Bank accounts are added by manual routing + account number entry.
-// Lob does not support Plaid processor tokens, and the Plaid Link UI
-// we briefly tried was removed because typing two numbers is simpler
-// than guiding users through an OAuth dance for the same end result.
-// After the row is inserted, Lob initiates two small micro-deposits
-// to the bank account. The operator enters those two cent amounts in
-// the Verify Manually modal on the bank card and the row flips to
-// verified once Lob accepts them.
+// After the row is inserted, the mail provider sends two small
+// micro-deposits to the bank account. The operator reads the two cent
+// amounts from their statement and enters them in the Verify Manually
+// modal to flip the row to verified.
+//
+// Bank-type compatibility gate (added after a Mercury / Column NA add
+// surfaced the issue): the provider picks micro-deposit format based
+// on the receiving bank. Traditional banks (Chase, BofA, credit
+// unions) get the two-amounts flow we support. Fintech banks like
+// Mercury get a single-deposit descriptor-code flow that our portal
+// does not implement. To keep the verification UX consistent, we
+// reject any bank where the provider returns microdeposit_type other
+// than "amounts" and clean up the just-created provider record.
 
 export async function addMailBankAccountManually(input: {
   routing_number: string;
@@ -903,6 +910,22 @@ export async function addMailBankAccountManually(input: {
       input.account_type === "individual" ? "individual" : "company",
   });
   if (!lobRes.ok) return { ok: false, error: lobRes.error };
+
+  const lobState = await lobGetBankAccount(lobRes.lob_bank_account_id);
+  if (lobState.ok) {
+    const mdType = (lobState.raw as { microdeposit_type?: string | null })
+      .microdeposit_type;
+    if (mdType && mdType !== "amounts") {
+      await lobDeleteBankAccount(lobRes.lob_bank_account_id);
+      const inferredBank =
+        lobRes.bank_name ?? input.bank_name?.trim() ?? "this bank";
+      return {
+        ok: false,
+        error: `${inferredBank} is not supported for check funding. Please add a traditional checking account from a major bank or credit union.`,
+      };
+    }
+  }
+
   const sb = await createClient();
   const { data, error } = await sb
     .from("mail_bank_accounts")
