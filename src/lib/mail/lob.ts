@@ -656,6 +656,42 @@ export async function lobCreateBankAccount(
   }
 }
 
+export type LobBankAccountState =
+  | {
+      ok: true;
+      raw: Record<string, unknown>;
+    }
+  | { ok: false; status: number; error: string };
+
+export async function lobGetBankAccount(
+  bnkId: string
+): Promise<LobBankAccountState> {
+  if (!isLobConfigured()) {
+    return { ok: false, status: 0, error: "Mail service is not configured." };
+  }
+  try {
+    const res = await fetch(`${LOB_BASE_URL}/bank_accounts/${bnkId}`, {
+      method: "GET",
+      headers: { Authorization: authHeader(), Accept: "application/json" },
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: await res.text(),
+      };
+    }
+    const raw = (await res.json()) as Record<string, unknown>;
+    return { ok: true, raw };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      error: err instanceof Error ? err.message : "Lob bank lookup failed.",
+    };
+  }
+}
+
 export async function lobVerifyBankAccount(
   bnkId: string,
   amounts: [number, number]

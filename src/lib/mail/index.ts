@@ -38,10 +38,12 @@ export {
   lobCreateBankAccount,
   lobVerifyBankAccount,
   lobDeleteBankAccount,
+  lobGetBankAccount,
 } from "./lob";
 export type {
   LobBankAccountInput,
   LobBankAccountResult,
+  LobBankAccountState,
 } from "./lob";
 export { renderMerge, MERGE_FIELDS, fieldsByGroup } from "./merge";
 export type { MergeContext, MergeField } from "./merge";
