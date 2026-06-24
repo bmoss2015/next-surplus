@@ -43,21 +43,21 @@ export function PhoneNumbersSection({ initial }: { initial?: PhoneNumberRow[] })
 
 function PhoneNumbersInner({ initial }: { initial: PhoneNumberRow[] }) {
   const sp = useSearchParams();
-  const initialState =
+  const initialState: A2PState =
     (sp.get("a2p") as A2PState | null) === "approved"
       ? "approved"
-      : (sp.get("a2p") as A2PState | null) === "pending"
-        ? "pending"
-        : "in-progress";
-  const [a2pState, setA2pState] = useState<A2PState>(initialState);
+      : (sp.get("a2p") as A2PState | null) === "in-progress"
+        ? "in-progress"
+        : "pending";
+  const [a2pState] = useState<A2PState>(initialState);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const numbers = initial;
 
   return (
-    <div className="mx-auto max-w-[960px] px-12 pb-32 pt-11">
-      <div className="flex items-start justify-between gap-6">
-        <div>
-          <h1 className="text-[30px] font-semibold leading-[1.15] tracking-[-0.028em] text-[#0a0d14]">
+    <div className="mx-auto w-full max-w-[960px] px-8 pb-32 pt-10">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.026em] text-[#0a0d14]">
             Phone Numbers
           </h1>
           <p className="mt-3 max-w-[60ch] text-[14px] leading-[1.55] text-[#5b606a]">
@@ -66,11 +66,11 @@ function PhoneNumbersInner({ initial }: { initial: PhoneNumberRow[] }) {
         </div>
         <button
           type="button"
-          className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-4 text-[13px] font-medium text-white"
+          className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[7px] bg-[#0d4b3a] px-4 text-[13px] font-medium text-white"
           style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
         >
           <IconPlus size={13} stroke={2.25} />
-          Buy A Number
+          Buy Number
         </button>
       </div>
 
@@ -185,17 +185,6 @@ function PhoneNumbersInner({ initial }: { initial: PhoneNumberRow[] }) {
         </div>
       </div>
 
-      <div className="mt-3 text-[11px] text-[#9298a3]">
-        A2P state demo:{" "}
-        <button
-          type="button"
-          onClick={() => setA2pState((s) => (s === "pending" ? "in-progress" : s === "in-progress" ? "approved" : "pending"))}
-          className="cursor-pointer font-medium text-[#0d4b3a] hover:text-[#13644e]"
-        >
-          cycle
-        </button>{" "}
-        (current: <span className="font-semibold text-[#0a0d14]">{a2pState}</span>)
-      </div>
     </div>
   );
 }

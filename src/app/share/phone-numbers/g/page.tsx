@@ -57,7 +57,7 @@ function PNVariantGInner() {
               Phone Numbers
             </h1>
             <p className="mt-4 max-w-[60ch] text-[14px] leading-[1.55] text-[#5b606a]">
-              Variant G &middot; Wizard-style A2P up top. Approved-state view: <span className="font-semibold text-[#0a0d14]">{approvedView}</span> (try <code>?a2p=approved&amp;view=A</code>, <code>view=B</code>, or <code>view=C</code>)
+              Numbers your team dials from. Voice works immediately. SMS unlocks once your brand and campaign clear carrier review.
             </p>
             {a2pState === "approved" && approvedView === "B" && (
               <p className="mt-2 text-[13px] text-[#5b606a]">
