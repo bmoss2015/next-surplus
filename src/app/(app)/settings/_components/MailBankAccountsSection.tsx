@@ -620,7 +620,6 @@ function SampleStatement({ mode }: { mode: "amounts" | "descriptor_code" }) {
           >
             <div style={{ color: "var(--text-2)" }}>Jun 25</div>
             <div style={{ fontVariantNumeric: "tabular-nums" }}>
-              ACH CREDIT{" "}
               <span
                 style={{
                   background: "var(--brand)",
@@ -633,7 +632,7 @@ function SampleStatement({ mode }: { mode: "amounts" | "descriptor_code" }) {
               >
                 SMABCD
               </span>
-              -LOB
+              -LOB.COM
             </div>
             <div
               style={{
@@ -711,7 +710,7 @@ function SampleStatement({ mode }: { mode: "amounts" | "descriptor_code" }) {
           }}
         >
           <div style={{ color: "var(--text-2)" }}>Jun 25</div>
-          <div style={{ fontVariantNumeric: "tabular-nums" }}>LOB-VERIF</div>
+          <div style={{ fontVariantNumeric: "tabular-nums" }}>LOB.COM</div>
           <div
             style={{
               textAlign: "right",
@@ -737,7 +736,7 @@ function SampleStatement({ mode }: { mode: "amounts" | "descriptor_code" }) {
           }}
         >
           <div style={{ color: "var(--text-2)" }}>Jun 25</div>
-          <div style={{ fontVariantNumeric: "tabular-nums" }}>LOB-VERIF</div>
+          <div style={{ fontVariantNumeric: "tabular-nums" }}>LOB.COM</div>
           <div
             style={{
               textAlign: "right",

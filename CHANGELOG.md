@@ -11,6 +11,7 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 
 
 ### Fixed
+- Fix SAMPLE-STATEMENT-REAL-DESCRIPTOR: Verify Manually sample-statement preview now matches the actual descriptor format Lob writes to bank statements. Descriptor_code mode shows `SMABCD-LOB.COM` (was `ACH CREDIT SMABCD-LOB`; the "ACH CREDIT" prefix is a Mercury-side transaction label, not part of the descriptor, and the suffix is `.COM` not just `-LOB`). Amounts mode descriptor shows `LOB.COM` (was `LOB-VERIF`, which was a guess). Verified against Bree's real Mercury / Column NA statements: `SMTJDY-LOB.COM` and `SMHVUT-LOB.COM`. (2026-06-25T17:30:00-05:00)
 - Fix LOB-WEBHOOK-SIGNATURE-TIMESTAMP: Lob webhook signature verification was hashing only the raw body, but Lob's documented format is HMAC-SHA256 over `${Lob-Signature-Timestamp}.${body}`. The handler now reads the `lob-signature-timestamp` header, builds the concatenated signature input, and computes the HMAC against that. Without this fix every real Lob webhook delivery returned 401 since at least May 2026 (all `bank_account.*`, `letter.*`, `check.*`, `address.*` events were silently rejected). Latent bug present before the secret rotation work in PR #197+. (2026-06-25T13:50:00-05:00)
 
 
