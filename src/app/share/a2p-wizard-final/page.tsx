@@ -313,7 +313,7 @@ function Hero({ step }: { step: Step }) {
           <h1 className="mt-5 text-[36px] font-semibold leading-[1.1] tracking-[-0.022em] text-white">
             Registration Submitted
           </h1>
-          <p className="mx-auto mt-3 max-w-[58ch] text-[14.5px] leading-[1.55] text-white/75">
+          <p className="mx-auto mt-3 text-[14.5px] leading-[1.55] text-white/85">
             The Campaign Registry received the brand and campaign for review. Notifications will arrive by SMS and email at each status change.
           </p>
         </div>
@@ -346,7 +346,7 @@ function Hero({ step }: { step: Step }) {
         <h1 className="mt-3 text-[34px] font-semibold leading-[1.1] tracking-[-0.024em] text-white">
           {titles[step]}
         </h1>
-        <p className="mt-3 max-w-[60ch] text-[14.5px] leading-[1.55] text-white/75">
+        <p className="mt-3 text-[14.5px] leading-[1.55] text-white/85">
           {subs[step]}
         </p>
 
@@ -663,7 +663,7 @@ function Step2Campaign({
 
       <Card
         title="Campaign Description"
-        subtitle="A starter template is loaded below. Replace every bracketed placeholder with details specific to the business before continuing. Carriers compare this against the sample messages to verify alignment."
+        subtitle="One or two sentences describing how SMS is used, in the operator's own words. Carriers compare this against the sample messages to verify alignment. Click Load Example Template below to start with a surplus recovery starter, then replace every bracketed placeholder with details specific to the business."
       >
         <textarea
           value={campaign.description}
@@ -1561,9 +1561,9 @@ function BrandIdentityChangeConfirm() {
             Brand Identity Change
           </div>
           <h1 className="mt-3 text-[30px] font-semibold leading-[1.15] tracking-[-0.022em] text-white">
-            This Edit Registers A New Brand
+            Brand Identity Change
           </h1>
-          <p className="mt-3 max-w-[58ch] text-[14px] leading-[1.55] text-white/75">
+          <p className="mt-3 text-[14px] leading-[1.55] text-white/85">
             The Campaign Registry treats any change to Entity Type, Legal Name, or EIN as a separate brand. The original approved brand remains registered with TCR. A separate new brand is then created with the updated identity, which restarts verification and incurs a new fee.
           </p>
         </div>
@@ -1655,7 +1655,7 @@ function BrandIdentityChangeConfirm() {
                 className="mt-0.5 h-4 w-4 cursor-pointer accent-[#0d4b3a]"
               />
               <span>
-                I understand that this edit registers a new brand, incurs a new $40 verification fee, and that the original brand and its fee are not refunded.
+                I understand that this edit registers a new brand, incurs a new $19.50 verification fee, and that the original brand and its fee are not refunded.
               </span>
             </label>
           </div>
