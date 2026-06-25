@@ -37,27 +37,22 @@ type Campaign = {
   messages: string[];
 };
 
-const PRE_FILLED_FIELDS: ReadonlySet<keyof Brand> = new Set([
-  "legalName",
-  "vertical",
-  "website",
-  "repEmail",
-  "repPhone",
-  "street",
-  "city",
-  "state",
-  "postal",
-]);
-
 const DEFAULT_MESSAGES = [
   "Hi {first_name}, this is Sarah with Workflow Minds. Public records show you may be owed funds from a recent foreclosure sale. Reply Y for details, STOP to opt out.",
   "Following up on the surplus funds from your property sale. The claim window is open through August 15. Reply with a good time to talk.",
-  "Quick reminder, we still need a signed retainer to file your claim before the surplus funds are turned over to the state. Text or call when you have a minute.",
+  "Quick reminder, a signed retainer is still needed to file the claim before the surplus funds are turned over to the state. Text or call when convenient.",
+];
+
+const ALT_MESSAGES = [
+  "Hi {first_name}, the documents are filed with the court. You'll be texted again when a hearing date is set. Reply STOP to opt out.",
+  "Hi {first_name}, a check is ready. Reply with the current mailing address and it'll go out today.",
+  "Following up on the claim package mailed last week. Please confirm receipt or reply with any questions.",
 ];
 
 export default function A2pWizardFinal() {
   const [step, setStep] = useState<Step>(1);
   const [preview, setPreview] = useState(false);
+  const [useCaseOpen, setUseCaseOpen] = useState(false);
 
   const [brand, setBrand] = useState<Brand>({
     legalName: "Workflow Minds LLC",
@@ -97,10 +92,22 @@ export default function A2pWizardFinal() {
           <div className="grid grid-cols-[1fr_280px] gap-7">
             <div>
               {step === 1 && <Step1Brand brand={brand} setBrand={setBrand} />}
-              {step === 2 && <Step2Campaign campaign={campaign} setCampaign={setCampaign} />}
+              {step === 2 && (
+                <Step2Campaign
+                  campaign={campaign}
+                  setCampaign={setCampaign}
+                  useCaseOpen={useCaseOpen}
+                  setUseCaseOpen={setUseCaseOpen}
+                />
+              )}
               {step === 3 && <Step3Review brand={brand} campaign={campaign} />}
 
-              <NavRow step={step} onBack={back} onNext={next} onPreview={() => setPreview(true)} />
+              <NavRow
+                step={step}
+                onBack={back}
+                onNext={next}
+                onPreview={() => setPreview(true)}
+              />
             </div>
 
             <aside>{stepHelpFor(step)}</aside>
@@ -138,7 +145,7 @@ function Hero({ step }: { step: Step }) {
             Registration Submitted
           </h1>
           <p className="mx-auto mt-3 max-w-[58ch] text-[14.5px] leading-[1.55] text-white/75">
-            The Campaign Registry has your brand and campaign. We&apos;ll text and email you the moment the carriers approve.
+            The Campaign Registry received the brand and campaign. An SMS and email notification will fire the moment carriers approve.
           </p>
         </div>
       </div>
@@ -146,15 +153,15 @@ function Hero({ step }: { step: Step }) {
   }
 
   const titles = {
-    1: "Verify Your Brand",
-    2: "Build Your Campaign",
+    1: "Verify The Brand",
+    2: "Build The Campaign",
     3: "Review And Submit",
   } as const;
 
   const subs = {
-    1: "Carriers verify the legal entity behind every SMS campaign before approving it. This is the entity they will register.",
-    2: "Tell carriers how you will use SMS and give them three real examples. Both shape the approval decision.",
-    3: "Final look before submission. Brand vetting runs 1 to 2 business days, then carriers review the campaign.",
+    1: "Carriers verify the legal entity behind every SMS campaign before approving it. This is the entity that gets registered.",
+    2: "Carriers need to know how SMS will be used and need three real example messages. Both shape the approval decision.",
+    3: "Final look before submission. Brand verification runs 1 to 2 business days, then carriers review the campaign for 1 to 3 weeks.",
   } as const;
 
   return (
@@ -164,7 +171,7 @@ function Hero({ step }: { step: Step }) {
         background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)",
       }}
     >
-      <div className="mx-auto max-w-[1080px] px-10 py-11">
+      <div className="mx-auto max-w-[1080px] px-10 py-12">
         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
           <IconShieldCheck size={13} stroke={2.25} />
           A2P 10DLC Registration
@@ -176,11 +183,11 @@ function Hero({ step }: { step: Step }) {
           {subs[step]}
         </p>
 
-        <div className="mt-7 flex items-center gap-3">
+        <div className="mt-8 flex items-center gap-4">
           <HeroStep n={1} label="Brand" state={step === 1 ? "active" : "done"} />
-          <span className={["h-px w-12", step >= 2 ? "bg-white/50" : "bg-white/20"].join(" ")} />
+          <span className={["h-px w-14", step >= 2 ? "bg-white/50" : "bg-white/20"].join(" ")} />
           <HeroStep n={2} label="Campaign" state={step === 2 ? "active" : step > 2 ? "done" : "todo"} />
-          <span className={["h-px w-12", step >= 3 ? "bg-white/50" : "bg-white/20"].join(" ")} />
+          <span className={["h-px w-14", step >= 3 ? "bg-white/50" : "bg-white/20"].join(" ")} />
           <HeroStep n={3} label="Review" state={step === 3 ? "active" : "todo"} />
         </div>
       </div>
@@ -190,7 +197,7 @@ function Hero({ step }: { step: Step }) {
 
 function HeroStep({ n, label, state }: { n: number; label: string; state: "done" | "active" | "todo" }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-2.5">
       <span
         className={[
           "inline-flex h-7 w-7 items-center justify-center rounded-full text-[12.5px] font-semibold",
@@ -243,56 +250,128 @@ function Step1Brand({ brand, setBrand }: { brand: Brand; setBrand: (b: Brand) =>
 }
 
 // ─── Step 2: Campaign ───────────────────────────────────────────────────
-function Step2Campaign({ campaign, setCampaign }: { campaign: Campaign; setCampaign: (c: Campaign) => void }) {
+function Step2Campaign({
+  campaign,
+  setCampaign,
+  useCaseOpen,
+  setUseCaseOpen,
+}: {
+  campaign: Campaign;
+  setCampaign: (c: Campaign) => void;
+  useCaseOpen: boolean;
+  setUseCaseOpen: (b: boolean) => void;
+}) {
+  const otherUseCases = ["Marketing", "Account Notification", "Higher Education", "Polling And Voting", "Public Service"];
+
+  function swapMessage(i: number) {
+    const alt = ALT_MESSAGES[i % ALT_MESSAGES.length];
+    setCampaign({ ...campaign, messages: campaign.messages.map((x, j) => (j === i ? alt : x)) });
+  }
+
   return (
     <div className="space-y-5">
       <Card title="Use Case">
-        <div className="text-[12.5px] leading-[1.55] text-[#5b606a]">
-          Auto-selected based on your industry. Surplus recovery best fits Customer Care because outreach goes to identified parties of interest, not cold prospects.
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="text-[14.5px] font-semibold tracking-[-0.012em] text-[#0a0d14]">
+                {campaign.useCase}
+              </div>
+              <AutoTag />
+            </div>
+            <p className="mt-1 max-w-[44ch] text-[12.5px] leading-[1.55] text-[#5b606a]">
+              Best fit for surplus recovery, where outreach goes to identified parties of interest, not cold prospects.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUseCaseOpen(!useCaseOpen)}
+            className="cursor-pointer text-[12px] font-medium text-[#0d4b3a] hover:text-[#13644e]"
+          >
+            Change Use Case
+          </button>
         </div>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-[7px] border border-[#ebedf0] bg-white px-3.5 py-2 text-[13px] font-medium text-[#0a0d14]">
-          <IconCheck size={12} stroke={2.5} className="text-[#0d4b3a]" />
-          Customer Care
-        </div>
+
+        {useCaseOpen && (
+          <div className="mt-4 rounded-[10px] border border-[#ebedf0] bg-white p-4">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+              Alternative Use Cases
+            </div>
+            <p className="mt-1.5 text-[11.5px] text-[#5b606a]">
+              These rarely fit surplus recovery. Carriers may deny if mismatched.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {otherUseCases.map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  onClick={() => {
+                    setCampaign({ ...campaign, useCase: u });
+                    setUseCaseOpen(false);
+                  }}
+                  className="cursor-pointer rounded-[7px] border border-[#ebedf0] bg-white px-3 py-1.5 text-[12px] font-medium text-[#0a0d14] hover:border-[#0d4b3a]"
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card title="Monthly Volume">
         <div className="grid grid-cols-3 gap-2.5">
-          {(["LOW", "MEDIUM", "HIGH"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setCampaign({ ...campaign, volume: v })}
-              className={[
-                "cursor-pointer rounded-[10px] border px-4 py-3 text-left transition",
-                campaign.volume === v
-                  ? "border-[#0d4b3a] bg-[#0d4b3a]/[0.04]"
-                  : "border-[#ebedf0] bg-white hover:border-[#9298a3]",
-              ].join(" ")}
-            >
-              <div className="text-[13px] font-semibold text-[#0a0d14]">
-                {v === "LOW" ? "Low" : v === "MEDIUM" ? "Medium" : "High"}
-              </div>
-              <div className="mt-0.5 text-[11.5px] text-[#5b606a]">
-                {v === "LOW" ? "Up to 3,000 / mo" : v === "MEDIUM" ? "Up to 30,000 / mo" : "Above 30,000 / mo"}
-              </div>
-            </button>
-          ))}
+          {(["LOW", "MEDIUM", "HIGH"] as const).map((v) => {
+            const selected = campaign.volume === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setCampaign({ ...campaign, volume: v })}
+                className={[
+                  "cursor-pointer rounded-[10px] border px-4 py-3 text-left transition",
+                  selected
+                    ? "border-[#0d4b3a] bg-[#0d4b3a] text-white"
+                    : "border-[#ebedf0] bg-white text-[#0a0d14] hover:border-[#9298a3]",
+                ].join(" ")}
+                style={selected ? { boxShadow: "0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" } : undefined}
+              >
+                <div className={["text-[13px] font-semibold", selected ? "text-white" : "text-[#0a0d14]"].join(" ")}>
+                  {v === "LOW" ? "Low" : v === "MEDIUM" ? "Medium" : "High"}
+                </div>
+                <div className={["mt-0.5 text-[11.5px]", selected ? "text-white/75" : "text-[#5b606a]"].join(" ")}>
+                  {v === "LOW" ? "Up To 3,000 / Mo" : v === "MEDIUM" ? "Up To 30,000 / Mo" : "Above 30,000 / Mo"}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </Card>
 
       <Card title="Sample Messages">
         <div className="mb-3 text-[12.5px] leading-[1.55] text-[#5b606a]">
-          Three pre-written templates that match Customer Care for surplus recovery. Edit any line. {"{first_name}"} and other tokens fill in at send time.
+          Three pre-filled defaults that match Customer Care for surplus recovery. Edit inline. Click Swap Template to load an alternative. Tokens like {"{first_name}"} fill in at send time.
         </div>
         <div className="space-y-3">
           {campaign.messages.map((m, i) => (
-            <div key={i} className="rounded-[10px] border border-[#ebedf0] bg-white p-3">
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-                  Template {i + 1}
-                </span>
-                <span className="text-[10.5px] text-[#9298a3]">{m.length} / 160</span>
+            <div key={i} className="rounded-[10px] border border-[#ebedf0] bg-white p-3.5">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+                    Template {i + 1}
+                  </span>
+                  <AutoTag />
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => swapMessage(i)}
+                    className="cursor-pointer text-[11px] font-medium text-[#0d4b3a] hover:text-[#13644e]"
+                  >
+                    Swap Template
+                  </button>
+                  <span className="text-[10.5px] text-[#9298a3]">{m.length} / 160</span>
+                </div>
               </div>
               <textarea
                 value={m}
@@ -320,10 +399,10 @@ function Step3Review({ brand, campaign }: { brand: Brand; campaign: Campaign }) 
       <Card title="Brand">
         <ReviewGrid>
           <ReviewItem label="Legal Name" value={brand.legalName} />
-          <ReviewItem label="EIN" value={brand.ein || "(missing)"} missing={!brand.ein} />
+          <ReviewItem label="EIN" value={brand.ein || "Missing"} missing={!brand.ein} />
           <ReviewItem label="Vertical" value={brand.vertical} />
           <ReviewItem label="Website" value={brand.website} />
-          <ReviewItem label="Authorized Rep" value={brand.repName || "(missing)"} missing={!brand.repName} />
+          <ReviewItem label="Authorized Rep" value={brand.repName || "Missing"} missing={!brand.repName} />
           <ReviewItem label="Rep Email" value={brand.repEmail} />
           <ReviewItem label="Rep Phone" value={brand.repPhone} />
           <ReviewItem label="Address" value={`${brand.street}, ${brand.city}, ${brand.state} ${brand.postal}`} />
@@ -343,23 +422,40 @@ function Step3Review({ brand, campaign }: { brand: Brand; campaign: Campaign }) 
                   : "High (Above 30,000 / Mo)"
             }
           />
-          <ReviewItem label="Sample Templates" value={`${campaign.messages.length} approved templates`} />
-          <ReviewItem label="HELP and STOP Behavior" value="Auto-handled by Next Surplus" />
+          <ReviewItem label="Sample Messages" value={`${campaign.messages.length} Submitted`} />
+          <ReviewItem label="HELP And STOP Behavior" value="Handled Automatically" />
         </ReviewGrid>
       </Card>
 
-      <div className="rounded-[10px] border border-[#ebedf0] bg-white p-4">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-[#0d4b3a]/[0.08] text-[#0d4b3a]">
-            <IconShieldCheck size={14} stroke={2.25} />
-          </span>
-          <div className="flex-1">
-            <div className="text-[13.5px] font-semibold text-[#0a0d14]">Standard Vetting, $40 One Time</div>
-            <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">
-              The Campaign Registry charges this on submit. Approved within 1 to 2 business days. Then carriers review the campaign for 1 to 3 weeks.
-            </p>
+      <FeeRow />
+    </div>
+  );
+}
+
+function FeeRow() {
+  return (
+    <div className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white" style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}>
+      <div className="grid grid-cols-[1fr_auto] items-center gap-4 px-6 py-4">
+        <div>
+          <div className="flex items-baseline gap-2">
+            <div className="text-[14.5px] font-semibold tracking-[-0.012em] text-[#0a0d14]">
+              Carrier Verification Fee
+            </div>
+            <div className="text-[14.5px] font-semibold tabular-nums text-[#0a0d14]">$40</div>
           </div>
+          <p className="mt-1 max-w-[58ch] text-[12px] leading-[1.5] text-[#5b606a]">
+            Set by The Campaign Registry. Not marked up. Same rate at every messaging provider. Charged at submission. Brand verifies in 1 to 2 business days, then carriers review the campaign for 1 to 3 weeks.
+          </p>
         </div>
+        <a
+          href="https://www.campaignregistry.com/pricing"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[11.5px] font-medium text-[#5b606a] hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
+        >
+          See TCR Pricing
+          <IconExternalLink size={11} stroke={2.25} />
+        </a>
       </div>
     </div>
   );
@@ -379,26 +475,23 @@ function Step4Success() {
           </div>
           <div className="mt-3 space-y-3">
             <Timeline
-              step={1}
               icon={<IconShieldCheck size={14} stroke={2.25} />}
-              title="Brand Vetting"
-              when="Within 1 to 2 business days"
-              desc="The Campaign Registry verifies your legal entity, EIN, and contact details."
+              title="Brand Verification"
+              when="Within 1 To 2 Business Days"
+              desc="The Campaign Registry verifies the legal entity, EIN, and contact details."
               active
             />
             <Timeline
-              step={2}
               icon={<IconClock size={14} stroke={2.25} />}
               title="Carrier Review"
-              when="1 to 3 weeks after brand approval"
-              desc="T-Mobile, AT&T, and Verizon review your campaign use case and sample messages."
+              when="1 To 3 Weeks After Verification"
+              desc="T-Mobile, AT&T, and Verizon review the campaign use case and sample messages."
             />
             <Timeline
-              step={3}
               icon={<IconCheck size={14} stroke={2.25} />}
               title="SMS Goes Live"
-              when="The moment carriers approve"
-              desc="We flip SMS on across every phone number on your account automatically. You will be notified by email and text."
+              when="The Moment Carriers Approve"
+              desc="SMS flips on across every phone number automatically. An SMS and email confirmation fires."
             />
           </div>
         </div>
@@ -409,9 +502,9 @@ function Step4Success() {
               <IconMail size={14} stroke={2.25} />
             </span>
             <div className="flex-1">
-              <div className="text-[13px] font-semibold text-[#0a0d14]">A Confirmation Was Sent</div>
+              <div className="text-[13px] font-semibold text-[#0a0d14]">Confirmation Sent</div>
               <div className="mt-0.5 text-[12px] text-[#5b606a]">
-                Check bree@nextsurplus.com for the submission record and tracking link.
+                Submission record and tracking link sent to bree@nextsurplus.com.
               </div>
             </div>
           </div>
@@ -439,14 +532,12 @@ function Step4Success() {
 }
 
 function Timeline({
-  step,
   icon,
   title,
   when,
   desc,
   active,
 }: {
-  step: number;
   icon: React.ReactNode;
   title: string;
   when: string;
@@ -474,18 +565,26 @@ function Timeline({
   );
 }
 
-// ─── Help Cards ─────────────────────────────────────────────────────────
+// ─── Help Cards (redesigned: structured data rows, no checkmark bullets) ─
 function stepHelpFor(step: Step) {
   if (step === 1) {
     return (
       <div className="space-y-3">
         <HelpCard
           title="What Carriers Check"
-          points={["Legal entity is verifiable", "EIN matches IRS records", "Rep is reachable by phone or email"]}
+          rows={[
+            ["Legal Entity", "Verifiable In State Records"],
+            ["EIN", "Matches IRS Records Exactly"],
+            ["Rep Contact", "Reachable By Phone And Email"],
+          ]}
         />
         <HelpCard
-          title="Common Denial Reasons"
-          points={["EIN typo or wrong format", "Vertical does not match website", "Rep contact bounces"]}
+          title="Top Denial Reasons"
+          rows={[
+            ["EIN Format", "Wrong Digit Count Or Hyphen"],
+            ["Vertical Mismatch", "Does Not Match Website Content"],
+            ["Rep Email", "Bounces Or Undeliverable"],
+          ]}
         />
       </div>
     );
@@ -495,11 +594,19 @@ function stepHelpFor(step: Step) {
       <div className="space-y-3">
         <HelpCard
           title="What Makes A Strong Campaign"
-          points={["Messages match the stated use case", "Opt-in path is clear and documented", "HELP and STOP behavior is documented"]}
+          rows={[
+            ["Use Case", "Messages Match The Stated Use"],
+            ["Opt-In Flow", "Documented And Clear"],
+            ["Keywords", "HELP And STOP Behavior Set"],
+          ]}
         />
         <HelpCard
-          title="On HELP And STOP"
-          points={["Auto-handled by Next Surplus", "STOP marks the contact do-not-text", "HELP returns a standard response"]}
+          title="HELP And STOP"
+          rows={[
+            ["Setup", "Handled Automatically"],
+            ["STOP Reply", "Marks Contact Do-Not-Text"],
+            ["HELP Reply", "Returns A Standard Response"],
+          ]}
         />
       </div>
     );
@@ -507,29 +614,43 @@ function stepHelpFor(step: Step) {
   return (
     <div className="space-y-3">
       <HelpCard
-        title="After You Submit"
-        points={["Brand verified in 1 to 2 business days", "Carriers review campaign over 1 to 3 weeks", "SMS goes live the moment they approve"]}
+        title="After Submission"
+        rows={[
+          ["Brand Verify", "1 To 2 Business Days"],
+          ["Campaign Review", "1 To 3 Weeks"],
+          ["SMS Live", "Automatic On Approval"],
+        ]}
       />
       <HelpCard
         title="Costs"
-        points={["$40 standard vetting, one time", "No charge per number after submission", "No charge if denied (resubmit free)"]}
+        rows={[
+          ["Verification Fee", "$40 Carrier-Set"],
+          ["Per Number", "No Charge"],
+          ["If Denied", "Resubmit Free"],
+        ]}
       />
     </div>
   );
 }
 
-function HelpCard({ title, points }: { title: string; points: string[] }) {
+function HelpCard({ title, rows }: { title: string; rows: [string, string][] }) {
   return (
-    <div className="rounded-[10px] border border-[#ebedf0] bg-white px-4 py-3.5">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0d4b3a]">{title}</div>
-      <ul className="mt-2 space-y-1.5">
-        {points.map((p) => (
-          <li key={p} className="flex items-start gap-1.5 text-[11.5px] leading-[1.5] text-[#5b606a]">
-            <IconCheck size={11} stroke={2.5} className="mt-0.5 shrink-0 text-[#0d4b3a]" />
-            {p}
-          </li>
+    <div className="overflow-hidden rounded-[10px] border border-[#ebedf0] bg-white">
+      <div className="border-b border-[#f1f2f4] px-4 py-2.5">
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0a0d14]">
+          {title}
+        </div>
+      </div>
+      <div className="divide-y divide-[#f1f2f4]">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-[100px_1fr] gap-2 px-4 py-2.5">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
+              {label}
+            </div>
+            <div className="text-[11.5px] leading-[1.4] text-[#0a0d14]">{value}</div>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -573,15 +694,11 @@ function Field({
   const showRequired = required && !value;
   return (
     <div className={wide ? "col-span-2" : ""}>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
           {label}
         </label>
-        {preFilled && (
-          <span title="From Company Profile" className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#0d4b3a]/[0.10] text-[#0d4b3a]">
-            <IconCheck size={9} stroke={3} />
-          </span>
-        )}
+        {preFilled && <AutoTag />}
       </div>
       <input
         type="text"
@@ -594,19 +711,27 @@ function Field({
         ].join(" ")}
       />
       {showRequired && (
-        <div className="mt-1 text-[11px] font-medium text-[#b42318]">Required for carrier review</div>
+        <div className="mt-1 text-[11px] font-medium text-[#b42318]">Required For Carrier Review</div>
       )}
     </div>
   );
 }
 
+function AutoTag() {
+  return (
+    <span className="inline-flex h-4 items-center gap-1 rounded-[3px] border border-[#ebedf0] bg-white px-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#5b606a]">
+      Auto
+    </span>
+  );
+}
+
 function ReviewGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-x-6 gap-y-4">{children}</div>;
+  return <div className="grid grid-cols-2 gap-x-6 gap-y-0">{children}</div>;
 }
 
 function ReviewItem({ label, value, missing }: { label: string; value: string; missing?: boolean }) {
   return (
-    <div className="border-b border-[#f1f2f4] pb-3 last:border-0">
+    <div className="border-b border-[#f1f2f4] py-3">
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">{label}</div>
       <div className={["mt-1 text-[13px] font-medium", missing ? "text-[#b42318]" : "text-[#0a0d14]"].join(" ")}>
         {value}
@@ -615,7 +740,7 @@ function ReviewItem({ label, value, missing }: { label: string; value: string; m
   );
 }
 
-// ─── Nav row ────────────────────────────────────────────────────────────
+// ─── Nav row (Preview only on Step 3) ──────────────────────────────────
 function NavRow({
   step,
   onBack,
@@ -640,14 +765,16 @@ function NavRow({
       </button>
 
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onPreview}
-          className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[7px] border border-[#ebedf0] bg-white px-3.5 text-[12.5px] font-medium text-[#5b606a] hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
-        >
-          <IconEye size={12} stroke={2.25} />
-          Preview Submission
-        </button>
+        {step === 3 && (
+          <button
+            type="button"
+            onClick={onPreview}
+            className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[7px] border border-[#ebedf0] bg-white px-3.5 text-[12.5px] font-medium text-[#5b606a] hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
+          >
+            <IconEye size={12} stroke={2.25} />
+            Preview Submission
+          </button>
+        )}
         <button
           type="button"
           onClick={onNext}
@@ -666,12 +793,7 @@ function NavRow({
 function PreviewDrawer({ brand, campaign, onClose }: { brand: Brand; campaign: Campaign; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close preview"
-        className="flex-1 cursor-default bg-[#0a0d14]/30"
-      />
+      <button type="button" onClick={onClose} aria-label="Close preview" className="flex-1 cursor-default bg-[#0a0d14]/30" />
       <aside className="flex w-[420px] flex-col overflow-y-auto border-l border-[#ebedf0] bg-white">
         <div
           className="border-b border-[#04261c] px-7 py-5 text-white"
@@ -680,7 +802,7 @@ function PreviewDrawer({ brand, campaign, onClose }: { brand: Brand; campaign: C
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-white/60">
-                Live Preview
+                Submission Preview
               </div>
               <div className="mt-0.5 text-[15px] font-semibold tracking-[-0.012em]">
                 What Carriers See
@@ -703,10 +825,10 @@ function PreviewDrawer({ brand, campaign, onClose }: { brand: Brand; campaign: C
               Brand Submission
             </div>
             <PreviewLine label="Legal Name" value={brand.legalName} />
-            <PreviewLine label="EIN" value={brand.ein || "(Required)"} warn={!brand.ein} />
+            <PreviewLine label="EIN" value={brand.ein || "Required"} warn={!brand.ein} />
             <PreviewLine label="Vertical" value={brand.vertical} />
             <PreviewLine label="Website" value={brand.website.replace(/^https?:\/\//, "")} />
-            <PreviewLine label="Rep" value={brand.repName || "(Required)"} warn={!brand.repName} />
+            <PreviewLine label="Rep" value={brand.repName || "Required"} warn={!brand.repName} />
             <PreviewLine label="Address" value={`${brand.city}, ${brand.state}`} />
           </section>
 
@@ -721,7 +843,7 @@ function PreviewDrawer({ brand, campaign, onClose }: { brand: Brand; campaign: C
                 campaign.volume === "LOW" ? "Low (3k / mo)" : campaign.volume === "MEDIUM" ? "Medium (30k / mo)" : "High (30k+ / mo)"
               }
             />
-            <PreviewLine label="Templates" value={`${campaign.messages.length} approved`} />
+            <PreviewLine label="Templates" value={`${campaign.messages.length} Submitted`} />
           </section>
 
           <section>
@@ -758,6 +880,3 @@ function PreviewLine({ label, value, warn }: { label: string; value: string; war
     </div>
   );
 }
-
-// Suppress unused warning for the constant
-void PRE_FILLED_FIELDS;
