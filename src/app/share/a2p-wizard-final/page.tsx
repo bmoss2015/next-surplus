@@ -696,26 +696,20 @@ function Step4Success() {
             <div className="flex-1">
               <div className="text-[13px] font-semibold text-[#0a0d14]">Confirmation Sent</div>
               <div className="mt-0.5 text-[12px] text-[#5b606a]">
-                The submission record and tracking link were sent to bree@nextsurplus.com.
+                The submission record and tracking link were sent to the authorized representative email on file.
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-3">
+      <div className="mt-6 flex items-center justify-end gap-3">
         <Link
           href="/share/phone-numbers-approved?v=6"
-          className="cursor-pointer text-[12.5px] font-medium text-[#5b606a] hover:text-[#0d4b3a]"
-        >
-          View Phone Numbers Settings &rarr;
-        </Link>
-        <Link
-          href="/share/a2p-wizard-final"
           className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-5 text-[13px] font-medium text-white"
           style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
         >
-          Back To Dashboard
+          View Phone Numbers Settings
           <IconChevronRight size={12} stroke={2.25} />
         </Link>
       </div>
@@ -844,8 +838,17 @@ function ReferencePanel({
       className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
-      <div className="border-b border-[#f1f2f4] px-5 py-4">
-        <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">{title}</div>
+      <div
+        className="border-b border-[#04261c] px-5 py-3 text-white"
+        style={{ background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 100%)" }}
+      >
+        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+          <IconShieldCheck size={11} stroke={2.25} />
+          Carrier Notes
+        </div>
+        <div className="mt-0.5 text-[15px] font-semibold leading-[1.2] tracking-[-0.014em]">
+          {title}
+        </div>
       </div>
 
       <div className="px-5 py-4">
