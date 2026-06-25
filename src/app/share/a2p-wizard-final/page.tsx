@@ -122,8 +122,8 @@ export default function A2pWizardFinal() {
     ein: "",
     vertical: "FINANCIAL",
     website: "https://nextsurplus.com",
-    privacyUrl: "https://app.nextsurplus.com/legal/workflow-minds/privacy",
-    termsUrl: "https://app.nextsurplus.com/legal/workflow-minds/terms",
+    privacyUrl: "",
+    termsUrl: "",
     repName: "Bree Moss",
     repEmail: "bree@nextsurplus.com",
     repPhone: "+1 (432) 400-5579",
@@ -134,20 +134,23 @@ export default function A2pWizardFinal() {
   });
 
   const [campaign, setCampaign] = useState<Campaign>({
-    useCase: "CUSTOMER_CARE",
-    description:
-      "[COMPANY NAME] sends transactional follow-up to individuals identified through public court records as potential claimants for surplus funds from [TYPES OF SALES, e.g. foreclosure or tax sales]. Messages provide case status updates, document requests, and payment notifications.",
+    useCase: "",
+    description: "",
     volume: "LOW",
-    messages: DEFAULT_MESSAGES,
+    messages: ["", "", ""],
   });
 
   const descriptionPlaceholders = extractPlaceholders(campaign.description);
 
   const canContinue =
     step === 1
-      ? !!brand.ein.trim() && !!brand.repName.trim()
+      ? !!brand.ein.trim() &&
+        !!brand.repName.trim() &&
+        !!brand.privacyUrl.trim() &&
+        !!brand.termsUrl.trim()
       : step === 2
-        ? campaign.messages.every((m) => m.trim().length > 0) &&
+        ? !!campaign.useCase &&
+          campaign.messages.every((m) => m.trim().length > 0) &&
           !!campaign.description.trim() &&
           descriptionPlaceholders.length === 0
         : true;
