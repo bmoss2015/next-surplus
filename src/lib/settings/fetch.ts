@@ -302,7 +302,7 @@ export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
   const withTracking = await sb
     .from("mail_bank_accounts")
     .select(
-      "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at, verify_attempts, last_verify_error, last_verify_attempt_at, created_at"
+      "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at, verify_attempts, last_verify_error, last_verify_attempt_at, created_at, microdeposit_type"
     )
     .order("created_at", { ascending: false });
   if (withTracking.error) {
