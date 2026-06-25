@@ -698,10 +698,10 @@ function Step2Campaign({
         </span>
         <div className="min-w-0">
           <div className="text-[12.5px] font-semibold text-[#0a0d14]">
-            STOP And HELP Keywords Are Already Handled
+            Include &quot;Reply STOP To Opt Out&quot; In Sample Messages
           </div>
           <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">
-            FCC and CTIA guidelines require automated responses to STOP and HELP on every messaging program. Next Surplus configures both at the platform level, including the opt-out and help message text submitted to The Campaign Registry. When a recipient texts STOP, the platform flags the contact as opted out and sends a standard confirmation. When a recipient texts HELP, the platform replies with the brand name, support email, and instructions to opt back in. Sample messages should still include the phrase &quot;Reply STOP to opt out&quot; as a courtesy to recipients and a signal to carriers that opt-out is being honored.
+            Carriers expect every messaging program to honor STOP and HELP keywords. Include the phrase &quot;Reply STOP to opt out&quot; in at least one sample message so reviewers can see the opt-out path on the same page they review the campaign.
           </p>
         </div>
       </div>
@@ -773,13 +773,54 @@ function FeeRow() {
         <p className="mt-2 text-[12.5px] leading-[1.55] text-[#5b606a]">
           The Campaign Registry, an industry body operated by the major US mobile carriers, administers brand verification on behalf of the wireless industry. The fee passes through at cost with no markup and is identical at every messaging provider. Verification completes within 1 to 2 business days. Carrier review of the campaign follows for 1 to 3 weeks before SMS is enabled across registered numbers.
         </p>
-        <div className="mt-3 border-t border-[#f1f2f4] pt-3">
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-            About Resubmissions
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-[10px] border border-[#ebedf0] bg-[#fafbfc] p-3.5">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-[7px] w-[7px] rounded-full"
+                style={{ background: "#0d4b3a", boxShadow: "0 0 0 3px rgba(13,75,58,0.14)" }}
+              />
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0d4b3a]">
+                Free Resubmission
+              </div>
+            </div>
+            <p className="mt-1.5 text-[12px] leading-[1.5] text-[#0a0d14]">
+              If the campaign is rejected, edit any of the following and resubmit at no charge:
+            </p>
+            <ul className="mt-1.5 space-y-0.5 text-[12px] leading-[1.5] text-[#5b606a]">
+              <li>Campaign description</li>
+              <li>Sample messages</li>
+              <li>Use case</li>
+              <li>Monthly volume</li>
+              <li>Authorized representative contact info</li>
+              <li>Privacy policy or terms URL</li>
+              <li>Address</li>
+            </ul>
           </div>
-          <p className="mt-1 text-[12px] leading-[1.55] text-[#5b606a]">
-            Minor corrections after a rejection, such as an EIN typo or a clarified description, do not retrigger the $40 fee. Material changes to brand identity, such as a different legal entity, a new EIN, or a vetting tier upgrade from Standard to Enhanced, register as a new brand and incur the fee again.
-          </p>
+
+          <div className="rounded-[10px] border border-[#ebedf0] bg-[#fafbfc] p-3.5">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-[7px] w-[7px] rounded-full"
+                style={{ background: "#b42318", boxShadow: "0 0 0 3px rgba(180,35,24,0.14)" }}
+              />
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#b42318]">
+                Triggers New $40 Fee
+              </div>
+            </div>
+            <p className="mt-1.5 text-[12px] leading-[1.5] text-[#0a0d14]">
+              Editing any of these registers a new brand and starts the verification cycle over:
+            </p>
+            <ul className="mt-1.5 space-y-0.5 text-[12px] leading-[1.5] text-[#5b606a]">
+              <li>Entity Type</li>
+              <li>Legal Name</li>
+              <li>EIN</li>
+            </ul>
+            <p className="mt-1.5 text-[11px] leading-[1.5] text-[#5b606a]">
+              These three fields lock after submission and require an explicit confirmation to change.
+            </p>
+          </div>
         </div>
       </div>
     </div>
