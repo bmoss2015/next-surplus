@@ -246,6 +246,26 @@ function BankCard({
           </span>
         </div>
       )}
+      {!isVerified && !bank.last_verify_error && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: "8px 10px",
+            background: "var(--surface)",
+            border: "1px solid var(--hairline)",
+            borderRadius: 6,
+            fontSize: 11.5,
+            color: "var(--text-2)",
+            lineHeight: 1.4,
+          }}
+        >
+          {bank.microdeposit_type === "descriptor_code"
+            ? "A single $0.01 deposit with a 6 character verification code starting with SM arrives in 1 to 2 business days. Click Verify Manually once it lands."
+            : bank.microdeposit_type === "amounts"
+              ? "Two small test deposits (under $1 each) arrive in 1 to 2 business days. Click Verify Manually once both land."
+              : "A verification deposit arrives in 1 to 2 business days. Click Verify Manually once it lands."}
+        </div>
+      )}
       {!isVerified && bank.last_verify_error && (
         <div
           style={{
