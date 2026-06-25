@@ -53,6 +53,7 @@ export default function A2pWizardFinal() {
   const [step, setStep] = useState<Step>(1);
   const [preview, setPreview] = useState(false);
   const [useCaseOpen, setUseCaseOpen] = useState(false);
+  const [attempted, setAttempted] = useState<Record<number, boolean>>({});
 
   const [brand, setBrand] = useState<Brand>({
     legalName: "Workflow Minds LLC",
@@ -75,6 +76,7 @@ export default function A2pWizardFinal() {
   });
 
   function next() {
+    setAttempted((a) => ({ ...a, [step]: true }));
     setStep((s) => Math.min(4, s + 1) as Step);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -89,9 +91,9 @@ export default function A2pWizardFinal() {
 
       {step !== 4 && (
         <div className="mx-auto max-w-[1080px] px-10 py-9">
-          <div className="grid grid-cols-[1fr_280px] gap-7">
+          <div className="grid grid-cols-[1fr_300px] gap-7">
             <div>
-              {step === 1 && <Step1Brand brand={brand} setBrand={setBrand} />}
+              {step === 1 && <Step1Brand brand={brand} setBrand={setBrand} attempted={!!attempted[1]} />}
               {step === 2 && (
                 <Step2Campaign
                   campaign={campaign}
@@ -215,36 +217,60 @@ function HeroStep({ n, label, state }: { n: number; label: string; state: "done"
 }
 
 // ─── Step 1: Brand ──────────────────────────────────────────────────────
-function Step1Brand({ brand, setBrand }: { brand: Brand; setBrand: (b: Brand) => void }) {
+function Step1Brand({
+  brand,
+  setBrand,
+  attempted,
+}: {
+  brand: Brand;
+  setBrand: (b: Brand) => void;
+  attempted: boolean;
+}) {
   const u = <K extends keyof Brand>(k: K, v: Brand[K]) => setBrand({ ...brand, [k]: v });
 
   return (
     <div className="space-y-5">
+      <PreFillBanner />
+
       <Card title="Company">
         <FieldGrid>
-          <Field label="Legal Name" value={brand.legalName} onChange={(v) => u("legalName", v)} preFilled />
-          <Field label="EIN" value={brand.ein} onChange={(v) => u("ein", v)} placeholder="12-3456789" required />
-          <Field label="Vertical" value={brand.vertical} onChange={(v) => u("vertical", v)} preFilled />
-          <Field label="Website" value={brand.website} onChange={(v) => u("website", v)} preFilled />
+          <Field label="Legal Name" value={brand.legalName} onChange={(v) => u("legalName", v)} />
+          <Field label="EIN" value={brand.ein} onChange={(v) => u("ein", v)} placeholder="12-3456789" required attempted={attempted} />
+          <Field label="Vertical" value={brand.vertical} onChange={(v) => u("vertical", v)} />
+          <Field label="Website" value={brand.website} onChange={(v) => u("website", v)} />
         </FieldGrid>
       </Card>
 
       <Card title="Authorized Representative">
         <FieldGrid>
-          <Field label="Full Name" value={brand.repName} onChange={(v) => u("repName", v)} placeholder="Jane Operator" required />
-          <Field label="Email" value={brand.repEmail} onChange={(v) => u("repEmail", v)} preFilled />
-          <Field label="Phone" value={brand.repPhone} onChange={(v) => u("repPhone", v)} preFilled wide />
+          <Field label="Full Name" value={brand.repName} onChange={(v) => u("repName", v)} placeholder="Jane Operator" required attempted={attempted} />
+          <Field label="Email" value={brand.repEmail} onChange={(v) => u("repEmail", v)} />
+          <Field label="Phone" value={brand.repPhone} onChange={(v) => u("repPhone", v)} wide />
         </FieldGrid>
       </Card>
 
       <Card title="Company Address">
         <FieldGrid>
-          <Field label="Street" value={brand.street} onChange={(v) => u("street", v)} preFilled wide />
-          <Field label="City" value={brand.city} onChange={(v) => u("city", v)} preFilled />
-          <Field label="State" value={brand.state} onChange={(v) => u("state", v)} preFilled />
-          <Field label="Postal Code" value={brand.postal} onChange={(v) => u("postal", v)} preFilled wide />
+          <Field label="Street" value={brand.street} onChange={(v) => u("street", v)} wide />
+          <Field label="City" value={brand.city} onChange={(v) => u("city", v)} />
+          <Field label="State" value={brand.state} onChange={(v) => u("state", v)} />
+          <Field label="Postal Code" value={brand.postal} onChange={(v) => u("postal", v)} wide />
         </FieldGrid>
       </Card>
+    </div>
+  );
+}
+
+function PreFillBanner() {
+  return (
+    <div className="flex items-center gap-3 rounded-[10px] border border-[#ebedf0] bg-white px-4 py-3">
+      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-[#0d4b3a] text-white">
+        <IconCheck size={13} stroke={2.5} />
+      </span>
+      <div className="text-[12.5px] leading-[1.5] text-[#0a0d14]">
+        <span className="font-semibold">Filled In From Your Company Profile.</span>
+        <span className="text-[#5b606a]"> Edit anything that does not match.</span>
+      </div>
     </div>
   );
 }
@@ -273,14 +299,14 @@ function Step2Campaign({
       <Card title="Use Case">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <div className="text-[14.5px] font-semibold tracking-[-0.012em] text-[#0a0d14]">
-                {campaign.useCase}
-              </div>
-              <AutoTag />
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
+              Suggested For Surplus Recovery
+            </div>
+            <div className="mt-1 text-[16px] font-semibold tracking-[-0.012em] text-[#0a0d14]">
+              {campaign.useCase}
             </div>
             <p className="mt-1 max-w-[44ch] text-[12.5px] leading-[1.55] text-[#5b606a]">
-              Best fit for surplus recovery, where outreach goes to identified parties of interest, not cold prospects.
+              Best fit for outreach to identified parties of interest, not cold prospects. Most other use cases get denied for surplus.
             </p>
           </div>
           <button
@@ -360,7 +386,6 @@ function Step2Campaign({
                   <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
                     Template {i + 1}
                   </span>
-                  <AutoTag />
                 </div>
                 <div className="flex items-center gap-3">
                   <button
@@ -565,91 +590,100 @@ function Timeline({
   );
 }
 
-// ─── Help Cards (redesigned: structured data rows, no checkmark bullets) ─
+// ─── Compliance Coach (editorial side panel) ───────────────────────────
 function stepHelpFor(step: Step) {
   if (step === 1) {
     return (
-      <div className="space-y-3">
-        <HelpCard
-          title="What Carriers Check"
-          rows={[
-            ["Legal Entity", "Verifiable In State Records"],
-            ["EIN", "Matches IRS Records Exactly"],
-            ["Rep Contact", "Reachable By Phone And Email"],
-          ]}
-        />
-        <HelpCard
-          title="Top Denial Reasons"
-          rows={[
-            ["EIN Format", "Wrong Digit Count Or Hyphen"],
-            ["Vertical Mismatch", "Does Not Match Website Content"],
-            ["Rep Email", "Bounces Or Undeliverable"],
-          ]}
-        />
-      </div>
+      <ComplianceCoach
+        title="What Carriers Verify"
+        lead="Brand registration goes through three checks before the campaign can be reviewed."
+        tips={[
+          { headline: "Legal Entity", body: "Must be verifiable in your state's business registry. Use the exact name as it appears in filings." },
+          { headline: "EIN", body: "Must match IRS records. Format as 12-3456789 with the hyphen. Single most common denial reason." },
+          { headline: "Authorized Rep", body: "Carriers may call this person to verify the brand. Use a reachable cell, not a help desk line." },
+        ]}
+        footer="Most Common Denials: EIN typos, vertical mismatch, undeliverable rep email."
+      />
     );
   }
   if (step === 2) {
     return (
-      <div className="space-y-3">
-        <HelpCard
-          title="What Makes A Strong Campaign"
-          rows={[
-            ["Use Case", "Messages Match The Stated Use"],
-            ["Opt-In Flow", "Documented And Clear"],
-            ["Keywords", "HELP And STOP Behavior Set"],
-          ]}
-        />
-        <HelpCard
-          title="HELP And STOP"
-          rows={[
-            ["Setup", "Handled Automatically"],
-            ["STOP Reply", "Marks Contact Do-Not-Text"],
-            ["HELP Reply", "Returns A Standard Response"],
-          ]}
-        />
-      </div>
+      <ComplianceCoach
+        title="What Makes A Strong Campaign"
+        lead="Three pieces shape whether carriers approve the campaign."
+        tips={[
+          { headline: "Use Case Match", body: "Sample messages should sound like the use case. Customer Care messages read transactional, not promotional." },
+          { headline: "Opt-In Flow", body: "Carriers want a clear path showing how recipients consented. Public-record outreach works if phrased correctly." },
+          { headline: "Keywords", body: "HELP and STOP must work. Both are handled automatically by the portal." },
+        ]}
+        footer="Most Common Denials: marketing tone in Customer Care, missing opt-in description, volume mismatch."
+      />
     );
   }
   return (
-    <div className="space-y-3">
-      <HelpCard
-        title="After Submission"
-        rows={[
-          ["Brand Verify", "1 To 2 Business Days"],
-          ["Campaign Review", "1 To 3 Weeks"],
-          ["SMS Live", "Automatic On Approval"],
-        ]}
-      />
-      <HelpCard
-        title="Costs"
-        rows={[
-          ["Verification Fee", "$40 Carrier-Set"],
-          ["Per Number", "No Charge"],
-          ["If Denied", "Resubmit Free"],
-        ]}
-      />
-    </div>
+    <ComplianceCoach
+      title="After Submission"
+      lead="Three phases. Each one has a defined timeline."
+      tips={[
+        { headline: "Brand Verification", body: "1 to 2 business days. The Campaign Registry confirms the legal entity and EIN." },
+        { headline: "Carrier Review", body: "1 to 3 weeks. T-Mobile, AT&T, and Verizon evaluate the use case and sample messages." },
+        { headline: "SMS Goes Live", body: "Automatic on approval. SMS flips on across every phone number purchased." },
+      ]}
+      footer="If denied: resubmit free. The specific rejection reason surfaces inline on the Phone Numbers page."
+    />
   );
 }
 
-function HelpCard({ title, rows }: { title: string; rows: [string, string][] }) {
+function ComplianceCoach({
+  title,
+  lead,
+  tips,
+  footer,
+}: {
+  title: string;
+  lead: string;
+  tips: { headline: string; body: string }[];
+  footer: string;
+}) {
   return (
-    <div className="overflow-hidden rounded-[10px] border border-[#ebedf0] bg-white">
-      <div className="border-b border-[#f1f2f4] px-4 py-2.5">
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0a0d14]">
+    <div
+      className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+      style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+    >
+      <div
+        className="border-b border-[#04261c] px-5 py-3 text-white"
+        style={{ background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 100%)" }}
+      >
+        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+          <IconShieldCheck size={11} stroke={2.25} />
+          Compliance Coach
+        </div>
+        <div className="mt-0.5 text-[15px] font-semibold leading-[1.2] tracking-[-0.014em]">
           {title}
         </div>
       </div>
-      <div className="divide-y divide-[#f1f2f4]">
-        {rows.map(([label, value]) => (
-          <div key={label} className="grid grid-cols-[100px_1fr] gap-2 px-4 py-2.5">
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
-              {label}
-            </div>
-            <div className="text-[11.5px] leading-[1.4] text-[#0a0d14]">{value}</div>
-          </div>
-        ))}
+
+      <div className="px-5 py-4">
+        <p className="text-[12.5px] leading-[1.55] text-[#5b606a]">{lead}</p>
+        <ol className="mt-4 space-y-3.5">
+          {tips.map((t, i) => (
+            <li key={t.headline} className="grid grid-cols-[24px_1fr] gap-3">
+              <span className="text-[20px] font-semibold leading-none tabular-nums text-[#0d4b3a]">
+                {i + 1}
+              </span>
+              <div>
+                <div className="text-[12.5px] font-semibold leading-[1.3] text-[#0a0d14]">
+                  {t.headline}
+                </div>
+                <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">{t.body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-5 py-3">
+        <p className="text-[11px] leading-[1.45] text-[#5b606a]">{footer}</p>
       </div>
     </div>
   );
@@ -679,26 +713,26 @@ function Field({
   value,
   onChange,
   placeholder,
-  preFilled,
   required,
+  attempted,
   wide,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-  preFilled?: boolean;
   required?: boolean;
+  attempted?: boolean;
   wide?: boolean;
 }) {
-  const showRequired = required && !value;
+  const errored = required && attempted && !value;
   return (
     <div className={wide ? "col-span-2" : ""}>
       <div className="flex items-center gap-2">
         <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
           {label}
         </label>
-        {preFilled && <AutoTag />}
+        {required && <span className="text-[10px] font-medium text-[#9298a3]">Required</span>}
       </div>
       <input
         type="text"
@@ -707,21 +741,13 @@ function Field({
         placeholder={placeholder}
         className={[
           "mt-1.5 h-[38px] w-full rounded-[7px] border bg-white px-3 text-[13px] text-[#0a0d14] outline-none placeholder:text-[#9298a3]",
-          showRequired ? "border-[#fca5a5]" : "border-[#ebedf0] focus:border-[#0d4b3a]",
+          errored ? "border-[#fca5a5] focus:border-[#b42318]" : "border-[#ebedf0] focus:border-[#0d4b3a]",
         ].join(" ")}
       />
-      {showRequired && (
-        <div className="mt-1 text-[11px] font-medium text-[#b42318]">Required For Carrier Review</div>
+      {errored && (
+        <div className="mt-1 text-[11px] font-medium text-[#b42318]">Fill This In Before Continuing</div>
       )}
     </div>
-  );
-}
-
-function AutoTag() {
-  return (
-    <span className="inline-flex h-4 items-center gap-1 rounded-[3px] border border-[#ebedf0] bg-white px-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#5b606a]">
-      Auto
-    </span>
   );
 }
 
