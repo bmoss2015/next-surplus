@@ -11,6 +11,7 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 
 
 ### Fixed
+- Fix FETCH-MICRODEPOSIT-TYPE-SELECT: `fetchMailBankAccounts` SELECT was missing `microdeposit_type` from its column list. The mapper read `r.microdeposit_type` but the SELECT never asked for it, so the value was always undefined, the mapper fell through to null, and the Verify Manually modal saw `useDescriptorCode = false` for every bank regardless of mode. Result: every bank (traditional or fintech) got rendered with the two-amounts UI, even after dual-mode logic from PR #206 / #210 / #211 landed. Root cause: my PR #206 fetch change shipped the type definition and the mapper but forgot to add the column to the SELECT itself. Trivial one-string fix; impact was complete (no fintech could verify through the UI). (2026-06-25T18:00:00-05:00)
 - Fix LOB-WEBHOOK-SIGNATURE-TIMESTAMP: Lob webhook signature verification was hashing only the raw body, but Lob's documented format is HMAC-SHA256 over `${Lob-Signature-Timestamp}.${body}`. The handler now reads the `lob-signature-timestamp` header, builds the concatenated signature input, and computes the HMAC against that. Without this fix every real Lob webhook delivery returned 401 since at least May 2026 (all `bank_account.*`, `letter.*`, `check.*`, `address.*` events were silently rejected). Latent bug present before the secret rotation work in PR #197+. (2026-06-25T13:50:00-05:00)
 
 
