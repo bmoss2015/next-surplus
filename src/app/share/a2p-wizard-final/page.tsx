@@ -32,7 +32,9 @@ type Brand = {
   website: string;
   privacyUrl: string;
   termsUrl: string;
+  optInUrl: string;
   repName: string;
+  repTitle: string;
   repEmail: string;
   repPhone: string;
   street: string;
@@ -46,6 +48,8 @@ type Campaign = {
   description: string;
   volume: "LOW" | "MEDIUM" | "HIGH";
   messages: string[];
+  optInConfirmation: string;
+  helpMessage: string;
 };
 
 const VERTICALS: { value: string; label: string }[] = [
@@ -172,7 +176,9 @@ function A2pWizardFinal() {
     website: "https://nextsurplus.com",
     privacyUrl: "",
     termsUrl: "",
+    optInUrl: "",
     repName: "Bree Moss",
+    repTitle: "",
     repEmail: "bree@nextsurplus.com",
     repPhone: "+1 (432) 400-5579",
     street: "1234 Surplus Way",
@@ -186,6 +192,8 @@ function A2pWizardFinal() {
     description: DESCRIPTION_TEMPLATE,
     volume: "LOW",
     messages: ["", "", ""],
+    optInConfirmation: "You're subscribed to surplus recovery updates from [COMPANY NAME]. Reply HELP for help, STOP to opt out.",
+    helpMessage: "[COMPANY NAME] surplus recovery support. Email [SUPPORT EMAIL]. Reply STOP to opt out, START to opt back in.",
   });
 
   const [loadedTemplates, setLoadedTemplates] = useState<(string | null)[]>([null, null, null]);
@@ -195,20 +203,29 @@ function A2pWizardFinal() {
 
   const descriptionPlaceholders = extractPlaceholders(campaign.description);
   const stopMentioned = campaign.messages.some((m) => /\bSTOP\b/i.test(m));
+  const einValid = /^\d{2}-\d{7}$/.test(brand.ein.trim());
+  const optInConfirmationPlaceholders = extractPlaceholders(campaign.optInConfirmation);
+  const helpMessagePlaceholders = extractPlaceholders(campaign.helpMessage);
 
   const canContinue =
     step === 1
-      ? !!brand.ein.trim() &&
+      ? einValid &&
         !!brand.repName.trim() &&
+        !!brand.repTitle.trim() &&
         !!brand.privacyUrl.trim() &&
-        !!brand.termsUrl.trim()
+        !!brand.termsUrl.trim() &&
+        !!brand.optInUrl.trim()
       : step === 2
         ? !!campaign.useCase &&
           campaign.messages.every((m) => m.trim().length > 0) &&
           !!campaign.description.trim() &&
           descriptionPlaceholders.length === 0 &&
           messagesUnchanged.every((u) => !u) &&
-          stopMentioned
+          stopMentioned &&
+          !!campaign.optInConfirmation.trim() &&
+          optInConfirmationPlaceholders.length === 0 &&
+          !!campaign.helpMessage.trim() &&
+          helpMessagePlaceholders.length === 0
         : true;
 
   function next() {
@@ -373,7 +390,11 @@ function Step1Brand({
             onChange={(v) => u("entityType", v)}
             options={ENTITY_TYPES}
           />
-          <Field label="EIN" value={brand.ein} onChange={(v) => u("ein", v)} placeholder="12-3456789" required attempted={attempted} />
+          <EinField
+            value={brand.ein}
+            onChange={(v) => u("ein", v)}
+            attempted={attempted}
+          />
           <Field label="Legal Name" value={brand.legalName} onChange={(v) => u("legalName", v)} />
           <SelectField
             label="Industry"
@@ -395,12 +416,20 @@ function Step1Brand({
 
       <Card
         title="Authorized Representative"
-        subtitle="Carriers contact this person directly to verify the brand. Both the email and phone number must be actively monitored at the time of submission."
+        subtitle="Carriers contact this person directly to verify the brand. The Campaign Registry requires Full Name and Title at minimum. Both the email and phone number must be actively monitored at the time of submission."
       >
         <FieldGrid>
           <Field label="Full Name" value={brand.repName} onChange={(v) => u("repName", v)} required attempted={attempted} />
+          <Field
+            label="Title"
+            value={brand.repTitle}
+            onChange={(v) => u("repTitle", v)}
+            placeholder="e.g. Owner, Operations Director"
+            required
+            attempted={attempted}
+          />
           <Field label="Email" value={brand.repEmail} onChange={(v) => u("repEmail", v)} type="email" />
-          <Field label="Phone" value={brand.repPhone} onChange={(v) => u("repPhone", v)} type="tel" wide />
+          <Field label="Phone" value={brand.repPhone} onChange={(v) => u("repPhone", v)} type="tel" />
         </FieldGrid>
       </Card>
 
@@ -417,13 +446,17 @@ function Step1Brand({
       </Card>
 
       <Card
-        title="Legal Documents"
-        subtitle="The Campaign Registry requires both URLs to be live and publicly accessible. Each page must reflect the legal entity above and the way the business uses SMS. Placeholder, broken, or generic URLs are a common rejection reason."
+        title="Legal Documents And Opt-In Flow"
+        subtitle="The Campaign Registry requires all three URLs to be live and publicly accessible on the brand's own domain. Carriers actively crawl these URLs during review. Placeholder, broken, or generic pages are a common rejection reason."
         info={
           <>
             <div className="font-semibold text-[#0a0d14]">If There Is No Existing Policy</div>
             <p className="mt-1 text-[#5b606a]">
-              Operators without an existing Privacy Policy or Terms Of Service typically use a third-party generator such as Termly or iubenda and host the resulting page on their own domain. Both URLs must point to live, publicly accessible pages on the brand&apos;s own website.
+              Operators without an existing Privacy Policy or Terms Of Service typically use a third-party generator such as Termly or iubenda and host the resulting page on their own domain. All three URLs must point to live, publicly accessible pages on the brand&apos;s own website.
+            </p>
+            <div className="mt-3 font-semibold text-[#0a0d14]">What An Opt-In Page Looks Like</div>
+            <p className="mt-1 text-[#5b606a]">
+              The Opt-In Flow URL is a public page that shows how recipients consented to receive SMS. For surplus recovery, this is typically a landing page with a form including the phone field, a checkbox saying &quot;I agree to receive SMS updates&quot;, frequency disclosure, and STOP and HELP keyword guidance. The page must be reachable without a login.
             </p>
           </>
         }
@@ -444,6 +477,16 @@ function Step1Brand({
             value={brand.termsUrl}
             onChange={(v) => u("termsUrl", v)}
             placeholder="https://example.com/terms"
+            type="url"
+            required
+            attempted={attempted}
+            wide
+          />
+          <Field
+            label="Opt-In Flow URL"
+            value={brand.optInUrl}
+            onChange={(v) => u("optInUrl", v)}
+            placeholder="https://example.com/sms-opt-in"
             type="url"
             required
             attempted={attempted}
@@ -480,6 +523,9 @@ function Step2Campaign({
   const selectedUseCase = USE_CASES.find((u) => u.value === campaign.useCase);
   const useCaseMissing = attempted && !campaign.useCase;
   const stopMentioned = campaign.messages.some((m) => /\bSTOP\b/i.test(m));
+  const optInConfirmationPlaceholders = extractPlaceholders(campaign.optInConfirmation);
+  const helpMessagePlaceholders = extractPlaceholders(campaign.helpMessage);
+  const showFccWarning = campaign.useCase === "MARKETING" || campaign.useCase === "MIXED";
 
   function loadTemplate(i: number, templateIdx: number) {
     const tmpl = SAMPLE_TEMPLATES[i]?.[templateIdx] ?? "";
@@ -751,6 +797,100 @@ function Step2Campaign({
           </p>
         </div>
       </div>
+
+      <Card
+        title="Opt-In Confirmation Message"
+        subtitle="The single message sent automatically to a recipient the moment they opt in. Carriers compare this against the opt-in flow URL and reject submissions where the confirmation does not match the consent that was given. 160 character limit."
+      >
+        <textarea
+          value={campaign.optInConfirmation}
+          onChange={(e) => setCampaign({ ...campaign, optInConfirmation: e.target.value })}
+          rows={2}
+          maxLength={160}
+          data-invalid={
+            (attempted && (!campaign.optInConfirmation.trim() || optInConfirmationPlaceholders.length > 0))
+              ? "true"
+              : undefined
+          }
+          className={[
+            "w-full rounded-[7px] border bg-white p-3 text-[13px] leading-[1.5] text-[#0a0d14] outline-none",
+            (attempted && !campaign.optInConfirmation.trim()) || optInConfirmationPlaceholders.length > 0
+              ? "border-[#fca5a5] focus:border-[#b42318]"
+              : "border-[#ebedf0] focus:border-[#0d4b3a]",
+          ].join(" ")}
+        />
+        <div className="mt-1 flex items-center justify-between text-[10.5px] text-[#9298a3]">
+          <span>{campaign.optInConfirmation.length} / 160</span>
+        </div>
+        {optInConfirmationPlaceholders.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#b42318]">
+            <span className="font-semibold">Replace before continuing:</span>
+            {optInConfirmationPlaceholders.map((p) => (
+              <span
+                key={p}
+                className="inline-flex items-center rounded-[5px] border border-[#fca5a5] bg-white px-2 py-0.5 font-medium tabular-nums"
+              >
+                {p}
+              </span>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card
+        title="HELP Reply Message"
+        subtitle="The reply sent automatically when a recipient texts HELP. Must include the brand name, support contact, and instructions to opt back in. Required by CTIA guidelines and reviewed by carriers."
+      >
+        <textarea
+          value={campaign.helpMessage}
+          onChange={(e) => setCampaign({ ...campaign, helpMessage: e.target.value })}
+          rows={2}
+          maxLength={160}
+          data-invalid={
+            (attempted && (!campaign.helpMessage.trim() || helpMessagePlaceholders.length > 0))
+              ? "true"
+              : undefined
+          }
+          className={[
+            "w-full rounded-[7px] border bg-white p-3 text-[13px] leading-[1.5] text-[#0a0d14] outline-none",
+            (attempted && !campaign.helpMessage.trim()) || helpMessagePlaceholders.length > 0
+              ? "border-[#fca5a5] focus:border-[#b42318]"
+              : "border-[#ebedf0] focus:border-[#0d4b3a]",
+          ].join(" ")}
+        />
+        <div className="mt-1 flex items-center justify-between text-[10.5px] text-[#9298a3]">
+          <span>{campaign.helpMessage.length} / 160</span>
+        </div>
+        {helpMessagePlaceholders.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#b42318]">
+            <span className="font-semibold">Replace before continuing:</span>
+            {helpMessagePlaceholders.map((p) => (
+              <span
+                key={p}
+                className="inline-flex items-center rounded-[5px] border border-[#fca5a5] bg-white px-2 py-0.5 font-medium tabular-nums"
+              >
+                {p}
+              </span>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {showFccWarning && (
+        <div className="flex items-start gap-3 rounded-[10px] border border-[#fca5a5] bg-white px-5 py-4">
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-white text-[#b42318] ring-1 ring-[#fca5a5]">
+            <IconAlertTriangle size={14} stroke={2.25} />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[12.5px] font-semibold text-[#0a0d14]">
+              FCC One-To-One Consent Rule Applies
+            </div>
+            <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">
+              As of January 27, 2026, the FCC requires recipients of Marketing and Mixed use case messages to give consent individually for each specific seller. Blanket consent for affiliated companies is no longer valid. The Opt-In Flow URL above must show consent collected for this brand specifically, not for a parent company, lead generation marketplace, or affiliated network. Misalignment is a top rejection reason in 2026.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -814,7 +954,7 @@ function FeeRow() {
           <div className="text-[14.5px] font-semibold tracking-[-0.012em] text-[#0a0d14]">
             Carrier Verification Fee
           </div>
-          <div className="text-[16px] font-semibold tabular-nums text-[#0a0d14]">$40.00</div>
+          <div className="text-[16px] font-semibold tabular-nums text-[#0a0d14]">$41.50</div>
         </div>
         <p className="mt-2 text-[12.5px] leading-[1.55] text-[#5b606a]">
           The Campaign Registry, an industry body operated by the major US mobile carriers, administers brand verification on behalf of the wireless industry. The fee passes through at cost with no markup and is identical at every messaging provider. Verification completes within 1 to 2 business days. Carrier review of the campaign follows for 1 to 3 weeks before SMS is enabled across registered numbers.
@@ -852,7 +992,7 @@ function FeeRow() {
                 style={{ background: "#b42318", boxShadow: "0 0 0 3px rgba(180,35,24,0.14)" }}
               />
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#b42318]">
-                Triggers New $40 Fee
+                Triggers New $41.50 Fee
               </div>
             </div>
             <p className="mt-1.5 text-[12px] leading-[1.5] text-[#0a0d14]">
@@ -1165,6 +1305,47 @@ function FieldGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-2 gap-x-5 gap-y-4">{children}</div>;
 }
 
+function EinField({
+  value,
+  onChange,
+  attempted,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  attempted?: boolean;
+}) {
+  const validFormat = /^\d{2}-\d{7}$/.test(value.trim());
+  const empty = attempted && !value.trim();
+  const wrongFormat = attempted && value.trim().length > 0 && !validFormat;
+  const errored = empty || wrongFormat;
+  return (
+    <div>
+      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
+        EIN
+        <span className="ml-1 text-[#b42318]">*</span>
+      </label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="12-3456789"
+        inputMode="numeric"
+        data-invalid={errored ? "true" : undefined}
+        className={[
+          "mt-1.5 h-[38px] w-full rounded-[7px] border bg-white px-3 text-[13px] text-[#0a0d14] outline-none placeholder:text-[#9298a3] tabular-nums",
+          errored ? "border-[#fca5a5] focus:border-[#b42318]" : "border-[#ebedf0] focus:border-[#0d4b3a]",
+        ].join(" ")}
+      />
+      <p className="mt-1 text-[10.5px] leading-[1.4] text-[#9298a3]">
+        Format XX-XXXXXXX. EIN must be at least 15 days old to register; new EINs are rejected by The Campaign Registry.
+      </p>
+      {wrongFormat && (
+        <p className="mt-1 text-[11px] font-medium text-[#b42318]">Format must be XX-XXXXXXX with the hyphen.</p>
+      )}
+    </div>
+  );
+}
+
 function Field({
   label,
   value,
@@ -1319,7 +1500,7 @@ function BrandIdentityChangeConfirm() {
             This Edit Registers A New Brand
           </h1>
           <p className="mt-3 max-w-[58ch] text-[14px] leading-[1.55] text-white/75">
-            The Campaign Registry treats any change to Entity Type, Legal Name, or EIN as a separate brand. The existing approved brand stays on file. A new brand is registered for this updated identity, which restarts verification and incurs a new fee.
+            The Campaign Registry treats any change to Entity Type, Legal Name, or EIN as a separate brand. The original approved brand remains registered with TCR. A separate new brand is then created with the updated identity, which restarts verification and incurs a new fee.
           </p>
         </div>
       </div>
@@ -1349,10 +1530,10 @@ function BrandIdentityChangeConfirm() {
           <div className="px-6 py-5">
             <div className="flex items-baseline justify-between gap-4">
               <div className="text-[13.5px] font-semibold text-[#0a0d14]">New Carrier Verification Fee</div>
-              <div className="text-[18px] font-semibold tabular-nums text-[#0a0d14]">$40.00</div>
+              <div className="text-[18px] font-semibold tabular-nums text-[#0a0d14]">$41.50</div>
             </div>
             <p className="mt-2 text-[12.5px] leading-[1.55] text-[#5b606a]">
-              Charged at submission of the updated brand. Set by The Campaign Registry, passes through at cost. The previous brand and its $40 fee stay on file and are not refunded.
+              Charged at submission of the updated brand. Set by The Campaign Registry, passes through at cost. The original brand remains registered with TCR and its fee is not refundable.
             </p>
           </div>
         </div>
@@ -1434,7 +1615,7 @@ function BrandIdentityChangeConfirm() {
                 : undefined
             }
           >
-            Register New Brand And Pay $40
+            Register New Brand And Pay $41.50
             <IconArrowRight size={13} stroke={2.25} />
           </button>
         </div>
