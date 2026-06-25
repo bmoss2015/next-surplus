@@ -44,6 +44,7 @@ export type {
   LobBankAccountInput,
   LobBankAccountResult,
   LobBankAccountState,
+  LobVerifyInput,
 } from "./lob";
 export { renderMerge, MERGE_FIELDS, fieldsByGroup } from "./merge";
 export type { MergeContext, MergeField } from "./merge";
