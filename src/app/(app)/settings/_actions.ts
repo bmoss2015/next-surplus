@@ -983,7 +983,70 @@ export async function verifyMailBankAccountManually(input: {
   if (!lobId.startsWith("bank_")) {
     return { ok: false, error: "Bank account is missing a Lob reference" };
   }
-  const lobRes = await lobVerifyBankAccount(lobId, [a1, a2]);
+  const lobRes = await lobVerifyBankAccount(lobId, { kind: "amounts", amounts: [a1, a2] });
+  const nowIso = new Date().toISOString();
+  if (!lobRes.ok) {
+    await sb
+      .from("mail_bank_accounts")
+      .update({
+        verify_attempts: ((row.verify_attempts as number | null) ?? 0) + 1,
+        last_verify_error: lobRes.error,
+        last_verify_attempt_at: nowIso,
+      })
+      .eq("id", input.bank_account_id);
+    revalidatePath("/settings");
+    return { ok: false, error: lobRes.error };
+  }
+  const { error: updateErr } = await sb
+    .from("mail_bank_accounts")
+    .update({
+      status: "verified",
+      verified_at: nowIso,
+      verify_attempts: ((row.verify_attempts as number | null) ?? 0) + 1,
+      last_verify_error: null,
+      last_verify_attempt_at: nowIso,
+    })
+    .eq("id", input.bank_account_id);
+  if (updateErr) return { ok: false, error: updateErr.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// Descriptor-code verification path. Fintech banks (Mercury, Brex,
+// Novo, Rho, Ramp) get a single $0.01 deposit with a 6-character code
+// in the ACH descriptor starting with SM. Operator reads the code from
+// their bank statement and enters it here. Same 3-attempt cap as the
+// amounts path.
+export async function verifyMailBankAccountWithCode(input: {
+  bank_account_id: string;
+  descriptor_code: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const code = input.descriptor_code.trim().toUpperCase();
+  if (!/^SM[A-Z0-9]{4}$/.test(code)) {
+    return {
+      ok: false,
+      error: "Enter the 6 character code starting with SM that appears in your bank statement.",
+    };
+  }
+  const sb = await createClient();
+  const { data: row, error: lookupErr } = await sb
+    .from("mail_bank_accounts")
+    .select("lob_bank_account_id, status, verify_attempts")
+    .eq("id", input.bank_account_id)
+    .single();
+  if (lookupErr || !row) {
+    return { ok: false, error: "Bank account not found" };
+  }
+  if (row.status === "verified") {
+    return { ok: false, error: "This bank account is already verified" };
+  }
+  const lobId = (row.lob_bank_account_id as string | null) ?? "";
+  if (!lobId.startsWith("bank_")) {
+    return { ok: false, error: "Bank account is missing a Lob reference" };
+  }
+  const lobRes = await lobVerifyBankAccount(lobId, { kind: "descriptor_code", code });
   const nowIso = new Date().toISOString();
   if (!lobRes.ok) {
     await sb

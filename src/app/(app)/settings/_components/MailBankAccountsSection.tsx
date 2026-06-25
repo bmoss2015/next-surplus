@@ -14,6 +14,7 @@ import type { MailBankAccountRow } from "@/lib/settings/fetch";
 import {
   deleteMailBankAccount,
   verifyMailBankAccountManually,
+  verifyMailBankAccountWithCode,
 } from "@/app/(app)/settings/_actions";
 import { BankAccountDrawer, type BankDrawerState } from "./BankAccountDrawer";
 import { Modal } from "@/components/Modal";
@@ -301,8 +302,11 @@ function ManualVerifyModal({
 }) {
   const [amount1, setAmount1] = useState("");
   const [amount2, setAmount2] = useState("");
+  const [codeInput, setCodeInput] = useState("");
   const [submitting, startSubmit] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+
+  const useDescriptorCode = bank?.microdeposit_type === "descriptor_code";
 
   function parseCents(input: string): number | null {
     const trimmed = input.trim();
@@ -320,11 +324,34 @@ function ManualVerifyModal({
   function reset() {
     setAmount1("");
     setAmount2("");
+    setCodeInput("");
     setErr(null);
   }
 
   function submit() {
     if (!bank) return;
+    if (useDescriptorCode) {
+      const code = codeInput.trim().toUpperCase();
+      if (!/^SM[A-Z0-9]{4}$/.test(code)) {
+        setErr("Enter the 6 character code starting with SM that appears in your bank statement.");
+        return;
+      }
+      setErr(null);
+      startSubmit(async () => {
+        const res = await verifyMailBankAccountWithCode({
+          bank_account_id: bank.id,
+          descriptor_code: code,
+        });
+        if (!res.ok) {
+          setErr(res.error);
+          return;
+        }
+        reset();
+        onVerified();
+      });
+      return;
+    }
+
     const a1 = parseCents(amount1);
     const a2 = parseCents(amount2);
     if (a1 === null || a2 === null) {
@@ -354,6 +381,9 @@ function ManualVerifyModal({
   if (!bank) return null;
   const attemptsUsed = bank.verify_attempts ?? 0;
   const attemptsRemaining = LOB_VERIFY_ATTEMPT_LIMIT - attemptsUsed;
+  const submitDisabled = useDescriptorCode
+    ? submitting || !codeInput.trim()
+    : submitting || !amount1.trim() || !amount2.trim();
 
   return (
     <Modal
@@ -367,55 +397,94 @@ function ManualVerifyModal({
       title="Verify Bank Account"
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <p
-          className="m-0"
-          style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.5 }}
-        >
-          Enter the two small test deposit amounts you see on your bank
-          statement for <strong>{bank.bank_name ?? "this account"}</strong>{" "}
-          {maskLast4(bank.account_last_four)}. Each will be between 1 and 99
-          cents.
-        </p>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
-            <label
-              className="drawer-label"
-              style={{ fontSize: 11.5, marginBottom: 4 }}
+        {useDescriptorCode ? (
+          <>
+            <p
+              className="m-0"
+              style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.5 }}
             >
-              Amount 1
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              autoFocus
-              placeholder="0.07"
-              value={amount1}
-              onChange={(e) => setAmount1(e.target.value)}
-              className="input"
-              style={{ width: "100%" }}
-              disabled={submitting}
-            />
-          </div>
-          <div>
-            <label
-              className="drawer-label"
-              style={{ fontSize: 11.5, marginBottom: 4 }}
+              Your bank uses a single test deposit of $0.01 with a 6 character
+              verification code printed in the transaction descriptor. Open
+              the $0.01 transaction for{" "}
+              <strong>{bank.bank_name ?? "this account"}</strong>{" "}
+              {maskLast4(bank.account_last_four)} in your bank statement, find
+              the full ACH descriptor, and enter the 6 character code below.
+              The code always starts with <strong>SM</strong>.
+            </p>
+            <div>
+              <label
+                className="drawer-label"
+                style={{ fontSize: 11.5, marginBottom: 4 }}
+              >
+                Verification Code
+              </label>
+              <input
+                type="text"
+                inputMode="text"
+                autoFocus
+                placeholder="SM____"
+                value={codeInput}
+                onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 6))}
+                maxLength={6}
+                className="input"
+                style={{ width: "100%", textTransform: "uppercase", letterSpacing: 1 }}
+                disabled={submitting}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <p
+              className="m-0"
+              style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.5 }}
             >
-              Amount 2
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder="0.23"
-              value={amount2}
-              onChange={(e) => setAmount2(e.target.value)}
-              className="input"
-              style={{ width: "100%" }}
-              disabled={submitting}
-            />
-          </div>
-        </div>
+              Two small test deposits arrive in your bank account within 1 to 2
+              business days. Each is between 1 and 99 cents. Enter both amounts
+              you see on your statement for{" "}
+              <strong>{bank.bank_name ?? "this account"}</strong>{" "}
+              {maskLast4(bank.account_last_four)}.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label
+                  className="drawer-label"
+                  style={{ fontSize: 11.5, marginBottom: 4 }}
+                >
+                  Amount 1
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoFocus
+                  placeholder="0.07"
+                  value={amount1}
+                  onChange={(e) => setAmount1(e.target.value)}
+                  className="input"
+                  style={{ width: "100%" }}
+                  disabled={submitting}
+                />
+              </div>
+              <div>
+                <label
+                  className="drawer-label"
+                  style={{ fontSize: 11.5, marginBottom: 4 }}
+                >
+                  Amount 2
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.23"
+                  value={amount2}
+                  onChange={(e) => setAmount2(e.target.value)}
+                  className="input"
+                  style={{ width: "100%" }}
+                  disabled={submitting}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         <p
           className="m-0"
@@ -466,7 +535,7 @@ function ManualVerifyModal({
             type="button"
             className="btn btn-primary btn-sm"
             onClick={submit}
-            disabled={submitting || !amount1.trim() || !amount2.trim()}
+            disabled={submitDisabled}
             style={{ minWidth: 100 }}
           >
             {submitting ? "Verifying…" : "Verify"}

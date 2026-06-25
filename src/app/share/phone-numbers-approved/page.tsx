@@ -531,8 +531,8 @@ function ComplianceCard({
           </div>
           <button
             type="button"
-            className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#b42318] px-3.5 text-[12px] font-medium text-white"
-            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(180,35,24,0.20), 0 6px 16px -4px rgba(180,35,24,0.30)" }}
+            className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-3.5 text-[12px] font-medium text-white"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
           >
             Fix And Resubmit
           </button>
