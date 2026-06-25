@@ -409,6 +409,7 @@ function ManualVerifyModal({
               {maskLast4(bank.account_last_four)} in your bank statement and
               enter the full code below.
             </p>
+            <SampleStatement mode="descriptor_code" />
             <div>
               <label
                 className="drawer-label"
@@ -442,6 +443,7 @@ function ManualVerifyModal({
               <strong>{bank.bank_name ?? "this account"}</strong>{" "}
               {maskLast4(bank.account_last_four)}.
             </p>
+            <SampleStatement mode="amounts" />
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
@@ -542,5 +544,203 @@ function ManualVerifyModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+function SampleStatement({ mode }: { mode: "amounts" | "descriptor_code" }) {
+  if (mode === "descriptor_code") {
+    return (
+      <div
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--hairline)",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "8px 12px",
+            borderBottom: "1px solid var(--hairline)",
+            fontSize: 11,
+            textTransform: "uppercase",
+            letterSpacing: 0.6,
+            color: "var(--text-3)",
+          }}
+        >
+          Sample From Your Bank Statement
+        </div>
+        <div style={{ padding: "10px 12px", display: "grid", gap: 6 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "72px 1fr 64px",
+              gap: 8,
+              fontSize: 11,
+              color: "var(--text-3)",
+              fontWeight: 500,
+            }}
+          >
+            <div>Date</div>
+            <div>Description</div>
+            <div style={{ textAlign: "right" }}>Amount</div>
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "72px 1fr 64px",
+              gap: 8,
+              fontSize: 12.5,
+              alignItems: "center",
+              padding: "8px 10px",
+              background: "#fff",
+              border: "1px solid var(--brand)",
+              borderRadius: 6,
+            }}
+          >
+            <div style={{ color: "var(--text-2)" }}>Jun 25</div>
+            <div style={{ fontVariantNumeric: "tabular-nums" }}>
+              ACH CREDIT{" "}
+              <span
+                style={{
+                  background: "var(--brand)",
+                  color: "#fff",
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                }}
+              >
+                SMABCD
+              </span>
+              -LOB
+            </div>
+            <div
+              style={{
+                textAlign: "right",
+                fontVariantNumeric: "tabular-nums",
+                color: "var(--text-2)",
+              }}
+            >
+              +$0.01
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: 11.5,
+              color: "var(--text-3)",
+              lineHeight: 1.4,
+              paddingLeft: 2,
+            }}
+          >
+            The highlighted 6 character code is what to type below. Always
+            starts with <strong>SM</strong>.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--hairline)",
+        borderRadius: 8,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "8px 12px",
+          borderBottom: "1px solid var(--hairline)",
+          fontSize: 11,
+          textTransform: "uppercase",
+          letterSpacing: 0.6,
+          color: "var(--text-3)",
+        }}
+      >
+        Sample From Your Bank Statement
+      </div>
+      <div style={{ padding: "10px 12px", display: "grid", gap: 6 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "72px 1fr 64px",
+            gap: 8,
+            fontSize: 11,
+            color: "var(--text-3)",
+            fontWeight: 500,
+          }}
+        >
+          <div>Date</div>
+          <div>Description</div>
+          <div style={{ textAlign: "right" }}>Amount</div>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "72px 1fr 64px",
+            gap: 8,
+            fontSize: 12.5,
+            alignItems: "center",
+            padding: "8px 10px",
+            background: "#fff",
+            border: "1px solid var(--brand)",
+            borderRadius: 6,
+          }}
+        >
+          <div style={{ color: "var(--text-2)" }}>Jun 25</div>
+          <div style={{ fontVariantNumeric: "tabular-nums" }}>LOB-VERIF</div>
+          <div
+            style={{
+              textAlign: "right",
+              fontVariantNumeric: "tabular-nums",
+              fontWeight: 600,
+              color: "var(--brand)",
+            }}
+          >
+            +$0.07
+          </div>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "72px 1fr 64px",
+            gap: 8,
+            fontSize: 12.5,
+            alignItems: "center",
+            padding: "8px 10px",
+            background: "#fff",
+            border: "1px solid var(--brand)",
+            borderRadius: 6,
+          }}
+        >
+          <div style={{ color: "var(--text-2)" }}>Jun 25</div>
+          <div style={{ fontVariantNumeric: "tabular-nums" }}>LOB-VERIF</div>
+          <div
+            style={{
+              textAlign: "right",
+              fontVariantNumeric: "tabular-nums",
+              fontWeight: 600,
+              color: "var(--brand)",
+            }}
+          >
+            +$0.23
+          </div>
+        </div>
+        <div
+          style={{
+            fontSize: 11.5,
+            color: "var(--text-3)",
+            lineHeight: 1.4,
+            paddingLeft: 2,
+          }}
+        >
+          Two highlighted amounts are what to type below. Each will be between
+          1 and 99 cents.
+        </div>
+      </div>
+    </div>
   );
 }
