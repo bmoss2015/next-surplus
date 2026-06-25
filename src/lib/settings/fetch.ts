@@ -293,6 +293,7 @@ export type MailBankAccountRow = {
   last_verify_error: string | null;
   last_verify_attempt_at: string | null;
   created_at: string;
+  microdeposit_type: "amounts" | "descriptor_code" | null;
 };
 
 export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
@@ -316,22 +317,28 @@ export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
   } else {
     rows = (withTracking.data ?? []) as Record<string, unknown>[];
   }
-  return rows.map((r) => ({
-    id: r.id as string,
-    bank_name: (r.bank_name as string | null) ?? null,
-    account_holder_name: (r.account_holder_name as string | null) ?? "",
-    routing_last_four: (r.routing_last_four as string | null) ?? null,
-    account_last_four: (r.account_last_four as string | null) ?? null,
-    status:
-      r.status === "verified" || r.status === "disabled"
-        ? (r.status as "verified" | "disabled")
-        : "unverified",
-    verified_at: (r.verified_at as string | null) ?? null,
-    verify_attempts: (r.verify_attempts as number | null) ?? 0,
-    last_verify_error: (r.last_verify_error as string | null) ?? null,
-    last_verify_attempt_at: (r.last_verify_attempt_at as string | null) ?? null,
-    created_at: (r.created_at as string | null) ?? new Date().toISOString(),
-  }));
+  return rows.map((r) => {
+    const mdRaw = r.microdeposit_type;
+    const microdeposit_type: MailBankAccountRow["microdeposit_type"] =
+      mdRaw === "amounts" || mdRaw === "descriptor_code" ? mdRaw : null;
+    return {
+      id: r.id as string,
+      bank_name: (r.bank_name as string | null) ?? null,
+      account_holder_name: (r.account_holder_name as string | null) ?? "",
+      routing_last_four: (r.routing_last_four as string | null) ?? null,
+      account_last_four: (r.account_last_four as string | null) ?? null,
+      status:
+        r.status === "verified" || r.status === "disabled"
+          ? (r.status as "verified" | "disabled")
+          : "unverified",
+      verified_at: (r.verified_at as string | null) ?? null,
+      verify_attempts: (r.verify_attempts as number | null) ?? 0,
+      last_verify_error: (r.last_verify_error as string | null) ?? null,
+      last_verify_attempt_at: (r.last_verify_attempt_at as string | null) ?? null,
+      created_at: (r.created_at as string | null) ?? new Date().toISOString(),
+      microdeposit_type,
+    };
+  });
 }
 
 export type MailTemplateFolderRow = {

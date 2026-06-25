@@ -867,19 +867,23 @@ import {
 } from "@/lib/mail";
 
 // Bank accounts are added by manual routing + account number entry.
-// After the row is inserted, the mail provider sends two small
-// micro-deposits to the bank account. The operator reads the two cent
-// amounts from their statement and enters them in the Verify Manually
-// modal to flip the row to verified.
+// After the row is inserted, the mail provider sends micro-deposits
+// to the bank account. The format depends on the receiving bank
+// (decided by the provider, not configurable):
 //
-// Bank-type compatibility gate (added after a Mercury / Column NA add
-// surfaced the issue): the provider picks micro-deposit format based
-// on the receiving bank. Traditional banks (Chase, BofA, credit
-// unions) get the two-amounts flow we support. Fintech banks like
-// Mercury get a single-deposit descriptor-code flow that our portal
-// does not implement. To keep the verification UX consistent, we
-// reject any bank where the provider returns microdeposit_type other
-// than "amounts" and clean up the just-created provider record.
+//   - microdeposit_type = "amounts" (traditional banks like Chase,
+//     BofA, credit unions). Two random small deposits arrive over
+//     1-2 business days. User enters both amounts in the Verify
+//     Manually modal.
+//   - microdeposit_type = "descriptor_code" (fintech banks like
+//     Mercury, Brex, Novo, Rho, Ramp). One $0.01 deposit arrives
+//     with a 6-character verification code in the ACH descriptor
+//     starting with "SM". User enters that code in the Verify
+//     Manually modal.
+//
+// We store the type on the row at add time and the Verify Manually
+// modal branches its UI accordingly so the customer sees the right
+// input regardless of bank type.
 
 export async function addMailBankAccountManually(input: {
   routing_number: string;
@@ -911,18 +915,17 @@ export async function addMailBankAccountManually(input: {
   });
   if (!lobRes.ok) return { ok: false, error: lobRes.error };
 
+  // Ask the provider which micro-deposit format it assigned for this
+  // receiving bank. Stored on the row so the verify modal renders the
+  // right input. Failure to read is non-fatal; we just insert with
+  // null and the verify modal falls back to the two-amounts UI.
+  let microdepositType: string | null = null;
   const lobState = await lobGetBankAccount(lobRes.lob_bank_account_id);
   if (lobState.ok) {
     const mdType = (lobState.raw as { microdeposit_type?: string | null })
       .microdeposit_type;
-    if (mdType && mdType !== "amounts") {
-      await lobDeleteBankAccount(lobRes.lob_bank_account_id);
-      const inferredBank =
-        lobRes.bank_name ?? input.bank_name?.trim() ?? "this bank";
-      return {
-        ok: false,
-        error: `${inferredBank} is not supported for check funding. Please add a traditional checking account from a major bank or credit union.`,
-      };
+    if (mdType === "amounts" || mdType === "descriptor_code") {
+      microdepositType = mdType;
     }
   }
 
@@ -936,6 +939,7 @@ export async function addMailBankAccountManually(input: {
       routing_last_four: lobRes.routing_last_four,
       account_last_four: lobRes.account_last_four,
       verified_via: "micro_deposits",
+      microdeposit_type: microdepositType,
     })
     .select("id")
     .single();
@@ -969,31 +973,24 @@ export async function deleteMailBankAccount(
   return { ok: true };
 }
 
-// Micro-deposit verification. Operator enters the two cent amounts
-// from their bank statement. Both values are integer cents in 1-99.
-// Lob locks the bank account after 3 failed /verify calls.
-export async function verifyMailBankAccountManually(input: {
-  bank_account_id: string;
-  amount1_cents: number;
-  amount2_cents: number;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+// Micro-deposit verification. Operator enters either two cent
+// amounts (traditional banks) or a single 6-character code starting
+// with "SM" (fintech banks). The modal picks the input shape based
+// on the bank's microdeposit_type. Lob locks the bank account after
+// 3 failed /verify calls.
+export type VerifyMailBankAccountInput =
+  | { bank_account_id: string; amount1_cents: number; amount2_cents: number }
+  | { bank_account_id: string; descriptor_code: string };
+
+export async function verifyMailBankAccountManually(
+  input: VerifyMailBankAccountInput
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
-  const a1 = Math.round(input.amount1_cents);
-  const a2 = Math.round(input.amount2_cents);
-  if (!Number.isFinite(a1) || !Number.isFinite(a2)) {
-    return { ok: false, error: "Both amounts are required" };
-  }
-  if (a1 < 1 || a1 > 99 || a2 < 1 || a2 > 99) {
-    return {
-      ok: false,
-      error: "Each amount must be between 1 and 99 cents",
-    };
-  }
   const sb = await createClient();
   const { data: row, error: lookupErr } = await sb
     .from("mail_bank_accounts")
-    .select("lob_bank_account_id, status, verify_attempts")
+    .select("lob_bank_account_id, status, verify_attempts, microdeposit_type")
     .eq("id", input.bank_account_id)
     .single();
   if (lookupErr || !row) {
@@ -1006,7 +1003,33 @@ export async function verifyMailBankAccountManually(input: {
   if (!lobId.startsWith("bank_")) {
     return { ok: false, error: "Bank account is missing a Lob reference" };
   }
-  const lobRes = await lobVerifyBankAccount(lobId, [a1, a2]);
+
+  let verifyInput: import("@/lib/mail").LobVerifyInput;
+  if ("descriptor_code" in input) {
+    const code = input.descriptor_code.trim().toUpperCase();
+    if (!/^SM[A-Z0-9]{4}$/.test(code)) {
+      return {
+        ok: false,
+        error: "Enter the 6 character code starting with SM that appears in your bank statement.",
+      };
+    }
+    verifyInput = { kind: "descriptor_code", code };
+  } else {
+    const a1 = Math.round(input.amount1_cents);
+    const a2 = Math.round(input.amount2_cents);
+    if (!Number.isFinite(a1) || !Number.isFinite(a2)) {
+      return { ok: false, error: "Both amounts are required" };
+    }
+    if (a1 < 1 || a1 > 99 || a2 < 1 || a2 > 99) {
+      return {
+        ok: false,
+        error: "Each amount must be between 1 and 99 cents",
+      };
+    }
+    verifyInput = { kind: "amounts", amounts: [a1, a2] };
+  }
+
+  const lobRes = await lobVerifyBankAccount(lobId, verifyInput);
   const nowIso = new Date().toISOString();
   if (!lobRes.ok) {
     await sb
@@ -1033,6 +1056,19 @@ export async function verifyMailBankAccountManually(input: {
   if (updateErr) return { ok: false, error: updateErr.message };
   revalidatePath("/settings");
   return { ok: true };
+}
+
+// Convenience wrapper for the descriptor_code path so the UI can call a
+// single-purpose function without juggling the discriminated input shape.
+// All validation and Lob dispatch happens through verifyMailBankAccountManually.
+export async function verifyMailBankAccountWithCode(input: {
+  bank_account_id: string;
+  descriptor_code: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  return verifyMailBankAccountManually({
+    bank_account_id: input.bank_account_id,
+    descriptor_code: input.descriptor_code,
+  });
 }
 
 // -- Mail templates ---------------------------------------------------------

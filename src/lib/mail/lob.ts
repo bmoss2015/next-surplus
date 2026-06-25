@@ -692,14 +692,27 @@ export async function lobGetBankAccount(
   }
 }
 
+// Lob's /verify endpoint accepts one of two payload shapes depending
+// on the account's microdeposit_type (set per receiving bank). Pass
+// `{ kind: "amounts", amounts: [n, n] }` for traditional banks and
+// `{ kind: "descriptor_code", code: "SM____" }` for fintech banks.
+// Mixing them up returns an error from Lob.
+export type LobVerifyInput =
+  | { kind: "amounts"; amounts: [number, number] }
+  | { kind: "descriptor_code"; code: string };
+
 export async function lobVerifyBankAccount(
   bnkId: string,
-  amounts: [number, number]
+  input: LobVerifyInput
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isLobConfigured()) {
     return { ok: false, error: "Mail service is not configured. Contact support." };
   }
   try {
+    const body =
+      input.kind === "amounts"
+        ? { amounts: [input.amounts[0], input.amounts[1]] }
+        : { descriptor_code: input.code };
     const res = await lobFetch(`${LOB_BASE_URL}/bank_accounts/${bnkId}/verify`, {
       method: "POST",
       headers: {
@@ -707,7 +720,7 @@ export async function lobVerifyBankAccount(
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ amounts: [amounts[0], amounts[1]] }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       return {
