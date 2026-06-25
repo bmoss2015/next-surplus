@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
   IconCheck,
@@ -11,7 +11,13 @@ import {
   IconArrowRight,
   IconClock,
   IconMail,
+  IconInfoCircle,
 } from "@tabler/icons-react";
+
+function extractPlaceholders(text: string): string[] {
+  const matches = text.match(/\[[A-Z][A-Z0-9 ,.'\-/]+\]/g);
+  return matches ? Array.from(new Set(matches)) : [];
+}
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -134,16 +140,20 @@ export default function A2pWizardFinal() {
   const [campaign, setCampaign] = useState<Campaign>({
     useCase: "CUSTOMER_CARE",
     description:
-      "Outreach to individuals identified through public court records as potential claimants for surplus funds from foreclosure or tax sales. Messages provide case status, document requests, and payment notifications.",
+      "[COMPANY NAME] sends transactional follow-up to individuals identified through public court records as potential claimants for surplus funds from [TYPES OF SALES, e.g. foreclosure or tax sales]. Messages provide case status updates, document requests, and payment notifications.",
     volume: "LOW",
     messages: DEFAULT_MESSAGES,
   });
+
+  const descriptionPlaceholders = extractPlaceholders(campaign.description);
 
   const canContinue =
     step === 1
       ? !!brand.ein.trim() && !!brand.repName.trim()
       : step === 2
-        ? campaign.messages.every((m) => m.trim().length > 0) && !!campaign.description.trim()
+        ? campaign.messages.every((m) => m.trim().length > 0) &&
+          !!campaign.description.trim() &&
+          descriptionPlaceholders.length === 0
         : true;
 
   function next() {
@@ -303,16 +313,32 @@ function Step1Brand({
           />
           <Field label="EIN" value={brand.ein} onChange={(v) => u("ein", v)} placeholder="12-3456789" required attempted={attempted} />
           <Field label="Legal Name" value={brand.legalName} onChange={(v) => u("legalName", v)} />
-          <SelectField label="Industry" value={brand.vertical} onChange={(v) => u("vertical", v)} options={VERTICALS} />
+          <SelectField
+            label="Industry"
+            value={brand.vertical}
+            onChange={(v) => u("vertical", v)}
+            options={VERTICALS}
+            info={
+              <>
+                <div className="font-semibold text-[#0a0d14]">Industry Selection</div>
+                <p className="mt-1 text-[#5b606a]">
+                  Pre-selected as Financial Services because surplus recovery involves identifying entitled parties to funds from court-supervised sales. Carriers classify this work under financial services even when the company itself is structured as professional services or legal services.
+                </p>
+              </>
+            }
+          />
           <Field label="Website" value={brand.website} onChange={(v) => u("website", v)} wide />
         </FieldGrid>
       </Card>
 
-      <Card title="Authorized Representative" subtitle="Person carriers will contact to verify the brand. Must be reachable by phone and email.">
+      <Card
+        title="Authorized Representative"
+        subtitle="Person carriers will contact to verify the brand. Must be reachable by phone and email."
+      >
         <FieldGrid>
           <Field label="Full Name" value={brand.repName} onChange={(v) => u("repName", v)} required attempted={attempted} />
-          <Field label="Email" value={brand.repEmail} onChange={(v) => u("repEmail", v)} />
-          <Field label="Phone" value={brand.repPhone} onChange={(v) => u("repPhone", v)} wide />
+          <Field label="Email" value={brand.repEmail} onChange={(v) => u("repEmail", v)} type="email" />
+          <Field label="Phone" value={brand.repPhone} onChange={(v) => u("repPhone", v)} type="tel" wide />
         </FieldGrid>
       </Card>
 
@@ -327,7 +353,15 @@ function Step1Brand({
 
       <Card
         title="Legal Documents"
-        subtitle="Carriers and recipients can review the policies that govern messaging. URLs are hosted automatically and update when company details change."
+        subtitle="Privacy Policy and Terms Of Service are required for SMS approval. Hosted pages were generated automatically from the company details above. Override either URL only if a separate policy is already published."
+        info={
+          <>
+            <div className="font-semibold text-[#0a0d14]">No Existing Policy? It Is Handled.</div>
+            <p className="mt-1 text-[#5b606a]">
+              A privacy policy and terms of service are generated automatically for the company at the URLs shown. Both pages reflect the legal name, address, and contact email from the Company section above, and update whenever those details change. Override either URL only if an existing policy lives elsewhere.
+            </p>
+          </>
+        }
       >
         <FieldGrid>
           <Field label="Privacy Policy" value={brand.privacyUrl} onChange={(v) => u("privacyUrl", v)} wide />
@@ -371,7 +405,7 @@ function Step2Campaign({
               <div className="mt-1.5 text-[18px] font-semibold tracking-[-0.014em] text-[#0a0d14]">
                 {current.label}
               </div>
-              <p className="mt-2 max-w-[54ch] text-[13px] leading-[1.55] text-[#5b606a]">
+              <p className="mt-2 text-[13px] leading-[1.55] text-[#5b606a]">
                 {current.description}
               </p>
             </div>
@@ -387,43 +421,70 @@ function Step2Campaign({
         </div>
 
         {useCaseOpen && (
-          <div className="mt-3 space-y-2">
-            <div className="px-1 text-[11px] text-[#5b606a]">
-              Other use cases rarely fit surplus recovery and may extend or fail carrier review. Choose with care.
+          <div className="mt-3 overflow-hidden rounded-[10px] border border-[#ebedf0] bg-white">
+            <div className="border-b border-[#f1f2f4] px-4 py-2.5 text-[11px] text-[#5b606a]">
+              Other use cases rarely fit surplus recovery. A mismatch is a common rejection reason.
             </div>
-            {USE_CASES.filter((u) => u.value !== campaign.useCase).map((u) => (
-              <button
-                key={u.value}
-                type="button"
-                onClick={() => {
-                  setCampaign({ ...campaign, useCase: u.value });
-                  setUseCaseOpen(false);
-                }}
-                className="block w-full cursor-pointer rounded-[10px] border border-[#ebedf0] bg-white p-4 text-left hover:border-[#0d4b3a]"
-              >
-                <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">{u.label}</div>
-                <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">{u.description}</p>
-              </button>
+            <div className="divide-y divide-[#f1f2f4]">
+              {USE_CASES.filter((u) => u.value !== campaign.useCase).map((u) => (
+                <button
+                  key={u.value}
+                  type="button"
+                  onClick={() => {
+                    setCampaign({ ...campaign, useCase: u.value });
+                    setUseCaseOpen(false);
+                  }}
+                  className="grid w-full cursor-pointer grid-cols-[140px_1fr] gap-3 px-4 py-3 text-left hover:bg-[#fafbfc]"
+                >
+                  <div className="text-[12.5px] font-semibold tracking-[-0.012em] text-[#0a0d14]">{u.label}</div>
+                  <p className="text-[12px] leading-[1.5] text-[#5b606a]">{u.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <Card
+        title="Campaign Description"
+        subtitle="A short statement describing how SMS is used. Carriers compare this to the sample messages. Replace the bracketed placeholders with details specific to the company."
+      >
+        <textarea
+          value={campaign.description}
+          onChange={(e) => setCampaign({ ...campaign, description: e.target.value })}
+          rows={4}
+          className={[
+            "w-full rounded-[7px] border bg-white p-3 text-[13px] leading-[1.5] text-[#0a0d14] outline-none",
+            attempted && !campaign.description.trim()
+              ? "border-[#fca5a5] focus:border-[#b42318]"
+              : descriptionPlaceholders.length > 0
+                ? "border-[#fca5a5] focus:border-[#b42318]"
+                : "border-[#ebedf0] focus:border-[#0d4b3a]",
+          ].join(" ")}
+        />
+        {descriptionPlaceholders.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#b42318]">
+            <span className="font-semibold">Replace before continuing:</span>
+            {descriptionPlaceholders.map((p) => (
+              <span key={p} className="inline-flex items-center rounded-[5px] border border-[#fca5a5] bg-white px-2 py-0.5 font-medium tabular-nums">
+                {p}
+              </span>
             ))}
           </div>
         )}
       </Card>
 
-      <Card title="Campaign Description" subtitle="A short statement describing how SMS is used. Carriers compare this to the sample messages.">
-        <textarea
-          value={campaign.description}
-          onChange={(e) => setCampaign({ ...campaign, description: e.target.value })}
-          rows={3}
-          className={[
-            "w-full rounded-[7px] border bg-white p-3 text-[13px] leading-[1.5] text-[#0a0d14] outline-none",
-            attempted && !campaign.description.trim()
-              ? "border-[#fca5a5] focus:border-[#b42318]"
-              : "border-[#ebedf0] focus:border-[#0d4b3a]",
-          ].join(" ")}
-        />
-      </Card>
-
-      <Card title="Monthly Volume">
+      <Card
+        title="Monthly Volume"
+        info={
+          <>
+            <div className="font-semibold text-[#0a0d14]">How Volume Affects Approval</div>
+            <p className="mt-1 text-[#5b606a]">
+              Volume tells carriers what throughput to expect. Picking too high triggers extra scrutiny; picking too low can result in throttling once active. Low covers most surplus recovery operators. Medium and High require justification in the campaign description.
+            </p>
+          </>
+        }
+      >
         <div className="grid grid-cols-3 gap-2.5">
           {(["LOW", "MEDIUM", "HIGH"] as const).map((v) => {
             const selected = campaign.volume === v;
@@ -496,24 +557,19 @@ function Step2Campaign({
         </div>
       </Card>
 
-      <Card title="Keywords And Opt-Outs" subtitle="STOP and HELP keyword behavior is handled by the platform. No additional configuration is needed for compliance with carrier requirements.">
-        <div className="grid grid-cols-2 gap-3">
-          <KeywordRow keyword="STOP" behavior="Marks the contact do-not-text and confirms with a standard reply." />
-          <KeywordRow keyword="HELP" behavior="Returns brand name, support email, and how to opt back in." />
+      <div className="flex items-start gap-3 rounded-[10px] border border-[#ebedf0] bg-[#fafbfc] px-5 py-4">
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-white text-[#0d4b3a] ring-1 ring-[#ebedf0]">
+          <IconInfoCircle size={14} stroke={2} />
+        </span>
+        <div className="min-w-0">
+          <div className="text-[12.5px] font-semibold text-[#0a0d14]">
+            STOP And HELP Keywords Are Already Handled
+          </div>
+          <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">
+            FCC and CTIA guidelines require automated STOP and HELP responses on every messaging program. The platform handles both without any additional configuration. STOP marks the recipient do-not-text and confirms with a standard reply. HELP returns the brand name, support email, and instructions to opt back in.
+          </p>
         </div>
-      </Card>
-    </div>
-  );
-}
-
-function KeywordRow({ keyword, behavior }: { keyword: string; behavior: string }) {
-  return (
-    <div className="rounded-[10px] border border-[#ebedf0] bg-white p-3.5">
-      <div className="flex items-center gap-2">
-        <span className="text-[12px] font-semibold tabular-nums text-[#0a0d14]">{keyword}</span>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">Automatic</span>
       </div>
-      <p className="mt-1 text-[11.5px] leading-[1.5] text-[#5b606a]">{behavior}</p>
     </div>
   );
 }
@@ -579,7 +635,7 @@ function FeeRow() {
           </div>
           <div className="text-[16px] font-semibold tabular-nums text-[#0a0d14]">$40.00</div>
         </div>
-        <p className="mt-2 max-w-[64ch] text-[12.5px] leading-[1.55] text-[#5b606a]">
+        <p className="mt-2 text-[12.5px] leading-[1.55] text-[#5b606a]">
           The Campaign Registry, an industry body operated by the major US mobile carriers, administers brand verification on behalf of the wireless industry. The fee passes through at cost and is identical at every messaging provider. Verification completes within 1 to 2 business days. Carrier review of the campaign follows for 1 to 3 weeks before SMS is enabled across registered numbers.
         </p>
       </div>
@@ -691,11 +747,11 @@ function Timeline({
   );
 }
 
-// ─── Compliance Coach ──────────────────────────────────────────────────
+// ─── Reference Panel (side column) ─────────────────────────────────────
 function stepHelpFor(step: Step) {
   if (step === 1) {
     return (
-      <ComplianceCoach
+      <ReferencePanel
         title="What Carriers Verify"
         lead="Brand registration passes through three checks before the campaign can enter carrier review."
         tips={[
@@ -718,7 +774,7 @@ function stepHelpFor(step: Step) {
   }
   if (step === 2) {
     return (
-      <ComplianceCoach
+      <ReferencePanel
         title="What Strengthens A Campaign"
         lead="Three components shape the carrier decision on whether the campaign is approved."
         tips={[
@@ -762,7 +818,7 @@ function stepHelpFor(step: Step) {
   );
 }
 
-function ComplianceCoach({
+function ReferencePanel({
   title,
   lead,
   tips,
@@ -778,17 +834,8 @@ function ComplianceCoach({
       className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
-      <div
-        className="border-b border-[#04261c] px-5 py-3 text-white"
-        style={{ background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 100%)" }}
-      >
-        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
-          <IconShieldCheck size={11} stroke={2.25} />
-          Compliance Coach
-        </div>
-        <div className="mt-0.5 text-[15px] font-semibold leading-[1.2] tracking-[-0.014em]">
-          {title}
-        </div>
+      <div className="border-b border-[#f1f2f4] px-5 py-4">
+        <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">{title}</div>
       </div>
 
       <div className="px-5 py-4">
@@ -818,17 +865,65 @@ function ComplianceCoach({
 }
 
 // ─── Building blocks ────────────────────────────────────────────────────
-function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Card({
+  title,
+  subtitle,
+  info,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  info?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div
       className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
       <div className="border-b border-[#f1f2f4] px-6 py-4">
-        <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">{title}</div>
-        {subtitle && <div className="mt-1 max-w-[64ch] text-[12px] leading-[1.5] text-[#5b606a]">{subtitle}</div>}
+        <div className="flex items-center gap-1.5">
+          <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">{title}</div>
+          {info && <InfoButton>{info}</InfoButton>}
+        </div>
+        {subtitle && <div className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">{subtitle}</div>}
       </div>
       <div className="px-6 py-5">{children}</div>
+    </div>
+  );
+}
+
+function InfoButton({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label="More information"
+        className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-[#9298a3] hover:text-[#0d4b3a]"
+      >
+        <IconInfoCircle size={14} stroke={2} />
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 top-6 z-40 w-[280px] rounded-[10px] border border-[#ebedf0] bg-white p-3.5 text-[12px] leading-[1.5] text-[#0a0d14]"
+          style={{ boxShadow: "0 8px 28px -10px rgba(12,13,16,0.15)" }}
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -844,6 +939,7 @@ function Field({
   placeholder,
   required,
   attempted,
+  type,
   wide,
 }: {
   label: string;
@@ -852,6 +948,7 @@ function Field({
   placeholder?: string;
   required?: boolean;
   attempted?: boolean;
+  type?: "text" | "email" | "tel" | "url";
   wide?: boolean;
 }) {
   const errored = required && attempted && !value;
@@ -862,10 +959,12 @@ function Field({
         {required && <span className="ml-1 text-[#b42318]">*</span>}
       </label>
       <input
-        type="text"
+        type={type ?? "text"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        inputMode={type === "tel" ? "tel" : type === "email" ? "email" : undefined}
+        pattern={type === "tel" ? "[+0-9() \\-]*" : undefined}
         className={[
           "mt-1.5 h-[38px] w-full rounded-[7px] border bg-white px-3 text-[13px] text-[#0a0d14] outline-none placeholder:text-[#9298a3]",
           errored ? "border-[#fca5a5] focus:border-[#b42318]" : "border-[#ebedf0] focus:border-[#0d4b3a]",
@@ -880,19 +979,24 @@ function SelectField({
   value,
   onChange,
   options,
+  info,
   wide,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
+  info?: React.ReactNode;
   wide?: boolean;
 }) {
   return (
     <div className={wide ? "col-span-2" : ""}>
-      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
-        {label}
-      </label>
+      <div className="flex items-center gap-1.5">
+        <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
+          {label}
+        </label>
+        {info && <InfoButton>{info}</InfoButton>}
+      </div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
