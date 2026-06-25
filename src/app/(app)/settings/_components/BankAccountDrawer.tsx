@@ -114,9 +114,8 @@ function AddDrawer({
       <div className="drawer-field">
         <div className="drawer-hint">
           Enter your bank&apos;s routing and account numbers from a check.
-          A small test deposit will arrive in 1 to 2 business days. Once
-          it lands, click Verify Manually on the bank card and follow the
-          on-screen instructions to confirm the account.
+          Two small test deposits (under $1 each) will arrive in 1-2
+          business days. Enter both amounts on the bank card to verify.
         </div>
       </div>
 

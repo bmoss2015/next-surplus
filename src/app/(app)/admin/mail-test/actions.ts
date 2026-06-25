@@ -123,10 +123,9 @@ export async function seedMailTestArtifacts(): Promise<{
       if (!create.ok) {
         return { ok: false, error: `Lob bank create failed: ${create.error}` };
       }
-      const verify = await lobVerifyBankAccount(create.lob_bank_account_id, {
-        kind: "amounts",
-        amounts: [11, 35],
-      });
+      const verify = await lobVerifyBankAccount(create.lob_bank_account_id, [
+        11, 35,
+      ]);
       if (!verify.ok) {
         return { ok: false, error: `Lob bank verify failed: ${verify.error}` };
       }
