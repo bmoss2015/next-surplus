@@ -327,6 +327,16 @@ function ManualVerifyModal({
   const [err, setErr] = useState<string | null>(null);
 
   const useDescriptorCode = bank?.microdeposit_type === "descriptor_code";
+  if (typeof window !== "undefined" && bank) {
+    // eslint-disable-next-line no-console
+    console.log("[verify-modal] bank prop", {
+      id: bank.id,
+      bank_name: bank.bank_name,
+      microdeposit_type: bank.microdeposit_type,
+      microdeposit_type_typeof: typeof bank.microdeposit_type,
+      useDescriptorCode,
+    });
+  }
 
   function parseCents(input: string): number | null {
     const trimmed = input.trim();
