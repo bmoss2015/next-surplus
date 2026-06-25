@@ -461,10 +461,9 @@ function V6TwoCardPolished({ state }: { state: "approved" | "denied" }) {
       <ComplianceCard
         eyebrow="Brand"
         title="Workflow Minds LLC"
-        meta="EIN ending 4821 · Verified May 18, 2026"
+        meta="EIN Ending 4821 · Verified May 18, 2026"
         status={brandStatus}
         denialReason="Carriers flagged the EIN format. Looks like a 9-digit value without the standard hyphen. Easy fix."
-        cardAccent
       />
       <ComplianceCard
         eyebrow="Campaign"
@@ -472,7 +471,6 @@ function V6TwoCardPolished({ state }: { state: "approved" | "denied" }) {
         meta="Surplus Recovery · Live Since May 22, 2026"
         status={campaignStatus}
         denialReason=""
-        cardAccent
       />
     </div>
   );
@@ -484,14 +482,12 @@ function ComplianceCard({
   meta,
   status,
   denialReason,
-  cardAccent,
 }: {
   eyebrow: string;
   title: string;
   meta: string;
   status: "approved" | "pending" | "denied";
   denialReason: string;
-  cardAccent?: boolean;
 }) {
   const isApproved = status === "approved";
   const isDenied = status === "denied";
@@ -500,25 +496,17 @@ function ComplianceCard({
       className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
-      {cardAccent && !isDenied && (
-        <div
-          className="h-1 w-full"
-          style={{
-            background: "linear-gradient(90deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)",
-          }}
-        />
-      )}
       <div className="px-6 py-5">
         <div className="flex items-center justify-between gap-3">
           <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">
             {eyebrow}
           </div>
-          <StatusPill status={status} />
+          <StatusIndicator status={status} />
         </div>
-        <div className="mt-2 text-[16px] font-semibold tracking-[-0.014em] text-[#0a0d14]">
+        <div className="mt-3 text-[17px] font-semibold tracking-[-0.014em] text-[#0a0d14]">
           {title}
         </div>
-        <div className="mt-1 text-[12px] text-[#5b606a]">{meta}</div>
+        <div className="mt-1 text-[12.5px] text-[#5b606a]">{meta}</div>
       </div>
 
       {isDenied && (
@@ -540,35 +528,42 @@ function ComplianceCard({
       )}
 
       {isApproved && (
-        <div className="border-t border-[#f1f2f4] px-6 py-3">
+        <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-3">
           <button type="button" className="cursor-pointer text-[12px] font-medium text-[#5b606a] hover:text-[#0d4b3a]">
             View Details &rarr;
           </button>
+        </div>
+      )}
+
+      {status === "pending" && (
+        <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-3 text-[12px] text-[#5b606a]">
+          Carriers reviewing this submission. No action needed.
         </div>
       )}
     </div>
   );
 }
 
-function StatusPill({ status }: { status: "approved" | "pending" | "denied" }) {
-  if (status === "approved") {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0d4b3a]">
-        <IconCheck size={11} stroke={2.5} />
-        Approved
-      </span>
-    );
-  }
-  if (status === "denied") {
-    return (
-      <span className="inline-flex h-6 items-center gap-1 rounded-full bg-[#b42318] px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white">
-        Denied
-      </span>
-    );
-  }
+function StatusIndicator({ status }: { status: "approved" | "pending" | "denied" }) {
+  const color =
+    status === "approved" ? "#0d4b3a" : status === "denied" ? "#b42318" : "#9298a3";
+  const glow =
+    status === "approved"
+      ? "rgba(13,75,58,0.16)"
+      : status === "denied"
+        ? "rgba(180,35,24,0.16)"
+        : "rgba(146,152,163,0.16)";
+  const label = status === "approved" ? "Approved" : status === "denied" ? "Denied" : "In Review";
   return (
-    <span className="inline-flex h-6 items-center gap-1 rounded-full border border-[#ebedf0] bg-white px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
-      In Review
+    <span
+      className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em]"
+      style={{ color }}
+    >
+      <span
+        className="inline-block h-[7px] w-[7px] rounded-full"
+        style={{ background: color, boxShadow: `0 0 0 3px ${glow}` }}
+      />
+      {label}
     </span>
   );
 }
