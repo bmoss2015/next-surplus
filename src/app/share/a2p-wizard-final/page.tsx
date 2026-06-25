@@ -911,8 +911,10 @@ function Step3Review({ brand, campaign }: { brand: Brand; campaign: Campaign }) 
           <ReviewItem label="Industry" value={verticalLabel} />
           <ReviewItem label="Website" value={brand.website} />
           <ReviewItem label="Privacy Policy" value={brand.privacyUrl} />
-          <ReviewItem label="Terms" value={brand.termsUrl} />
+          <ReviewItem label="Terms Of Service" value={brand.termsUrl} />
+          <ReviewItem label="Opt-In Flow URL" value={brand.optInUrl || "Missing"} missing={!brand.optInUrl} />
           <ReviewItem label="Authorized Rep" value={brand.repName || "Missing"} missing={!brand.repName} />
+          <ReviewItem label="Rep Title" value={brand.repTitle || "Missing"} missing={!brand.repTitle} />
           <ReviewItem label="Rep Email" value={brand.repEmail} />
           <ReviewItem label="Rep Phone" value={brand.repPhone} />
           <ReviewItem label="Address" value={`${brand.street}, ${brand.city}, ${brand.state} ${brand.postal}`} wide />
@@ -934,7 +936,8 @@ function Step3Review({ brand, campaign }: { brand: Brand; campaign: Campaign }) 
           />
           <ReviewItem label="Description" value={campaign.description} wide />
           <ReviewItem label="Sample Messages" value={`${campaign.messages.length} Submitted`} />
-          <ReviewItem label="STOP And HELP Behavior" value="Handled By Platform" />
+          <ReviewItem label="Opt-In Confirmation" value={campaign.optInConfirmation} wide />
+          <ReviewItem label="HELP Reply" value={campaign.helpMessage} wide />
         </ReviewGrid>
       </Card>
 
