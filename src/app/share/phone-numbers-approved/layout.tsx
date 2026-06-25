@@ -26,11 +26,14 @@ export default function ApprovedStateLayout({
             Approved-State Variants V2
           </span>
           <div className="flex items-center gap-4 text-[12px] text-[#5b606a]">
-            <Link href="/share/phone-numbers-approved?v=1" className="hover:text-[#0a0d14]">V1 Compliance</Link>
-            <Link href="/share/phone-numbers-approved?v=2" className="hover:text-[#0a0d14]">V2 Sender</Link>
-            <Link href="/share/phone-numbers-approved?v=3" className="hover:text-[#0a0d14]">V3 Activity</Link>
             <Link href="/share/phone-numbers-approved?v=4" className="hover:text-[#0a0d14]">V4 Two Card</Link>
-            <Link href="/share/phone-numbers-approved?v=5" className="hover:text-[#0a0d14]">V5 Top Strip</Link>
+            <Link href="/share/phone-numbers-approved?v=6" className="font-semibold text-[#0d4b3a] hover:opacity-70">V6 Two Card Polished</Link>
+            <Link href="/share/phone-numbers-approved?v=6&state=denied" className="font-semibold text-[#b42318] hover:opacity-70">V6 Denied</Link>
+            <span className="text-[#ebedf0]">|</span>
+            <Link href="/share/phone-numbers-approved?v=1" className="hover:text-[#0a0d14]">V1</Link>
+            <Link href="/share/phone-numbers-approved?v=2" className="hover:text-[#0a0d14]">V2</Link>
+            <Link href="/share/phone-numbers-approved?v=3" className="hover:text-[#0a0d14]">V3</Link>
+            <Link href="/share/phone-numbers-approved?v=5" className="hover:text-[#0a0d14]">V5</Link>
           </div>
         </div>
       </div>

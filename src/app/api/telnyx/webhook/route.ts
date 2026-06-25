@@ -1,37 +1,71 @@
 // Telnyx Call Control webhook receiver.
 //
-// Phase 1 stub. Receives webhook events for outbound call lifecycle
-// (call.initiated, call.answered, call.hangup, call.bridged,
-// call.machine.detection.ended, call.recording.saved, etc) and logs them.
+// Verifies the Ed25519 signature Telnyx puts on every webhook, then
+// dispatches by event type. Updates session_calls + dialer_sessions
+// rows so the live dialer can react via Supabase realtime.
 //
-// Signature verification is gated by TELNYX_PUBLIC_KEY env var. If the var
-// is unset (local/dev), verification is skipped and a warning is logged. In
-// production both TELNYX_PUBLIC_KEY and the Telnyx-Signature-Ed25519-Signature
-// + Telnyx-Signature-Ed25519-Timestamp headers must be present.
-//
-// Next steps (Phase 2):
-//   * On call.initiated -> upsert session_calls row with the
-//     telnyx_call_control_id and dialed_at.
-//   * On call.answered -> update session_calls.duration_seconds tracking.
-//   * On call.hangup -> finalize duration, surface state to client via
-//     Supabase realtime channel scoped to the active session.
-//   * On call.machine.detection.ended -> if result is "machine",
-//     auto-trigger voicemail drop via the play_audio command.
-//   * On call.recording.saved -> store recording_url on session_calls row.
+// Signature scheme (Telnyx docs):
+//   message = timestamp + "|" + rawBody
+//   signature is base64 ed25519 over message
+//   public key is base64 from GET /v2/public_key
 
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "node:crypto";
+import { createServiceClient } from "@/lib/supabase/service";
 
-// Telnyx events look like:
-// { data: { event_type: "call.initiated", id: "...", occurred_at: "...",
-//           payload: { call_control_id, call_leg_id, from, to, ... } } }
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 type TelnyxWebhookPayload = {
   data?: {
     event_type?: string;
     id?: string;
     occurred_at?: string;
-    payload?: Record<string, unknown>;
+    payload?: {
+      call_control_id?: string;
+      call_leg_id?: string;
+      from?: string;
+      to?: string;
+      hangup_cause?: string;
+      hangup_source?: string;
+      result?: string;
+      recording_urls?: { mp3?: string; wav?: string };
+      [key: string]: unknown;
+    };
   };
 };
+
+const MAX_AGE_SECONDS = 60 * 5;
+
+function verifyTelnyxSignature(args: {
+  publicKeyBase64: string;
+  signatureBase64: string;
+  timestamp: string;
+  rawBody: string;
+}): boolean {
+  const ageSeconds = Math.floor(Date.now() / 1000) - parseInt(args.timestamp, 10);
+  if (Number.isNaN(ageSeconds) || ageSeconds < 0 || ageSeconds > MAX_AGE_SECONDS) {
+    return false;
+  }
+  try {
+    const message = Buffer.from(`${args.timestamp}|${args.rawBody}`, "utf8");
+    const signature = Buffer.from(args.signatureBase64, "base64");
+    const rawKey = Buffer.from(args.publicKeyBase64, "base64");
+
+    const publicKey = crypto.createPublicKey({
+      key: Buffer.concat([
+        Buffer.from("302a300506032b6570032100", "hex"),
+        rawKey,
+      ]),
+      format: "der",
+      type: "spki",
+    });
+    return crypto.verify(null, message, publicKey, signature);
+  } catch (e) {
+    console.error("[telnyx-webhook] verify error", e);
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
   const signature = req.headers.get("telnyx-signature-ed25519-signature");
@@ -39,65 +73,82 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
 
   const publicKey = process.env.TELNYX_PUBLIC_KEY;
-
   if (publicKey) {
-    // Phase 2 will plug in real Ed25519 verification using a library like
-    // `tweetnacl` or `@noble/ed25519`. Keep the stub here so the wiring point
-    // is obvious when the public key arrives.
     if (!signature || !timestamp) {
-      console.warn("[telnyx-webhook] missing signature headers, rejecting");
-      return new NextResponse("Missing signature", { status: 400 });
+      return new NextResponse("Missing signature headers", { status: 400 });
     }
-    // const verified = verifyTelnyxSignature(publicKey, signature, timestamp, rawBody);
-    // if (!verified) return new NextResponse("Invalid signature", { status: 401 });
+    const ok = verifyTelnyxSignature({
+      publicKeyBase64: publicKey,
+      signatureBase64: signature,
+      timestamp,
+      rawBody,
+    });
+    if (!ok) return new NextResponse("Invalid signature", { status: 401 });
+  } else if (process.env.NODE_ENV === "production") {
+    return new NextResponse("Public key not configured", { status: 500 });
   } else {
-    console.warn(
-      "[telnyx-webhook] TELNYX_PUBLIC_KEY unset, skipping signature verification (dev only)",
-    );
+    console.warn("[telnyx-webhook] TELNYX_PUBLIC_KEY unset, dev-only bypass");
   }
 
   let event: TelnyxWebhookPayload;
   try {
     event = JSON.parse(rawBody);
-  } catch (err) {
-    console.error("[telnyx-webhook] invalid JSON body", err);
+  } catch {
     return new NextResponse("Invalid JSON", { status: 400 });
   }
 
   const eventType = event.data?.event_type ?? "unknown";
-  const eventId = event.data?.id ?? "no-id";
-  console.log(`[telnyx-webhook] received ${eventType} (id=${eventId})`);
+  const payload = event.data?.payload ?? {};
+  const callControlId = payload.call_control_id;
 
-  // Dispatch by event type. Empty no-op handlers until Phase 2.
-  switch (eventType) {
-    case "call.initiated":
-      // TODO: upsert session_calls row, mark dialed_at.
-      break;
-    case "call.answered":
-      // TODO: mark connected, start duration tracking.
-      break;
-    case "call.hangup":
-      // TODO: finalize call, write duration.
-      break;
-    case "call.machine.detection.ended":
-      // TODO: if machine detected, trigger voicemail drop via play_audio.
-      break;
-    case "call.recording.saved":
-      // TODO: store recording_url on session_calls row.
-      break;
-    case "call.bridged":
-    case "call.gather.ended":
-    case "call.dtmf.received":
-      // Not used in Phase 2.
-      break;
-    default:
-      console.log(`[telnyx-webhook] no handler for ${eventType}`);
+  const sb = createServiceClient();
+
+  if (callControlId) {
+    switch (eventType) {
+      case "call.initiated":
+      case "call.answered": {
+        await sb
+          .from("session_calls")
+          .update({
+            ...(eventType === "call.initiated" ? { dialed_at: new Date().toISOString() } : {}),
+          })
+          .eq("telnyx_call_control_id", callControlId);
+        break;
+      }
+      case "call.hangup": {
+        await sb
+          .from("session_calls")
+          .update({
+            ...(typeof payload.hangup_cause === "string" ? { note: `Hangup: ${payload.hangup_cause}` } : {}),
+          })
+          .eq("telnyx_call_control_id", callControlId);
+        break;
+      }
+      case "call.machine.detection.ended": {
+        if (payload.result === "machine") {
+          await sb
+            .from("session_calls")
+            .update({ disposition: "voicemail" })
+            .eq("telnyx_call_control_id", callControlId);
+        }
+        break;
+      }
+      case "call.recording.saved": {
+        const url = payload.recording_urls?.mp3 ?? payload.recording_urls?.wav ?? null;
+        if (url) {
+          await sb
+            .from("session_calls")
+            .update({ recording_url: url })
+            .eq("telnyx_call_control_id", callControlId);
+        }
+        break;
+      }
+    }
   }
 
   return NextResponse.json({ received: true });
 }
 
-// Telnyx pings the URL with a GET for liveness checks.
 export async function GET() {
   return NextResponse.json({ status: "ok", endpoint: "telnyx-webhook" });
 }

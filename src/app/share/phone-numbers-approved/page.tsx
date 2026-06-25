@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   IconPlus,
@@ -14,7 +14,7 @@ import {
 } from "@tabler/icons-react";
 import { NUMBERS } from "../phone-numbers/_data";
 
-type View = "1" | "2" | "3" | "4" | "5";
+type View = "1" | "2" | "3" | "4" | "5" | "6";
 
 export default function ApprovedStateMockup() {
   return (
@@ -35,7 +35,10 @@ function Inner() {
           ? "4"
           : sp.get("v") === "5"
             ? "5"
-            : "1";
+            : sp.get("v") === "6"
+              ? "6"
+              : "1";
+  const state = sp.get("state") === "denied" ? "denied" : "approved";
 
   return (
     <div className="mx-auto max-w-[960px] px-12 pb-32 pt-11">
@@ -69,6 +72,7 @@ function Inner() {
       {view === "2" && <V2Sender />}
       {view === "3" && <V3Activity />}
       {view === "4" && <V4TwoCard />}
+      {view === "6" && <V6TwoCardPolished state={state} />}
 
       <div className="mt-10 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
         Your Numbers
@@ -441,5 +445,135 @@ function FeatureTile({ eyebrow, title, sub, accent }: { eyebrow: string; title: 
         <IconArrowUpRight size={13} stroke={2} className="text-[#9298a3] transition group-hover:text-[#0d4b3a]" />
       </div>
     </button>
+  );
+}
+
+// V6 — Polished V4 per Bree's pass.
+// Two side-by-side cards, Title Case, slim petrol top accent strip, status pill
+// that handles approved/in-review/denied. When denied, expandable rejection reason
+// inline with a Resubmit button. NO stats, NO activity. Compliance only.
+function V6TwoCardPolished({ state }: { state: "approved" | "denied" }) {
+  const brandStatus = state === "denied" ? "denied" : "approved";
+  const campaignStatus = state === "denied" ? "pending" : "approved";
+
+  return (
+    <div className="mt-8 grid grid-cols-2 gap-3">
+      <ComplianceCard
+        eyebrow="Brand"
+        title="Workflow Minds LLC"
+        meta="EIN ending 4821 · Verified May 18, 2026"
+        status={brandStatus}
+        denialReason="Carriers flagged the EIN format. Looks like a 9-digit value without the standard hyphen. Easy fix."
+        cardAccent
+      />
+      <ComplianceCard
+        eyebrow="Campaign"
+        title="Customer Care"
+        meta="Surplus Recovery · Live Since May 22, 2026"
+        status={campaignStatus}
+        denialReason=""
+        cardAccent
+      />
+    </div>
+  );
+}
+
+function ComplianceCard({
+  eyebrow,
+  title,
+  meta,
+  status,
+  denialReason,
+  cardAccent,
+}: {
+  eyebrow: string;
+  title: string;
+  meta: string;
+  status: "approved" | "pending" | "denied";
+  denialReason: string;
+  cardAccent?: boolean;
+}) {
+  const isApproved = status === "approved";
+  const isDenied = status === "denied";
+  return (
+    <div
+      className={[
+        "overflow-hidden rounded-[14px] border bg-white",
+        isDenied ? "border-[#b42318]/30" : "border-[#ebedf0]",
+      ].join(" ")}
+      style={{
+        boxShadow: isDenied ? "0 8px 24px -12px rgba(180,35,24,0.15)" : "0 1px 2px rgba(12,13,16,0.02)",
+      }}
+    >
+      {cardAccent && (
+        <div
+          className="h-1 w-full"
+          style={{
+            background: isDenied
+              ? "linear-gradient(90deg, #b42318 0%, #ef4444 100%)"
+              : "linear-gradient(90deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)",
+          }}
+        />
+      )}
+      <div className="px-6 py-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">
+            {eyebrow}
+          </div>
+          <StatusPill status={status} />
+        </div>
+        <div className="mt-2 text-[16px] font-semibold tracking-[-0.014em] text-[#0a0d14]">
+          {title}
+        </div>
+        <div className="mt-1 text-[12px] text-[#5b606a]">{meta}</div>
+      </div>
+
+      {isDenied && (
+        <div className="border-t border-[#fca5a5]/40 bg-[#fef2f2] px-6 py-4">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#b42318]">
+            Carrier Feedback
+          </div>
+          <p className="mt-1.5 text-[12.5px] leading-[1.5] text-[#0a0d14]">{denialReason}</p>
+          <button
+            type="button"
+            className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#b42318] px-3.5 text-[12px] font-medium text-white"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(180,35,24,0.20), 0 6px 16px -4px rgba(180,35,24,0.30)" }}
+          >
+            Fix And Resubmit
+          </button>
+        </div>
+      )}
+
+      {isApproved && (
+        <div className="border-t border-[#f1f2f4] px-6 py-3">
+          <button type="button" className="cursor-pointer text-[12px] font-medium text-[#5b606a] hover:text-[#0d4b3a]">
+            View Details &rarr;
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: "approved" | "pending" | "denied" }) {
+  if (status === "approved") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0d4b3a]">
+        <IconCheck size={11} stroke={2.5} />
+        Approved
+      </span>
+    );
+  }
+  if (status === "denied") {
+    return (
+      <span className="inline-flex h-6 items-center gap-1 rounded-full bg-[#b42318] px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white">
+        Denied
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex h-6 items-center gap-1 rounded-full border border-[#ebedf0] bg-white px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
+      In Review
+    </span>
   );
 }

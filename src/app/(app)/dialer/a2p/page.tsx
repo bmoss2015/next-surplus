@@ -12,5 +12,16 @@ export default async function A2pPage() {
 
   const [brand, orgInfo] = await Promise.all([fetchA2pBrand(), fetchOrgInfo()]);
 
-  return <A2pWizard initialBrand={brand} orgInfo={orgInfo} />;
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://app.nextsurplus.com";
+  const hostedPrivacyUrl = `${baseUrl}/legal/${profile.orgId}/privacy`;
+  const hostedTermsUrl = `${baseUrl}/legal/${profile.orgId}/terms`;
+
+  return (
+    <A2pWizard
+      initialBrand={brand}
+      orgInfo={orgInfo}
+      hostedPrivacyUrl={hostedPrivacyUrl}
+      hostedTermsUrl={hostedTermsUrl}
+    />
+  );
 }

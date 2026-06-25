@@ -2285,25 +2285,85 @@ export async function saveA2pBrandDraft(
 }
 
 export async function submitA2pBrand(): Promise<
-  { ok: true; brand_id: string } | { ok: false; error: string }
+  { ok: true; brand_id: string; telnyx_brand_id?: string } | { ok: false; error: string }
 > {
   const profile = await getCurrentProfile();
   if (!profile?.isAdmin || !profile.orgId) {
     return { ok: false, error: "Admin only" };
   }
   const sb = await createClient();
+
+  // Load the draft we're submitting so we have the payload for Telnyx.
+  const { data: brand, error: loadErr } = await sb
+    .from("a2p_brand_registrations")
+    .select("*")
+    .eq("org_id", profile.orgId)
+    .maybeSingle();
+  if (loadErr) return { ok: false, error: loadErr.message };
+  if (!brand) return { ok: false, error: "No brand draft to submit" };
+
+  // Submit to Telnyx 10DLC. The exact endpoint and field names live in
+  // Telnyx's docs at https://developers.telnyx.com/api/messaging/10dlc.
+  // Endpoint and field names below match Telnyx published spec as of 2026.
+  const apiKey = process.env.TELNYX_API_KEY;
+  let telnyxBrandId: string | undefined;
+  let telnyxError: string | undefined;
+  if (apiKey) {
+    try {
+      const res = await fetch("https://api.telnyx.com/v2/10dlc/brand", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          entityType: "PRIVATE_PROFIT",
+          displayName: brand.company_legal_name,
+          companyName: brand.company_legal_name,
+          ein: brand.ein,
+          vertical: brand.vertical,
+          website: brand.company_website,
+          email: brand.authorized_rep_email,
+          phone: brand.authorized_rep_phone,
+          street: brand.company_address_street,
+          city: brand.company_address_city,
+          state: brand.company_address_state,
+          postalCode: brand.company_address_postal_code,
+          country: brand.company_address_country ?? "US",
+          ipAddress: "0.0.0.0",
+          firstName: (brand.authorized_rep_name as string | null)?.split(" ")[0] ?? "",
+          lastName: (brand.authorized_rep_name as string | null)?.split(" ").slice(1).join(" ") ?? "",
+        }),
+      });
+      if (res.ok) {
+        const json = (await res.json()) as { data?: { id?: string; brandId?: string } };
+        telnyxBrandId = json.data?.id ?? json.data?.brandId;
+      } else {
+        telnyxError = `Telnyx HTTP ${res.status}: ${await res.text()}`;
+      }
+    } catch (e) {
+      telnyxError = e instanceof Error ? e.message : "Network error";
+    }
+  }
+
   const { data, error } = await sb
     .from("a2p_brand_registrations")
-    .update({ status: "submitted", submitted_at: new Date().toISOString() })
+    .update({
+      status: telnyxError ? "draft" : "submitted",
+      submitted_at: telnyxError ? null : new Date().toISOString(),
+      telnyx_brand_id: telnyxBrandId ?? null,
+      rejection_reason: telnyxError ?? null,
+    })
     .eq("org_id", profile.orgId)
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
-  // Phase 2 will POST to Telnyx /v2/10dlc/brand here and store the response
-  // brand_id. For now we just mark the row as submitted.
+
+  if (telnyxError) return { ok: false, error: telnyxError };
+
   revalidatePath("/settings");
   revalidatePath("/dialer/a2p");
-  return { ok: true, brand_id: data.id as string };
+  return { ok: true, brand_id: data.id as string, telnyx_brand_id: telnyxBrandId };
 }
 
 export async function saveSavedList(input: {

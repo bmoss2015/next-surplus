@@ -26,9 +26,13 @@ const DEFAULT_SAMPLE_MESSAGES = [
 export function A2pWizard({
   initialBrand,
   orgInfo,
+  hostedPrivacyUrl,
+  hostedTermsUrl,
 }: {
   initialBrand: A2pBrand | null;
   orgInfo: OrgInfo | null;
+  hostedPrivacyUrl?: string;
+  hostedTermsUrl?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -49,8 +53,8 @@ export function A2pWizard({
     company_address_state: orgInfo?.region ?? "",
     company_address_postal_code: orgInfo?.postal_code ?? "",
     company_address_country: orgInfo?.country ?? "US",
-    privacy_policy_url: initialBrand?.privacy_policy_url ?? "",
-    terms_url: initialBrand?.terms_url ?? "",
+    privacy_policy_url: initialBrand?.privacy_policy_url ?? hostedPrivacyUrl ?? "",
+    terms_url: initialBrand?.terms_url ?? hostedTermsUrl ?? "",
     vetting_tier: (initialBrand?.vetting_tier ?? "standard") as "standard" | "enhanced" | "sole_prop",
   });
 
