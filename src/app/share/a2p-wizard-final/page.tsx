@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   IconCheck,
@@ -12,6 +13,8 @@ import {
   IconClock,
   IconMail,
   IconInfoCircle,
+  IconLock,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 
 function extractPlaceholders(text: string): string[] {
@@ -131,7 +134,32 @@ const SAMPLE_TEMPLATES: string[][] = [
 const DESCRIPTION_TEMPLATE =
   "[COMPANY NAME] sends transactional outreach to individuals identified through public court records as potential claimants for surplus funds from [SALE TYPES, e.g. foreclosure or tax sales]. Messages provide case status updates, document requests, and payment notifications. Recipients can reply STOP at any time to opt out.";
 
-export default function A2pWizardFinal() {
+// Industry-standard A2P sample message slot labels. The Campaign
+// Registry expects carriers to see what type of message lives in each
+// slot, not "Message 1, 2, 3". For Customer Care use case, all three
+// slots are transactional/informational with different roles.
+const SAMPLE_LABELS: { title: string; subtitle: string }[] = [
+  { title: "Initial Outreach", subtitle: "First contact with the recipient" },
+  { title: "Follow-Up", subtitle: "After first contact" },
+  { title: "Status Or Reminder", subtitle: "Routine activity" },
+];
+
+export default function A2pWizardFinalEntry() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#fafbfc]" />}>
+      <RouteSwitch />
+    </Suspense>
+  );
+}
+
+function RouteSwitch() {
+  const sp = useSearchParams();
+  const action = sp.get("action");
+  if (action === "rebrand-confirm") return <BrandIdentityChangeConfirm />;
+  return <A2pWizardFinal />;
+}
+
+function A2pWizardFinal() {
   const [step, setStep] = useState<Step>(1);
   const [useCaseOpen, setUseCaseOpen] = useState(false);
   const [attempted, setAttempted] = useState<Record<number, boolean>>({});
@@ -166,6 +194,7 @@ export default function A2pWizardFinal() {
   );
 
   const descriptionPlaceholders = extractPlaceholders(campaign.description);
+  const stopMentioned = campaign.messages.some((m) => /\bSTOP\b/i.test(m));
 
   const canContinue =
     step === 1
@@ -178,7 +207,8 @@ export default function A2pWizardFinal() {
           campaign.messages.every((m) => m.trim().length > 0) &&
           !!campaign.description.trim() &&
           descriptionPlaceholders.length === 0 &&
-          messagesUnchanged.every((u) => !u)
+          messagesUnchanged.every((u) => !u) &&
+          stopMentioned
         : true;
 
   function next() {
@@ -393,7 +423,7 @@ function Step1Brand({
           <>
             <div className="font-semibold text-[#0a0d14]">If There Is No Existing Policy</div>
             <p className="mt-1 text-[#5b606a]">
-              Operators without an existing Privacy Policy or Terms Of Service typically use a third-party generator such as Termly or iubenda and host the resulting page on their own domain. A future Next Surplus update will offer a one-click partner integration so the policy lives at a subdomain the operator controls. For now, both URLs must be brought in.
+              Operators without an existing Privacy Policy or Terms Of Service typically use a third-party generator such as Termly or iubenda and host the resulting page on their own domain. Both URLs must point to live, publicly accessible pages on the brand&apos;s own website.
             </p>
           </>
         }
@@ -449,6 +479,7 @@ function Step2Campaign({
 }) {
   const selectedUseCase = USE_CASES.find((u) => u.value === campaign.useCase);
   const useCaseMissing = attempted && !campaign.useCase;
+  const stopMentioned = campaign.messages.some((m) => /\bSTOP\b/i.test(m));
 
   function loadTemplate(i: number, templateIdx: number) {
     const tmpl = SAMPLE_TEMPLATES[i]?.[templateIdx] ?? "";
@@ -653,9 +684,10 @@ function Step2Campaign({
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-                      Message {i + 1}
+                    <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0a0d14]">
+                      {SAMPLE_LABELS[i]?.title ?? `Message ${i + 1}`}
                     </span>
+                    <span className="text-[10.5px] text-[#9298a3]">{SAMPLE_LABELS[i]?.subtitle ?? ""}</span>
                     {templates.map((_, j) => (
                       <button
                         key={j}
@@ -692,16 +724,30 @@ function Step2Campaign({
         </div>
       </Card>
 
-      <div className="flex items-start gap-3 rounded-[10px] border border-[#ebedf0] bg-[#fafbfc] px-5 py-4">
-        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-white text-[#0d4b3a] ring-1 ring-[#ebedf0]">
+      <div
+        data-invalid={attempted && !stopMentioned ? "true" : undefined}
+        className={[
+          "flex items-start gap-3 rounded-[10px] border px-5 py-4",
+          attempted && !stopMentioned ? "border-[#fca5a5] bg-white" : "border-[#ebedf0] bg-[#fafbfc]",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-white ring-1",
+            attempted && !stopMentioned ? "text-[#b42318] ring-[#fca5a5]" : "text-[#0d4b3a] ring-[#ebedf0]",
+          ].join(" ")}
+        >
           <IconInfoCircle size={14} stroke={2} />
         </span>
         <div className="min-w-0">
           <div className="text-[12.5px] font-semibold text-[#0a0d14]">
-            Include &quot;Reply STOP To Opt Out&quot; In Sample Messages
+            At Least One Sample Message Must Mention STOP
           </div>
           <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">
-            Carriers expect every messaging program to honor STOP and HELP keywords. Include the phrase &quot;Reply STOP to opt out&quot; in at least one sample message so reviewers can see the opt-out path on the same page they review the campaign.
+            Carriers expect to see the opt-out path on the same page they review the campaign. The phrase &quot;Reply STOP to opt out&quot; or any sentence containing the word STOP qualifies. The wizard checks for this before continuing.
+            {attempted && !stopMentioned && (
+              <span className="ml-1 font-semibold text-[#b42318]">No sample message currently contains STOP.</span>
+            )}
           </p>
         </div>
       </div>
@@ -1245,6 +1291,184 @@ function NavRow({
         {step === 1 ? "Continue To Campaign" : step === 2 ? "Continue To Review" : "Submit Registration"}
         {step === 3 ? <IconArrowRight size={13} stroke={2.25} /> : <IconChevronRight size={13} stroke={2.25} />}
       </button>
+    </div>
+  );
+}
+
+// ─── Brand Identity Change Confirmation ─────────────────────────────────
+// Hit at /share/a2p-wizard-final?action=rebrand-confirm
+// Shown when the operator tries to edit Entity Type, Legal Name, or EIN
+// on an already-submitted brand. These three fields lock after
+// submission. Editing any one of them registers a new brand and starts
+// the verification cycle over, which costs another $40.
+function BrandIdentityChangeConfirm() {
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  return (
+    <div>
+      <div
+        className="border-b border-[#04261c]"
+        style={{ background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)" }}
+      >
+        <div className="mx-auto max-w-[760px] px-10 py-12">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
+            <IconShieldCheck size={13} stroke={2.25} />
+            Brand Identity Change
+          </div>
+          <h1 className="mt-3 text-[30px] font-semibold leading-[1.15] tracking-[-0.022em] text-white">
+            This Edit Registers A New Brand
+          </h1>
+          <p className="mt-3 max-w-[58ch] text-[14px] leading-[1.55] text-white/75">
+            The Campaign Registry treats any change to Entity Type, Legal Name, or EIN as a separate brand. The existing approved brand stays on file. A new brand is registered for this updated identity, which restarts verification and incurs a new fee.
+          </p>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-[760px] px-10 pb-20 pt-9 space-y-5">
+        <div
+          className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+        >
+          <div className="border-b border-[#f1f2f4] px-6 py-4">
+            <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">What Is Changing</div>
+          </div>
+          <div className="divide-y divide-[#f1f2f4]">
+            <ChangeRow field="EIN" from="12-3456789" to="12-3456788" />
+            <ChangeRow field="Legal Name" from="Workflow Minds LLC" to="(unchanged)" muted />
+            <ChangeRow field="Entity Type" from="Private For-Profit Company" to="(unchanged)" muted />
+          </div>
+        </div>
+
+        <div
+          className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+        >
+          <div className="border-b border-[#f1f2f4] px-6 py-4">
+            <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">What This Costs</div>
+          </div>
+          <div className="px-6 py-5">
+            <div className="flex items-baseline justify-between gap-4">
+              <div className="text-[13.5px] font-semibold text-[#0a0d14]">New Carrier Verification Fee</div>
+              <div className="text-[18px] font-semibold tabular-nums text-[#0a0d14]">$40.00</div>
+            </div>
+            <p className="mt-2 text-[12.5px] leading-[1.55] text-[#5b606a]">
+              Charged at submission of the updated brand. Set by The Campaign Registry, passes through at cost. The previous brand and its $40 fee stay on file and are not refunded.
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+        >
+          <div className="border-b border-[#f1f2f4] px-6 py-4">
+            <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">What Happens Next</div>
+          </div>
+          <div className="space-y-3 px-6 py-5">
+            <NextStep
+              icon={<IconShieldCheck size={14} stroke={2.25} />}
+              title="Brand Verification Restarts"
+              when="1 To 2 Business Days"
+              desc="The Campaign Registry verifies the new legal entity, EIN, address, and authorized representative against IRS and state records."
+            />
+            <NextStep
+              icon={<IconClock size={14} stroke={2.25} />}
+              title="Campaign Carries Over"
+              when="No Additional Carrier Review"
+              desc="The campaign description, use case, and sample messages stay attached to the new brand without re-review by carriers."
+            />
+            <NextStep
+              icon={<IconCheck size={14} stroke={2.25} />}
+              title="SMS Pauses Then Resumes"
+              when="Once The New Brand Verifies"
+              desc="SMS sending pauses on the affected numbers during verification. It resumes automatically when the new brand is approved."
+            />
+          </div>
+        </div>
+
+        <div
+          className="overflow-hidden rounded-[14px] border-[#fca5a5] bg-white"
+          style={{ borderWidth: 1, boxShadow: "0 1px 2px rgba(180,35,24,0.06)" }}
+        >
+          <div className="px-6 py-5">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-white text-[#b42318] ring-1 ring-[#fca5a5]">
+                <IconAlertTriangle size={14} stroke={2.25} />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold text-[#0a0d14]">No Refund For The Existing Brand</div>
+                <p className="mt-1 text-[12.5px] leading-[1.55] text-[#5b606a]">
+                  The previous brand stays in The Campaign Registry permanently. If this change was made by mistake, cancel below to keep the existing brand and avoid the new fee. There is no recovery path once the new brand is submitted.
+                </p>
+              </div>
+            </div>
+            <label className="mt-4 flex cursor-pointer items-start gap-2.5 text-[12.5px] leading-[1.5] text-[#0a0d14]">
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(e) => setAcknowledged(e.target.checked)}
+                className="mt-0.5 h-4 w-4 cursor-pointer accent-[#0d4b3a]"
+              />
+              <span>
+                I understand that this edit registers a new brand, incurs a new $40 verification fee, and that the original brand and its fee are not refunded.
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <Link
+            href="/share/phone-numbers-approved?v=6"
+            className="inline-flex h-10 cursor-pointer items-center gap-1 rounded-[7px] border border-[#ebedf0] bg-white px-4 text-[13px] font-medium text-[#0a0d14] hover:border-[#0d4b3a]"
+          >
+            <IconChevronLeft size={12} stroke={2.25} />
+            Cancel And Keep Existing Brand
+          </Link>
+          <button
+            type="button"
+            disabled={!acknowledged}
+            className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#b42318] px-5 text-[13.5px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+            style={
+              acknowledged
+                ? { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(180,35,24,0.20), 0 6px 16px -4px rgba(180,35,24,0.30)" }
+                : undefined
+            }
+          >
+            Register New Brand And Pay $40
+            <IconArrowRight size={13} stroke={2.25} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChangeRow({ field, from, to, muted }: { field: string; from: string; to: string; muted?: boolean }) {
+  return (
+    <div className="grid grid-cols-[160px_1fr_1fr] items-center gap-4 px-6 py-3.5">
+      <div className={["text-[10.5px] font-semibold uppercase tracking-[0.08em]", muted ? "text-[#9298a3]" : "text-[#b42318]"].join(" ")}>
+        {field}
+        {!muted && <IconLock size={10} stroke={2.25} className="ml-1 inline" />}
+      </div>
+      <div className={["text-[12.5px]", muted ? "text-[#9298a3]" : "text-[#5b606a] line-through"].join(" ")}>{from}</div>
+      <div className={["text-[12.5px] font-semibold", muted ? "text-[#9298a3]" : "text-[#0a0d14]"].join(" ")}>{to}</div>
+    </div>
+  );
+}
+
+function NextStep({ icon, title, when, desc }: { icon: React.ReactNode; title: string; when: string; desc: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-[10px] border border-[#f1f2f4] p-3.5">
+      <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-white text-[#0d4b3a] ring-1 ring-[#ebedf0]">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-2">
+          <div className="text-[13.5px] font-semibold text-[#0a0d14]">{title}</div>
+          <div className="text-[11.5px] text-[#9298a3]">{when}</div>
+        </div>
+        <p className="mt-1 text-[12.5px] leading-[1.5] text-[#5b606a]">{desc}</p>
+      </div>
     </div>
   );
 }
