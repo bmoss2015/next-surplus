@@ -103,13 +103,33 @@ const USE_CASES: { value: string; label: string; description: string }[] = [
   },
 ];
 
-// Example placeholders only. Shown as light gray prompts in empty
-// textareas. Never written into the field state, never submitted.
+// Placeholder copy shown in empty textareas. Never written into state.
 const SAMPLE_PLACEHOLDERS: string[] = [
-  "Example: Hi {first_name}, this is [your name] with [your company]. [Describe what triggered this first message]. Reply Y for details or STOP to opt out.",
-  "Example: A follow-up after first contact, written as the operator's actual second message would read.",
-  "Example: A reminder or status update message, written as the operator's actual third message would read.",
+  "Write the first message recipients will see. For example, an introduction explaining who is contacting them, why, and how to opt out.",
+  "Write a follow-up message that goes out after first contact. For example, a status update, document request, or scheduling prompt.",
+  "Write a third example representative of routine activity. For example, a reminder, confirmation, or wrap-up.",
 ];
+
+// Templates the operator can LOAD with one click. After loading, the
+// wizard remembers the loaded value and blocks Continue if the message
+// is still identical to it, so boilerplate never ships across operators.
+const SAMPLE_TEMPLATES: string[][] = [
+  [
+    "Hi [FIRST NAME], this is [YOUR NAME] with [COMPANY]. Public records show you may be entitled to surplus funds from a [SALE TYPE]. Reply Y for details or STOP to opt out.",
+    "Hi [FIRST NAME], following up on a possible recovery from court records tied to [PROPERTY OR CASE DETAIL]. Reply Y to learn more or STOP to opt out.",
+  ],
+  [
+    "Hi [FIRST NAME], following up on the surplus funds claim from the [PROPERTY ADDRESS] sale. The window closes on [DEADLINE]. Reply with a good time to talk.",
+    "Hi [FIRST NAME], the documents you signed are filed with the court. The next step is [NEXT STEP]. Reply STOP to opt out at any time.",
+  ],
+  [
+    "Hi [FIRST NAME], a check is ready to mail. Reply with the current mailing address and it will go out today.",
+    "Hi [FIRST NAME], a signed retainer is still needed to file the claim before [DEADLINE]. Reply or call when convenient.",
+  ],
+];
+
+const DESCRIPTION_TEMPLATE =
+  "[COMPANY NAME] sends transactional outreach to individuals identified through public court records as potential claimants for surplus funds from [SALE TYPES, e.g. foreclosure or tax sales]. Messages provide case status updates, document requests, and payment notifications. Recipients can reply STOP at any time to opt out.";
 
 export default function A2pWizardFinal() {
   const [step, setStep] = useState<Step>(1);
@@ -134,11 +154,16 @@ export default function A2pWizardFinal() {
   });
 
   const [campaign, setCampaign] = useState<Campaign>({
-    useCase: "",
-    description: "",
+    useCase: "CUSTOMER_CARE",
+    description: DESCRIPTION_TEMPLATE,
     volume: "LOW",
     messages: ["", "", ""],
   });
+
+  const [loadedTemplates, setLoadedTemplates] = useState<(string | null)[]>([null, null, null]);
+  const messagesUnchanged = campaign.messages.map(
+    (m, i) => loadedTemplates[i] !== null && m === loadedTemplates[i],
+  );
 
   const descriptionPlaceholders = extractPlaceholders(campaign.description);
 
@@ -152,15 +177,19 @@ export default function A2pWizardFinal() {
         ? !!campaign.useCase &&
           campaign.messages.every((m) => m.trim().length > 0) &&
           !!campaign.description.trim() &&
-          descriptionPlaceholders.length === 0
+          descriptionPlaceholders.length === 0 &&
+          messagesUnchanged.every((u) => !u)
         : true;
 
   function next() {
+    setAttempted((a) => ({ ...a, [step]: true }));
     if (!canContinue) {
-      setAttempted((a) => ({ ...a, [step]: true }));
+      setTimeout(() => {
+        const first = document.querySelector<HTMLElement>("[data-invalid='true']");
+        if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
       return;
     }
-    setAttempted((a) => ({ ...a, [step]: true }));
     setStep((s) => Math.min(4, s + 1) as Step);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -185,11 +214,15 @@ export default function A2pWizardFinal() {
                   useCaseOpen={useCaseOpen}
                   setUseCaseOpen={setUseCaseOpen}
                   attempted={!!attempted[2]}
+                  loadedTemplates={loadedTemplates}
+                  setLoadedTemplates={setLoadedTemplates}
+                  messagesUnchanged={messagesUnchanged}
+                  descriptionPlaceholders={descriptionPlaceholders}
                 />
               )}
               {step === 3 && <Step3Review brand={brand} campaign={campaign} />}
 
-              <NavRow step={step} onBack={back} onNext={next} canContinue={canContinue} />
+              <NavRow step={step} onBack={back} onNext={next} />
             </div>
 
             <aside>{stepHelpFor(step)}</aside>
@@ -197,7 +230,7 @@ export default function A2pWizardFinal() {
         </div>
       )}
 
-      {step === 4 && <Step4Success />}
+      {step === 4 && <Step4Success repEmail={brand.repEmail} />}
     </>
   );
 }
@@ -399,15 +432,29 @@ function Step2Campaign({
   useCaseOpen,
   setUseCaseOpen,
   attempted,
+  loadedTemplates,
+  setLoadedTemplates,
+  messagesUnchanged,
+  descriptionPlaceholders,
 }: {
   campaign: Campaign;
   setCampaign: (c: Campaign) => void;
   useCaseOpen: boolean;
   setUseCaseOpen: (b: boolean) => void;
   attempted: boolean;
+  loadedTemplates: (string | null)[];
+  setLoadedTemplates: (v: (string | null)[]) => void;
+  messagesUnchanged: boolean[];
+  descriptionPlaceholders: string[];
 }) {
   const selectedUseCase = USE_CASES.find((u) => u.value === campaign.useCase);
   const useCaseMissing = attempted && !campaign.useCase;
+
+  function loadTemplate(i: number, templateIdx: number) {
+    const tmpl = SAMPLE_TEMPLATES[i]?.[templateIdx] ?? "";
+    setCampaign({ ...campaign, messages: campaign.messages.map((x, j) => (j === i ? tmpl : x)) });
+    setLoadedTemplates(loadedTemplates.map((x, j) => (j === i ? tmpl : x)));
+  }
 
   return (
     <div className="space-y-5">
@@ -436,12 +483,15 @@ function Step2Campaign({
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
-                  Selected
+                  Suggested For Surplus Recovery
                 </div>
                 <div className="mt-1.5 text-[18px] font-semibold tracking-[-0.014em] text-[#0a0d14]">
                   {selectedUseCase.label}
                 </div>
                 <p className="mt-2 text-[13px] leading-[1.55] text-[#5b606a]">{selectedUseCase.description}</p>
+                <p className="mt-2 text-[11.5px] leading-[1.5] text-[#5b606a]">
+                  Auto-suggested based on the registered industry. Change the selection if the actual messaging program does not match.
+                </p>
               </div>
               <button
                 type="button"
@@ -493,20 +543,53 @@ function Step2Campaign({
 
       <Card
         title="Campaign Description"
-        subtitle="One or two sentences describing how SMS is used, in the operator's own words. Carriers compare this against the sample messages to verify alignment. Generic or boilerplate descriptions are a common rejection reason."
+        subtitle="A starter template is loaded below. Replace every bracketed placeholder with details specific to the business before continuing. Carriers compare this against the sample messages to verify alignment."
       >
         <textarea
           value={campaign.description}
           onChange={(e) => setCampaign({ ...campaign, description: e.target.value })}
-          rows={4}
-          placeholder="Describe the messaging program. For example: who receives the messages, what triggers them, and what action recipients are expected to take."
+          rows={5}
+          data-invalid={
+            (attempted && !campaign.description.trim()) || descriptionPlaceholders.length > 0
+              ? "true"
+              : undefined
+          }
           className={[
             "w-full rounded-[7px] border bg-white p-3 text-[13px] leading-[1.5] text-[#0a0d14] outline-none placeholder:text-[#9298a3]",
-            attempted && !campaign.description.trim()
+            (attempted && !campaign.description.trim()) || descriptionPlaceholders.length > 0
               ? "border-[#fca5a5] focus:border-[#b42318]"
               : "border-[#ebedf0] focus:border-[#0d4b3a]",
           ].join(" ")}
         />
+        {descriptionPlaceholders.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#b42318]">
+            <span className="font-semibold">Replace before continuing:</span>
+            {descriptionPlaceholders.map((p) => (
+              <span
+                key={p}
+                className="inline-flex items-center rounded-[5px] border border-[#fca5a5] bg-white px-2 py-0.5 font-medium tabular-nums"
+              >
+                {p}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="mt-3 flex items-center gap-3 text-[11.5px] text-[#5b606a]">
+          <button
+            type="button"
+            onClick={() => setCampaign({ ...campaign, description: DESCRIPTION_TEMPLATE })}
+            className="cursor-pointer font-medium text-[#0d4b3a] hover:text-[#13644e]"
+          >
+            Reset To Template
+          </button>
+          <button
+            type="button"
+            onClick={() => setCampaign({ ...campaign, description: "" })}
+            className="cursor-pointer font-medium text-[#5b606a] hover:text-[#0a0d14]"
+          >
+            Start From Scratch
+          </button>
+        </div>
       </Card>
 
       <Card
@@ -550,24 +633,40 @@ function Step2Campaign({
 
       <Card
         title="Sample Messages"
-        subtitle="Three messages representative of the actual SMS the program will send. Carriers compare these against the campaign description and the use case. Tokens like {first_name} fill at send time. Write messages that genuinely reflect the program; copying boilerplate language across submissions is a common rejection reason."
+        subtitle="Three messages representative of the actual SMS the program will send. Load an example to start fast, then edit so the wording reflects this specific business. Identical templates submitted across operators are a common rejection reason."
       >
         <div className="space-y-3">
           {campaign.messages.map((m, i) => {
             const empty = attempted && !m.trim();
+            const unchanged = attempted && messagesUnchanged[i];
+            const errored = empty || unchanged;
             const placeholder = SAMPLE_PLACEHOLDERS[i] ?? "";
+            const templates = SAMPLE_TEMPLATES[i] ?? [];
             return (
               <div
                 key={i}
+                data-invalid={errored ? "true" : undefined}
                 className={[
                   "rounded-[10px] border bg-white p-3.5",
-                  empty ? "border-[#fca5a5]" : "border-[#ebedf0]",
+                  errored ? "border-[#fca5a5]" : "border-[#ebedf0]",
                 ].join(" ")}
               >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-                    Message {i + 1}
-                  </span>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+                      Message {i + 1}
+                    </span>
+                    {templates.map((_, j) => (
+                      <button
+                        key={j}
+                        type="button"
+                        onClick={() => loadTemplate(i, j)}
+                        className="cursor-pointer text-[11px] font-medium text-[#0d4b3a] hover:text-[#13644e]"
+                      >
+                        Load Example {j + 1}
+                      </button>
+                    ))}
+                  </div>
                   <span className="text-[10.5px] text-[#9298a3]">{m.length} / 160</span>
                 </div>
                 <textarea
@@ -582,6 +681,11 @@ function Step2Campaign({
                   placeholder={placeholder}
                   className="w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-[1.45] text-[#0a0d14] outline-none placeholder:text-[#9298a3]"
                 />
+                {unchanged && (
+                  <div className="mt-2 text-[11.5px] font-medium text-[#b42318]">
+                    Edit this message before continuing. Submitting an unedited example will be flagged by carriers as boilerplate.
+                  </div>
+                )}
               </div>
             );
           })}
@@ -683,7 +787,7 @@ function FeeRow() {
 }
 
 // ─── Step 4: Success ────────────────────────────────────────────────────
-function Step4Success() {
+function Step4Success({ repEmail }: { repEmail: string }) {
   return (
     <div className="mx-auto max-w-[760px] px-10 pb-20 pt-10">
       <div
@@ -725,7 +829,7 @@ function Step4Success() {
             <div className="flex-1">
               <div className="text-[13px] font-semibold text-[#0a0d14]">Confirmation Sent</div>
               <div className="mt-0.5 text-[12px] text-[#5b606a]">
-                The submission record and tracking link were sent to the authorized representative email on file.
+                The submission record and tracking link were sent to {repEmail || "the authorized representative email on file"}.
               </div>
             </div>
           </div>
@@ -1074,12 +1178,10 @@ function NavRow({
   step,
   onBack,
   onNext,
-  canContinue,
 }: {
   step: Step;
   onBack: () => void;
   onNext: () => void;
-  canContinue: boolean;
 }) {
   return (
     <div className="mt-7 flex items-center justify-between">
@@ -1096,10 +1198,8 @@ function NavRow({
       <button
         type="button"
         onClick={onNext}
-        disabled={!canContinue}
-        className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-6 text-[13.5px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-        style={canContinue ? { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" } : undefined}
-        title={canContinue ? undefined : "Complete the required fields to continue"}
+        className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-6 text-[13.5px] font-medium text-white"
+        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
       >
         {step === 1 ? "Continue To Campaign" : step === 2 ? "Continue To Review" : "Submit Registration"}
         {step === 3 ? <IconArrowRight size={13} stroke={2.25} /> : <IconChevronRight size={13} stroke={2.25} />}
