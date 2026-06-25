@@ -497,21 +497,14 @@ function ComplianceCard({
   const isDenied = status === "denied";
   return (
     <div
-      className={[
-        "overflow-hidden rounded-[14px] border bg-white",
-        isDenied ? "border-[#b42318]/30" : "border-[#ebedf0]",
-      ].join(" ")}
-      style={{
-        boxShadow: isDenied ? "0 8px 24px -12px rgba(180,35,24,0.15)" : "0 1px 2px rgba(12,13,16,0.02)",
-      }}
+      className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+      style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
-      {cardAccent && (
+      {cardAccent && !isDenied && (
         <div
           className="h-1 w-full"
           style={{
-            background: isDenied
-              ? "linear-gradient(90deg, #b42318 0%, #ef4444 100%)"
-              : "linear-gradient(90deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)",
+            background: "linear-gradient(90deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)",
           }}
         />
       )}
@@ -529,11 +522,13 @@ function ComplianceCard({
       </div>
 
       {isDenied && (
-        <div className="border-t border-[#fca5a5]/40 bg-[#fef2f2] px-6 py-4">
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#b42318]">
-            Carrier Feedback
+        <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-4">
+          <div className="border-l-[3px] border-[#b42318] pl-3">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
+              Carrier Feedback
+            </div>
+            <p className="mt-1.5 text-[12.5px] leading-[1.5] text-[#0a0d14]">{denialReason}</p>
           </div>
-          <p className="mt-1.5 text-[12.5px] leading-[1.5] text-[#0a0d14]">{denialReason}</p>
           <button
             type="button"
             className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#b42318] px-3.5 text-[12px] font-medium text-white"
