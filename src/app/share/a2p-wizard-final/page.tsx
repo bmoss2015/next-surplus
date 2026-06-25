@@ -103,16 +103,12 @@ const USE_CASES: { value: string; label: string; description: string }[] = [
   },
 ];
 
-const DEFAULT_MESSAGES = [
-  "Hi {first_name}, this is Sarah with Workflow Minds. Public records show you may be owed funds from a recent foreclosure sale. Reply Y for details or STOP to opt out.",
-  "Following up on the surplus funds from your property sale. The claim window is open through August 15. Reply with a good time to talk.",
-  "A signed retainer is still needed to file the claim before the surplus funds transfer to the state. Reply or call when convenient.",
-];
-
-const ALT_MESSAGES = [
-  "Hi {first_name}, the documents are filed with the court. A follow-up text will go out when a hearing date is set. Reply STOP to opt out.",
-  "Hi {first_name}, a check is ready to mail. Reply with the current mailing address and it will go out today.",
-  "Following up on the claim package mailed last week. Please confirm receipt or reply with any questions.",
+// Example placeholders only. Shown as light gray prompts in empty
+// textareas. Never written into the field state, never submitted.
+const SAMPLE_PLACEHOLDERS: string[] = [
+  "Example: Hi {first_name}, this is [your name] with [your company]. [Describe what triggered this first message]. Reply Y for details or STOP to opt out.",
+  "Example: A follow-up after first contact, written as the operator's actual second message would read.",
+  "Example: A reminder or status update message, written as the operator's actual third message would read.",
 ];
 
 export default function A2pWizardFinal() {
@@ -386,45 +382,71 @@ function Step2Campaign({
   setUseCaseOpen: (b: boolean) => void;
   attempted: boolean;
 }) {
-  function swapMessage(i: number) {
-    const alt = ALT_MESSAGES[i % ALT_MESSAGES.length];
-    setCampaign({ ...campaign, messages: campaign.messages.map((x, j) => (j === i ? alt : x)) });
-  }
-
-  const current = USE_CASES.find((u) => u.value === campaign.useCase) ?? USE_CASES[0];
+  const selectedUseCase = USE_CASES.find((u) => u.value === campaign.useCase);
+  const useCaseMissing = attempted && !campaign.useCase;
 
   return (
     <div className="space-y-5">
-      <Card title="Use Case">
-        <div className="rounded-[10px] border border-[#ebedf0] bg-white p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
-                Suggested For Surplus Recovery
-              </div>
-              <div className="mt-1.5 text-[18px] font-semibold tracking-[-0.014em] text-[#0a0d14]">
-                {current.label}
-              </div>
-              <p className="mt-2 text-[13px] leading-[1.55] text-[#5b606a]">
-                {current.description}
-              </p>
+      <div className="rounded-[10px] border border-[#ebedf0] bg-[#fafbfc] px-5 py-4">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-white text-[#0d4b3a] ring-1 ring-[#ebedf0]">
+            <IconInfoCircle size={14} stroke={2} />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[12.5px] font-semibold text-[#0a0d14]">
+              Approval Is Decided By Carriers
             </div>
-            <button
-              type="button"
-              onClick={() => setUseCaseOpen(!useCaseOpen)}
-              className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[12px] font-medium text-[#0a0d14] hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
-            >
-              Change Use Case
-              <IconChevronDown size={12} stroke={2.25} className={useCaseOpen ? "rotate-180 transition" : "transition"} />
-            </button>
+            <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">
+              The Campaign Registry and mobile carriers review every campaign individually. The fields below describe the messaging program in the operator&apos;s own words. Guidance is informational. Approval cannot be guaranteed in advance.
+            </p>
           </div>
         </div>
+      </div>
+
+      <Card
+        title="Use Case"
+        subtitle="The category that best matches how messages will be used. Sample messages must align with the chosen use case."
+      >
+        {selectedUseCase ? (
+          <div className={["rounded-[10px] border bg-white p-5", useCaseMissing ? "border-[#fca5a5]" : "border-[#ebedf0]"].join(" ")}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
+                  Selected
+                </div>
+                <div className="mt-1.5 text-[18px] font-semibold tracking-[-0.014em] text-[#0a0d14]">
+                  {selectedUseCase.label}
+                </div>
+                <p className="mt-2 text-[13px] leading-[1.55] text-[#5b606a]">{selectedUseCase.description}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUseCaseOpen(!useCaseOpen)}
+                className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[12px] font-medium text-[#0a0d14] hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
+              >
+                Change Use Case
+                <IconChevronDown size={12} stroke={2.25} className={useCaseOpen ? "rotate-180 transition" : "transition"} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className={["rounded-[10px] border bg-white p-5", useCaseMissing ? "border-[#fca5a5]" : "border-[#ebedf0]"].join(" ")}>
+            <p className="text-[13px] leading-[1.55] text-[#5b606a]">
+              Choose the category that matches the messaging program. Surplus recovery operators most commonly select Customer Care when outreach goes to identified parties of interest, but the right choice depends on the actual program.
+            </p>
+            <button
+              type="button"
+              onClick={() => setUseCaseOpen(true)}
+              className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-4 text-[12.5px] font-medium text-white"
+              style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
+            >
+              Pick A Use Case
+            </button>
+          </div>
+        )}
 
         {useCaseOpen && (
           <div className="mt-3 overflow-hidden rounded-[10px] border border-[#ebedf0] bg-white">
-            <div className="border-b border-[#f1f2f4] px-4 py-2.5 text-[11px] text-[#5b606a]">
-              Other use cases rarely fit surplus recovery. A mismatch is a common rejection reason.
-            </div>
             <div className="divide-y divide-[#f1f2f4]">
               {USE_CASES.filter((u) => u.value !== campaign.useCase).map((u) => (
                 <button
@@ -434,7 +456,7 @@ function Step2Campaign({
                     setCampaign({ ...campaign, useCase: u.value });
                     setUseCaseOpen(false);
                   }}
-                  className="grid w-full cursor-pointer grid-cols-[140px_1fr] gap-3 px-4 py-3 text-left hover:bg-[#fafbfc]"
+                  className="grid w-full cursor-pointer grid-cols-[160px_1fr] gap-3 px-4 py-3 text-left hover:bg-[#fafbfc]"
                 >
                   <div className="text-[12.5px] font-semibold tracking-[-0.012em] text-[#0a0d14]">{u.label}</div>
                   <p className="text-[12px] leading-[1.5] text-[#5b606a]">{u.description}</p>
@@ -447,31 +469,20 @@ function Step2Campaign({
 
       <Card
         title="Campaign Description"
-        subtitle="A short statement describing how SMS is used. Carriers compare this to the sample messages. Replace the bracketed placeholders with details specific to the company."
+        subtitle="One or two sentences describing how SMS is used, in the operator's own words. Carriers compare this against the sample messages to verify alignment. Generic or boilerplate descriptions are a common rejection reason."
       >
         <textarea
           value={campaign.description}
           onChange={(e) => setCampaign({ ...campaign, description: e.target.value })}
           rows={4}
+          placeholder="Describe the messaging program. For example: who receives the messages, what triggers them, and what action recipients are expected to take."
           className={[
-            "w-full rounded-[7px] border bg-white p-3 text-[13px] leading-[1.5] text-[#0a0d14] outline-none",
+            "w-full rounded-[7px] border bg-white p-3 text-[13px] leading-[1.5] text-[#0a0d14] outline-none placeholder:text-[#9298a3]",
             attempted && !campaign.description.trim()
               ? "border-[#fca5a5] focus:border-[#b42318]"
-              : descriptionPlaceholders.length > 0
-                ? "border-[#fca5a5] focus:border-[#b42318]"
-                : "border-[#ebedf0] focus:border-[#0d4b3a]",
+              : "border-[#ebedf0] focus:border-[#0d4b3a]",
           ].join(" ")}
         />
-        {descriptionPlaceholders.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#b42318]">
-            <span className="font-semibold">Replace before continuing:</span>
-            {descriptionPlaceholders.map((p) => (
-              <span key={p} className="inline-flex items-center rounded-[5px] border border-[#fca5a5] bg-white px-2 py-0.5 font-medium tabular-nums">
-                {p}
-              </span>
-            ))}
-          </div>
-        )}
       </Card>
 
       <Card
@@ -513,10 +524,14 @@ function Step2Campaign({
         </div>
       </Card>
 
-      <Card title="Sample Messages" subtitle="Three templates carriers will compare against the campaign description. These are starting points tailored to the selected use case and can be edited inline. Tokens such as {first_name} fill at send time.">
+      <Card
+        title="Sample Messages"
+        subtitle="Three messages representative of the actual SMS the program will send. Carriers compare these against the campaign description and the use case. Tokens like {first_name} fill at send time. Write messages that genuinely reflect the program; copying boilerplate language across submissions is a common rejection reason."
+      >
         <div className="space-y-3">
           {campaign.messages.map((m, i) => {
             const empty = attempted && !m.trim();
+            const placeholder = SAMPLE_PLACEHOLDERS[i] ?? "";
             return (
               <div
                 key={i}
@@ -527,18 +542,9 @@ function Step2Campaign({
               >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-                    Template {i + 1}
+                    Message {i + 1}
                   </span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => swapMessage(i)}
-                      className="cursor-pointer text-[11px] font-medium text-[#0d4b3a] hover:text-[#13644e]"
-                    >
-                      Swap Template
-                    </button>
-                    <span className="text-[10.5px] text-[#9298a3]">{m.length} / 160</span>
-                  </div>
+                  <span className="text-[10.5px] text-[#9298a3]">{m.length} / 160</span>
                 </div>
                 <textarea
                   value={m}
@@ -549,7 +555,8 @@ function Step2Campaign({
                     })
                   }
                   rows={2}
-                  className="w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-[1.45] text-[#0a0d14] outline-none"
+                  placeholder={placeholder}
+                  className="w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-[1.45] text-[#0a0d14] outline-none placeholder:text-[#9298a3]"
                 />
               </div>
             );
@@ -796,7 +803,7 @@ function stepHelpFor(step: Step) {
     );
   }
   return (
-    <ComplianceCoach
+    <ReferencePanel
       title="After Submission"
       lead="Three phases follow once the registration is submitted to The Campaign Registry."
       tips={[
