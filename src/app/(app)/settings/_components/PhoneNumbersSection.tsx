@@ -132,6 +132,25 @@ function PhoneNumbersInner({
         </div>
       )}
 
+      {a2pState === "approved" && (
+        <div className="mt-8 grid grid-cols-2 gap-3">
+          <ComplianceCard
+            eyebrow="Brand"
+            title={a2pBrand?.company_legal_name ?? "Your Brand"}
+            meta={brandMeta(a2pBrand)}
+            status={a2pBrand?.status === "rejected" ? "denied" : a2pBrand?.status === "approved" ? "approved" : "pending"}
+            denialReason={a2pBrand?.rejection_reason ?? ""}
+          />
+          <ComplianceCard
+            eyebrow="Campaign"
+            title="Customer Care"
+            meta="Surplus Recovery"
+            status="approved"
+            denialReason=""
+          />
+        </div>
+      )}
+
       <div className="mt-10 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
         Your Numbers
         <span className="h-px flex-1 bg-[#ebedf0]" />
@@ -245,5 +264,105 @@ function DetailCell({ label, value }: { label: string; value: string }) {
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">{label}</div>
       <div className="mt-1 text-[13px] font-medium text-[#0a0d14]">{value}</div>
     </div>
+  );
+}
+
+function brandMeta(brand: A2pBrand | null): string {
+  if (!brand) return "Not Registered";
+  const parts: string[] = [];
+  if (brand.ein) parts.push(`EIN Ending ${brand.ein.slice(-4)}`);
+  if (brand.approved_at) parts.push(`Verified ${formatDate(brand.approved_at)}`);
+  return parts.length ? parts.join(" · ") : "Verified";
+}
+
+function ComplianceCard({
+  eyebrow,
+  title,
+  meta,
+  status,
+  denialReason,
+}: {
+  eyebrow: string;
+  title: string;
+  meta: string;
+  status: "approved" | "pending" | "denied";
+  denialReason: string;
+}) {
+  const isApproved = status === "approved";
+  const isDenied = status === "denied";
+  return (
+    <div
+      className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+      style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+    >
+      <div className="px-6 py-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">
+            {eyebrow}
+          </div>
+          <StatusIndicator status={status} />
+        </div>
+        <div className="mt-3 text-[17px] font-semibold tracking-[-0.014em] text-[#0a0d14]">
+          {title}
+        </div>
+        <div className="mt-1 text-[12.5px] text-[#5b606a]">{meta}</div>
+      </div>
+
+      {isDenied && (
+        <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-4">
+          <div className="border-l-[3px] border-[#b42318] pl-3">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
+              Carrier Feedback
+            </div>
+            <p className="mt-1.5 text-[12.5px] leading-[1.5] text-[#0a0d14]">{denialReason}</p>
+          </div>
+          <Link
+            href="/dialer/a2p"
+            className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-3.5 text-[12px] font-medium text-white"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
+          >
+            Fix And Resubmit
+          </Link>
+        </div>
+      )}
+
+      {isApproved && (
+        <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-3">
+          <button type="button" className="cursor-pointer text-[12px] font-medium text-[#5b606a] hover:text-[#0d4b3a]">
+            View Details &rarr;
+          </button>
+        </div>
+      )}
+
+      {status === "pending" && (
+        <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-3 text-[12px] text-[#5b606a]">
+          Carriers reviewing this submission. No action needed.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusIndicator({ status }: { status: "approved" | "pending" | "denied" }) {
+  const color =
+    status === "approved" ? "#0d4b3a" : status === "denied" ? "#b42318" : "#9298a3";
+  const glow =
+    status === "approved"
+      ? "rgba(13,75,58,0.16)"
+      : status === "denied"
+        ? "rgba(180,35,24,0.16)"
+        : "rgba(146,152,163,0.16)";
+  const label = status === "approved" ? "Approved" : status === "denied" ? "Denied" : "In Review";
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em]"
+      style={{ color }}
+    >
+      <span
+        className="inline-block h-[7px] w-[7px] rounded-full"
+        style={{ background: color, boxShadow: `0 0 0 3px ${glow}` }}
+      />
+      {label}
+    </span>
   );
 }
