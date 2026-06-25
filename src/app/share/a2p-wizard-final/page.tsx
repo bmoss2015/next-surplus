@@ -202,7 +202,7 @@ function A2pWizardFinal() {
 
   const [campaign, setCampaign] = useState<Campaign>({
     useCase: "CUSTOMER_CARE",
-    description: DESCRIPTION_TEMPLATE,
+    description: "",
     volume: "LOW",
     messages: ["", "", ""],
     optInConfirmation: "You're subscribed to surplus recovery updates from [COMPANY NAME]. Reply HELP for help, STOP to opt out.",
@@ -700,15 +700,17 @@ function Step2Campaign({
             onClick={() => setCampaign({ ...campaign, description: DESCRIPTION_TEMPLATE })}
             className="cursor-pointer font-medium text-[#0d4b3a] hover:text-[#13644e]"
           >
-            Reset To Template
+            Load Example Template
           </button>
-          <button
-            type="button"
-            onClick={() => setCampaign({ ...campaign, description: "" })}
-            className="cursor-pointer font-medium text-[#5b606a] hover:text-[#0a0d14]"
-          >
-            Start From Scratch
-          </button>
+          {campaign.description.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setCampaign({ ...campaign, description: "" })}
+              className="cursor-pointer font-medium text-[#5b606a] hover:text-[#0a0d14]"
+            >
+              Clear Field
+            </button>
+          )}
         </div>
       </Card>
 
@@ -795,6 +797,18 @@ function Step2Campaign({
                         Load Example {j + 1}
                       </button>
                     ))}
+                    {m.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCampaign({ ...campaign, messages: campaign.messages.map((x, j) => (j === i ? "" : x)) });
+                          setLoadedTemplates(loadedTemplates.map((x, j) => (j === i ? null : x)));
+                        }}
+                        className="cursor-pointer text-[11px] font-medium text-[#5b606a] hover:text-[#0a0d14]"
+                      >
+                        Clear Field
+                      </button>
+                    )}
                   </div>
                   <span className="text-[10.5px] text-[#9298a3]">{m.length} / 160</span>
                 </div>
@@ -980,7 +994,7 @@ function FeeRow() {
           <div className="text-[14.5px] font-semibold tracking-[-0.012em] text-[#0a0d14]">
             Carrier Verification Fee
           </div>
-          <div className="text-[16px] font-semibold tabular-nums text-[#0a0d14]">$41.50</div>
+          <div className="text-[16px] font-semibold tabular-nums text-[#0a0d14]">$19.50</div>
         </div>
         <p className="mt-2 text-[12.5px] leading-[1.55] text-[#5b606a]">
           The Campaign Registry, an industry body operated by the major US mobile carriers, administers brand verification on behalf of the wireless industry. The fee passes through at cost with no markup and is identical at every messaging provider. Verification completes within 1 to 2 business days. Carrier review of the campaign follows for 1 to 3 weeks before SMS is enabled across registered numbers.
@@ -1018,7 +1032,7 @@ function FeeRow() {
                 style={{ background: "#b42318", boxShadow: "0 0 0 3px rgba(180,35,24,0.14)" }}
               />
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#b42318]">
-                Triggers New $41.50 Fee
+                Triggers New $19.50 Fee
               </div>
             </div>
             <p className="mt-1.5 text-[12px] leading-[1.5] text-[#0a0d14]">
@@ -1360,12 +1374,12 @@ function EinField({
           <span className="ml-1 text-[#b42318]">*</span>
         </label>
         <InfoButton>
-          <div className="font-semibold text-[#0a0d14]">About The EIN Field</div>
+          <div className="font-semibold text-[#0a0d14]">EIN Requirements</div>
           <p className="mt-1 text-[#5b606a]">
-            Format is XX-XXXXXXX. The wizard inserts the dash and limits the input to nine digits automatically, so typing 123456789 becomes 12-3456789.
+            The Employer Identification Number is a nine-digit federal tax ID issued by the IRS, formatted as XX-XXXXXXX.
           </p>
           <p className="mt-2 text-[#5b606a]">
-            The EIN must be at least 15 days old at the time of submission. The Campaign Registry pulls EINs from IRS records that update on a delay, and newly issued numbers are rejected as unverifiable. If the EIN was issued recently, wait the 15 days before submitting.
+            The Campaign Registry requires the EIN to be at least 15 days old at the time of submission. EINs are verified against IRS records, which update on a delay. Newly issued numbers are rejected as unverifiable.
           </p>
         </InfoButton>
       </div>
@@ -1580,7 +1594,7 @@ function BrandIdentityChangeConfirm() {
           <div className="px-6 py-5">
             <div className="flex items-baseline justify-between gap-4">
               <div className="text-[13.5px] font-semibold text-[#0a0d14]">New Carrier Verification Fee</div>
-              <div className="text-[18px] font-semibold tabular-nums text-[#0a0d14]">$41.50</div>
+              <div className="text-[18px] font-semibold tabular-nums text-[#0a0d14]">$19.50</div>
             </div>
             <p className="mt-2 text-[12.5px] leading-[1.55] text-[#5b606a]">
               Charged at submission of the updated brand. Set by The Campaign Registry, passes through at cost. The original brand remains registered with TCR and its fee is not refundable.
@@ -1665,7 +1679,7 @@ function BrandIdentityChangeConfirm() {
                 : undefined
             }
           >
-            Register New Brand And Pay $41.50
+            Register New Brand And Pay $19.50
             <IconArrowRight size={13} stroke={2.25} />
           </button>
         </div>
