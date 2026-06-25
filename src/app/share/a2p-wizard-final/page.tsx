@@ -332,7 +332,7 @@ function Step1Brand({
 
       <Card
         title="Authorized Representative"
-        subtitle="Person carriers will contact to verify the brand. Must be reachable by phone and email."
+        subtitle="Carriers contact this person directly to verify the brand. Both the email and phone number must be actively monitored at the time of submission."
       >
         <FieldGrid>
           <Field label="Full Name" value={brand.repName} onChange={(v) => u("repName", v)} required attempted={attempted} />
@@ -341,7 +341,10 @@ function Step1Brand({
         </FieldGrid>
       </Card>
 
-      <Card title="Company Address" subtitle="Must match the address registered with the IRS.">
+      <Card
+        title="Company Address"
+        subtitle="The Campaign Registry verifies this against the address on file with the IRS. Discrepancies delay verification or cause rejection."
+      >
         <FieldGrid>
           <Field label="Street" value={brand.street} onChange={(v) => u("street", v)} wide />
           <Field label="City" value={brand.city} onChange={(v) => u("city", v)} />
@@ -352,19 +355,37 @@ function Step1Brand({
 
       <Card
         title="Legal Documents"
-        subtitle="Privacy Policy and Terms Of Service are required for SMS approval. Hosted pages were generated automatically from the company details above. Override either URL only if a separate policy is already published."
+        subtitle="The Campaign Registry requires both URLs to be live and publicly accessible. Each page must reflect the legal entity above and the way the business uses SMS. Placeholder, broken, or generic URLs are a common rejection reason."
         info={
           <>
-            <div className="font-semibold text-[#0a0d14]">No Existing Policy? It Is Handled.</div>
+            <div className="font-semibold text-[#0a0d14]">If There Is No Existing Policy</div>
             <p className="mt-1 text-[#5b606a]">
-              A privacy policy and terms of service are generated automatically for the company at the URLs shown. Both pages reflect the legal name, address, and contact email from the Company section above, and update whenever those details change. Override either URL only if an existing policy lives elsewhere.
+              Operators without an existing Privacy Policy or Terms Of Service typically use a third-party generator such as Termly or iubenda and host the resulting page on their own domain. A future Next Surplus update will offer a one-click partner integration so the policy lives at a subdomain the operator controls. For now, both URLs must be brought in.
             </p>
           </>
         }
       >
         <FieldGrid>
-          <Field label="Privacy Policy" value={brand.privacyUrl} onChange={(v) => u("privacyUrl", v)} wide />
-          <Field label="Terms Of Service" value={brand.termsUrl} onChange={(v) => u("termsUrl", v)} wide />
+          <Field
+            label="Privacy Policy URL"
+            value={brand.privacyUrl}
+            onChange={(v) => u("privacyUrl", v)}
+            placeholder="https://example.com/privacy"
+            type="url"
+            required
+            attempted={attempted}
+            wide
+          />
+          <Field
+            label="Terms Of Service URL"
+            value={brand.termsUrl}
+            onChange={(v) => u("termsUrl", v)}
+            placeholder="https://example.com/terms"
+            type="url"
+            required
+            attempted={attempted}
+            wide
+          />
         </FieldGrid>
       </Card>
     </div>
@@ -576,7 +597,7 @@ function Step2Campaign({
             STOP And HELP Keywords Are Already Handled
           </div>
           <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">
-            FCC and CTIA guidelines require automated STOP and HELP responses on every messaging program. The platform handles both without any additional configuration. STOP marks the recipient do-not-text and confirms with a standard reply. HELP returns the brand name, support email, and instructions to opt back in.
+            FCC and CTIA guidelines require automated responses to STOP and HELP on every messaging program. Next Surplus configures both at the platform level, including the opt-out and help message text submitted to The Campaign Registry. When a recipient texts STOP, the platform flags the contact as opted out and sends a standard confirmation. When a recipient texts HELP, the platform replies with the brand name, support email, and instructions to opt back in. Sample messages should still include the phrase &quot;Reply STOP to opt out&quot; as a courtesy to recipients and a signal to carriers that opt-out is being honored.
           </p>
         </div>
       </div>
@@ -635,7 +656,7 @@ function Step3Review({ brand, campaign }: { brand: Brand; campaign: Campaign }) 
 function FeeRow() {
   return (
     <div
-      className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+      className="rounded-[14px] border border-[#ebedf0] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
       <div className="px-6 py-5">
@@ -646,8 +667,16 @@ function FeeRow() {
           <div className="text-[16px] font-semibold tabular-nums text-[#0a0d14]">$40.00</div>
         </div>
         <p className="mt-2 text-[12.5px] leading-[1.55] text-[#5b606a]">
-          The Campaign Registry, an industry body operated by the major US mobile carriers, administers brand verification on behalf of the wireless industry. The fee passes through at cost and is identical at every messaging provider. Verification completes within 1 to 2 business days. Carrier review of the campaign follows for 1 to 3 weeks before SMS is enabled across registered numbers.
+          The Campaign Registry, an industry body operated by the major US mobile carriers, administers brand verification on behalf of the wireless industry. The fee passes through at cost with no markup and is identical at every messaging provider. Verification completes within 1 to 2 business days. Carrier review of the campaign follows for 1 to 3 weeks before SMS is enabled across registered numbers.
         </p>
+        <div className="mt-3 border-t border-[#f1f2f4] pt-3">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+            About Resubmissions
+          </div>
+          <p className="mt-1 text-[12px] leading-[1.55] text-[#5b606a]">
+            Minor corrections after a rejection, such as an EIN typo or a clarified description, do not retrigger the $40 fee. Material changes to brand identity, such as a different legal entity, a new EIN, or a vetting tier upgrade from Standard to Enhanced, register as a new brand and incur the fee again.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -891,7 +920,7 @@ function Card({
 }) {
   return (
     <div
-      className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+      className="rounded-[14px] border border-[#ebedf0] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
       <div className="border-b border-[#f1f2f4] px-6 py-4">
@@ -931,8 +960,8 @@ function InfoButton({ children }: { children: React.ReactNode }) {
       </button>
       {open && (
         <div
-          className="absolute left-0 top-6 z-40 w-[280px] rounded-[10px] border border-[#ebedf0] bg-white p-3.5 text-[12px] leading-[1.5] text-[#0a0d14]"
-          style={{ boxShadow: "0 8px 28px -10px rgba(12,13,16,0.15)" }}
+          className="absolute left-0 top-6 w-[280px] rounded-[10px] border border-[#ebedf0] bg-white p-3.5 text-[12px] leading-[1.5] text-[#0a0d14]"
+          style={{ boxShadow: "0 8px 28px -10px rgba(12,13,16,0.15)", zIndex: 100 }}
         >
           {children}
         </div>
