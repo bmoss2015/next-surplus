@@ -68,13 +68,30 @@ const STATUS_BY_EVENT: Record<string, "in_transit" | "delivered" | "returned" | 
   "check.failed": "failed",
 };
 
-function verifySignature(rawBody: string, signature: string | null): boolean {
-  if (!signature) return false;
+// Lob's webhook signing format (per
+// help.lob.com/print-and-mail/ready-to-get-started/webhooks):
+//   Lob-Signature = HMAC-SHA256(secret, `${Lob-Signature-Timestamp}.${body}`)
+// The timestamp is sent as a separate header. Hashing the raw body
+// alone produces 401 on every Lob delivery, which was the bug here
+// from May through June 2026.
+function verifySignature(
+  rawBody: string,
+  signature: string | null,
+  timestamp: string | null
+): boolean {
+  if (!signature || !timestamp) return false;
   const secret = process.env.LOB_WEBHOOK_SECRET;
   if (!secret) return false;
-  const computed = createHmac("sha256", secret).update(rawBody).digest("hex");
-  const a = Buffer.from(signature, "hex");
-  const b = Buffer.from(computed, "hex");
+  const input = `${timestamp}.${rawBody}`;
+  const computed = createHmac("sha256", secret).update(input).digest("hex");
+  let a: Buffer;
+  let b: Buffer;
+  try {
+    a = Buffer.from(signature, "hex");
+    b = Buffer.from(computed, "hex");
+  } catch {
+    return false;
+  }
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
@@ -82,11 +99,12 @@ function verifySignature(rawBody: string, signature: string | null): boolean {
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const sig = req.headers.get("lob-signature");
+  const ts = req.headers.get("lob-signature-timestamp");
 
   if (!process.env.LOB_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "webhook_secret_unset" }, { status: 401 });
   }
-  if (!verifySignature(rawBody, sig)) {
+  if (!verifySignature(rawBody, sig, ts)) {
     return NextResponse.json({ error: "bad_signature" }, { status: 401 });
   }
 

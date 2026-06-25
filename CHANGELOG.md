@@ -10,6 +10,10 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Fixed
+- Fix LOB-WEBHOOK-SIGNATURE-TIMESTAMP: Lob webhook signature verification was hashing only the raw body, but Lob's documented format is HMAC-SHA256 over `${Lob-Signature-Timestamp}.${body}`. The handler now reads the `lob-signature-timestamp` header, builds the concatenated signature input, and computes the HMAC against that. Without this fix every real Lob webhook delivery returned 401 since at least May 2026 (all `bank_account.*`, `letter.*`, `check.*`, `address.*` events were silently rejected). Latent bug present before the secret rotation work in PR #197+. (2026-06-25T13:50:00-05:00)
+
+
 ### Changed
 - Fix LOB-SCRAPER-REWORK: Lob published-rate sync now targets the stable GitBook article (`help.lob.com/print-and-mail/ready-to-get-started/pricing-details.md`) instead of the volatile `llms-full.txt` corpus. New parser walks the HTML tables embedded in the markdown and extracts the Developer-column price for each line item via a single regex pass keyed on a label-to-LobPricing-key map. The new page contains both currently-effective rates and any future-effective sections Lob has announced (currently a July 12, 2026 rate change is live on the page). Cron now: (1) refreshes `app_pricing_config.wholesale_pricing_cents` from the current section, (2) for each future-effective section, emails ops one alert with the diff and effective date, (3) on any fetch/parse failure, emails ops one alert and returns 502. Failure path no longer writes to the customer-facing `notifications` table; ops health alerts go to `OPS_ALERT_EMAIL` (defaults to `bree@mossequitypartners.com`) via Resend instead. Per-org `lob_published_pricing_cents` snapshot still updates so the Settings > Lob Pricing UI stays fresh. Per-org `lob_pricing_cents` still auto-syncs when `lob_pricing_auto_sync=true`. New helper `pricingDiff` returns a key-by-key delta used by both email templates. (2026-06-22T12:30:00-05:00)
 
