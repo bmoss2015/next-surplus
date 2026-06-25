@@ -82,6 +82,19 @@ const ENTITY_TYPES: { value: string; label: string }[] = [
   { value: "SOLE_PROPRIETOR", label: "Sole Proprietor" },
 ];
 
+// TCR's accepted job titles for the authorized representative. Fixed
+// list per Twilio's published collect-business-info docs.
+const REP_TITLES: { value: string; label: string }[] = [
+  { value: "", label: "Select A Title" },
+  { value: "CEO", label: "CEO" },
+  { value: "CFO", label: "CFO" },
+  { value: "DIRECTOR", label: "Director" },
+  { value: "GM", label: "General Manager" },
+  { value: "VP", label: "Vice President" },
+  { value: "GENERAL_COUNSEL", label: "General Counsel" },
+  { value: "OTHER", label: "Other" },
+];
+
 const USE_CASES: { value: string; label: string; description: string }[] = [
   {
     value: "CUSTOMER_CARE",
@@ -138,14 +151,14 @@ const SAMPLE_TEMPLATES: string[][] = [
 const DESCRIPTION_TEMPLATE =
   "[COMPANY NAME] sends transactional outreach to individuals identified through public court records as potential claimants for surplus funds from [SALE TYPES, e.g. foreclosure or tax sales]. Messages provide case status updates, document requests, and payment notifications. Recipients can reply STOP at any time to opt out.";
 
-// Industry-standard A2P sample message slot labels. The Campaign
-// Registry expects carriers to see what type of message lives in each
-// slot, not "Message 1, 2, 3". For Customer Care use case, all three
-// slots are transactional/informational with different roles.
+// Sample message slot labels. The Campaign Registry itself does not
+// enforce a specific label for each slot, but the messages submitted
+// must reflect what carriers will see in production. Three slots are
+// labeled simply by number, in line with Twilio's API field naming.
 const SAMPLE_LABELS: { title: string; subtitle: string }[] = [
-  { title: "Initial Outreach", subtitle: "First contact with the recipient" },
-  { title: "Follow-Up", subtitle: "After first contact" },
-  { title: "Status Or Reminder", subtitle: "Routine activity" },
+  { title: "Message 1", subtitle: "" },
+  { title: "Message 2", subtitle: "" },
+  { title: "Message 3", subtitle: "" },
 ];
 
 export default function A2pWizardFinalEntry() {
@@ -420,11 +433,11 @@ function Step1Brand({
       >
         <FieldGrid>
           <Field label="Full Name" value={brand.repName} onChange={(v) => u("repName", v)} required attempted={attempted} />
-          <Field
+          <SelectField
             label="Title"
             value={brand.repTitle}
             onChange={(v) => u("repTitle", v)}
-            placeholder="e.g. Owner, Operations Director"
+            options={REP_TITLES}
             required
             attempted={attempted}
           />
@@ -450,13 +463,43 @@ function Step1Brand({
         subtitle="The Campaign Registry requires all three URLs to be live and publicly accessible on the brand's own domain. Carriers actively crawl these URLs during review. Placeholder, broken, or generic pages are a common rejection reason."
         info={
           <>
-            <div className="font-semibold text-[#0a0d14]">If There Is No Existing Policy</div>
+            <div className="font-semibold text-[#0a0d14]">Privacy Policy Must Include</div>
+            <ul className="mt-1 list-disc pl-4 text-[#5b606a]">
+              <li>Statement that SMS opt-in data is NOT shared with third parties for marketing</li>
+              <li>How phone numbers are collected and used</li>
+              <li>Instructions to text STOP to opt out at any time</li>
+              <li>Contact email for privacy questions</li>
+            </ul>
+
+            <div className="mt-3 font-semibold text-[#0a0d14]">Terms Of Service Must Include</div>
+            <ul className="mt-1 list-disc pl-4 text-[#5b606a]">
+              <li>Description of the service the business provides</li>
+              <li>Mention of SMS as part of the service</li>
+              <li>Standard disclaimers and dispute resolution</li>
+            </ul>
+
+            <div className="mt-3 font-semibold text-[#0a0d14]">Opt-In Flow URL Must Include</div>
+            <ul className="mt-1 list-disc pl-4 text-[#5b606a]">
+              <li>Form with a phone number field</li>
+              <li>Unchecked consent checkbox with explicit language: &quot;I agree to receive SMS from [BRAND]&quot;</li>
+              <li>Frequency disclosure (e.g. &quot;Up to 4 messages per month&quot;)</li>
+              <li>&quot;Message and data rates may apply&quot;</li>
+              <li>Visible links to Privacy Policy and Terms Of Service</li>
+              <li>STOP and HELP keyword guidance</li>
+              <li>Reachable without a login</li>
+            </ul>
+
+            <div className="mt-3 font-semibold text-[#0a0d14]">Common Rejection Reasons</div>
+            <ul className="mt-1 list-disc pl-4 text-[#5b606a]">
+              <li>Pre-checked consent box</li>
+              <li>Generic privacy policy with no SMS-specific language</li>
+              <li>Login-protected URLs</li>
+              <li>Opt-in checkbox language that does not match the campaign description</li>
+            </ul>
+
+            <div className="mt-3 font-semibold text-[#0a0d14]">No Existing Policy?</div>
             <p className="mt-1 text-[#5b606a]">
-              Operators without an existing Privacy Policy or Terms Of Service typically use a third-party generator such as Termly or iubenda and host the resulting page on their own domain. All three URLs must point to live, publicly accessible pages on the brand&apos;s own website.
-            </p>
-            <div className="mt-3 font-semibold text-[#0a0d14]">What An Opt-In Page Looks Like</div>
-            <p className="mt-1 text-[#5b606a]">
-              The Opt-In Flow URL is a public page that shows how recipients consented to receive SMS. For surplus recovery, this is typically a landing page with a form including the phone field, a checkbox saying &quot;I agree to receive SMS updates&quot;, frequency disclosure, and STOP and HELP keyword guidance. The page must be reachable without a login.
+              Use a third-party generator like Termly or iubenda and host the resulting pages on the brand&apos;s own domain.
             </p>
           </>
         }
@@ -710,8 +753,16 @@ function Step2Campaign({
 
       <Card
         title="Sample Messages"
-        subtitle="Three messages representative of the actual SMS the program will send. Load an example to start fast, then edit so the wording reflects this specific business. Identical templates submitted across operators are a common rejection reason."
+        subtitle="Three messages representative of the actual SMS the program will send. At least one must include the word STOP so carriers see the opt-out path. Load an example to start fast, then edit so the wording reflects this specific business. Identical templates submitted across operators are a common rejection reason."
       >
+        {attempted && !stopMentioned && (
+          <div
+            data-invalid="true"
+            className="mb-3 rounded-[7px] border border-[#fca5a5] bg-white px-3 py-2 text-[11.5px] font-medium text-[#b42318]"
+          >
+            No sample message currently contains the word STOP. At least one is required before continuing.
+          </div>
+        )}
         <div className="space-y-3">
           {campaign.messages.map((m, i) => {
             const empty = attempted && !m.trim();
@@ -769,34 +820,6 @@ function Step2Campaign({
           })}
         </div>
       </Card>
-
-      <div
-        data-invalid={attempted && !stopMentioned ? "true" : undefined}
-        className={[
-          "flex items-start gap-3 rounded-[10px] border px-5 py-4",
-          attempted && !stopMentioned ? "border-[#fca5a5] bg-white" : "border-[#ebedf0] bg-[#fafbfc]",
-        ].join(" ")}
-      >
-        <span
-          className={[
-            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-white ring-1",
-            attempted && !stopMentioned ? "text-[#b42318] ring-[#fca5a5]" : "text-[#0d4b3a] ring-[#ebedf0]",
-          ].join(" ")}
-        >
-          <IconInfoCircle size={14} stroke={2} />
-        </span>
-        <div className="min-w-0">
-          <div className="text-[12.5px] font-semibold text-[#0a0d14]">
-            At Least One Sample Message Must Mention STOP
-          </div>
-          <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">
-            Carriers expect to see the opt-out path on the same page they review the campaign. The phrase &quot;Reply STOP to opt out&quot; or any sentence containing the word STOP qualifies. The wizard checks for this before continuing.
-            {attempted && !stopMentioned && (
-              <span className="ml-1 font-semibold text-[#b42318]">No sample message currently contains STOP.</span>
-            )}
-          </p>
-        </div>
-      </div>
 
       <Card
         title="Opt-In Confirmation Message"
@@ -1321,30 +1344,44 @@ function EinField({
   const empty = attempted && !value.trim();
   const wrongFormat = attempted && value.trim().length > 0 && !validFormat;
   const errored = empty || wrongFormat;
+
+  // Auto-format: strip non-digits, insert dash after 2 digits, cap at 9 digits total.
+  function format(raw: string): string {
+    const digits = raw.replace(/\D/g, "").slice(0, 9);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  }
+
   return (
     <div>
-      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
-        EIN
-        <span className="ml-1 text-[#b42318]">*</span>
-      </label>
+      <div className="flex items-center gap-1.5">
+        <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
+          EIN
+          <span className="ml-1 text-[#b42318]">*</span>
+        </label>
+        <InfoButton>
+          <div className="font-semibold text-[#0a0d14]">About The EIN Field</div>
+          <p className="mt-1 text-[#5b606a]">
+            Format is XX-XXXXXXX. The wizard inserts the dash and limits the input to nine digits automatically, so typing 123456789 becomes 12-3456789.
+          </p>
+          <p className="mt-2 text-[#5b606a]">
+            The EIN must be at least 15 days old at the time of submission. The Campaign Registry pulls EINs from IRS records that update on a delay, and newly issued numbers are rejected as unverifiable. If the EIN was issued recently, wait the 15 days before submitting.
+          </p>
+        </InfoButton>
+      </div>
       <input
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(format(e.target.value))}
         placeholder="12-3456789"
         inputMode="numeric"
+        maxLength={10}
         data-invalid={errored ? "true" : undefined}
         className={[
           "mt-1.5 h-[38px] w-full rounded-[7px] border bg-white px-3 text-[13px] text-[#0a0d14] outline-none placeholder:text-[#9298a3] tabular-nums",
           errored ? "border-[#fca5a5] focus:border-[#b42318]" : "border-[#ebedf0] focus:border-[#0d4b3a]",
         ].join(" ")}
       />
-      <p className="mt-1 text-[10.5px] leading-[1.4] text-[#9298a3]">
-        Format XX-XXXXXXX. EIN must be at least 15 days old to register; new EINs are rejected by The Campaign Registry.
-      </p>
-      {wrongFormat && (
-        <p className="mt-1 text-[11px] font-medium text-[#b42318]">Format must be XX-XXXXXXX with the hyphen.</p>
-      )}
     </div>
   );
 }
@@ -1397,6 +1434,8 @@ function SelectField({
   onChange,
   options,
   info,
+  required,
+  attempted,
   wide,
 }: {
   label: string;
@@ -1404,20 +1443,28 @@ function SelectField({
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   info?: React.ReactNode;
+  required?: boolean;
+  attempted?: boolean;
   wide?: boolean;
 }) {
+  const errored = required && attempted && !value;
   return (
     <div className={wide ? "col-span-2" : ""}>
       <div className="flex items-center gap-1.5">
         <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
           {label}
+          {required && <span className="ml-1 text-[#b42318]">*</span>}
         </label>
         {info && <InfoButton>{info}</InfoButton>}
       </div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 h-[38px] w-full cursor-pointer rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[13px] text-[#0a0d14] outline-none focus:border-[#0d4b3a]"
+        data-invalid={errored ? "true" : undefined}
+        className={[
+          "mt-1.5 h-[38px] w-full cursor-pointer rounded-[7px] border bg-white px-3 text-[13px] text-[#0a0d14] outline-none",
+          errored ? "border-[#fca5a5] focus:border-[#b42318]" : "border-[#ebedf0] focus:border-[#0d4b3a]",
+        ].join(" ")}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
