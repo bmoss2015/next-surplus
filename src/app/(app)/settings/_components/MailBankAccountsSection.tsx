@@ -441,7 +441,7 @@ function ManualVerifyModal({
                 type="text"
                 inputMode="text"
                 autoFocus
-                placeholder="SM____"
+                placeholder="Example: SMTJDY"
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 6))}
                 maxLength={6}
@@ -449,6 +449,16 @@ function ManualVerifyModal({
                 style={{ width: "100%", textTransform: "uppercase", letterSpacing: 1 }}
                 disabled={submitting}
               />
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-3)",
+                  marginTop: 6,
+                  lineHeight: 1.4,
+                }}
+              >
+                Type all 6 characters including SM.
+              </div>
             </div>
           </>
         ) : (
@@ -511,10 +521,13 @@ function ManualVerifyModal({
           className="m-0"
           style={{ fontSize: 11.5, color: "var(--text-3)", lineHeight: 1.45 }}
         >
-          You have <strong>{attemptsRemaining}</strong> of{" "}
-          {LOB_VERIFY_ATTEMPT_LIMIT} verification attempts remaining. After 3
-          failed attempts the account is locked and you&apos;ll need to remove
-          it and re-add.
+          You have{" "}
+          <strong style={{ fontVariantNumeric: "tabular-nums" }}>
+            {attemptsRemaining}
+          </strong>{" "}
+          of {LOB_VERIFY_ATTEMPT_LIMIT} verification attempts remaining. After
+          3 failed attempts the account is locked and you&apos;ll need to
+          remove it and re-add.
         </p>
 
         {err && (
@@ -590,12 +603,12 @@ function SampleStatement({ mode }: { mode: "amounts" | "descriptor_code" }) {
         >
           Sample From Your Bank Statement
         </div>
-        <div style={{ padding: "10px 12px", display: "grid", gap: 6 }}>
+        <div style={{ padding: "14px 16px", display: "grid", gap: 10 }}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "72px 1fr 64px",
-              gap: 8,
+              gridTemplateColumns: "80px 1fr 72px",
+              gap: 12,
               fontSize: 11,
               color: "var(--text-3)",
               fontWeight: 500,
@@ -608,11 +621,11 @@ function SampleStatement({ mode }: { mode: "amounts" | "descriptor_code" }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "72px 1fr 64px",
-              gap: 8,
+              gridTemplateColumns: "80px 1fr 72px",
+              gap: 12,
               fontSize: 12.5,
               alignItems: "center",
-              padding: "8px 10px",
+              padding: "10px 12px",
               background: "#fff",
               border: "1px solid var(--brand)",
               borderRadius: 6,
@@ -620,20 +633,19 @@ function SampleStatement({ mode }: { mode: "amounts" | "descriptor_code" }) {
           >
             <div style={{ color: "var(--text-2)" }}>Jun 25</div>
             <div style={{ fontVariantNumeric: "tabular-nums" }}>
-              ACH CREDIT{" "}
               <span
                 style={{
                   background: "var(--brand)",
                   color: "#fff",
-                  padding: "1px 6px",
+                  padding: "2px 8px",
                   borderRadius: 3,
                   fontWeight: 600,
-                  letterSpacing: 0.5,
+                  letterSpacing: 1,
                 }}
               >
-                SMABCD
+                SM••••
               </span>
-              -LOB
+              -LOB.COM
             </div>
             <div
               style={{
