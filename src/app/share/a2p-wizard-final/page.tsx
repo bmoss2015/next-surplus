@@ -4,13 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   IconCheck,
+  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconShieldCheck,
   IconArrowRight,
-  IconEye,
-  IconX,
-  IconExternalLink,
   IconClock,
   IconMail,
 } from "@tabler/icons-react";
@@ -18,10 +16,13 @@ import {
 type Step = 1 | 2 | 3 | 4;
 
 type Brand = {
+  entityType: string;
   legalName: string;
   ein: string;
   vertical: string;
   website: string;
+  privacyUrl: string;
+  termsUrl: string;
   repName: string;
   repEmail: string;
   repPhone: string;
@@ -33,34 +34,95 @@ type Brand = {
 
 type Campaign = {
   useCase: string;
+  description: string;
   volume: "LOW" | "MEDIUM" | "HIGH";
   messages: string[];
 };
 
+const VERTICALS: { value: string; label: string }[] = [
+  { value: "FINANCIAL", label: "Financial Services" },
+  { value: "REAL_ESTATE", label: "Real Estate" },
+  { value: "PROFESSIONAL", label: "Professional Services" },
+  { value: "LEGAL", label: "Legal" },
+  { value: "INSURANCE", label: "Insurance" },
+  { value: "HEALTHCARE", label: "Healthcare" },
+  { value: "EDUCATION", label: "Education" },
+  { value: "GOVERNMENT", label: "Government" },
+  { value: "NON_PROFIT", label: "Non-Profit" },
+  { value: "RETAIL", label: "Retail" },
+  { value: "TECHNOLOGY", label: "Technology" },
+  { value: "TRANSPORTATION", label: "Transportation" },
+  { value: "HOSPITALITY_TRAVEL", label: "Hospitality and Travel" },
+  { value: "MANUFACTURING", label: "Manufacturing" },
+  { value: "AGRICULTURE", label: "Agriculture" },
+  { value: "CONSTRUCTION", label: "Construction" },
+  { value: "ENERGY_UTILITIES", label: "Energy and Utilities" },
+  { value: "ENTERTAINMENT", label: "Entertainment" },
+  { value: "COMMUNICATION", label: "Communication" },
+];
+
+const ENTITY_TYPES: { value: string; label: string }[] = [
+  { value: "PRIVATE_PROFIT", label: "Private For-Profit Company" },
+  { value: "PUBLIC_PROFIT", label: "Public For-Profit Company" },
+  { value: "NON_PROFIT", label: "Non-Profit Organization" },
+  { value: "GOVERNMENT", label: "Government Entity" },
+  { value: "SOLE_PROPRIETOR", label: "Sole Proprietor" },
+];
+
+const USE_CASES: { value: string; label: string; description: string }[] = [
+  {
+    value: "CUSTOMER_CARE",
+    label: "Customer Care",
+    description: "Transactional messages to recipients who have an established relationship with the sender. Best fit for surplus recovery outreach to identified parties of interest.",
+  },
+  {
+    value: "ACCOUNT_NOTIFICATION",
+    label: "Account Notification",
+    description: "Updates about account status, transactions, or upcoming events. Use when messages are strictly notifications, not conversational outreach.",
+  },
+  {
+    value: "MIXED",
+    label: "Mixed",
+    description: "Combination of marketing and informational content. Subject to higher carrier scrutiny and slower approval.",
+  },
+  {
+    value: "MARKETING",
+    label: "Marketing",
+    description: "Promotional content. Requires documented opt-in for every recipient. Not recommended for cold outreach scenarios.",
+  },
+  {
+    value: "LOW_VOLUME",
+    label: "Low Volume",
+    description: "Mixed content with strict volume caps. Appropriate when total throughput stays under 6,000 messages per day across all numbers.",
+  },
+];
+
 const DEFAULT_MESSAGES = [
-  "Hi {first_name}, this is Sarah with Workflow Minds. Public records show you may be owed funds from a recent foreclosure sale. Reply Y for details, STOP to opt out.",
+  "Hi {first_name}, this is Sarah with Workflow Minds. Public records show you may be owed funds from a recent foreclosure sale. Reply Y for details or STOP to opt out.",
   "Following up on the surplus funds from your property sale. The claim window is open through August 15. Reply with a good time to talk.",
-  "Quick reminder, a signed retainer is still needed to file the claim before the surplus funds are turned over to the state. Text or call when convenient.",
+  "A signed retainer is still needed to file the claim before the surplus funds transfer to the state. Reply or call when convenient.",
 ];
 
 const ALT_MESSAGES = [
-  "Hi {first_name}, the documents are filed with the court. You'll be texted again when a hearing date is set. Reply STOP to opt out.",
-  "Hi {first_name}, a check is ready. Reply with the current mailing address and it'll go out today.",
+  "Hi {first_name}, the documents are filed with the court. A follow-up text will go out when a hearing date is set. Reply STOP to opt out.",
+  "Hi {first_name}, a check is ready to mail. Reply with the current mailing address and it will go out today.",
   "Following up on the claim package mailed last week. Please confirm receipt or reply with any questions.",
 ];
 
 export default function A2pWizardFinal() {
   const [step, setStep] = useState<Step>(1);
-  const [preview, setPreview] = useState(false);
   const [useCaseOpen, setUseCaseOpen] = useState(false);
   const [attempted, setAttempted] = useState<Record<number, boolean>>({});
 
   const [brand, setBrand] = useState<Brand>({
+    entityType: "PRIVATE_PROFIT",
     legalName: "Workflow Minds LLC",
     ein: "",
-    vertical: "Financial Services",
+    vertical: "FINANCIAL",
     website: "https://nextsurplus.com",
-    repName: "",
+    privacyUrl: "https://app.nextsurplus.com/legal/workflow-minds/privacy",
+    termsUrl: "https://app.nextsurplus.com/legal/workflow-minds/terms",
+    repName: "Bree Moss",
     repEmail: "bree@nextsurplus.com",
     repPhone: "+1 (432) 400-5579",
     street: "1234 Surplus Way",
@@ -70,12 +132,25 @@ export default function A2pWizardFinal() {
   });
 
   const [campaign, setCampaign] = useState<Campaign>({
-    useCase: "Customer Care",
+    useCase: "CUSTOMER_CARE",
+    description:
+      "Outreach to individuals identified through public court records as potential claimants for surplus funds from foreclosure or tax sales. Messages provide case status, document requests, and payment notifications.",
     volume: "LOW",
     messages: DEFAULT_MESSAGES,
   });
 
+  const canContinue =
+    step === 1
+      ? !!brand.ein.trim() && !!brand.repName.trim()
+      : step === 2
+        ? campaign.messages.every((m) => m.trim().length > 0) && !!campaign.description.trim()
+        : true;
+
   function next() {
+    if (!canContinue) {
+      setAttempted((a) => ({ ...a, [step]: true }));
+      return;
+    }
     setAttempted((a) => ({ ...a, [step]: true }));
     setStep((s) => Math.min(4, s + 1) as Step);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -100,16 +175,12 @@ export default function A2pWizardFinal() {
                   setCampaign={setCampaign}
                   useCaseOpen={useCaseOpen}
                   setUseCaseOpen={setUseCaseOpen}
+                  attempted={!!attempted[2]}
                 />
               )}
               {step === 3 && <Step3Review brand={brand} campaign={campaign} />}
 
-              <NavRow
-                step={step}
-                onBack={back}
-                onNext={next}
-                onPreview={() => setPreview(true)}
-              />
+              <NavRow step={step} onBack={back} onNext={next} canContinue={canContinue} />
             </div>
 
             <aside>{stepHelpFor(step)}</aside>
@@ -118,10 +189,6 @@ export default function A2pWizardFinal() {
       )}
 
       {step === 4 && <Step4Success />}
-
-      {preview && (
-        <PreviewDrawer brand={brand} campaign={campaign} onClose={() => setPreview(false)} />
-      )}
     </>
   );
 }
@@ -132,9 +199,7 @@ function Hero({ step }: { step: Step }) {
     return (
       <div
         className="border-b border-[#04261c]"
-        style={{
-          background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)",
-        }}
+        style={{ background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)" }}
       >
         <div className="mx-auto max-w-[1080px] px-10 py-14 text-center">
           <span
@@ -147,7 +212,7 @@ function Hero({ step }: { step: Step }) {
             Registration Submitted
           </h1>
           <p className="mx-auto mt-3 max-w-[58ch] text-[14.5px] leading-[1.55] text-white/75">
-            The Campaign Registry received the brand and campaign. An SMS and email notification will fire the moment carriers approve.
+            The Campaign Registry received the brand and campaign for review. Notifications will arrive by SMS and email at each status change.
           </p>
         </div>
       </div>
@@ -155,23 +220,21 @@ function Hero({ step }: { step: Step }) {
   }
 
   const titles = {
-    1: "Verify The Brand",
-    2: "Build The Campaign",
+    1: "Brand Registration",
+    2: "Campaign Definition",
     3: "Review And Submit",
   } as const;
 
   const subs = {
-    1: "Carriers verify the legal entity behind every SMS campaign before approving it. This is the entity that gets registered.",
-    2: "Carriers need to know how SMS will be used and need three real example messages. Both shape the approval decision.",
-    3: "Final look before submission. Brand verification runs 1 to 2 business days, then carriers review the campaign for 1 to 3 weeks.",
+    1: "Carriers verify the legal entity behind every SMS campaign before approval. The entity registered here represents the sender to mobile network operators.",
+    2: "Carriers assess how the SMS program will be used and review three sample messages alongside the campaign description.",
+    3: "Final review before submission. Brand verification completes in 1 to 2 business days, followed by carrier campaign review of 1 to 3 weeks.",
   } as const;
 
   return (
     <div
       className="border-b border-[#04261c]"
-      style={{
-        background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)",
-      }}
+      style={{ background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 50%, #13644e 100%)" }}
     >
       <div className="mx-auto max-w-[1080px] px-10 py-12">
         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
@@ -203,7 +266,7 @@ function HeroStep({ n, label, state }: { n: number; label: string; state: "done"
       <span
         className={[
           "inline-flex h-7 w-7 items-center justify-center rounded-full text-[12.5px] font-semibold",
-          state === "done" ? "bg-white text-[#0d4b3a]" : state === "active" ? "bg-white text-[#0d4b3a]" : "bg-white/10 text-white/70",
+          state === "done" || state === "active" ? "bg-white text-[#0d4b3a]" : "bg-white/10 text-white/70",
         ].join(" ")}
         style={{ boxShadow: state === "active" ? "0 0 0 4px rgba(255,255,255,0.15)" : undefined }}
       >
@@ -230,26 +293,30 @@ function Step1Brand({
 
   return (
     <div className="space-y-5">
-      <PreFillBanner />
-
       <Card title="Company">
         <FieldGrid>
-          <Field label="Legal Name" value={brand.legalName} onChange={(v) => u("legalName", v)} />
+          <SelectField
+            label="Entity Type"
+            value={brand.entityType}
+            onChange={(v) => u("entityType", v)}
+            options={ENTITY_TYPES}
+          />
           <Field label="EIN" value={brand.ein} onChange={(v) => u("ein", v)} placeholder="12-3456789" required attempted={attempted} />
-          <Field label="Vertical" value={brand.vertical} onChange={(v) => u("vertical", v)} />
-          <Field label="Website" value={brand.website} onChange={(v) => u("website", v)} />
+          <Field label="Legal Name" value={brand.legalName} onChange={(v) => u("legalName", v)} />
+          <SelectField label="Industry" value={brand.vertical} onChange={(v) => u("vertical", v)} options={VERTICALS} />
+          <Field label="Website" value={brand.website} onChange={(v) => u("website", v)} wide />
         </FieldGrid>
       </Card>
 
-      <Card title="Authorized Representative">
+      <Card title="Authorized Representative" subtitle="Person carriers will contact to verify the brand. Must be reachable by phone and email.">
         <FieldGrid>
-          <Field label="Full Name" value={brand.repName} onChange={(v) => u("repName", v)} placeholder="Jane Operator" required attempted={attempted} />
+          <Field label="Full Name" value={brand.repName} onChange={(v) => u("repName", v)} required attempted={attempted} />
           <Field label="Email" value={brand.repEmail} onChange={(v) => u("repEmail", v)} />
           <Field label="Phone" value={brand.repPhone} onChange={(v) => u("repPhone", v)} wide />
         </FieldGrid>
       </Card>
 
-      <Card title="Company Address">
+      <Card title="Company Address" subtitle="Must match the address registered with the IRS.">
         <FieldGrid>
           <Field label="Street" value={brand.street} onChange={(v) => u("street", v)} wide />
           <Field label="City" value={brand.city} onChange={(v) => u("city", v)} />
@@ -257,20 +324,16 @@ function Step1Brand({
           <Field label="Postal Code" value={brand.postal} onChange={(v) => u("postal", v)} wide />
         </FieldGrid>
       </Card>
-    </div>
-  );
-}
 
-function PreFillBanner() {
-  return (
-    <div className="flex items-center gap-3 rounded-[10px] border border-[#ebedf0] bg-white px-4 py-3">
-      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-[#0d4b3a] text-white">
-        <IconCheck size={13} stroke={2.5} />
-      </span>
-      <div className="text-[12.5px] leading-[1.5] text-[#0a0d14]">
-        <span className="font-semibold">Filled In From Your Company Profile.</span>
-        <span className="text-[#5b606a]"> Edit anything that does not match.</span>
-      </div>
+      <Card
+        title="Legal Documents"
+        subtitle="Carriers and recipients can review the policies that govern messaging. URLs are hosted automatically and update when company details change."
+      >
+        <FieldGrid>
+          <Field label="Privacy Policy" value={brand.privacyUrl} onChange={(v) => u("privacyUrl", v)} wide />
+          <Field label="Terms Of Service" value={brand.termsUrl} onChange={(v) => u("termsUrl", v)} wide />
+        </FieldGrid>
+      </Card>
     </div>
   );
 }
@@ -281,68 +344,83 @@ function Step2Campaign({
   setCampaign,
   useCaseOpen,
   setUseCaseOpen,
+  attempted,
 }: {
   campaign: Campaign;
   setCampaign: (c: Campaign) => void;
   useCaseOpen: boolean;
   setUseCaseOpen: (b: boolean) => void;
+  attempted: boolean;
 }) {
-  const otherUseCases = ["Marketing", "Account Notification", "Higher Education", "Polling And Voting", "Public Service"];
-
   function swapMessage(i: number) {
     const alt = ALT_MESSAGES[i % ALT_MESSAGES.length];
     setCampaign({ ...campaign, messages: campaign.messages.map((x, j) => (j === i ? alt : x)) });
   }
 
+  const current = USE_CASES.find((u) => u.value === campaign.useCase) ?? USE_CASES[0];
+
   return (
     <div className="space-y-5">
       <Card title="Use Case">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
-              Suggested For Surplus Recovery
+        <div className="rounded-[10px] border border-[#ebedf0] bg-white p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
+                Suggested For Surplus Recovery
+              </div>
+              <div className="mt-1.5 text-[18px] font-semibold tracking-[-0.014em] text-[#0a0d14]">
+                {current.label}
+              </div>
+              <p className="mt-2 max-w-[54ch] text-[13px] leading-[1.55] text-[#5b606a]">
+                {current.description}
+              </p>
             </div>
-            <div className="mt-1 text-[16px] font-semibold tracking-[-0.012em] text-[#0a0d14]">
-              {campaign.useCase}
-            </div>
-            <p className="mt-1 max-w-[44ch] text-[12.5px] leading-[1.55] text-[#5b606a]">
-              Best fit for outreach to identified parties of interest, not cold prospects. Most other use cases get denied for surplus.
-            </p>
+            <button
+              type="button"
+              onClick={() => setUseCaseOpen(!useCaseOpen)}
+              className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[12px] font-medium text-[#0a0d14] hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
+            >
+              Change Use Case
+              <IconChevronDown size={12} stroke={2.25} className={useCaseOpen ? "rotate-180 transition" : "transition"} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setUseCaseOpen(!useCaseOpen)}
-            className="cursor-pointer text-[12px] font-medium text-[#0d4b3a] hover:text-[#13644e]"
-          >
-            Change Use Case
-          </button>
         </div>
 
         {useCaseOpen && (
-          <div className="mt-4 rounded-[10px] border border-[#ebedf0] bg-white p-4">
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-              Alternative Use Cases
+          <div className="mt-3 space-y-2">
+            <div className="px-1 text-[11px] text-[#5b606a]">
+              Other use cases rarely fit surplus recovery and may extend or fail carrier review. Choose with care.
             </div>
-            <p className="mt-1.5 text-[11.5px] text-[#5b606a]">
-              These rarely fit surplus recovery. Carriers may deny if mismatched.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {otherUseCases.map((u) => (
-                <button
-                  key={u}
-                  type="button"
-                  onClick={() => {
-                    setCampaign({ ...campaign, useCase: u });
-                    setUseCaseOpen(false);
-                  }}
-                  className="cursor-pointer rounded-[7px] border border-[#ebedf0] bg-white px-3 py-1.5 text-[12px] font-medium text-[#0a0d14] hover:border-[#0d4b3a]"
-                >
-                  {u}
-                </button>
-              ))}
-            </div>
+            {USE_CASES.filter((u) => u.value !== campaign.useCase).map((u) => (
+              <button
+                key={u.value}
+                type="button"
+                onClick={() => {
+                  setCampaign({ ...campaign, useCase: u.value });
+                  setUseCaseOpen(false);
+                }}
+                className="block w-full cursor-pointer rounded-[10px] border border-[#ebedf0] bg-white p-4 text-left hover:border-[#0d4b3a]"
+              >
+                <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">{u.label}</div>
+                <p className="mt-1 text-[12px] leading-[1.5] text-[#5b606a]">{u.description}</p>
+              </button>
+            ))}
           </div>
         )}
+      </Card>
+
+      <Card title="Campaign Description" subtitle="A short statement describing how SMS is used. Carriers compare this to the sample messages.">
+        <textarea
+          value={campaign.description}
+          onChange={(e) => setCampaign({ ...campaign, description: e.target.value })}
+          rows={3}
+          className={[
+            "w-full rounded-[7px] border bg-white p-3 text-[13px] leading-[1.5] text-[#0a0d14] outline-none",
+            attempted && !campaign.description.trim()
+              ? "border-[#fca5a5] focus:border-[#b42318]"
+              : "border-[#ebedf0] focus:border-[#0d4b3a]",
+          ].join(" ")}
+        />
       </Card>
 
       <Card title="Monthly Volume">
@@ -366,7 +444,7 @@ function Step2Campaign({
                   {v === "LOW" ? "Low" : v === "MEDIUM" ? "Medium" : "High"}
                 </div>
                 <div className={["mt-0.5 text-[11.5px]", selected ? "text-white/75" : "text-[#5b606a]"].join(" ")}>
-                  {v === "LOW" ? "Up To 3,000 / Mo" : v === "MEDIUM" ? "Up To 30,000 / Mo" : "Above 30,000 / Mo"}
+                  {v === "LOW" ? "Up To 3,000 Per Month" : v === "MEDIUM" ? "Up To 30,000 Per Month" : "Above 30,000 Per Month"}
                 </div>
               </button>
             );
@@ -374,81 +452,112 @@ function Step2Campaign({
         </div>
       </Card>
 
-      <Card title="Sample Messages">
-        <div className="mb-3 text-[12.5px] leading-[1.55] text-[#5b606a]">
-          Three pre-filled defaults that match Customer Care for surplus recovery. Edit inline. Click Swap Template to load an alternative. Tokens like {"{first_name}"} fill in at send time.
-        </div>
+      <Card title="Sample Messages" subtitle="Three templates carriers will compare against the campaign description. These are starting points tailored to the selected use case and can be edited inline. Tokens such as {first_name} fill at send time.">
         <div className="space-y-3">
-          {campaign.messages.map((m, i) => (
-            <div key={i} className="rounded-[10px] border border-[#ebedf0] bg-white p-3.5">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+          {campaign.messages.map((m, i) => {
+            const empty = attempted && !m.trim();
+            return (
+              <div
+                key={i}
+                className={[
+                  "rounded-[10px] border bg-white p-3.5",
+                  empty ? "border-[#fca5a5]" : "border-[#ebedf0]",
+                ].join(" ")}
+              >
+                <div className="mb-2 flex items-center justify-between">
                   <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
                     Template {i + 1}
                   </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => swapMessage(i)}
+                      className="cursor-pointer text-[11px] font-medium text-[#0d4b3a] hover:text-[#13644e]"
+                    >
+                      Swap Template
+                    </button>
+                    <span className="text-[10.5px] text-[#9298a3]">{m.length} / 160</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => swapMessage(i)}
-                    className="cursor-pointer text-[11px] font-medium text-[#0d4b3a] hover:text-[#13644e]"
-                  >
-                    Swap Template
-                  </button>
-                  <span className="text-[10.5px] text-[#9298a3]">{m.length} / 160</span>
-                </div>
+                <textarea
+                  value={m}
+                  onChange={(e) =>
+                    setCampaign({
+                      ...campaign,
+                      messages: campaign.messages.map((x, j) => (j === i ? e.target.value : x)),
+                    })
+                  }
+                  rows={2}
+                  className="w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-[1.45] text-[#0a0d14] outline-none"
+                />
               </div>
-              <textarea
-                value={m}
-                onChange={(e) =>
-                  setCampaign({
-                    ...campaign,
-                    messages: campaign.messages.map((x, j) => (j === i ? e.target.value : x)),
-                  })
-                }
-                rows={2}
-                className="w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-[1.45] text-[#0a0d14] outline-none"
-              />
-            </div>
-          ))}
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card title="Keywords And Opt-Outs" subtitle="STOP and HELP keyword behavior is handled by the platform. No additional configuration is needed for compliance with carrier requirements.">
+        <div className="grid grid-cols-2 gap-3">
+          <KeywordRow keyword="STOP" behavior="Marks the contact do-not-text and confirms with a standard reply." />
+          <KeywordRow keyword="HELP" behavior="Returns brand name, support email, and how to opt back in." />
         </div>
       </Card>
     </div>
   );
 }
 
+function KeywordRow({ keyword, behavior }: { keyword: string; behavior: string }) {
+  return (
+    <div className="rounded-[10px] border border-[#ebedf0] bg-white p-3.5">
+      <div className="flex items-center gap-2">
+        <span className="text-[12px] font-semibold tabular-nums text-[#0a0d14]">{keyword}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">Automatic</span>
+      </div>
+      <p className="mt-1 text-[11.5px] leading-[1.5] text-[#5b606a]">{behavior}</p>
+    </div>
+  );
+}
+
 // ─── Step 3: Review ─────────────────────────────────────────────────────
 function Step3Review({ brand, campaign }: { brand: Brand; campaign: Campaign }) {
+  const useCaseLabel = USE_CASES.find((u) => u.value === campaign.useCase)?.label ?? campaign.useCase;
+  const verticalLabel = VERTICALS.find((v) => v.value === brand.vertical)?.label ?? brand.vertical;
+  const entityLabel = ENTITY_TYPES.find((e) => e.value === brand.entityType)?.label ?? brand.entityType;
+
   return (
     <div className="space-y-5">
       <Card title="Brand">
         <ReviewGrid>
+          <ReviewItem label="Entity Type" value={entityLabel} />
           <ReviewItem label="Legal Name" value={brand.legalName} />
           <ReviewItem label="EIN" value={brand.ein || "Missing"} missing={!brand.ein} />
-          <ReviewItem label="Vertical" value={brand.vertical} />
+          <ReviewItem label="Industry" value={verticalLabel} />
           <ReviewItem label="Website" value={brand.website} />
+          <ReviewItem label="Privacy Policy" value={brand.privacyUrl} />
+          <ReviewItem label="Terms" value={brand.termsUrl} />
           <ReviewItem label="Authorized Rep" value={brand.repName || "Missing"} missing={!brand.repName} />
           <ReviewItem label="Rep Email" value={brand.repEmail} />
           <ReviewItem label="Rep Phone" value={brand.repPhone} />
-          <ReviewItem label="Address" value={`${brand.street}, ${brand.city}, ${brand.state} ${brand.postal}`} />
+          <ReviewItem label="Address" value={`${brand.street}, ${brand.city}, ${brand.state} ${brand.postal}`} wide />
         </ReviewGrid>
       </Card>
 
       <Card title="Campaign">
         <ReviewGrid>
-          <ReviewItem label="Use Case" value={campaign.useCase} />
+          <ReviewItem label="Use Case" value={useCaseLabel} />
           <ReviewItem
             label="Monthly Volume"
             value={
               campaign.volume === "LOW"
-                ? "Low (Up To 3,000 / Mo)"
+                ? "Low (Up To 3,000 Per Month)"
                 : campaign.volume === "MEDIUM"
-                  ? "Medium (Up To 30,000 / Mo)"
-                  : "High (Above 30,000 / Mo)"
+                  ? "Medium (Up To 30,000 Per Month)"
+                  : "High (Above 30,000 Per Month)"
             }
           />
+          <ReviewItem label="Description" value={campaign.description} wide />
           <ReviewItem label="Sample Messages" value={`${campaign.messages.length} Submitted`} />
-          <ReviewItem label="HELP And STOP Behavior" value="Handled Automatically" />
+          <ReviewItem label="STOP And HELP Behavior" value="Handled By Platform" />
         </ReviewGrid>
       </Card>
 
@@ -459,28 +568,20 @@ function Step3Review({ brand, campaign }: { brand: Brand; campaign: Campaign }) 
 
 function FeeRow() {
   return (
-    <div className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white" style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}>
-      <div className="grid grid-cols-[1fr_auto] items-center gap-4 px-6 py-4">
-        <div>
-          <div className="flex items-baseline gap-2">
-            <div className="text-[14.5px] font-semibold tracking-[-0.012em] text-[#0a0d14]">
-              Carrier Verification Fee
-            </div>
-            <div className="text-[14.5px] font-semibold tabular-nums text-[#0a0d14]">$40</div>
+    <div
+      className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+      style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+    >
+      <div className="px-6 py-5">
+        <div className="flex items-baseline justify-between gap-4">
+          <div className="text-[14.5px] font-semibold tracking-[-0.012em] text-[#0a0d14]">
+            Carrier Verification Fee
           </div>
-          <p className="mt-1 max-w-[58ch] text-[12px] leading-[1.5] text-[#5b606a]">
-            Set by The Campaign Registry. Not marked up. Same rate at every messaging provider. Charged at submission. Brand verifies in 1 to 2 business days, then carriers review the campaign for 1 to 3 weeks.
-          </p>
+          <div className="text-[16px] font-semibold tabular-nums text-[#0a0d14]">$40.00</div>
         </div>
-        <a
-          href="https://www.campaignregistry.com/pricing"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[11.5px] font-medium text-[#5b606a] hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
-        >
-          See TCR Pricing
-          <IconExternalLink size={11} stroke={2.25} />
-        </a>
+        <p className="mt-2 max-w-[64ch] text-[12.5px] leading-[1.55] text-[#5b606a]">
+          The Campaign Registry, an industry body operated by the major US mobile carriers, administers brand verification on behalf of the wireless industry. The fee passes through at cost and is identical at every messaging provider. Verification completes within 1 to 2 business days. Carrier review of the campaign follows for 1 to 3 weeks before SMS is enabled across registered numbers.
+        </p>
       </div>
     </div>
   );
@@ -502,21 +603,21 @@ function Step4Success() {
             <Timeline
               icon={<IconShieldCheck size={14} stroke={2.25} />}
               title="Brand Verification"
-              when="Within 1 To 2 Business Days"
-              desc="The Campaign Registry verifies the legal entity, EIN, and contact details."
+              when="1 To 2 Business Days"
+              desc="The Campaign Registry verifies the legal entity, EIN, address, and authorized representative."
               active
             />
             <Timeline
               icon={<IconClock size={14} stroke={2.25} />}
-              title="Carrier Review"
+              title="Carrier Campaign Review"
               when="1 To 3 Weeks After Verification"
-              desc="T-Mobile, AT&T, and Verizon review the campaign use case and sample messages."
+              desc="Mobile network operators evaluate the campaign use case, description, and sample messages."
             />
             <Timeline
               icon={<IconCheck size={14} stroke={2.25} />}
-              title="SMS Goes Live"
-              when="The Moment Carriers Approve"
-              desc="SMS flips on across every phone number automatically. An SMS and email confirmation fires."
+              title="SMS Activation"
+              when="At The Moment Of Approval"
+              desc="SMS capability enables automatically across every phone number registered to the account. A confirmation arrives by SMS and email."
             />
           </div>
         </div>
@@ -529,7 +630,7 @@ function Step4Success() {
             <div className="flex-1">
               <div className="text-[13px] font-semibold text-[#0a0d14]">Confirmation Sent</div>
               <div className="mt-0.5 text-[12px] text-[#5b606a]">
-                Submission record and tracking link sent to bree@nextsurplus.com.
+                The submission record and tracking link were sent to bree@nextsurplus.com.
               </div>
             </div>
           </div>
@@ -590,46 +691,73 @@ function Timeline({
   );
 }
 
-// ─── Compliance Coach (editorial side panel) ───────────────────────────
+// ─── Compliance Coach ──────────────────────────────────────────────────
 function stepHelpFor(step: Step) {
   if (step === 1) {
     return (
       <ComplianceCoach
         title="What Carriers Verify"
-        lead="Brand registration goes through three checks before the campaign can be reviewed."
+        lead="Brand registration passes through three checks before the campaign can enter carrier review."
         tips={[
-          { headline: "Legal Entity", body: "Must be verifiable in your state's business registry. Use the exact name as it appears in filings." },
-          { headline: "EIN", body: "Must match IRS records. Format as 12-3456789 with the hyphen. Single most common denial reason." },
-          { headline: "Authorized Rep", body: "Carriers may call this person to verify the brand. Use a reachable cell, not a help desk line." },
+          {
+            headline: "Legal Entity",
+            body: "Carriers validate the brand name against the entity registered with the state and the IRS. Use the legal name exactly as it appears on filings.",
+          },
+          {
+            headline: "EIN",
+            body: "Carriers cross-reference the EIN against IRS records. Format the value with the hyphen, for example 12-3456789. EIN format errors are the single most common rejection reason.",
+          },
+          {
+            headline: "Authorized Representative",
+            body: "Mobile carriers may place a verification call. Provide a direct line and an actively monitored email rather than a help desk address.",
+          },
         ]}
-        footer="Most Common Denials: EIN typos, vertical mismatch, undeliverable rep email."
+        footer="Common rejection reasons include EIN format errors, industry mismatches between the website and registered vertical, and undeliverable representative contact details."
       />
     );
   }
   if (step === 2) {
     return (
       <ComplianceCoach
-        title="What Makes A Strong Campaign"
-        lead="Three pieces shape whether carriers approve the campaign."
+        title="What Strengthens A Campaign"
+        lead="Three components shape the carrier decision on whether the campaign is approved."
         tips={[
-          { headline: "Use Case Match", body: "Sample messages should sound like the use case. Customer Care messages read transactional, not promotional." },
-          { headline: "Opt-In Flow", body: "Carriers want a clear path showing how recipients consented. Public-record outreach works if phrased correctly." },
-          { headline: "Keywords", body: "HELP and STOP must work. Both are handled automatically by the portal." },
+          {
+            headline: "Use Case Match",
+            body: "The sample messages must reflect the selected use case. Customer Care messages should read as transactional follow-up, not as cold marketing outreach.",
+          },
+          {
+            headline: "Opt-In Description",
+            body: "Carriers expect a clear path showing how recipients consented to receive messages. Public-record outreach is acceptable when the source and rationale are stated explicitly.",
+          },
+          {
+            headline: "Keyword Compliance",
+            body: "STOP and HELP keyword responses are required by FCC and CTIA guidelines. Both behaviors are handled by the platform with no additional configuration required.",
+          },
         ]}
-        footer="Most Common Denials: marketing tone in Customer Care, missing opt-in description, volume mismatch."
+        footer="Common rejection reasons include marketing-style language inside a Customer Care use case, missing opt-in explanation, and stated volume that exceeds the use-case norms."
       />
     );
   }
   return (
     <ComplianceCoach
       title="After Submission"
-      lead="Three phases. Each one has a defined timeline."
+      lead="Three phases follow once the registration is submitted to The Campaign Registry."
       tips={[
-        { headline: "Brand Verification", body: "1 to 2 business days. The Campaign Registry confirms the legal entity and EIN." },
-        { headline: "Carrier Review", body: "1 to 3 weeks. T-Mobile, AT&T, and Verizon evaluate the use case and sample messages." },
-        { headline: "SMS Goes Live", body: "Automatic on approval. SMS flips on across every phone number purchased." },
+        {
+          headline: "Brand Verification",
+          body: "The Campaign Registry confirms the legal entity and EIN within 1 to 2 business days. Status updates flow through to the Phone Numbers settings panel.",
+        },
+        {
+          headline: "Carrier Review",
+          body: "Mobile carriers conduct a 1 to 3 week review of the campaign use case, description, and sample messages once the brand verifies.",
+        },
+        {
+          headline: "SMS Activation",
+          body: "On approval, SMS capability activates across every phone number registered to the account, with notifications by SMS and email.",
+        },
       ]}
-      footer="If denied: resubmit free. The specific rejection reason surfaces inline on the Phone Numbers page."
+      footer="If a submission is rejected, the specific reason surfaces on the Phone Numbers settings panel with guidance on the corrections required before resubmission."
     />
   );
 }
@@ -690,14 +818,15 @@ function ComplianceCoach({
 }
 
 // ─── Building blocks ────────────────────────────────────────────────────
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <div
       className="overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
       style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
-      <div className="border-b border-[#f1f2f4] px-6 py-3.5">
+      <div className="border-b border-[#f1f2f4] px-6 py-4">
         <div className="text-[14px] font-semibold tracking-[-0.012em] text-[#0a0d14]">{title}</div>
+        {subtitle && <div className="mt-1 max-w-[64ch] text-[12px] leading-[1.5] text-[#5b606a]">{subtitle}</div>}
       </div>
       <div className="px-6 py-5">{children}</div>
     </div>
@@ -728,12 +857,10 @@ function Field({
   const errored = required && attempted && !value;
   return (
     <div className={wide ? "col-span-2" : ""}>
-      <div className="flex items-center gap-2">
-        <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
-          {label}
-        </label>
-        {required && <span className="text-[10px] font-medium text-[#9298a3]">Required</span>}
-      </div>
+      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
+        {label}
+        {required && <span className="ml-1 text-[#b42318]">*</span>}
+      </label>
       <input
         type="text"
         value={value}
@@ -744,20 +871,50 @@ function Field({
           errored ? "border-[#fca5a5] focus:border-[#b42318]" : "border-[#ebedf0] focus:border-[#0d4b3a]",
         ].join(" ")}
       />
-      {errored && (
-        <div className="mt-1 text-[11px] font-medium text-[#b42318]">Fill This In Before Continuing</div>
-      )}
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  wide,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  wide?: boolean;
+}) {
+  return (
+    <div className={wide ? "col-span-2" : ""}>
+      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">
+        {label}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1.5 h-[38px] w-full cursor-pointer rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[13px] text-[#0a0d14] outline-none focus:border-[#0d4b3a]"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
 
 function ReviewGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-x-6 gap-y-0">{children}</div>;
+  return <div className="grid grid-cols-2 gap-x-6">{children}</div>;
 }
 
-function ReviewItem({ label, value, missing }: { label: string; value: string; missing?: boolean }) {
+function ReviewItem({ label, value, missing, wide }: { label: string; value: string; missing?: boolean; wide?: boolean }) {
   return (
-    <div className="border-b border-[#f1f2f4] py-3">
+    <div className={["border-b border-[#f1f2f4] py-3", wide ? "col-span-2" : ""].join(" ")}>
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">{label}</div>
       <div className={["mt-1 text-[13px] font-medium", missing ? "text-[#b42318]" : "text-[#0a0d14]"].join(" ")}>
         {value}
@@ -766,17 +923,17 @@ function ReviewItem({ label, value, missing }: { label: string; value: string; m
   );
 }
 
-// ─── Nav row (Preview only on Step 3) ──────────────────────────────────
+// ─── Nav row ────────────────────────────────────────────────────────────
 function NavRow({
   step,
   onBack,
   onNext,
-  onPreview,
+  canContinue,
 }: {
   step: Step;
   onBack: () => void;
   onNext: () => void;
-  onPreview: () => void;
+  canContinue: boolean;
 }) {
   return (
     <div className="mt-7 flex items-center justify-between">
@@ -790,119 +947,17 @@ function NavRow({
         Back
       </button>
 
-      <div className="flex items-center gap-3">
-        {step === 3 && (
-          <button
-            type="button"
-            onClick={onPreview}
-            className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[7px] border border-[#ebedf0] bg-white px-3.5 text-[12.5px] font-medium text-[#5b606a] hover:border-[#0d4b3a] hover:text-[#0d4b3a]"
-          >
-            <IconEye size={12} stroke={2.25} />
-            Preview Submission
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onNext}
-          className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-6 text-[13.5px] font-medium text-white"
-          style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
-        >
-          {step === 1 ? "Continue To Campaign" : step === 2 ? "Continue To Review" : "Submit Registration"}
-          {step === 3 ? <IconArrowRight size={13} stroke={2.25} /> : <IconChevronRight size={13} stroke={2.25} />}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Live preview drawer ────────────────────────────────────────────────
-function PreviewDrawer({ brand, campaign, onClose }: { brand: Brand; campaign: Campaign; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex">
-      <button type="button" onClick={onClose} aria-label="Close preview" className="flex-1 cursor-default bg-[#0a0d14]/30" />
-      <aside className="flex w-[420px] flex-col overflow-y-auto border-l border-[#ebedf0] bg-white">
-        <div
-          className="border-b border-[#04261c] px-7 py-5 text-white"
-          style={{ background: "linear-gradient(135deg, #0a3d2c 0%, #0d4b3a 100%)" }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-white/60">
-                Submission Preview
-              </div>
-              <div className="mt-0.5 text-[15px] font-semibold tracking-[-0.012em]">
-                What Carriers See
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer rounded-[6px] p-1 text-white/70 hover:bg-white/10 hover:text-white"
-              aria-label="Close"
-            >
-              <IconX size={16} stroke={2.25} />
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-5 px-7 py-6">
-          <section>
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-              Brand Submission
-            </div>
-            <PreviewLine label="Legal Name" value={brand.legalName} />
-            <PreviewLine label="EIN" value={brand.ein || "Required"} warn={!brand.ein} />
-            <PreviewLine label="Vertical" value={brand.vertical} />
-            <PreviewLine label="Website" value={brand.website.replace(/^https?:\/\//, "")} />
-            <PreviewLine label="Rep" value={brand.repName || "Required"} warn={!brand.repName} />
-            <PreviewLine label="Address" value={`${brand.city}, ${brand.state}`} />
-          </section>
-
-          <section>
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-              Campaign Submission
-            </div>
-            <PreviewLine label="Use Case" value={campaign.useCase} />
-            <PreviewLine
-              label="Monthly Volume"
-              value={
-                campaign.volume === "LOW" ? "Low (3k / mo)" : campaign.volume === "MEDIUM" ? "Medium (30k / mo)" : "High (30k+ / mo)"
-              }
-            />
-            <PreviewLine label="Templates" value={`${campaign.messages.length} Submitted`} />
-          </section>
-
-          <section>
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
-              Sample Message
-            </div>
-            <div className="mt-2 rounded-[10px] bg-[#f1f2f4] p-3 text-[12.5px] leading-[1.45] text-[#0a0d14]">
-              {campaign.messages[0]}
-            </div>
-          </section>
-
-          <a
-            href="https://www.campaignregistry.com/about-tcr"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#5b606a] hover:text-[#0d4b3a]"
-          >
-            About The Campaign Registry
-            <IconExternalLink size={11} stroke={2.25} />
-          </a>
-        </div>
-      </aside>
-    </div>
-  );
-}
-
-function PreviewLine({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
-  return (
-    <div className="mt-3 flex items-baseline justify-between gap-3 border-b border-[#f1f2f4] pb-2">
-      <span className="text-[11px] uppercase tracking-[0.06em] text-[#9298a3]">{label}</span>
-      <span className={["text-[12.5px] font-medium tabular-nums", warn ? "text-[#b42318]" : "text-[#0a0d14]"].join(" ")}>
-        {value}
-      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={!canContinue}
+        className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#0d4b3a] px-6 text-[13.5px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        style={canContinue ? { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" } : undefined}
+        title={canContinue ? undefined : "Complete the required fields to continue"}
+      >
+        {step === 1 ? "Continue To Campaign" : step === 2 ? "Continue To Review" : "Submit Registration"}
+        {step === 3 ? <IconArrowRight size={13} stroke={2.25} /> : <IconChevronRight size={13} stroke={2.25} />}
+      </button>
     </div>
   );
 }
