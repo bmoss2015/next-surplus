@@ -19,18 +19,19 @@ type ListOption = {
   meta?: string;
 };
 
-const LIST_OPTIONS: ListOption[] = [
-  { id: "all", name: "All Leads", count: 412, source: "all" },
-  { id: "fort-bend", name: "Fort Bend County, Texas", count: 47, source: "import", meta: "Imported Jun 21, 2026" },
-  { id: "mecklenburg", name: "Mecklenburg County, North Carolina", count: 23, source: "import", meta: "Imported Jun 19, 2026" },
-  { id: "heir", name: "Heir Research Batch", count: 12, source: "import", meta: "Imported Jun 17, 2026" },
-  { id: "travis", name: "Travis County, Texas", count: 31, source: "import", meta: "Imported May 28, 2026" },
-  { id: "high-surplus", name: "High Surplus All States", count: 38, source: "saved" },
-  { id: "no-contact-60", name: "No Contact 60+ Days", count: 34, source: "saved" },
+const FALLBACK_LIST_OPTIONS: ListOption[] = [
+  { id: "all", name: "All Leads", count: 0, source: "all" },
 ];
 
-export function DialerSetupWizard() {
+export function DialerSetupWizard({
+  options,
+  resumeSession,
+}: {
+  options?: ListOption[];
+  resumeSession?: { id: string; list_name: string; remaining: number; paused_at: string | null } | null;
+} = {}) {
   const router = useRouter();
+  const listOptions = options && options.length > 0 ? options : FALLBACK_LIST_OPTIONS;
   const [selected, setSelected] = useState<ListOption | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -51,7 +52,7 @@ export function DialerSetupWizard() {
     return () => document.removeEventListener("mousedown", onDown);
   }, [listOpen]);
 
-  const filteredOptions = LIST_OPTIONS.filter((o) =>
+  const filteredOptions = listOptions.filter((o) =>
     o.name.toLowerCase().includes(search.toLowerCase()),
   );
 

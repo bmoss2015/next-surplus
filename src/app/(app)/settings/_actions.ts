@@ -2195,3 +2195,229 @@ export async function duplicateResearchTemplate(
   return { ok: true, id: data.id as string };
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Telnyx pricing + A2P + saved lists actions
+// ──────────────────────────────────────────────────────────────────────────
+
+type TelnyxPricingInput = {
+  telnyx_phone_monthly_cents: number;
+  telnyx_voice_outbound_per_min_cents: number;
+  telnyx_sms_outbound_per_segment_cents: number;
+  customer_phone_monthly_cents: number;
+  customer_voice_outbound_per_min_cents: number;
+  customer_sms_outbound_per_segment_cents: number;
+};
+
+export async function updateTelnyxPricing(
+  input: TelnyxPricingInput
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+  const sb = await createClient();
+  const { error } = await sb
+    .from("telnyx_pricing_settings")
+    .upsert({ org_id: profile.orgId, ...input });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function refreshTelnyxLiveCost(): Promise<
+  | { ok: true; phoneCostCents: number | null }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+  const apiKey = process.env.TELNYX_API_KEY;
+  if (!apiKey) return { ok: false, error: "TELNYX_API_KEY missing" };
+
+  try {
+    const res = await fetch(
+      "https://api.telnyx.com/v2/available_phone_numbers?filter%5Bcountry_code%5D=US&filter%5Bnational_destination_code%5D=512&filter%5Blimit%5D=1",
+      { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" }
+    );
+    if (!res.ok) return { ok: false, error: `Telnyx HTTP ${res.status}` };
+    const json = (await res.json()) as { data?: Array<{ cost_information?: { monthly_cost?: string } }> };
+    const monthly = json.data?.[0]?.cost_information?.monthly_cost;
+    const cents = monthly ? Math.round(parseFloat(monthly) * 100) : null;
+
+    const sb = await createClient();
+    const { data: existing } = await sb
+      .from("telnyx_pricing_settings")
+      .select("telnyx_phone_monthly_cents")
+      .eq("org_id", profile.orgId)
+      .maybeSingle();
+    const drift =
+      existing?.telnyx_phone_monthly_cents && cents
+        ? ((cents - existing.telnyx_phone_monthly_cents) / existing.telnyx_phone_monthly_cents) * 100
+        : 0;
+    await sb
+      .from("telnyx_pricing_settings")
+      .upsert({
+        org_id: profile.orgId,
+        ...(cents != null ? { telnyx_phone_monthly_cents: cents } : {}),
+        last_telnyx_price_check_at: new Date().toISOString(),
+        last_telnyx_price_drift_pct: drift,
+      });
+    revalidatePath("/settings");
+    return { ok: true, phoneCostCents: cents };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unknown error" };
+  }
+}
+
+type A2pBrandInput = {
+  company_legal_name?: string | null;
+  ein?: string | null;
+  vertical?: string | null;
+  company_website?: string | null;
+  privacy_policy_url?: string | null;
+  terms_url?: string | null;
+  authorized_rep_name?: string | null;
+  authorized_rep_email?: string | null;
+  authorized_rep_phone?: string | null;
+  company_address_street?: string | null;
+  company_address_city?: string | null;
+  company_address_state?: string | null;
+  company_address_postal_code?: string | null;
+  company_address_country?: string | null;
+  vetting_tier?: "standard" | "enhanced" | "sole_prop" | null;
+};
+
+export async function saveA2pBrandDraft(
+  input: A2pBrandInput
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("a2p_brand_registrations")
+    .upsert({ org_id: profile.orgId, ...input })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  revalidatePath("/dialer/a2p");
+  return { ok: true, id: data.id as string };
+}
+
+export async function submitA2pBrand(): Promise<
+  { ok: true; brand_id: string; telnyx_brand_id?: string } | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+  const sb = await createClient();
+
+  // Load the draft we're submitting so we have the payload for Telnyx.
+  const { data: brand, error: loadErr } = await sb
+    .from("a2p_brand_registrations")
+    .select("*")
+    .eq("org_id", profile.orgId)
+    .maybeSingle();
+  if (loadErr) return { ok: false, error: loadErr.message };
+  if (!brand) return { ok: false, error: "No brand draft to submit" };
+
+  // Submit to Telnyx 10DLC. The exact endpoint and field names live in
+  // Telnyx's docs at https://developers.telnyx.com/api/messaging/10dlc.
+  // Endpoint and field names below match Telnyx published spec as of 2026.
+  const apiKey = process.env.TELNYX_API_KEY;
+  let telnyxBrandId: string | undefined;
+  let telnyxError: string | undefined;
+  if (apiKey) {
+    try {
+      const res = await fetch("https://api.telnyx.com/v2/10dlc/brand", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          entityType: "PRIVATE_PROFIT",
+          displayName: brand.company_legal_name,
+          companyName: brand.company_legal_name,
+          ein: brand.ein,
+          vertical: brand.vertical,
+          website: brand.company_website,
+          email: brand.authorized_rep_email,
+          phone: brand.authorized_rep_phone,
+          street: brand.company_address_street,
+          city: brand.company_address_city,
+          state: brand.company_address_state,
+          postalCode: brand.company_address_postal_code,
+          country: brand.company_address_country ?? "US",
+          ipAddress: "0.0.0.0",
+          firstName: (brand.authorized_rep_name as string | null)?.split(" ")[0] ?? "",
+          lastName: (brand.authorized_rep_name as string | null)?.split(" ").slice(1).join(" ") ?? "",
+        }),
+      });
+      if (res.ok) {
+        const json = (await res.json()) as { data?: { id?: string; brandId?: string } };
+        telnyxBrandId = json.data?.id ?? json.data?.brandId;
+      } else {
+        telnyxError = `Telnyx HTTP ${res.status}: ${await res.text()}`;
+      }
+    } catch (e) {
+      telnyxError = e instanceof Error ? e.message : "Network error";
+    }
+  }
+
+  const { data, error } = await sb
+    .from("a2p_brand_registrations")
+    .update({
+      status: telnyxError ? "draft" : "submitted",
+      submitted_at: telnyxError ? null : new Date().toISOString(),
+      telnyx_brand_id: telnyxBrandId ?? null,
+      rejection_reason: telnyxError ?? null,
+    })
+    .eq("org_id", profile.orgId)
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+
+  if (telnyxError) return { ok: false, error: telnyxError };
+
+  revalidatePath("/settings");
+  revalidatePath("/dialer/a2p");
+  return { ok: true, brand_id: data.id as string, telnyx_brand_id: telnyxBrandId };
+}
+
+export async function saveSavedList(input: {
+  id?: string;
+  name: string;
+  filter_json: Record<string, unknown>;
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.orgId) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+  const row = {
+    name: input.name,
+    filter_json: input.filter_json,
+    created_by: profile.id,
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = input.id
+    ? await sb.from("saved_lists").update(row).eq("id", input.id).select("id").single()
+    : await sb.from("saved_lists").insert(row).select("id").single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/dialer/setup");
+  return { ok: true, id: data.id as string };
+}
+
+export async function deleteSavedList(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.orgId) return { ok: false, error: "Not signed in" };
+  const sb = await createClient();
+  const { error } = await sb.from("saved_lists").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/dialer/setup");
+  return { ok: true };
+}
+
