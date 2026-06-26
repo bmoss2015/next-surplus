@@ -11,6 +11,10 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 
 
 ### Added
+- Fix SENTRY-WIRE: Adds @sentry/nextjs (v8.55) with client/server/edge configs, an `instrumentation.ts` register hook, and the `withSentryConfig` wrapper in next.config.ts. All four Sentry init paths are gated on a DSN env var (`NEXT_PUBLIC_SENTRY_DSN` for the browser, `SENTRY_DSN` server-side, falls back to the public DSN). When the DSN is unset Sentry is a no-op, so local dev and any branch missing the env var still build and boot. Source-map upload only activates when `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are all present in the build environment. Tunnel route `/monitoring` is enabled so ad-blockers don't drop client error reports. (2026-06-26T11:30:00-05:00)
+
+
+
 - Fix BANK-ACCOUNT-PRIMARY: Adds a Primary designation to bank accounts so an org picks which verified account is the default funding source for outgoing checks. Migration 0163 adds `mail_bank_accounts.is_primary` boolean + a partial unique index `(org_id) WHERE is_primary=true` so two concurrent Set-As-Primary clicks can't end up with two primaries. New `setMailBankAccountPrimary` server action clears every other bank's `is_primary` first, then sets this one. Bank card under VERIFIED badge now shows a PRIMARY chip when applicable; verified non-primary cards show a Set As Primary button. fetchMailBankAccounts sorts is_primary first, then verified, then newest. Matches Stripe Dashboard / Mercury / Bill.com bank-account list pattern. Old "Default for outgoing checks" string in the card foot replaced by "Primary funding source for checks" tied to the is_primary flag. (2026-06-26T08:50:00-05:00)
 
 
