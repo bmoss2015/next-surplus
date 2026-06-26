@@ -10,7 +10,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateOrgInfo } from "@/app/(app)/settings/_actions";
-import { useSaveBarSection } from "@/components/SettingsSaveBar";
+import { useSaveBarSection } from "@/Components/SettingsSaveBar";
 import {
   uploadOrgLogo,
   removeOrgLogo,

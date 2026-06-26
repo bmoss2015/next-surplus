@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateAppSetting } from "@/app/(app)/settings/_actions";
-import { useSaveBarSection } from "@/components/SettingsSaveBar";
+import { useSaveBarSection } from "@/Components/SettingsSaveBar";
 import type { AppSettings } from "@/lib/settings/fetch";
 
 export function DefaultsSection({ initial }: { initial: AppSettings }) {

@@ -19,7 +19,7 @@ import { renderMerge, type MergeContext } from "@/lib/mail/merge";
 import type { EmailRecipientCandidate } from "@/lib/email/lead-recipients";
 import type { EmailTemplateRow } from "@/lib/settings/fetch";
 import type { EmailAccountRow } from "@/lib/email/types";
-import { RichTextEditor } from "@/components/email/RichTextEditor";
+import { RichTextEditor } from "@/Components/email/RichTextEditor";
 import type { Editor } from "@tiptap/react";
 
 const MERGE_TOKENS = [

@@ -6,7 +6,7 @@ import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchLeadParties, LEAD_PARTY_ROLE_LABELS } from "@/lib/leads/lead-parties";
 import { createClient } from "@/lib/supabase/server";
 import { ConversationTabClient } from "./ConversationTabClient";
-import { SendEmailButtonServer } from "@/components/email/SendEmailButtonServer";
+import { SendEmailButtonServer } from "@/Components/email/SendEmailButtonServer";
 import { buildLeadEmailCandidates } from "@/lib/email/lead-recipients";
 import { fetchEmailTemplates } from "@/lib/settings/fetch";
 

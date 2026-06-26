@@ -81,7 +81,7 @@ export async function fetchActivity(leadId: string): Promise<{
   leadSource: string | null;
 }> {
   const sb = await createClient();
-  const [actsRes, commentsRes, leadResult] = await Promise.all([
+  const [actsRes, commentsRes, callsRes, leadResult] = await Promise.all([
     sb
       .from("activities")
       .select("id, activity_type, payload, created_at, user_id")
@@ -92,6 +92,14 @@ export async function fetchActivity(leadId: string): Promise<{
       .select("id, body, created_at, author_id")
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false }),
+    sb
+      .from("session_calls")
+      .select(
+        "id, created_at, duration_seconds, disposition, note, recording_url, transcription_text, transcription_url, transcription_status, telnyx_call_control_id, dialed_at"
+      )
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
+      .limit(50),
     sb.from("leads").select("lead_source").eq("id", leadId).maybeSingle(),
   ]);
   if (actsRes.error) throw actsRes.error;
@@ -110,6 +118,19 @@ export async function fetchActivity(leadId: string): Promise<{
     created_at: string;
     author_id: string | null;
   }>;
+  const calls = (callsRes.data ?? []) as Array<{
+    id: string;
+    created_at: string;
+    duration_seconds: number | null;
+    disposition: string | null;
+    note: string | null;
+    recording_url: string | null;
+    transcription_text: string | null;
+    transcription_url: string | null;
+    transcription_status: string | null;
+    telnyx_call_control_id: string | null;
+    dialed_at: string | null;
+  }>;
   const merged = [
     ...acts,
     ...comments.map((c) => ({
@@ -118,6 +139,22 @@ export async function fetchActivity(leadId: string): Promise<{
       payload: { body: c.body, kind: "note" } as Record<string, unknown>,
       created_at: c.created_at,
       user_id: c.author_id,
+    })),
+    ...calls.map((c) => ({
+      id: `call:${c.id}`,
+      activity_type: "call",
+      payload: {
+        duration_seconds: c.duration_seconds,
+        disposition: c.disposition,
+        note: c.note,
+        recording_url: c.recording_url,
+        transcription_text: c.transcription_text,
+        transcription_url: c.transcription_url,
+        transcription_status: c.transcription_status,
+        call_id: c.id,
+      } as Record<string, unknown>,
+      created_at: c.created_at,
+      user_id: null,
     })),
   ].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 

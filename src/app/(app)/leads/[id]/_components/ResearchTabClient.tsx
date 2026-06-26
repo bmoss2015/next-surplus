@@ -22,7 +22,7 @@ import type {
   LeadResearchTemplate,
   AvailableTemplate,
 } from "@/lib/leads/fetch-research";
-import { Modal } from "@/components/Modal";
+import { Modal } from "@/Components/Modal";
 
 // Fix ZZZZ2: Research tab. A lead carries its own snapshot of one or more
 // checklists. Each checklist is a collapsible section with a petrol-tinted

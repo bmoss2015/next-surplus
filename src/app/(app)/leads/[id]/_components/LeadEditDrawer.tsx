@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { IconPencil } from "@tabler/icons-react";
-import { Modal } from "@/components/Modal";
+import { Modal } from "@/Components/Modal";
 import { updateLeadCoreFields } from "../_actions";
 import { US_STATE_NAMES } from "@/lib/leads/types";
 

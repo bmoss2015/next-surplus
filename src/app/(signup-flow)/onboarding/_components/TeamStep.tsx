@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { StepShell } from "./StepShell";
 import { inviteTeammates } from "../_actions";
-import { InlineError } from "@/components/InlineError";
+import { InlineError } from "@/Components/InlineError";
 
 export function TeamStep() {
   const router = useRouter();

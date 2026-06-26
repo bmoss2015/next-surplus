@@ -32,7 +32,7 @@ import { HtmlMessage } from "./HtmlMessage";
 import { LinkToLeadPicker } from "./LinkToLeadPicker";
 
 const SendEmailModal = dynamic(
-  () => import("@/components/email/SendEmailModal").then((m) => m.SendEmailModal),
+  () => import("@/Components/email/SendEmailModal").then((m) => m.SendEmailModal),
   { ssr: false }
 );
 

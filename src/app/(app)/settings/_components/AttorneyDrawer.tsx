@@ -15,7 +15,7 @@ import {
   deleteAttorney,
 } from "@/app/(app)/settings/_actions";
 import type { AttorneyRow } from "@/lib/settings/fetch";
-import { StatesPickerCombobox } from "@/components/StatesPickerCombobox";
+import { StatesPickerCombobox } from "@/Components/StatesPickerCombobox";
 
 type Form = {
   name: string;

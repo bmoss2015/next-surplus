@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { IconCircleCheck } from "@tabler/icons-react";
 import type { LeadRow } from "@/lib/leads/types";
-import { StagePill } from "@/components/StagePill";
+import { StagePill } from "@/Components/StagePill";
 import { formatCurrency, primaryOwner, ownerStatusOf } from "@/lib/leads/format";
 import { activeSurplus, activeNetPayout } from "@/lib/leads/active-surplus";
 import { OWNER_STATUS_LABELS, SALE_TYPE_LABELS } from "@/lib/leads/types";
-import { BelowFloorIcon } from "@/components/BelowFloorIcon";
+import { BelowFloorIcon } from "@/Components/BelowFloorIcon";
 import { SortHeader } from "./SortHeader";
 import { LeadActionsMenu } from "../[id]/_components/LeadActionsMenu";
 

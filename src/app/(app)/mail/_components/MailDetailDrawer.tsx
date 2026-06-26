@@ -8,10 +8,10 @@ import {
   IconMail,
   IconTrash,
 } from "@tabler/icons-react";
-import { MailStatusPill, mailStatusLabel } from "@/components/mail/MailStatusPill";
-import { MailStepTimeline } from "@/components/mail/MailStepTimeline";
-import type { LetterPreviewData } from "@/components/mail/LetterPreviewModal";
-import { displayRecipientName } from "@/components/mail/displayName";
+import { MailStatusPill, mailStatusLabel } from "@/Components/mail/MailStatusPill";
+import { MailStepTimeline } from "@/Components/mail/MailStepTimeline";
+import type { LetterPreviewData } from "@/Components/mail/LetterPreviewModal";
+import { displayRecipientName } from "@/Components/mail/displayName";
 import type { MailJobDetailRow } from "@/lib/mail/fetch";
 import { fetchMailJobAction } from "../_fetchers";
 import {

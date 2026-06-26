@@ -9,8 +9,8 @@ import {
   IconTrashFilled,
 } from "@tabler/icons-react";
 import { setLeadArchived, hardDeleteLead } from "../_actions";
-import { Modal } from "@/components/Modal";
-import { useRole } from "@/components/RoleProvider";
+import { Modal } from "@/Components/Modal";
+import { useRole } from "@/Components/RoleProvider";
 import { cn } from "@/lib/cn";
 
 // Fix DDD / Fix YYY: shared ⋯ menu for a lead — Archive (soft delete, reversible,

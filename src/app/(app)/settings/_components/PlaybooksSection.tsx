@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconChevronRight, IconCopy, IconPencil } from "@tabler/icons-react";
 import type { ResearchTemplateRow } from "@/lib/settings/fetch";
-import { US_STATES } from "@/components/StatesPicker";
+import { US_STATES } from "@/Components/StatesPicker";
 import { duplicateResearchTemplate } from "@/app/(app)/settings/_actions";
 
 export function PlaybooksSection({

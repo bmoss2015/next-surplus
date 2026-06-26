@@ -1,18 +1,9 @@
 const PROD_APP_URL = "https://app.nextsurplus.com";
-const STAGING_APP_URL = "https://staging.nextsurplus.com";
 
 function resolveLogoUrl(): string {
   const override = process.env.NEXT_PUBLIC_EMAIL_LOGO_URL;
   if (override) return override.replace(/\/$/, "");
-  if (process.env.VERCEL_ENV === "production") {
-    return `${PROD_APP_URL}/images/email-logo.png`;
-  }
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) {
-    const base = vercel.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    return `https://${base}/images/email-logo.png`;
-  }
-  return `${STAGING_APP_URL}/images/email-logo.png`;
+  return `${PROD_APP_URL}/images/email-logo.png`;
 }
 
 const LOGO_URL = resolveLogoUrl();

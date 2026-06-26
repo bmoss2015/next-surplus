@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { IconUser } from "@tabler/icons-react";
 import { assignLead } from "../_actions";
-import { useRole } from "@/components/RoleProvider";
+import { useRole } from "@/Components/RoleProvider";
 import { SectionSubheader } from "./SectionSubheader";
 
 // Fix 75: assign a lead to a team member. Admins can reassign anyone; non-admins
