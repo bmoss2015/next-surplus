@@ -740,10 +740,6 @@ export async function upsertContact(
     .maybeSingle();
 
   revalidatePath(`/leads/${leadId}`);
-  // Bust the Settings cache so the Billing credit meter reflects any new
-  // validation on the next navigation. The validator updates the live
-  // balance via Clearout's getcredits endpoint and the meter is otherwise
-  // server-rendered and would serve stale data.
   if (patch.channel === "phone" || (contactId && valueChanged)) {
     revalidatePath("/settings");
   }

@@ -266,9 +266,6 @@ export function ContactsTabClient({
   const [newOwnerEmail, setNewOwnerEmail] = useState("");
   const [newOwnerNotes, setNewOwnerNotes] = useState("");
   const [isPending, startTransition] = useTransition();
-  // IDs of phone contacts currently being validated server-side. Drives the
-  // small "Verifying…" spinner shown on the row while the action awaits
-  // Clearout. Cleared the moment the action returns with the real row.
   const [verifyingIds, setVerifyingIds] = useState<Set<string>>(() => new Set());
 
   function resetOwnerForm() {
@@ -452,9 +449,6 @@ export function ContactsTabClient({
   ) {
     const trimmed = value.trim();
     if (!trimmed) return;
-    // Optimistic placeholder so the user sees "Verifying…" on the new phone
-    // row while the action awaits the Clearout call (~500ms-1s). Real row
-    // replaces it when the action returns.
     const placeholderId = `pending-${crypto.randomUUID()}`;
     const placeholder: ContactRow = {
       id: placeholderId,

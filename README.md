@@ -9,8 +9,7 @@ Multi-tenant Next.js portal for surplus funds recovery operations. Built for Mos
 - React 19, Tailwind 4
 - Resend (transactional email)
 - Gmail OAuth + Cloudflare Worker poller (inbound mailbox sync)
-- Lob (check sending), Click2Mail (letter sending)
-- HLR Lookup (phone validation, currently paused)
+- Lob (check and letter sending)
 - OpenPhone / QUO (SMS, via separate Cloudflare Worker)
 - SuperDoc + Tiptap (in-app document editing)
 
