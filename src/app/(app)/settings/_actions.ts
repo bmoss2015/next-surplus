@@ -2600,10 +2600,25 @@ export async function syncTelnyxPhoneNumbers(): Promise<
 
   if (rows.length === 0) return { ok: true, synced: 0 };
 
-  const { error } = await sb.from("phone_numbers").insert(rows);
+  // Pull customer-facing rate from telnyx_pricing_settings so the number row
+  // shows the price the operator set for customers, not a hardcoded placeholder.
+  const { data: pricing } = await sb
+    .from("telnyx_pricing_settings")
+    .select("customer_phone_monthly_cents, telnyx_phone_monthly_cents")
+    .eq("org_id", profile.orgId)
+    .maybeSingle();
+  const customerCents = pricing?.customer_phone_monthly_cents ?? 300;
+  const telnyxCents = pricing?.telnyx_phone_monthly_cents ?? 100;
+  const rowsWithPricing = rows.map((r) => ({
+    ...r,
+    monthly_cost_cents: customerCents,
+    telnyx_cost_at_purchase_cents: telnyxCents,
+  }));
+
+  const { error } = await sb.from("phone_numbers").insert(rowsWithPricing);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
-  return { ok: true, synced: rows.length };
+  return { ok: true, synced: rowsWithPricing.length };
 }
 
 type TelnyxAvailableNumber = {
@@ -2723,6 +2738,13 @@ export async function buyTelnyxNumber(e164: string): Promise<
     }
 
     const sb = await createClient();
+    const { data: pricing } = await sb
+      .from("telnyx_pricing_settings")
+      .select("customer_phone_monthly_cents, telnyx_phone_monthly_cents")
+      .eq("org_id", profile.orgId)
+      .maybeSingle();
+    const customerCents = pricing?.customer_phone_monthly_cents ?? 300;
+    const telnyxCents = pricing?.telnyx_phone_monthly_cents ?? 100;
     const { data: inserted, error } = await sb
       .from("phone_numbers")
       .insert({
@@ -2732,7 +2754,8 @@ export async function buyTelnyxNumber(e164: string): Promise<
         voice_enabled: true,
         sms_enabled: false,
         status: "pending",
-        monthly_cost_cents: 100,
+        monthly_cost_cents: customerCents,
+        telnyx_cost_at_purchase_cents: telnyxCents,
         purchased_at: new Date().toISOString(),
       })
       .select("id")
