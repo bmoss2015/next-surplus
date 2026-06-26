@@ -54,7 +54,7 @@ export function SubRail({
         flexShrink: 0,
         background: "#ffffff",
         borderRight: "1px solid #ebedf0",
-        paddingTop: 20,
+        paddingTop: 0,
         paddingBottom: 20,
         position: "sticky",
         top: 56,

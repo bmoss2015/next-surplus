@@ -2906,12 +2906,20 @@ export async function searchAvailableNumbers(input: {
   | { ok: false; error: string }
 > {
   const profile = await getCurrentProfile();
-  if (!profile?.isAdmin) return { ok: false, error: "Admin only" };
+  if (!profile?.isAdmin || !profile.orgId) return { ok: false, error: "Admin only" };
   const apiKey = process.env.TELNYX_API_KEY;
   if (!apiKey) return { ok: false, error: "TELNYX_API_KEY missing" };
 
   const ac = input.area_code.replace(/[^\d]/g, "");
   if (ac.length !== 3) return { ok: false, error: "Area code must be 3 digits" };
+
+  const sb = await createClient();
+  const { data: pricing } = await sb
+    .from("telnyx_pricing_settings")
+    .select("customer_phone_monthly_cents")
+    .eq("org_id", profile.orgId)
+    .maybeSingle();
+  const customerCents = pricing?.customer_phone_monthly_cents ?? 300;
 
   const params = new URLSearchParams();
   params.set("filter[country_code]", "US");
@@ -2933,14 +2941,13 @@ export async function searchAvailableNumbers(input: {
     const json = (await res.json()) as { data?: TelnyxAvailableNumber[] };
     const numbers = (json.data ?? []).map((n) => {
       const features = (n.features ?? []).map((f) => f.name);
-      const localityRegion = n.region_information?.find((r) => r.region_type === "locality");
+      const localityRegion = n.region_information?.find((r) => r.region_type === "locality" || r.region_type === "rate_center");
       const stateRegion = n.region_information?.find((r) => r.region_type === "state");
-      const monthly = n.cost_information?.monthly_cost;
       return {
         e164: n.phone_number,
         city: localityRegion?.region_name ?? null,
         state: stateRegion?.region_name ?? null,
-        monthly_cost_cents: monthly ? Math.round(parseFloat(monthly) * 100) : 100,
+        monthly_cost_cents: customerCents,
         voice: features.includes("voice"),
         sms: features.includes("sms"),
       };

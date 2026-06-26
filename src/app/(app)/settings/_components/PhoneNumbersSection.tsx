@@ -673,9 +673,8 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
                 value={areaCode}
                 onChange={(e) => setAreaCode(e.target.value.replace(/[^\d]/g, "").slice(0, 3))}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-                placeholder="678"
                 maxLength={3}
-                className="h-10 w-24 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[14px] font-semibold tabular-nums text-[#0a0d14] outline-none transition focus:border-[#0d4b3a] placeholder:text-[#c2c5cc] placeholder:font-normal"
+                className="h-10 w-24 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[14px] font-semibold tabular-nums text-[#0a0d14] outline-none transition focus:border-[#0d4b3a]"
               />
               <button
                 type="button"
@@ -701,11 +700,10 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
                 </div>
                 <div className="mt-3 max-h-[340px] space-y-1.5 overflow-y-auto pr-1">
                   {results.map((n) => (
-                    <button
+                    <div
                       key={n.e164}
-                      type="button"
                       onClick={() => { setSelected(n); setStep("confirm"); }}
-                      className="group flex w-full cursor-pointer items-center justify-between gap-3 rounded-[10px] border border-[#ebedf0] bg-white px-4 py-3 text-left transition hover:border-[#9298a3] hover:bg-[#fafbfc]"
+                      className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-[10px] border border-[#ebedf0] bg-white px-4 py-3 text-left transition hover:bg-[#fafbfc]"
                       style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
                     >
                       <div className="min-w-0 flex-1">
@@ -731,10 +729,10 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
                           <span className="text-[11px] font-semibold tabular-nums text-[#0a0d14]">{formatMoney(n.monthly_cost_cents)}<span className="font-normal text-[#9298a3]">/mo</span></span>
                         </div>
                       </div>
-                      <span className="inline-flex h-9 items-center rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[12px] font-medium text-[#5b606a] transition group-hover:border-[#9298a3] group-hover:text-[#0a0d14]">
+                      <span className="inline-flex h-9 items-center rounded-[7px] bg-[#0a0d14] px-3 text-[12px] font-medium text-white">
                         Select
                       </span>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -745,17 +743,21 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
         {step === "confirm" && selected && (
           <div className="px-8 py-6">
             <div className="overflow-hidden rounded-[12px] border border-[#ebedf0] bg-white">
-              <div className="flex items-baseline justify-between gap-4 px-6 py-5">
+              <div className="grid grid-cols-2 gap-6 px-6 py-5">
                 <div>
                   <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">Selected Number</div>
-                  <div className="mt-2 text-[20px] font-semibold leading-[1.2] tracking-[-0.018em] text-[#0a0d14] tabular-nums">{formatE164(selected.e164)}</div>
+                  <div className="mt-2 text-[18px] font-semibold leading-[1.2] tracking-[-0.014em] text-[#0a0d14] tabular-nums">{formatE164(selected.e164)}</div>
                   {(selected.city || selected.state) && (
                     <div className="mt-1 text-[12.5px] text-[#5b606a]">{[selected.city, selected.state].filter(Boolean).join(", ")}</div>
                   )}
                 </div>
-                <div className="text-right">
-                  <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">Monthly</div>
-                  <div className="mt-2 text-[20px] font-semibold leading-[1.2] tracking-[-0.018em] text-[#0a0d14] tabular-nums">{formatMoney(selected.monthly_cost_cents)}<span className="text-[12px] font-normal text-[#9298a3]">/mo</span></div>
+                <div>
+                  <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">Monthly Charge</div>
+                  <div className="mt-2 flex items-baseline gap-1 text-[18px] font-semibold leading-[1.2] tracking-[-0.014em] text-[#0a0d14] tabular-nums">
+                    <span>{formatMoney(selected.monthly_cost_cents)}</span>
+                    <span className="text-[12px] font-normal text-[#9298a3]">/mo</span>
+                  </div>
+                  <div className="mt-1 text-[12.5px] text-[#5b606a]">Added to the next invoice</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 border-t border-[#f1f2f4]">
