@@ -20,7 +20,7 @@ export async function signUp(input: {
   const firmName = input.firmName.trim();
 
   const ip = await clientIp();
-  const limit = rateLimit(`signup:${ip}`, 10, 60 * 1000);
+  const limit = rateLimit(`signup:${ip}`, 5, 60 * 1000);
   if (!limit.ok) {
     return {
       ok: false,
