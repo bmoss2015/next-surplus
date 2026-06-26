@@ -71,6 +71,7 @@ export const GROUPS: RailGroup[] = [
     name: "Power Dialer",
     items: [
       { key: "phone-numbers", label: "Phone Numbers", adminOnly: true },
+      { key: "dialer-defaults", label: "Defaults", adminOnly: true },
       { key: "telnyx-pricing", label: "Pricing", adminOnly: true },
     ],
   },

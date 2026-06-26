@@ -2516,6 +2516,32 @@ export async function saveSavedList(input: {
   return { ok: true, id: data.id as string };
 }
 
+type DialerDefaultsInput = {
+  call_recording_enabled?: boolean;
+  amd_enabled?: boolean;
+  transcription_enabled?: boolean;
+  transcription_provider?: "deepgram_nova" | "telnyx_stt" | "google_stt" | "assemblyai";
+  wrap_up_seconds?: number;
+  caller_id_mode?: "auto_by_state" | "fixed_number";
+  caller_id_fixed_phone_number_id?: string | null;
+};
+
+export async function updateDialerDefaults(
+  input: DialerDefaultsInput
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+  const sb = await createClient();
+  const { error } = await sb
+    .from("org_dialer_defaults")
+    .upsert({ org_id: profile.orgId, ...input, updated_at: new Date().toISOString() });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 export async function deleteSavedList(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const profile = await getCurrentProfile();
   if (!profile?.orgId) return { ok: false, error: "Not signed in" };

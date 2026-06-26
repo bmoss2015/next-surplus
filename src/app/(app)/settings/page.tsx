@@ -31,6 +31,7 @@ import {
   fetchPhoneNumbers,
   fetchTelnyxPricingSettings,
   fetchA2pBrand,
+  fetchDialerDefaults,
 } from "@/lib/settings/fetch";
 import { fetchMyEmailAccounts } from "@/lib/email/fetch";
 import { fetchOrgCustomRoles } from "@/lib/leads/lead-parties";
@@ -84,6 +85,7 @@ export default async function SettingsPreviewJsxPage() {
     phoneNumbers,
     telnyxPricing,
     a2pBrand,
+    dialerDefaults,
   ] = isAdmin
     ? await Promise.all([
         fetchAppSettings(),
@@ -97,8 +99,9 @@ export default async function SettingsPreviewJsxPage() {
         fetchPhoneNumbers(),
         fetchTelnyxPricingSettings(),
         fetchA2pBrand(),
+        fetchDialerDefaults(),
       ])
-    : [null, null, [], [], null, null, [], null, [], null, null];
+    : [null, null, [], [], null, null, [], null, [], null, null, null];
 
   const cssText = readFileSync(
     path.join(process.cwd(), "src", "app", "(app)", "settings", "preview.css"),
@@ -175,6 +178,7 @@ export default async function SettingsPreviewJsxPage() {
           phoneNumbers,
           telnyxPricing,
           a2pBrand,
+          dialerDefaults,
         }}
       />
     </>

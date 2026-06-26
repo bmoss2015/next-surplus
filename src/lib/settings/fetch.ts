@@ -828,6 +828,41 @@ export async function fetchTelnyxPricingSettings(): Promise<TelnyxPricingSetting
   return { org_id: profile.orgId, ...DEFAULT_TELNYX_PRICING };
 }
 
+export type DialerDefaults = {
+  org_id: string;
+  call_recording_enabled: boolean;
+  amd_enabled: boolean;
+  transcription_enabled: boolean;
+  transcription_provider: "deepgram_nova" | "telnyx_stt" | "google_stt" | "assemblyai";
+  wrap_up_seconds: number;
+  caller_id_mode: "auto_by_state" | "fixed_number";
+  caller_id_fixed_phone_number_id: string | null;
+};
+
+const DEFAULT_DIALER_DEFAULTS: Omit<DialerDefaults, "org_id"> = {
+  call_recording_enabled: true,
+  amd_enabled: true,
+  transcription_enabled: false,
+  transcription_provider: "deepgram_nova",
+  wrap_up_seconds: 30,
+  caller_id_mode: "auto_by_state",
+  caller_id_fixed_phone_number_id: null,
+};
+
+export async function fetchDialerDefaults(): Promise<DialerDefaults | null> {
+  const profile = await getCurrentProfile();
+  if (!profile?.orgId) return null;
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("org_dialer_defaults")
+    .select("*")
+    .eq("org_id", profile.orgId)
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return data as DialerDefaults;
+  return { org_id: profile.orgId, ...DEFAULT_DIALER_DEFAULTS };
+}
+
 export type A2pBrand = {
   id: string;
   status: "draft" | "submitted" | "in_review" | "approved" | "rejected" | "suspended";
