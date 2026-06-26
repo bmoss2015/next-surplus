@@ -26,12 +26,12 @@ export default async function DialerSetupPage() {
       .select("id, filename, uploaded_at, imported_count")
       .eq("status", "completed")
       .order("uploaded_at", { ascending: false })
-      .limit(8),
+      .limit(50),
     sb
       .from("saved_lists")
       .select("id, name, filter_json, last_run_at")
       .order("last_run_at", { ascending: false, nullsFirst: false })
-      .limit(15),
+      .limit(50),
     sb
       .from("dialer_sessions")
       .select("id, list_filter_snapshot, lead_ids, current_cursor, paused_at, status")

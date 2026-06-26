@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   IconChevronDown,
   IconChevronUp,
   IconArrowRight,
   IconCheck,
-  IconExternalLink,
+  IconSettings,
 } from "@tabler/icons-react";
+import { startSession } from "../_actions";
 
 type Source = "import" | "saved" | "all";
 type ListOption = {
@@ -37,6 +39,8 @@ export function DialerSetupWizard({
   const [search, setSearch] = useState("");
   const [defaultsOpen, setDefaultsOpen] = useState(false);
   const [name, setName] = useState("");
+  const [startError, setStartError] = useState<string | null>(null);
+  const [isStarting, startTransition] = useTransition();
 
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -57,8 +61,30 @@ export function DialerSetupWizard({
   );
 
   function handleStart() {
-    router.push("/dialer");
+    if (!selected) return;
+    setStartError(null);
+    startTransition(async () => {
+      const res = await startSession({
+        list_id: selected.id,
+        list_name: name.trim() || selected.name,
+        filter_snapshot: { source: selected.source },
+      });
+      if (!res.ok) {
+        setStartError(res.error);
+        return;
+      }
+      router.push(`/dialer?session=${res.session_id}`);
+    });
   }
+
+  function handleResume() {
+    if (!resumeSession) return;
+    router.push(`/dialer?session=${resumeSession.id}`);
+  }
+
+  const resumeRelative = resumeSession?.paused_at
+    ? formatRelative(resumeSession.paused_at)
+    : null;
 
   return (
     <div className="mx-auto max-w-[880px] px-14 pb-32 pt-12">
@@ -66,55 +92,54 @@ export function DialerSetupWizard({
         Start A Dialer Session
       </h1>
 
-      <div
-        className="mt-8 flex overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
-        style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02), 0 12px 32px -10px rgba(13,75,58,0.10)" }}
-      >
-        <div
-          className="w-[5px] shrink-0"
-          style={{ background: "linear-gradient(135deg, #0d4b3a 0%, #04261c 100%)" }}
-        />
-        <div className="flex flex-1 items-center justify-between gap-6 px-8 py-7">
-          <div>
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0d4b3a]">
-              Resume Last Session
-            </div>
-            <div className="mt-2.5 text-[20px] font-semibold leading-[1.2] tracking-[-0.022em] text-[#0a0d14]">
-              Fort Bend County, Texas
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-[13px] text-[#5b606a]">
-              <div className="flex h-[6px] w-[120px] overflow-hidden rounded-full bg-[#f1f2f4]">
-                <div className="h-full bg-[#0d4b3a]" style={{ width: "48.9%" }} />
+      {resumeSession && (
+        <>
+          <div
+            className="mt-8 flex overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+            style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02), 0 12px 32px -10px rgba(13,75,58,0.10)" }}
+          >
+            <div
+              className="w-[5px] shrink-0"
+              style={{ background: "linear-gradient(135deg, #0d4b3a 0%, #04261c 100%)" }}
+            />
+            <div className="flex flex-1 items-center justify-between gap-6 px-8 py-7">
+              <div>
+                <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0d4b3a]">
+                  Resume Last Session
+                </div>
+                <div className="mt-2.5 text-[20px] font-semibold leading-[1.2] tracking-[-0.022em] text-[#0a0d14]">
+                  {resumeSession.list_name}
+                </div>
+                <div className="mt-3 flex items-center gap-2 text-[13px] text-[#5b606a]">
+                  <span className="tabular-nums">
+                    <span className="font-semibold text-[#0a0d14]">{resumeSession.remaining}</span>
+                    <span> Lead{resumeSession.remaining === 1 ? "" : "s"} Remaining</span>
+                  </span>
+                </div>
+                {resumeRelative && (
+                  <div className="mt-1.5 text-[12px] text-[#9298a3]">Paused {resumeRelative}</div>
+                )}
               </div>
-              <span className="tabular-nums">
-                <span className="font-semibold text-[#0a0d14]">23</span>
-                <span className="text-[#9298a3]"> of </span>
-                <span className="font-semibold text-[#0a0d14]">47</span>
-                <span> Dialed</span>
-              </span>
-            </div>
-            <div className="mt-1.5 text-[12px] text-[#9298a3]">
-              Paused Yesterday At 4:38pm
+              <button
+                type="button"
+                onClick={handleResume}
+                className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-[7px] bg-[#0d4b3a] px-6 text-[14px] font-medium tracking-[-0.008em] text-white"
+                style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
+              >
+                Resume Session
+                <IconArrowRight size={14} stroke={2.25} />
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleStart}
-            className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-[7px] bg-[#0d4b3a] px-6 text-[14px] font-medium tracking-[-0.008em] text-white"
-            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
-          >
-            Resume Session
-            <IconArrowRight size={14} stroke={2.25} />
-          </button>
-        </div>
-      </div>
 
-      <div className="mt-12 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
-        Or Start A New Session
-        <span className="h-px flex-1 bg-[#ebedf0]" />
-      </div>
+          <div className="mt-12 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">
+            Or Start A New Session
+            <span className="h-px flex-1 bg-[#ebedf0]" />
+          </div>
+        </>
+      )}
 
-      <div className="mt-6">
+      <div className={resumeSession ? "mt-6" : "mt-8"}>
         <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
           Lead Source
         </div>
@@ -261,11 +286,42 @@ export function DialerSetupWizard({
         </div>
         {defaultsOpen && (
           <div className="border-t border-[#f1f2f4] divide-y divide-[#f1f2f4]">
-            <DefaultRow label="Caller ID" value="Auto Map By State" subtitle="Picks a number local to each lead's state if available, otherwise falls back to your default number." />
-            <DefaultRow label="Voicemail" value="Off · You'll Handle Voicemail Manually" subtitle="Pre-record a voicemail to have it auto-play when a call reaches voicemail. Configure in Settings → Recordings." />
-            <DefaultRow label="Wrap Up" value="30 Seconds" subtitle="Short pause after a live conversation so you can finish your notes before the next call." />
-            <DefaultRow label="Email Followup" value="On · Auto Sent After Each Call" subtitle="An email auto-sends based on how the call went. Configure in Settings → Email Templates." />
-            <DefaultRow label="SMS Followup" value="Not Ready Until Approved" subtitle="Send a different text after a call. Unlocks after A2P 10DLC brand approval. Configure in Settings → SMS Templates." muted />
+            <DefaultRow
+              label="Caller ID"
+              value="Auto Map By State"
+              subtitle="Picks a number local to each lead's state if available, otherwise falls back to the default number."
+              href="/settings#phone-numbers"
+              adminOnly
+            />
+            <DefaultRow
+              label="Voicemail"
+              value="Off · Voicemail Handled Manually"
+              subtitle="Pre-record a voicemail to auto-play when a call reaches voicemail. Configure in Settings."
+              href="/settings#recordings"
+              adminOnly
+            />
+            <DefaultRow
+              label="Wrap Up"
+              value="30 Seconds"
+              subtitle="Short pause after a live conversation so notes can finish before the next call."
+              href="/settings#dialer-defaults"
+              adminOnly
+            />
+            <DefaultRow
+              label="Email Followup"
+              value="On · Auto Sent After Each Call"
+              subtitle="An email auto-sends based on the call outcome. Configure in Settings."
+              href="/settings#email-templates"
+              adminOnly
+            />
+            <DefaultRow
+              label="SMS Followup"
+              value="Waiting On A2P 10DLC Approval"
+              subtitle="A text auto-sends after each call. Unlocks once the brand and campaign clear carrier review."
+              href="/dialer/a2p"
+              adminOnly
+              muted
+            />
           </div>
         )}
       </div>
@@ -280,6 +336,7 @@ export function DialerSetupWizard({
         />
         <button
           type="button"
+          onClick={() => router.push("/")}
           className="h-11 cursor-pointer px-3 text-[13.5px] font-medium text-[#5b606a] transition hover:text-[#0a0d14]"
         >
           Cancel
@@ -287,16 +344,32 @@ export function DialerSetupWizard({
         <button
           type="button"
           onClick={handleStart}
-          disabled={!selected}
+          disabled={!selected || isStarting}
           className="inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-[7px] bg-[#0d4b3a] px-6 text-[14px] font-medium tracking-[-0.008em] text-white transition disabled:cursor-not-allowed disabled:opacity-40"
           style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
         >
-          Start Session
-          {selected && <span className="rounded-[5px] bg-white/15 px-2 py-0.5 text-[12px] tabular-nums">28</span>}
+          {isStarting ? "Starting..." : "Start Session"}
+          {selected && !isStarting && <span className="rounded-[5px] bg-white/15 px-2 py-0.5 text-[12px] tabular-nums">{selected.count}</span>}
         </button>
       </div>
+      {startError && (
+        <div className="mt-3 rounded-[7px] border border-[#fee4e2] bg-[#fef3f2] px-4 py-2.5 text-[12.5px] text-[#b42318]">
+          {startError}
+        </div>
+      )}
     </div>
   );
+}
+
+function formatRelative(iso: string): string {
+  const t = new Date(iso).getTime();
+  const diff = Date.now() - t;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins} Minute${mins === 1 ? "" : "s"} Ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} Hour${hours === 1 ? "" : "s"} Ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} Day${days === 1 ? "" : "s"} Ago`;
 }
 
 function ListGroup({ label, children }: { label: string; children: React.ReactNode }) {
@@ -358,23 +431,48 @@ function FilterCell({ label, value, right, last }: { label: string; value: strin
   );
 }
 
-function DefaultRow({ label, value, subtitle, muted }: { label: string; value: string; subtitle: string; muted?: boolean }) {
+function DefaultRow({
+  label,
+  value,
+  subtitle,
+  muted,
+  href,
+  adminOnly,
+}: {
+  label: string;
+  value: string;
+  subtitle: string;
+  muted?: boolean;
+  href?: string;
+  adminOnly?: boolean;
+}) {
   return (
     <div className="grid grid-cols-[160px_1fr_auto] items-start gap-6 px-7 py-5">
-      <div className="pt-1 text-[12.5px] font-medium text-[#0a0d14]">{label}</div>
+      <div className="pt-1 text-[12.5px] font-medium text-[#0a0d14]">
+        {label}
+        {adminOnly && (
+          <span className="ml-2 inline-flex items-center rounded-[4px] bg-[#f1f2f4] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[#5b606a]">
+            Admin
+          </span>
+        )}
+      </div>
       <div>
         <div className={["text-[13.5px] font-medium", muted ? "text-[#9298a3]" : "text-[#0a0d14]"].join(" ")}>
           {value}
         </div>
         <div className="mt-1.5 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>
       </div>
-      <button
-        type="button"
-        className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-semibold text-[#0d4b3a] transition hover:text-[#13644e]"
-      >
-        Preview
-        <IconExternalLink size={11} stroke={2} />
-      </button>
+      {href ? (
+        <Link
+          href={href}
+          className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-semibold text-[#0d4b3a] transition hover:text-[#13644e]"
+        >
+          Configure
+          <IconSettings size={11} stroke={2} />
+        </Link>
+      ) : (
+        <span className="text-[12px] text-[#9298a3]">—</span>
+      )}
     </div>
   );
 }

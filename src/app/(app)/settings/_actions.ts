@@ -2498,3 +2498,222 @@ export async function deleteSavedList(id: string): Promise<{ ok: true } | { ok: 
   return { ok: true };
 }
 
+type TelnyxNumber = {
+  id: string;
+  phone_number: string;
+  status?: string;
+  connection_id?: string | null;
+  tags?: string[] | null;
+  features?: Array<{ name: string }> | null;
+  purchased_at?: string | null;
+  customer_reference?: string | null;
+};
+
+// Pulls every phone number on the Telnyx account and upserts it into
+// phone_numbers for this org. Used when a number was bought directly in
+// Telnyx (e.g. Atlanta +1 678 619 3051) and never made it into the portal DB.
+export async function syncTelnyxPhoneNumbers(): Promise<
+  { ok: true; synced: number } | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+  const apiKey = process.env.TELNYX_API_KEY;
+  if (!apiKey) return { ok: false, error: "TELNYX_API_KEY missing" };
+
+  let page = 1;
+  const all: TelnyxNumber[] = [];
+  try {
+    while (page < 20) {
+      const res = await fetch(
+        `https://api.telnyx.com/v2/phone_numbers?page%5Bnumber%5D=${page}&page%5Bsize%5D=50`,
+        { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" }
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        return { ok: false, error: `Telnyx HTTP ${res.status}: ${text}` };
+      }
+      const json = (await res.json()) as { data?: TelnyxNumber[] };
+      const data = json.data ?? [];
+      all.push(...data);
+      if (data.length < 50) break;
+      page += 1;
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Telnyx fetch failed" };
+  }
+
+  if (all.length === 0) return { ok: true, synced: 0 };
+
+  const sb = await createClient();
+  const { data: existing } = await sb
+    .from("phone_numbers")
+    .select("telnyx_phone_number_id")
+    .eq("org_id", profile.orgId);
+  const existingIds = new Set((existing ?? []).map((r) => r.telnyx_phone_number_id as string | null));
+
+  const rows = all
+    .filter((n) => !existingIds.has(n.id))
+    .map((n) => {
+      const features = (n.features ?? []).map((f) => f.name);
+      return {
+        org_id: profile.orgId,
+        telnyx_phone_number_id: n.id,
+        e164: n.phone_number,
+        friendly_name: n.customer_reference ?? null,
+        voice_enabled: features.includes("voice") || features.length === 0,
+        sms_enabled: features.includes("sms"),
+        status: n.status === "active" ? "active" : "pending",
+        monthly_cost_cents: 100,
+        purchased_at: n.purchased_at ?? new Date().toISOString(),
+      };
+    });
+
+  if (rows.length === 0) return { ok: true, synced: 0 };
+
+  const { error } = await sb.from("phone_numbers").insert(rows);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true, synced: rows.length };
+}
+
+type TelnyxAvailableNumber = {
+  phone_number: string;
+  region_information?: Array<{ region_type?: string; region_name?: string }>;
+  cost_information?: { monthly_cost?: string; upfront_cost?: string };
+  features?: Array<{ name: string }>;
+};
+
+// Searches Telnyx inventory for available numbers in a given US area code.
+// Returns up to 25 results for the buy-number picker.
+export async function searchAvailableNumbers(input: {
+  area_code: string;
+  features?: ("voice" | "sms" | "mms")[];
+}): Promise<
+  | { ok: true; numbers: { e164: string; city: string | null; state: string | null; monthly_cost_cents: number; voice: boolean; sms: boolean }[] }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin) return { ok: false, error: "Admin only" };
+  const apiKey = process.env.TELNYX_API_KEY;
+  if (!apiKey) return { ok: false, error: "TELNYX_API_KEY missing" };
+
+  const ac = input.area_code.replace(/[^\d]/g, "");
+  if (ac.length !== 3) return { ok: false, error: "Area code must be 3 digits" };
+
+  const params = new URLSearchParams();
+  params.set("filter[country_code]", "US");
+  params.set("filter[national_destination_code]", ac);
+  params.set("filter[limit]", "25");
+  for (const f of input.features ?? ["voice", "sms"]) {
+    params.append("filter[features][]", f);
+  }
+
+  try {
+    const res = await fetch(`https://api.telnyx.com/v2/available_phone_numbers?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      return { ok: false, error: `Telnyx HTTP ${res.status}: ${text}` };
+    }
+    const json = (await res.json()) as { data?: TelnyxAvailableNumber[] };
+    const numbers = (json.data ?? []).map((n) => {
+      const features = (n.features ?? []).map((f) => f.name);
+      const localityRegion = n.region_information?.find((r) => r.region_type === "locality");
+      const stateRegion = n.region_information?.find((r) => r.region_type === "state");
+      const monthly = n.cost_information?.monthly_cost;
+      return {
+        e164: n.phone_number,
+        city: localityRegion?.region_name ?? null,
+        state: stateRegion?.region_name ?? null,
+        monthly_cost_cents: monthly ? Math.round(parseFloat(monthly) * 100) : 100,
+        voice: features.includes("voice"),
+        sms: features.includes("sms"),
+      };
+    });
+    return { ok: true, numbers };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Telnyx fetch failed" };
+  }
+}
+
+// Orders a single Telnyx number, polls until the order completes, then
+// writes the new row into phone_numbers. The Telnyx Number Orders API is
+// async; for one-number orders it normally resolves in under 2 seconds.
+export async function buyTelnyxNumber(e164: string): Promise<
+  | { ok: true; phone_number_id: string }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+  const apiKey = process.env.TELNYX_API_KEY;
+  const connectionId = process.env.TELNYX_CONNECTION_ID;
+  if (!apiKey) return { ok: false, error: "TELNYX_API_KEY missing" };
+  if (!connectionId) return { ok: false, error: "TELNYX_CONNECTION_ID missing" };
+
+  try {
+    const res = await fetch("https://api.telnyx.com/v2/number_orders", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone_numbers: [{ phone_number: e164 }],
+        connection_id: connectionId,
+        customer_reference: `next-surplus:${profile.orgId}`,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      return { ok: false, error: `Telnyx HTTP ${res.status}: ${text}` };
+    }
+    const json = (await res.json()) as {
+      data?: { id: string; phone_numbers?: Array<{ id?: string; phone_number?: string; status?: string }> };
+    };
+    const orderId = json.data?.id;
+    const orderedNumber = json.data?.phone_numbers?.[0];
+    if (!orderId || !orderedNumber?.phone_number) {
+      return { ok: false, error: "Telnyx order response missing data" };
+    }
+
+    let telnyxId = orderedNumber.id ?? null;
+    let attempts = 0;
+    while (!telnyxId && attempts < 10) {
+      await new Promise((r) => setTimeout(r, 600));
+      attempts += 1;
+      const detail = await fetch(`https://api.telnyx.com/v2/number_orders/${orderId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        cache: "no-store",
+      });
+      if (detail.ok) {
+        const dj = (await detail.json()) as { data?: { phone_numbers?: Array<{ id?: string }> } };
+        telnyxId = dj.data?.phone_numbers?.[0]?.id ?? null;
+      }
+    }
+
+    const sb = await createClient();
+    const { data: inserted, error } = await sb
+      .from("phone_numbers")
+      .insert({
+        org_id: profile.orgId,
+        telnyx_phone_number_id: telnyxId,
+        e164: orderedNumber.phone_number,
+        voice_enabled: true,
+        sms_enabled: false,
+        status: "pending",
+        monthly_cost_cents: 100,
+        purchased_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/settings");
+    return { ok: true, phone_number_id: inserted.id as string };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Telnyx order failed" };
+  }
+}
+
