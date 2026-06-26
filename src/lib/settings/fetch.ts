@@ -299,11 +299,16 @@ export type MailBankAccountRow = {
 export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
   const sb = await createClient();
   let rows: Record<string, unknown>[] = [];
+  // Sort verified accounts first, then unverified, then within each
+  // group newest-first. Matches Stripe Dashboard / Mercury / Bill.com
+  // bank account list ordering so the primary funding source is always
+  // at the top of the list regardless of when it was added.
   const withTracking = await sb
     .from("mail_bank_accounts")
     .select(
       "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at, verify_attempts, last_verify_error, last_verify_attempt_at, created_at, microdeposit_type"
     )
+    .order("status", { ascending: false })
     .order("created_at", { ascending: false });
   if (withTracking.error) {
     const fallback = await sb
