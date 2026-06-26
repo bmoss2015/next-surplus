@@ -2494,6 +2494,116 @@ export async function submitA2pBrand(): Promise<
   return { ok: true, brand_id: data.id as string, telnyx_brand_id: telnyxBrandId };
 }
 
+// Submits a 10DLC campaign to Telnyx Campaign Builder. Requires an
+// approved brand (telnyx_brand_id populated). Endpoint and field shape
+// verified from Telnyx docs on 2026-06-26 (cached in
+// docs/telnyx/10dlc-api.md).
+export async function submitA2pCampaign(input: {
+  use_case: "CUSTOMER_CARE" | "MARKETING" | "ACCOUNT_NOTIFICATION" | "MIXED" | "LOW_VOLUME";
+  description: string;
+  sample_messages: string[];
+  message_flow: string;
+  help_message: string;
+  opt_in_keywords?: string;
+  opt_out_keywords?: string;
+  help_keywords?: string;
+  embedded_link?: boolean;
+  number_pool?: boolean;
+  age_gated?: boolean;
+}): Promise<
+  | { ok: true; campaign_id: string; telnyx_campaign_id?: string }
+  | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+
+  const sb = await createClient();
+  const { data: brand } = await sb
+    .from("a2p_brand_registrations")
+    .select("id, telnyx_brand_id, status")
+    .eq("org_id", profile.orgId)
+    .maybeSingle();
+  if (!brand?.telnyx_brand_id) {
+    return { ok: false, error: "Submit and approve a brand before submitting a campaign" };
+  }
+
+  const apiKey = process.env.TELNYX_API_KEY;
+  const resellerId = process.env.TELNYX_RESELLER_ID;
+  if (!apiKey) return { ok: false, error: "TELNYX_API_KEY missing" };
+
+  const samples = (input.sample_messages ?? []).filter((s) => s.trim().length > 0);
+  if (samples.length < 2) {
+    return { ok: false, error: "At least two sample messages required" };
+  }
+
+  let telnyxCampaignId: string | undefined;
+  let telnyxError: string | undefined;
+  try {
+    const res = await fetch("https://api.telnyx.com/v2/10dlc/campaignBuilder", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        ...(resellerId ? { "Telnyx-Reseller-Id": resellerId } : {}),
+      },
+      body: JSON.stringify({
+        brandId: brand.telnyx_brand_id,
+        usecase: input.use_case,
+        description: input.description,
+        sample1: samples[0],
+        sample2: samples[1],
+        ...(samples[2] ? { sample3: samples[2] } : {}),
+        messageFlow: input.message_flow,
+        helpMessage: input.help_message,
+        optinKeywords: input.opt_in_keywords ?? "START,YES,UNSTOP",
+        optoutKeywords: input.opt_out_keywords ?? "STOP,END,CANCEL,UNSUBSCRIBE,QUIT",
+        helpKeywords: input.help_keywords ?? "HELP,INFO",
+        embeddedLink: input.embedded_link ?? false,
+        numberPool: input.number_pool ?? false,
+        ageGated: input.age_gated ?? false,
+      }),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { data?: { campaignId?: string; id?: string } };
+      telnyxCampaignId = json.data?.campaignId ?? json.data?.id;
+    } else {
+      telnyxError = `Telnyx HTTP ${res.status}: ${await res.text()}`;
+    }
+  } catch (e) {
+    telnyxError = e instanceof Error ? e.message : "Network error";
+  }
+
+  const optInArr = (input.opt_in_keywords ?? "START,YES").split(",").map((s) => s.trim()).filter(Boolean);
+  const { data, error } = await sb
+    .from("a2p_campaign_registrations")
+    .upsert({
+      org_id: profile.orgId,
+      brand_id: brand.id,
+      telnyx_campaign_id: telnyxCampaignId ?? null,
+      use_case: input.use_case,
+      description: input.description,
+      sample_messages: samples,
+      opt_in_keywords: optInArr,
+      opt_in_message: input.message_flow,
+      help_message: input.help_message,
+      age_gated: input.age_gated ?? false,
+      status: telnyxError ? "draft" : "submitted",
+      submitted_at: telnyxError ? null : new Date().toISOString(),
+      rejection_reason: telnyxError ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+
+  if (telnyxError) return { ok: false, error: telnyxError };
+
+  revalidatePath("/settings");
+  revalidatePath("/dialer/a2p");
+  return { ok: true, campaign_id: data.id as string, telnyx_campaign_id: telnyxCampaignId };
+}
+
 export async function saveSavedList(input: {
   id?: string;
   name: string;
@@ -2514,6 +2624,80 @@ export async function saveSavedList(input: {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/dialer/setup");
   return { ok: true, id: data.id as string };
+}
+
+export async function renamePhoneNumber(input: {
+  id: string;
+  friendly_name: string | null;
+  city: string | null;
+  state: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+  const sb = await createClient();
+  const { error } = await sb
+    .from("phone_numbers")
+    .update({
+      friendly_name: input.friendly_name?.trim() || null,
+      city: input.city?.trim() || null,
+      state: input.state?.trim().toUpperCase() || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.id)
+    .eq("org_id", profile.orgId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function releasePhoneNumber(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile?.isAdmin || !profile.orgId) {
+    return { ok: false, error: "Admin only" };
+  }
+  const apiKey = process.env.TELNYX_API_KEY;
+  if (!apiKey) return { ok: false, error: "TELNYX_API_KEY missing" };
+
+  const sb = await createClient();
+  const { data: row } = await sb
+    .from("phone_numbers")
+    .select("id, telnyx_phone_number_id, status")
+    .eq("id", id)
+    .eq("org_id", profile.orgId)
+    .maybeSingle();
+  if (!row) return { ok: false, error: "Phone number not found" };
+  if (row.status === "released") return { ok: false, error: "Already released" };
+
+  if (row.telnyx_phone_number_id) {
+    try {
+      const res = await fetch(
+        `https://api.telnyx.com/v2/phone_numbers/${row.telnyx_phone_number_id}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${apiKey}` } }
+      );
+      if (!res.ok && res.status !== 404) {
+        const text = await res.text();
+        return { ok: false, error: `Telnyx release failed: ${res.status} ${text}` };
+      }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Telnyx release failed" };
+    }
+  }
+
+  const { error } = await sb
+    .from("phone_numbers")
+    .update({
+      status: "released",
+      released_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
 }
 
 type DialerDefaultsInput = {

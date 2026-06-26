@@ -186,7 +186,15 @@ function ToggleRow({
   return (
     <div className="flex items-start justify-between gap-6 border-b border-[#f1f2f4] px-7 py-5 last:border-b-0">
       <div className="flex flex-1 items-start gap-3">
-        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[#0a0d14]" style={{ border: "1px solid #ebedf0" }}>{icon}</div>
+        <div
+          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white"
+          style={{
+            background: "linear-gradient(135deg, #04261c 0%, #0d4b3a 100%)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.14), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.28)",
+          }}
+        >
+          {icon}
+        </div>
         <div>
           <div className="text-[13.5px] font-semibold text-[#0a0d14]">{label}</div>
           <div className="mt-1 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>

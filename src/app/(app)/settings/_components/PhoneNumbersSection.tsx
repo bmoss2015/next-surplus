@@ -15,7 +15,13 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import type { PhoneNumberRow, A2pBrand } from "@/lib/settings/fetch";
-import { syncTelnyxPhoneNumbers, searchAvailableNumbers, buyTelnyxNumber } from "../_actions";
+import {
+  syncTelnyxPhoneNumbers,
+  searchAvailableNumbers,
+  buyTelnyxNumber,
+  renamePhoneNumber,
+  releasePhoneNumber,
+} from "../_actions";
 
 function formatE164(e164: string): string {
   const cleaned = e164.replace(/[^\d]/g, "");
@@ -261,18 +267,7 @@ function PhoneNumbersInner({
                     </div>
                   </button>
                   {expanded && (
-                    <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-4">
-                      <div className="grid grid-cols-3 gap-6">
-                        <DetailCell label="Purchased" value={formatDate(n.purchased_at)} />
-                        <DetailCell label="Telnyx Id" value={n.telnyx_phone_number_id ?? "—"} />
-                        <DetailCell label="Friendly Name" value={n.friendly_name ?? "—"} />
-                      </div>
-                      <div className="mt-4 flex items-center gap-2">
-                        <button type="button" className="cursor-pointer text-[12px] font-medium text-[#0d4b3a] hover:text-[#13644e]">Rename</button>
-                        <span className="text-[#c2c5cc]">&middot;</span>
-                        <button type="button" className="cursor-pointer text-[12px] font-medium text-[#5b606a] hover:text-[#b42318]">Release</button>
-                      </div>
-                    </div>
+                    <ExpandedRowEditor number={n} onUpdated={() => router.refresh()} onReleased={() => router.refresh()} />
                   )}
                 </div>
               );
@@ -318,6 +313,182 @@ function DetailCell({ label, value }: { label: string; value: string }) {
     <div>
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">{label}</div>
       <div className="mt-1 text-[13px] font-medium text-[#0a0d14]">{value}</div>
+    </div>
+  );
+}
+
+function ExpandedRowEditor({
+  number,
+  onUpdated,
+  onReleased,
+}: {
+  number: PhoneNumberRow;
+  onUpdated: () => void;
+  onReleased: () => void;
+}) {
+  const [mode, setMode] = useState<"view" | "edit" | "confirm-release">("view");
+  const [friendly, setFriendly] = useState(number.friendly_name ?? "");
+  const [city, setCity] = useState(number.city ?? "");
+  const [state, setState] = useState(number.state ?? "");
+  const [saving, startSave] = useTransition();
+  const [releasing, startRelease] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function save() {
+    setError(null);
+    startSave(async () => {
+      const res = await renamePhoneNumber({
+        id: number.id,
+        friendly_name: friendly,
+        city,
+        state,
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setMode("view");
+      onUpdated();
+    });
+  }
+
+  function release() {
+    setError(null);
+    startRelease(async () => {
+      const res = await releasePhoneNumber(number.id);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      onReleased();
+    });
+  }
+
+  if (mode === "confirm-release") {
+    return (
+      <div className="border-t border-[#f1f2f4] bg-white px-6 py-5">
+        <div
+          className="overflow-hidden rounded-[10px] border-l-[3px] border-l-[#b42318] bg-[#fef3f2]"
+          style={{ borderTop: "1px solid #fee4e2", borderRight: "1px solid #fee4e2", borderBottom: "1px solid #fee4e2" }}
+        >
+          <div className="px-5 py-4">
+            <div className="text-[13px] font-semibold text-[#0a0d14]">Release This Number?</div>
+            <p className="mt-1.5 text-[12.5px] leading-[1.55] text-[#5b606a]">
+              Releasing returns the number to Telnyx. The number stops working immediately and the monthly charge stops on the next billing cycle. This action cannot be undone, and the same number may not be available again.
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={release}
+                disabled={releasing}
+                className="inline-flex h-9 w-32 cursor-pointer items-center justify-center rounded-[7px] bg-[#b42318] text-[12.5px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {releasing ? "Releasing..." : "Release Number"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("view")}
+                disabled={releasing}
+                className="inline-flex h-9 w-32 cursor-pointer items-center justify-center rounded-[7px] border border-[#ebedf0] bg-white text-[12.5px] font-medium text-[#5b606a]"
+              >
+                Cancel
+              </button>
+            </div>
+            {error && <div className="mt-3 text-[12px] text-[#b42318]">{error}</div>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === "edit") {
+    return (
+      <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-5">
+        <div className="grid grid-cols-3 gap-4">
+          <Field label="Friendly Name" value={friendly} onChange={setFriendly} placeholder="Atlanta Cell Tower" />
+          <Field label="City" value={city} onChange={setCity} placeholder="Atlanta" />
+          <Field label="State" value={state} onChange={(v) => setState(v.slice(0, 2).toUpperCase())} placeholder="GA" maxLength={2} mono />
+        </div>
+        <div className="mt-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="inline-flex h-9 w-32 cursor-pointer items-center justify-center rounded-[7px] bg-[#0d4b3a] text-[12.5px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20)" }}
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode("view"); setFriendly(number.friendly_name ?? ""); setCity(number.city ?? ""); setState(number.state ?? ""); }}
+            disabled={saving}
+            className="inline-flex h-9 w-32 cursor-pointer items-center justify-center rounded-[7px] border border-[#ebedf0] bg-white text-[12.5px] font-medium text-[#5b606a]"
+          >
+            Cancel
+          </button>
+        </div>
+        {error && <div className="mt-3 text-[12px] text-[#b42318]">{error}</div>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-6 py-5">
+      <div className="grid grid-cols-3 gap-6">
+        <DetailCell label="Purchased" value={formatDate(number.purchased_at)} />
+        <DetailCell label="Location" value={[number.city, number.state].filter(Boolean).join(", ") || "Not set"} />
+        <DetailCell label="Friendly Name" value={number.friendly_name ?? "Not set"} />
+      </div>
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setMode("edit")}
+          className="inline-flex h-8 cursor-pointer items-center rounded-[6px] border border-[#ebedf0] bg-white px-3 text-[12px] font-medium text-[#0a0d14] hover:border-[#0d4b3a]"
+        >
+          Edit Details
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("confirm-release")}
+          className="inline-flex h-8 cursor-pointer items-center rounded-[6px] border border-[#ebedf0] bg-white px-3 text-[12px] font-medium text-[#5b606a] hover:border-[#b42318] hover:text-[#b42318]"
+        >
+          Release Number
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  mono,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  maxLength?: number;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <label className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9298a3]">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className={[
+          "mt-1.5 h-9 w-full rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[13px] text-[#0a0d14] outline-none transition focus:border-[#0d4b3a]",
+          mono ? "tabular-nums uppercase" : "",
+        ].join(" ")}
+      />
     </div>
   );
 }
@@ -408,11 +579,14 @@ type AvailableNumber = {
 };
 
 function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurchased: () => void }) {
+  const [step, setStep] = useState<"search" | "confirm" | "success">("search");
   const [areaCode, setAreaCode] = useState("");
   const [results, setResults] = useState<AvailableNumber[]>([]);
+  const [selected, setSelected] = useState<AvailableNumber | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searching, startSearch] = useTransition();
-  const [buyingNumber, setBuyingNumber] = useState<string | null>(null);
+  const [buying, startBuy] = useTransition();
+  const [boughtE164, setBoughtE164] = useState<string | null>(null);
 
   function handleSearch() {
     setError(null);
@@ -430,95 +604,226 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
     });
   }
 
-  async function handleBuy(e164: string) {
+  function confirmBuy() {
+    if (!selected) return;
     setError(null);
-    setBuyingNumber(e164);
-    const res = await buyTelnyxNumber(e164);
-    setBuyingNumber(null);
-    if (!res.ok) {
-      setError(res.error);
-      return;
-    }
-    onPurchased();
+    startBuy(async () => {
+      const res = await buyTelnyxNumber(selected.e164);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setBoughtE164(selected.e164);
+      setStep("success");
+    });
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-[640px] overflow-hidden rounded-[14px] bg-white" style={{ boxShadow: "0 24px 48px -8px rgba(15,23,41,0.30)" }}>
-        <div className="flex items-start justify-between gap-6 border-b border-[#f1f2f4] px-7 py-5">
-          <div>
-            <h2 className="text-[18px] font-semibold tracking-[-0.018em] text-[#0a0d14]">Buy Number</h2>
-            <p className="mt-1 text-[12.5px] text-[#5b606a]">Search inventory by US area code, then click a number to purchase.</p>
-          </div>
-          <button type="button" onClick={onClose} className="text-[#9298a3] hover:text-[#0a0d14]">
-            <IconX size={18} stroke={2} />
-          </button>
-        </div>
-
-        <div className="px-7 py-5">
-          <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Area Code</label>
-          <div className="mt-2 flex gap-2">
-            <input
-              autoFocus
-              type="text"
-              value={areaCode}
-              onChange={(e) => setAreaCode(e.target.value.replace(/[^\d]/g, "").slice(0, 3))}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-              placeholder="678"
-              maxLength={3}
-              className="h-11 w-32 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[14px] tabular-nums text-[#0a0d14] outline-none transition focus:border-[#0d4b3a] placeholder:text-[#c2c5cc]"
-            />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0d14]/55 p-4 backdrop-blur-sm">
+      <div
+        className="w-full max-w-[680px] overflow-hidden rounded-[16px] bg-white"
+        style={{ boxShadow: "0 32px 64px -12px rgba(15,23,41,0.40), 0 1px 0 rgba(255,255,255,0.10) inset" }}
+      >
+        <div
+          className="relative px-8 pt-6 pb-5"
+          style={{
+            background: "linear-gradient(135deg, #04261c 0%, #0d4b3a 100%)",
+            color: "white",
+          }}
+        >
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.10em] text-white/85">
+                {step === "search" && "Step 1 of 2 · Find A Number"}
+                {step === "confirm" && "Step 2 of 2 · Confirm Purchase"}
+                {step === "success" && "Done"}
+              </div>
+              <h2 className="mt-2.5 text-[22px] font-semibold leading-[1.2] tracking-[-0.022em]">
+                {step === "search" && "Buy A Phone Number"}
+                {step === "confirm" && "Review Your Purchase"}
+                {step === "success" && "Number Purchased"}
+              </h2>
+              <p className="mt-1 text-[12.5px] leading-[1.55] text-white/75">
+                {step === "search" && "Search inventory by US area code. Numbers include voice. SMS unlocks after A2P 10DLC brand approval."}
+                {step === "confirm" && "This is a real purchase. The number will be charged to the org subscription on the next invoice."}
+                {step === "success" && "The number is yours and now appears in Your Numbers below."}
+              </p>
+            </div>
             <button
               type="button"
-              onClick={handleSearch}
-              disabled={areaCode.length !== 3 || searching}
-              className="inline-flex h-11 cursor-pointer items-center rounded-[7px] bg-[#0d4b3a] px-5 text-[13.5px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
+              onClick={onClose}
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
             >
-              {searching ? "Searching..." : "Search"}
+              <IconX size={16} stroke={2.25} />
             </button>
           </div>
-
-          {error && (
-            <div className="mt-4 rounded-[7px] border border-[#fee4e2] bg-[#fef3f2] px-4 py-2.5 text-[12.5px] text-[#b42318]">
-              {error}
-            </div>
-          )}
-
-          {results.length > 0 && (
-            <div className="mt-5 max-h-[360px] overflow-y-auto rounded-[10px] border border-[#ebedf0]">
-              {results.map((n) => (
-                <div key={n.e164} className="flex items-center justify-between gap-3 border-b border-[#f1f2f4] px-4 py-3 last:border-b-0">
-                  <div>
-                    <div className="text-[14px] font-semibold tabular-nums text-[#0a0d14]">{formatE164(n.e164)}</div>
-                    <div className="mt-0.5 text-[11.5px] text-[#5b606a]">
-                      {n.city ?? "—"}{n.state ? `, ${n.state}` : ""} · {formatMoney(n.monthly_cost_cents)}/mo
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={["inline-flex items-center gap-1 text-[11px] font-medium", n.voice ? "text-[#0d4b3a]" : "text-[#9298a3]"].join(" ")}>
-                      <IconPhone size={11} stroke={2.25} />
-                      Voice
-                    </span>
-                    <span className={["inline-flex items-center gap-1 text-[11px] font-medium", n.sms ? "text-[#0d4b3a]" : "text-[#9298a3]"].join(" ")}>
-                      <IconMessageCircle size={11} stroke={2.25} />
-                      SMS
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleBuy(n.e164)}
-                      disabled={buyingNumber !== null}
-                      className="inline-flex h-9 cursor-pointer items-center rounded-[7px] bg-[#0d4b3a] px-3.5 text-[12px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {buyingNumber === n.e164 ? "Buying..." : "Buy"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
+
+        {step === "search" && (
+          <div className="px-8 py-6">
+            <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">US Area Code</label>
+            <div className="mt-2 flex gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={areaCode}
+                onChange={(e) => setAreaCode(e.target.value.replace(/[^\d]/g, "").slice(0, 3))}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
+                placeholder="678"
+                maxLength={3}
+                className="h-12 w-36 rounded-[8px] border border-[#ebedf0] bg-white px-4 text-[18px] font-semibold tabular-nums text-[#0a0d14] outline-none transition focus:border-[#0d4b3a] placeholder:text-[#c2c5cc] placeholder:font-normal"
+                style={{ letterSpacing: "0.05em" }}
+              />
+              <button
+                type="button"
+                onClick={handleSearch}
+                disabled={areaCode.length !== 3 || searching}
+                className="inline-flex h-12 cursor-pointer items-center rounded-[8px] bg-[#0d4b3a] px-6 text-[14px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
+              >
+                {searching ? "Searching..." : "Search Inventory"}
+              </button>
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-[8px] border border-[#fee4e2] bg-[#fef3f2] px-4 py-2.5 text-[12.5px] text-[#b42318]">
+                {error}
+              </div>
+            )}
+
+            {results.length > 0 && (
+              <div className="mt-6">
+                <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">
+                  {results.length} Available {results.length === 1 ? "Number" : "Numbers"}
+                </div>
+                <div className="mt-3 max-h-[340px] space-y-1.5 overflow-y-auto pr-1">
+                  {results.map((n) => (
+                    <button
+                      key={n.e164}
+                      type="button"
+                      onClick={() => { setSelected(n); setStep("confirm"); }}
+                      className="group flex w-full cursor-pointer items-center justify-between gap-3 rounded-[10px] border border-[#ebedf0] bg-white px-4 py-3 text-left transition hover:border-[#0d4b3a]"
+                      style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[16px] font-semibold tabular-nums text-[#0a0d14]">{formatE164(n.e164)}</span>
+                          {(n.city || n.state) && (
+                            <>
+                              <span className="text-[#c2c5cc]">·</span>
+                              <span className="text-[12.5px] text-[#5b606a]">{[n.city, n.state].filter(Boolean).join(", ")}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-3">
+                          <span className={["inline-flex items-center gap-1 text-[11px] font-medium", n.voice ? "text-[#0a0d14]" : "text-[#9298a3]"].join(" ")}>
+                            <IconPhone size={10} stroke={2.25} />
+                            Voice
+                          </span>
+                          <span className={["inline-flex items-center gap-1 text-[11px] font-medium", n.sms ? "text-[#0a0d14]" : "text-[#9298a3]"].join(" ")}>
+                            <IconMessageCircle size={10} stroke={2.25} />
+                            SMS
+                          </span>
+                          <span className="text-[#c2c5cc]">·</span>
+                          <span className="text-[11px] font-semibold tabular-nums text-[#0a0d14]">{formatMoney(n.monthly_cost_cents)}<span className="font-normal text-[#9298a3]">/mo</span></span>
+                        </div>
+                      </div>
+                      <span className="inline-flex h-9 items-center rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[12px] font-medium text-[#5b606a] transition group-hover:border-[#0d4b3a] group-hover:text-[#0d4b3a]">
+                        Select
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {step === "confirm" && selected && (
+          <div className="px-8 py-6">
+            <div
+              className="overflow-hidden rounded-[12px] border border-[#ebedf0]"
+              style={{ background: "linear-gradient(180deg, #fafbfc 0%, #ffffff 100%)" }}
+            >
+              <div className="px-6 py-5">
+                <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">You Are Purchasing</div>
+                <div className="mt-2 text-[28px] font-semibold leading-[1.1] tracking-[-0.024em] text-[#0a0d14] tabular-nums">{formatE164(selected.e164)}</div>
+                {(selected.city || selected.state) && (
+                  <div className="mt-1 text-[13px] text-[#5b606a]">{[selected.city, selected.state].filter(Boolean).join(", ")}</div>
+                )}
+              </div>
+              <div className="grid grid-cols-3 border-t border-[#ebedf0]">
+                <SummaryCell label="Voice" value={selected.voice ? "Included" : "Not Available"} good={selected.voice} />
+                <SummaryCell label="SMS" value="After A2P Approval" good={false} muted />
+                <SummaryCell label="Monthly Charge" value={`${formatMoney(selected.monthly_cost_cents)}/mo`} good />
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-[8px] border border-[#ffd6a1] bg-[#fff8ed] px-4 py-3">
+              <div className="text-[12px] font-semibold text-[#7a4400]">This Is A Real Charge</div>
+              <p className="mt-1 text-[12px] leading-[1.55] text-[#7a4400]">
+                Telnyx provisions the number immediately and bills the org subscription on the next invoice cycle. Releasing later returns the number but the prorated charge for the current period is non-refundable.
+              </p>
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-[8px] border border-[#fee4e2] bg-[#fef3f2] px-4 py-2.5 text-[12.5px] text-[#b42318]">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-6 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setStep("search")}
+                disabled={buying}
+                className="inline-flex h-11 cursor-pointer items-center rounded-[8px] border border-[#ebedf0] bg-white px-5 text-[13.5px] font-medium text-[#5b606a] transition hover:border-[#5b606a]"
+              >
+                Back To Search
+              </button>
+              <button
+                type="button"
+                onClick={confirmBuy}
+                disabled={buying}
+                className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-[8px] bg-[#0d4b3a] px-6 text-[14px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
+              >
+                {buying ? "Purchasing..." : `Confirm And Buy ${formatE164(selected.e164)}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === "success" && boughtE164 && (
+          <div className="px-8 py-10 text-center">
+            <div
+              className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#0d4b3a] text-white"
+              style={{ boxShadow: "0 0 0 6px rgba(13,75,58,0.10)" }}
+            >
+              <IconCheck size={22} stroke={3} />
+            </div>
+            <div className="mt-5 text-[20px] font-semibold tracking-[-0.020em] text-[#0a0d14] tabular-nums">{formatE164(boughtE164)}</div>
+            <p className="mt-2 text-[13px] text-[#5b606a]">Now active in Your Numbers. Voice works immediately.</p>
+            <button
+              type="button"
+              onClick={onPurchased}
+              className="mt-6 inline-flex h-11 cursor-pointer items-center rounded-[8px] bg-[#0d4b3a] px-6 text-[14px] font-medium text-white transition"
+              style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
+            >
+              Done
+            </button>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function SummaryCell({ label, value, good, muted }: { label: string; value: string; good: boolean; muted?: boolean }) {
+  return (
+    <div className="px-5 py-4">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">{label}</div>
+      <div className={["mt-1.5 text-[13.5px] font-semibold", muted ? "text-[#9298a3]" : good ? "text-[#0a0d14]" : "text-[#9298a3]"].join(" ")}>{value}</div>
     </div>
   );
 }

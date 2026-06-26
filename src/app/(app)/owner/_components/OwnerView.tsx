@@ -5,7 +5,7 @@
 // the unified bottom-right save bar pattern.
 
 import { useState } from "react";
-import { SubRail, GROUPS, GROUP_ACCENTS } from "./SubRail";
+import { SubRail, GROUPS } from "./SubRail";
 import { CustomerPricingSection } from "./CustomerPricingSection";
 import { OwnerReportsSection } from "./OwnerReportsSection";
 import { ProviderCostsSection } from "./ProviderCostsSection";
@@ -25,34 +25,14 @@ export type OwnerData = {
   telnyxPricing: TelnyxPricingSettings | null;
 };
 
-function findGroupForItem(key: string): string | null {
-  for (const g of GROUPS) {
-    if (g.items.some((i) => i.key === key)) return g.name;
-  }
-  return null;
-}
-
 export function OwnerView({ data }: { data: OwnerData }) {
   const [active, setActive] = useState<string>(GROUPS[0].items[0].key);
-  const group = findGroupForItem(active);
-  const accent = group ? GROUP_ACCENTS[group] : null;
 
   return (
     <SettingsSaveProvider>
       <div className="flex w-full">
         <SubRail active={active} onSelect={setActive} />
         <div className="min-w-0 flex-1">
-          {accent && group && (
-            <div
-              className="border-b border-[#ebedf0] bg-white px-8 pt-6 pb-3"
-            >
-              <div className="inline-flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.10em]" style={{ color: accent }}>
-                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: accent }} />
-                {group}
-              </div>
-            </div>
-          )}
-
           {active === "customer-pricing" && (
             <CustomerPricingSection data={data.customerPricing} />
           )}
