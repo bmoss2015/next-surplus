@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import type { MailBankAccountRow } from "@/lib/settings/fetch";
 import {
   deleteMailBankAccount,
+  setMailBankAccountPrimary,
   verifyMailBankAccountManually,
   verifyMailBankAccountWithCode,
 } from "@/app/(app)/settings/_actions";
@@ -182,10 +183,19 @@ function BankCard({
   onRemove: () => void;
   onVerify: () => void;
 }) {
+  const router = useRouter();
+  const [settingPrimary, startSetPrimary] = useTransition();
   const isVerified = bank.status === "verified";
   const attemptsUsed = bank.verify_attempts ?? 0;
   const attemptsRemaining = Math.max(0, LOB_VERIFY_ATTEMPT_LIMIT - attemptsUsed);
   const locked = attemptsRemaining === 0;
+
+  function makePrimary() {
+    startSetPrimary(async () => {
+      const res = await setMailBankAccountPrimary(bank.id);
+      if (res.ok) router.refresh();
+    });
+  }
 
   return (
     <div className="bank-card">
@@ -197,17 +207,33 @@ function BankCard({
           <div className="bank-card-holder">{bank.account_holder_name}</div>
         </div>
         {isVerified ? (
-          <span
-            className="role-tab"
-            style={{
-              display: "inline-flex",
-              background: "var(--brand)",
-              color: "#fff",
-              minWidth: 0,
-            }}
-          >
-            VERIFIED
-          </span>
+          <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+            {bank.is_primary && (
+              <span
+                className="role-tab"
+                style={{
+                  display: "inline-flex",
+                  background: "var(--brand)",
+                  color: "#fff",
+                  minWidth: 0,
+                }}
+              >
+                PRIMARY
+              </span>
+            )}
+            <span
+              className="role-tab"
+              style={{
+                display: "inline-flex",
+                background: bank.is_primary ? "transparent" : "var(--brand)",
+                color: bank.is_primary ? "var(--brand)" : "#fff",
+                border: bank.is_primary ? "1px solid var(--brand)" : "none",
+                minWidth: 0,
+              }}
+            >
+              VERIFIED
+            </span>
+          </div>
         ) : (
           <span
             className="role-tab"
@@ -284,9 +310,20 @@ function BankCard({
       )}
       <div className="bank-card-foot">
         <span className="text-[11px] text-3">
-          {isVerified && isFirst ? "Default for outgoing checks" : ""}
+          {bank.is_primary ? "Primary funding source for checks" : ""}
         </span>
         <div style={{ display: "flex", gap: 8 }}>
+          {isVerified && !bank.is_primary && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              style={{ fontSize: 11.5, padding: "4px 10px" }}
+              onClick={makePrimary}
+              disabled={settingPrimary}
+            >
+              {settingPrimary ? "Setting…" : "Set As Primary"}
+            </button>
+          )}
           {!isVerified && !locked && (
             <button
               type="button"
