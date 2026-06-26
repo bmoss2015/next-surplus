@@ -193,7 +193,9 @@ function BankCard({
   function makePrimary() {
     startSetPrimary(async () => {
       const res = await setMailBankAccountPrimary(bank.id);
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        await Promise.resolve(router.refresh());
+      }
     });
   }
 

@@ -1095,8 +1095,36 @@ export async function verifyMailBankAccountManually(
     })
     .eq("id", input.bank_account_id);
   if (updateErr) return { ok: false, error: updateErr.message };
+  await autoSetPrimaryIfNone(sb, input.bank_account_id);
   revalidatePath("/settings");
   return { ok: true };
+}
+
+// First verified bank in an org becomes the primary automatically so
+// the operator doesn't have to click Set As Primary when they have
+// only one account. Matches Stripe / Mercury default-payment-method
+// behavior. No-op if any other bank in the org is already primary.
+async function autoSetPrimaryIfNone(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  bankAccountId: string
+): Promise<void> {
+  const { data: row } = await sb
+    .from("mail_bank_accounts")
+    .select("org_id")
+    .eq("id", bankAccountId)
+    .maybeSingle();
+  const orgId = (row?.org_id as string | undefined) ?? null;
+  if (!orgId) return;
+  const { count } = await sb
+    .from("mail_bank_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("is_primary", true);
+  if ((count ?? 0) > 0) return;
+  await sb
+    .from("mail_bank_accounts")
+    .update({ is_primary: true })
+    .eq("id", bankAccountId);
 }
 
 // Convenience wrapper for the descriptor_code path so the UI can call a
