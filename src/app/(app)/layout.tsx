@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/Components/AppShell";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { fetchUrgentTaskCount } from "@/lib/tasks/fetch-urgent-count";
 import { createServiceClient } from "@/lib/supabase/service";

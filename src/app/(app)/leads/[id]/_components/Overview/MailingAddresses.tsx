@@ -19,7 +19,7 @@ import {
   LEAD_PARTY_ROLE_LABELS,
   type LeadPartyRow,
 } from "@/lib/leads/lead-parties-types";
-import { useRole } from "@/components/RoleProvider";
+import { useRole } from "@/Components/RoleProvider";
 import { cn } from "@/lib/cn";
 
 function fmtMailedAt(iso: string | null): string {

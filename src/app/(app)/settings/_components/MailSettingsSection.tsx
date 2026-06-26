@@ -21,7 +21,7 @@ import { useRouter } from "next/navigation";
 import {
   updateMailSettings,
 } from "@/app/(app)/settings/_actions";
-import { useSaveBarSection } from "@/components/SettingsSaveBar";
+import { useSaveBarSection } from "@/Components/SettingsSaveBar";
 import {
   uploadSignatureImage,
   removeSignatureImage,

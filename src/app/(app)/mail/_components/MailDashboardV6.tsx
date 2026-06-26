@@ -13,8 +13,8 @@ import {
   IconMailbox,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
-import { displayRecipientName } from "@/components/mail/displayName";
-import { LetterPreviewModal } from "@/components/mail/LetterPreviewModal";
+import { displayRecipientName } from "@/Components/mail/displayName";
+import { LetterPreviewModal } from "@/Components/mail/LetterPreviewModal";
 import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
 import type { MailJobListRow, MailStats } from "@/lib/mail/fetch";
 import {

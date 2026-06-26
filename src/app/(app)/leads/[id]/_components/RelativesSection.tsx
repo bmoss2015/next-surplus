@@ -5,8 +5,8 @@ import { IconPlus, IconTrash, IconUsersGroup, IconPencil, IconPhone } from "@tab
 import { upsertRelative, deleteRelative, type RelativePatch } from "../_actions";
 import type { ContactRow, RelativeRow } from "@/lib/leads/fetch-detail";
 import { MailingAddressSubsection } from "./MailingAddressSubsection";
-import { useRole } from "@/components/RoleProvider";
-import { Modal } from "@/components/Modal";
+import { useRole } from "@/Components/RoleProvider";
+import { Modal } from "@/Components/Modal";
 import { AgeEditField, NameEditField } from "./ContactsTabClient";
 import { formatPhone } from "@/lib/format/phone";
 import { formatPhoneInput, toE164 } from "@/lib/phone";

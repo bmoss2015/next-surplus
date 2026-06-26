@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import type { CustomerPricingData } from "@/lib/owner/fetch";
 import type { LobPricing } from "@/lib/mail/types";
 import { updateCustomerPricing } from "@/lib/owner/actions";
-import { useSaveBarSection } from "@/components/SettingsSaveBar";
+import { useSaveBarSection } from "@/Components/SettingsSaveBar";
 
 type PriceKey = keyof Omit<LobPricing, "tier_label">;
 

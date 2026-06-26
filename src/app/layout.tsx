@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { CookieConsent } from "@/components/legal/CookieConsent";
+import { CookieConsent } from "@/Components/legal/CookieConsent";
 
 export const metadata: Metadata = {
   title: "Next Surplus",

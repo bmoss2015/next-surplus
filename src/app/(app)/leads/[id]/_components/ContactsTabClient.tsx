@@ -18,8 +18,8 @@ import {
 } from "../_actions";
 import type { ContactRow, OwnerRowFull } from "@/lib/leads/fetch-detail";
 import { OWNER_STATUS_LABELS, type OwnerStatus } from "@/lib/leads/types";
-import { useRole } from "@/components/RoleProvider";
-import { Modal } from "@/components/Modal";
+import { useRole } from "@/Components/RoleProvider";
+import { Modal } from "@/Components/Modal";
 import { cn } from "@/lib/cn";
 import { formatPhone } from "@/lib/format/phone";
 import { formatPhoneInput, toE164 } from "@/lib/phone";

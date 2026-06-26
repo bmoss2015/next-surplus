@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { SubRail, GROUPS } from "./SubRail";
 import { Placeholder } from "./Placeholder";
-import { SettingsSaveProvider } from "@/components/SettingsSaveBar";
+import { SettingsSaveProvider } from "@/Components/SettingsSaveBar";
 
 import { ProfileSection } from "./ProfileSection";
 import { SecuritySection } from "./SecuritySection";

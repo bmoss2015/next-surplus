@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Drawer } from "@/components/Drawer";
+import { Drawer } from "@/Components/Drawer";
 import { SALE_TYPES, SALE_TYPE_LABELS, type SaleType } from "@/lib/leads/types";
 import { createLead } from "../_actions";
 

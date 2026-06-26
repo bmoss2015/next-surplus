@@ -10,7 +10,7 @@ import { CustomerPricingSection } from "./CustomerPricingSection";
 import { OwnerReportsSection } from "./OwnerReportsSection";
 import { ProviderCostsSection } from "./ProviderCostsSection";
 import { TelnyxPricingSection } from "@/app/(app)/settings/_components/TelnyxPricingSection";
-import { SettingsSaveProvider } from "@/components/SettingsSaveBar";
+import { SettingsSaveProvider } from "@/Components/SettingsSaveBar";
 import type {
   CustomerPricingData,
   ProviderCostsData,
@@ -30,7 +30,7 @@ export function OwnerView({ data }: { data: OwnerData }) {
 
   return (
     <SettingsSaveProvider>
-      <div className="flex w-full">
+      <div className="flex w-full bg-white" style={{ minHeight: "calc(100vh - 56px)" }}>
         <SubRail active={active} onSelect={setActive} />
         <div className="min-w-0 flex-1">
           {active === "customer-pricing" && (

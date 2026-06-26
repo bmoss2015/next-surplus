@@ -11,17 +11,17 @@ import {
   IconBarcode,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
-import { displayRecipientName } from "@/components/mail/displayName";
-import { LetterPreviewModal } from "@/components/mail/LetterPreviewModal";
-import { CheckPreviewModal } from "@/components/mail/CheckPreviewModal";
-import { LetterThumbnail } from "@/components/mail/LetterThumbnail";
+import { displayRecipientName } from "@/Components/mail/displayName";
+import { LetterPreviewModal } from "@/Components/mail/LetterPreviewModal";
+import { CheckPreviewModal } from "@/Components/mail/CheckPreviewModal";
+import { LetterThumbnail } from "@/Components/mail/LetterThumbnail";
 import type { MailJobListRow, MailJobDetailRow } from "@/lib/mail/fetch";
 import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
 import {
   SendMailModal,
   type SendMailModalRecipient,
-} from "@/components/mail/SendMailModal";
-import type { SendMailFromAddress } from "@/components/mail/SendMailButton";
+} from "@/Components/mail/SendMailModal";
+import type { SendMailFromAddress } from "@/Components/mail/SendMailButton";
 import type { MailTemplateRow } from "@/lib/settings/fetch";
 
 // V11 — lead Mail tab. Stats header on top, split-pane below.

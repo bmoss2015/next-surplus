@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import {
   PasswordRequirements,
   passwordMeetsRequirements,
-} from "@/components/PasswordRequirements";
-import { InlineError } from "@/components/InlineError";
+} from "@/Components/PasswordRequirements";
+import { InlineError } from "@/Components/InlineError";
 
 function postResetDestination(): string {
   if (typeof window === "undefined") return "/";

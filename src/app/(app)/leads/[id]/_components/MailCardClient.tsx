@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { IconExternalLink } from "@tabler/icons-react";
-import { MailStatusPill } from "@/components/mail/MailStatusPill";
+import { MailStatusPill } from "@/Components/mail/MailStatusPill";
 import {
   LetterPreviewModal,
   type LetterPreviewData,
-} from "@/components/mail/LetterPreviewModal";
+} from "@/Components/mail/LetterPreviewModal";
 import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
-import { displayRecipientName } from "@/components/mail/displayName";
+import { displayRecipientName } from "@/Components/mail/displayName";
 import type { MailJobListRow } from "@/lib/mail/fetch";
 
 function fmtDate(iso: string | null): string {

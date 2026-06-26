@@ -13,7 +13,7 @@ import {
   type NotificationPrefKey,
 } from "@/app/(app)/settings/_notification-prefs";
 import { setMyNotificationPref } from "@/app/(app)/settings/_notification-actions";
-import { useSaveBarSection } from "@/components/SettingsSaveBar";
+import { useSaveBarSection } from "@/Components/SettingsSaveBar";
 
 export function NotificationsSection({
   initial,

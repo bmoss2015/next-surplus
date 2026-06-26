@@ -6,7 +6,7 @@ import {
   LEAD_PARTY_ROLE_LABELS,
   type LeadPartyRole,
 } from "@/lib/leads/lead-parties-types";
-import type { SendMailModalRecipient } from "@/components/mail/SendMailModal";
+import type { SendMailModalRecipient } from "@/Components/mail/SendMailModal";
 
 // Since migration 0119, every mailing address lives in the contacts table
 // with one of owner_id / relative_id / lead_party_id set. This builder reads

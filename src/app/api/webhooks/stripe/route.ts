@@ -113,7 +113,33 @@ export async function POST(req: NextRequest) {
       break;
     }
 
+    case "checkout.session.completed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const orgId = (session.metadata?.org_id as string | undefined) ?? null;
+      const customerId =
+        typeof session.customer === "string"
+          ? session.customer
+          : session.customer?.id ?? null;
+      const subscriptionId =
+        typeof session.subscription === "string"
+          ? session.subscription
+          : session.subscription?.id ?? null;
+      if (orgId && customerId) {
+        await admin
+          .from("orgs")
+          .update({
+            stripe_customer_id: customerId,
+            ...(subscriptionId ? { stripe_subscription_id: subscriptionId } : {}),
+          })
+          .eq("id", orgId);
+      }
+      break;
+    }
+
     default:
+      console.warn(
+        `[stripe-webhook] unhandled event type: ${event.type} (id=${event.id})`
+      );
       break;
   }
 

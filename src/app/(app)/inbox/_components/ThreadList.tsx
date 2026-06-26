@@ -23,7 +23,7 @@ import type {
 import type { EmailTemplateRow } from "@/lib/settings/fetch";
 
 const SendEmailModal = dynamic(
-  () => import("@/components/email/SendEmailModal").then((m) => m.SendEmailModal),
+  () => import("@/Components/email/SendEmailModal").then((m) => m.SendEmailModal),
   { ssr: false }
 );
 

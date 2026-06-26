@@ -14,9 +14,9 @@ import {
   IconArrowBackUp,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/cn";
-import { MailStatusPill } from "@/components/mail/MailStatusPill";
-import { LetterPreviewModal, type LetterPreviewData } from "@/components/mail/LetterPreviewModal";
-import { displayRecipientName } from "@/components/mail/displayName";
+import { MailStatusPill } from "@/Components/mail/MailStatusPill";
+import { LetterPreviewModal, type LetterPreviewData } from "@/Components/mail/LetterPreviewModal";
+import { displayRecipientName } from "@/Components/mail/displayName";
 import type {
   MailJobListRow,
   MailStats,
