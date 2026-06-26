@@ -608,7 +608,11 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
     if (!selected) return;
     setError(null);
     startBuy(async () => {
-      const res = await buyTelnyxNumber(selected.e164);
+      const res = await buyTelnyxNumber({
+        e164: selected.e164,
+        city: selected.city,
+        state: selected.state,
+      });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -643,10 +647,10 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
                 {step === "confirm" && "Review Your Purchase"}
                 {step === "success" && "Number Purchased"}
               </h2>
-              <p className="mt-1 text-[12.5px] leading-[1.55] text-white/75">
-                {step === "search" && "Search inventory by US area code. Numbers include voice. SMS unlocks after A2P 10DLC brand approval."}
-                {step === "confirm" && "This is a real purchase. The number will be charged to the org subscription on the next invoice."}
-                {step === "success" && "The number is yours and now appears in Your Numbers below."}
+              <p className="mt-1 text-[12.5px] leading-[1.55] text-white/85">
+                {step === "search" && "Search available numbers by US area code. Numbers include voice immediately. SMS unlocks once the A2P 10DLC brand is approved."}
+                {step === "confirm" && "Review the details before completing the purchase."}
+                {step === "success" && "The new number appears in Your Numbers and is ready for outbound voice."}
               </p>
             </div>
             <button
@@ -671,17 +675,16 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
                 onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
                 placeholder="678"
                 maxLength={3}
-                className="h-12 w-36 rounded-[8px] border border-[#ebedf0] bg-white px-4 text-[18px] font-semibold tabular-nums text-[#0a0d14] outline-none transition focus:border-[#0d4b3a] placeholder:text-[#c2c5cc] placeholder:font-normal"
-                style={{ letterSpacing: "0.05em" }}
+                className="h-10 w-24 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[14px] font-semibold tabular-nums text-[#0a0d14] outline-none transition focus:border-[#0d4b3a] placeholder:text-[#c2c5cc] placeholder:font-normal"
               />
               <button
                 type="button"
                 onClick={handleSearch}
                 disabled={areaCode.length !== 3 || searching}
-                className="inline-flex h-12 cursor-pointer items-center rounded-[8px] bg-[#0d4b3a] px-6 text-[14px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40"
-                style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
+                className="inline-flex h-10 cursor-pointer items-center rounded-[7px] bg-[#0d4b3a] px-4 text-[13px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 4px 12px -2px rgba(13,75,58,0.24)" }}
               >
-                {searching ? "Searching..." : "Search Inventory"}
+                {searching ? "Searching..." : "Search"}
               </button>
             </div>
 
@@ -702,7 +705,7 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
                       key={n.e164}
                       type="button"
                       onClick={() => { setSelected(n); setStep("confirm"); }}
-                      className="group flex w-full cursor-pointer items-center justify-between gap-3 rounded-[10px] border border-[#ebedf0] bg-white px-4 py-3 text-left transition hover:border-[#0d4b3a]"
+                      className="group flex w-full cursor-pointer items-center justify-between gap-3 rounded-[10px] border border-[#ebedf0] bg-white px-4 py-3 text-left transition hover:border-[#9298a3] hover:bg-[#fafbfc]"
                       style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
                     >
                       <div className="min-w-0 flex-1">
@@ -728,7 +731,7 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
                           <span className="text-[11px] font-semibold tabular-nums text-[#0a0d14]">{formatMoney(n.monthly_cost_cents)}<span className="font-normal text-[#9298a3]">/mo</span></span>
                         </div>
                       </div>
-                      <span className="inline-flex h-9 items-center rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[12px] font-medium text-[#5b606a] transition group-hover:border-[#0d4b3a] group-hover:text-[#0d4b3a]">
+                      <span className="inline-flex h-9 items-center rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[12px] font-medium text-[#5b606a] transition group-hover:border-[#9298a3] group-hover:text-[#0a0d14]">
                         Select
                       </span>
                     </button>
@@ -741,28 +744,29 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
 
         {step === "confirm" && selected && (
           <div className="px-8 py-6">
-            <div
-              className="overflow-hidden rounded-[12px] border border-[#ebedf0]"
-              style={{ background: "linear-gradient(180deg, #fafbfc 0%, #ffffff 100%)" }}
-            >
-              <div className="px-6 py-5">
-                <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">You Are Purchasing</div>
-                <div className="mt-2 text-[28px] font-semibold leading-[1.1] tracking-[-0.024em] text-[#0a0d14] tabular-nums">{formatE164(selected.e164)}</div>
-                {(selected.city || selected.state) && (
-                  <div className="mt-1 text-[13px] text-[#5b606a]">{[selected.city, selected.state].filter(Boolean).join(", ")}</div>
-                )}
+            <div className="overflow-hidden rounded-[12px] border border-[#ebedf0] bg-white">
+              <div className="flex items-baseline justify-between gap-4 px-6 py-5">
+                <div>
+                  <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">Selected Number</div>
+                  <div className="mt-2 text-[20px] font-semibold leading-[1.2] tracking-[-0.018em] text-[#0a0d14] tabular-nums">{formatE164(selected.e164)}</div>
+                  {(selected.city || selected.state) && (
+                    <div className="mt-1 text-[12.5px] text-[#5b606a]">{[selected.city, selected.state].filter(Boolean).join(", ")}</div>
+                  )}
+                </div>
+                <div className="text-right">
+                  <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#9298a3]">Monthly</div>
+                  <div className="mt-2 text-[20px] font-semibold leading-[1.2] tracking-[-0.018em] text-[#0a0d14] tabular-nums">{formatMoney(selected.monthly_cost_cents)}<span className="text-[12px] font-normal text-[#9298a3]">/mo</span></div>
+                </div>
               </div>
-              <div className="grid grid-cols-3 border-t border-[#ebedf0]">
-                <SummaryCell label="Voice" value={selected.voice ? "Included" : "Not Available"} good={selected.voice} />
-                <SummaryCell label="SMS" value="After A2P Approval" good={false} muted />
-                <SummaryCell label="Monthly Charge" value={`${formatMoney(selected.monthly_cost_cents)}/mo`} good />
+              <div className="grid grid-cols-2 border-t border-[#f1f2f4]">
+                <SummaryCell label="Voice" value={selected.voice ? "Active On Purchase" : "Not Available"} good={selected.voice} />
+                <SummaryCell label="SMS" value="Pending A2P Approval" good={false} muted />
               </div>
             </div>
 
-            <div className="mt-5 rounded-[8px] border border-[#ffd6a1] bg-[#fff8ed] px-4 py-3">
-              <div className="text-[12px] font-semibold text-[#7a4400]">This Is A Real Charge</div>
-              <p className="mt-1 text-[12px] leading-[1.55] text-[#7a4400]">
-                Telnyx provisions the number immediately and bills the org subscription on the next invoice cycle. Releasing later returns the number but the prorated charge for the current period is non-refundable.
+            <div className="mt-5 rounded-[8px] border border-[#ebedf0] bg-[#fafbfc] px-4 py-3">
+              <p className="text-[12.5px] leading-[1.55] text-[#5b606a]">
+                The number is provisioned immediately on confirmation. Monthly cost is added as a line item on the next subscription invoice. Releasing the number later stops future charges; the current period is not refunded.
               </p>
             </div>
 
@@ -785,10 +789,10 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
                 type="button"
                 onClick={confirmBuy}
                 disabled={buying}
-                className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-[8px] bg-[#0d4b3a] px-6 text-[14px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-11 cursor-pointer items-center rounded-[8px] bg-[#0d4b3a] px-6 text-[14px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 8px 20px -4px rgba(13,75,58,0.34)" }}
               >
-                {buying ? "Purchasing..." : `Confirm And Buy ${formatE164(selected.e164)}`}
+                {buying ? "Purchasing..." : "Confirm Purchase"}
               </button>
             </div>
           </div>

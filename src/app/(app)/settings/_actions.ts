@@ -2954,10 +2954,17 @@ export async function searchAvailableNumbers(input: {
 // Orders a single Telnyx number, polls until the order completes, then
 // writes the new row into phone_numbers. The Telnyx Number Orders API is
 // async; for one-number orders it normally resolves in under 2 seconds.
-export async function buyTelnyxNumber(e164: string): Promise<
+// City + state come from the search inventory result and are stored so
+// the row renders Atlanta, GA rather than just a number forever after.
+export async function buyTelnyxNumber(input: {
+  e164: string;
+  city?: string | null;
+  state?: string | null;
+}): Promise<
   | { ok: true; phone_number_id: string }
   | { ok: false; error: string }
 > {
+  const e164 = input.e164;
   const profile = await getCurrentProfile();
   if (!profile?.isAdmin || !profile.orgId) {
     return { ok: false, error: "Admin only" };
@@ -3019,6 +3026,8 @@ export async function buyTelnyxNumber(e164: string): Promise<
         org_id: profile.orgId,
         telnyx_phone_number_id: telnyxId,
         e164: orderedNumber.phone_number,
+        city: input.city?.trim() || null,
+        state: input.state?.trim().toUpperCase() || null,
         voice_enabled: true,
         sms_enabled: false,
         status: "pending",

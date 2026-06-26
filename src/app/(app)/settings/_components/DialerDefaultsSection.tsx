@@ -9,23 +9,14 @@ import {
   IconMicrophone,
   IconPhoneCall,
   IconFileText,
-  IconCheck,
 } from "@tabler/icons-react";
 import type { DialerDefaults } from "@/lib/settings/fetch";
 import { updateDialerDefaults } from "../_actions";
-
-const PROVIDERS: { value: DialerDefaults["transcription_provider"]; label: string; cost: string; note: string }[] = [
-  { value: "deepgram_nova", label: "Deepgram Nova", cost: "$0.0074/min", note: "Cheapest, recommended" },
-  { value: "telnyx_stt", label: "Telnyx STT", cost: "$0.015/min", note: "Native Telnyx" },
-  { value: "google_stt", label: "Google STT", cost: "$0.017/min", note: "Premium accuracy" },
-  { value: "assemblyai", label: "AssemblyAI", cost: "$0.007/min", note: "Speaker diarization included" },
-];
 
 export function DialerDefaultsSection({ initial }: { initial: DialerDefaults }) {
   const [recording, setRecording] = useState(initial.call_recording_enabled);
   const [amd, setAmd] = useState(initial.amd_enabled);
   const [transcript, setTranscript] = useState(initial.transcription_enabled);
-  const [provider, setProvider] = useState(initial.transcription_provider);
   const [wrapUp, setWrapUp] = useState(initial.wrap_up_seconds);
   const [saving, startSave] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -49,7 +40,7 @@ export function DialerDefaultsSection({ initial }: { initial: DialerDefaults }) 
     <div className="mx-auto w-full max-w-[840px] px-8 pb-32 pt-10">
       <div>
         <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.026em] text-[#0a0d14]">Dialer Defaults</h1>
-        <p className="mt-3 max-w-[60ch] text-[14px] leading-[1.55] text-[#5b606a]">
+        <p className="mt-3 text-[14px] leading-[1.55] text-[#5b606a]">
           Org-wide settings for every dialer session. Operators can override these for a single session from Customize For This Session in the Setup Wizard. Persistent changes are admin only.
         </p>
       </div>
@@ -57,13 +48,12 @@ export function DialerDefaultsSection({ initial }: { initial: DialerDefaults }) 
       <SectionCard
         eyebrow="Telephony Add-Ons"
         title="Recording, Detection, Transcription"
-        intro="Each toggle controls a Telnyx add-on. Costs pass through at the provider rate and are billed monthly on the customer subscription."
+        intro="Each toggle controls a call-time add-on. Usage is included in the monthly subscription up to fair-use limits."
       >
         <ToggleRow
           icon={<IconMicrophone size={14} stroke={2.25} />}
           label="Call Recording"
-          subtitle="Saves an MP3 of every connected call to the lead's activity timeline."
-          cost="$0.002/min Telnyx pass-through"
+          subtitle="Saves an audio file of every connected call to the lead's activity timeline."
           on={recording}
           onChange={(v) => { setRecording(v); save({ call_recording_enabled: v }); }}
         />
@@ -71,45 +61,16 @@ export function DialerDefaultsSection({ initial }: { initial: DialerDefaults }) 
           icon={<IconPhoneCall size={14} stroke={2.25} />}
           label="Answering Machine Detection"
           subtitle="Detects when a voicemail picks up so the dialer can skip or play a voicemail drop instead of ringing dead air."
-          cost="$0.002/call Telnyx pass-through"
           on={amd}
           onChange={(v) => { setAmd(v); save({ amd_enabled: v }); }}
         />
         <ToggleRow
           icon={<IconFileText size={14} stroke={2.25} />}
           label="Live Call Transcription"
-          subtitle="Generates a text transcript of every recorded call. Searchable, copyable, and feeds AI summaries on the lead detail page."
-          cost="See provider below"
+          subtitle="Generates a searchable text transcript of every recorded call. Visible on the lead detail page."
           on={transcript}
           onChange={(v) => { setTranscript(v); save({ transcription_enabled: v }); }}
         />
-
-        {transcript && (
-          <div className="border-t border-[#f1f2f4] bg-[#fafbfc] px-7 py-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Transcription Provider</div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {PROVIDERS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => { setProvider(p.value); save({ transcription_provider: p.value }); }}
-                  className={[
-                    "rounded-[8px] border bg-white px-4 py-3 text-left transition cursor-pointer",
-                    provider === p.value ? "border-[#0d4b3a]" : "border-[#ebedf0] hover:border-[#9298a3]",
-                  ].join(" ")}
-                  style={provider === p.value ? { boxShadow: "0 0 0 3px rgba(13,75,58,0.10)" } : {}}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] font-semibold text-[#0a0d14]">{p.label}</span>
-                    {provider === p.value && <IconCheck size={12} stroke={2.5} className="text-[#0d4b3a]" />}
-                  </div>
-                  <div className="mt-1 text-[11.5px] tabular-nums font-semibold text-[#0a0d14]">{p.cost}</div>
-                  <div className="mt-0.5 text-[11px] text-[#5b606a]">{p.note}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </SectionCard>
 
       <SectionCard
@@ -172,14 +133,12 @@ function ToggleRow({
   icon,
   label,
   subtitle,
-  cost,
   on,
   onChange,
 }: {
   icon: React.ReactNode;
   label: string;
   subtitle: string;
-  cost: string;
   on: boolean;
   onChange: (v: boolean) => void;
 }) {
@@ -195,10 +154,9 @@ function ToggleRow({
         >
           {icon}
         </div>
-        <div>
+        <div className="flex-1">
           <div className="text-[13.5px] font-semibold text-[#0a0d14]">{label}</div>
           <div className="mt-1 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>
-          <div className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">{cost}</div>
         </div>
       </div>
       <button

@@ -1,7 +1,5 @@
-// Owner area sub-rail. Visual style matches Settings sub-rail
-// (preview.css .nav-item / .nav-item.active): solid brand-emerald
-// background on the active item, subtle gray on hover. Keeps the
-// portal's left rails feeling like one product.
+// Owner area sub-rail. Inline styles mirror preview.css (.rail,
+// .rail-section, .nav-item) so Owner + Settings sub-rails render identically.
 
 import { Fragment } from "react";
 
@@ -33,7 +31,6 @@ export const GROUPS: RailGroup[] = [
   },
 ];
 
-
 export function findItem(key: string): { group: string; item: RailItem } | null {
   for (const g of GROUPS) {
     for (const i of g.items) {
@@ -52,24 +49,31 @@ export function SubRail({
 }) {
   return (
     <aside
-      className="w-[220px] shrink-0 overflow-y-auto bg-white py-3"
       style={{
-        position: "sticky",
-        top: 0,
-        height: "calc(100vh - 56px)",
+        width: 244,
+        flexShrink: 0,
+        background: "#ffffff",
         borderRight: "1px solid #ebedf0",
+        paddingTop: 20,
+        paddingBottom: 20,
+        position: "sticky",
+        top: 56,
+        height: "calc(100vh - 56px)",
+        overflowY: "auto",
       }}
     >
-      {GROUPS.map((g) => (
+      {GROUPS.map((g, gi) => (
         <Fragment key={g.name}>
           <div
             style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "0.05em",
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: "0.06em",
               textTransform: "uppercase",
-              color: "#5b606a",
-              padding: "16px 18px 8px 18px",
+              color: "#374151",
+              padding: gi === 0 ? "8px 18px 8px 18px" : "18px 18px 8px 18px",
+              marginTop: gi === 0 ? 0 : 6,
+              borderTop: gi === 0 ? "none" : "1px solid #ebedf0",
             }}
           >
             {g.name}
@@ -77,28 +81,27 @@ export function SubRail({
           {g.items.map((i) => {
             const isActive = active === i.key;
             return (
-              <button
+              <div
                 key={i.key}
-                type="button"
                 onClick={() => onSelect(i.key)}
                 style={{
                   display: "flex",
-                  width: "calc(100% - 20px)",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                   margin: "0 10px",
                   padding: "7px 12px",
-                  alignItems: "center",
-                  textAlign: "left",
                   borderRadius: 7,
                   fontSize: 13.25,
+                  color: isActive ? "#fff" : "#5b606a",
                   fontWeight: isActive ? 500 : 400,
                   cursor: "pointer",
+                  userSelect: "none",
                   transition: "background 0.12s, color 0.12s",
+                  position: "relative",
                   background: isActive ? "#0d4b3a" : "transparent",
-                  color: isActive ? "#fff" : "#5b606a",
                   boxShadow: isActive
-                    ? "0 1px 2px rgba(13, 75, 58, 0.20), 0 4px 12px -4px rgba(13, 75, 58, 0.30), inset 0 1px 0 rgba(255,255,255,0.10)"
+                    ? "0 1px 2px rgba(13,75,58,0.20), 0 4px 12px -4px rgba(13,75,58,0.30), inset 0 1px 0 rgba(255,255,255,0.10)"
                     : "none",
-                  border: "none",
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -114,7 +117,7 @@ export function SubRail({
                 }}
               >
                 {i.label}
-              </button>
+              </div>
             );
           })}
         </Fragment>
