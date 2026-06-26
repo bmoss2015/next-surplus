@@ -973,6 +973,47 @@ export async function deleteMailBankAccount(
   return { ok: true };
 }
 
+// Set a verified bank as the org's primary funding source. Clears
+// is_primary on every other bank in the org first, then sets it on
+// this one. Partial unique index in the DB enforces single-primary-
+// per-org at the constraint layer too, so a race here can't end with
+// two primaries.
+export async function setMailBankAccountPrimary(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  const sb = await createClient();
+  const { data: row, error: lookupErr } = await sb
+    .from("mail_bank_accounts")
+    .select("id, org_id, status")
+    .eq("id", id)
+    .single();
+  if (lookupErr || !row) {
+    return { ok: false, error: "Bank account not found" };
+  }
+  if (row.status !== "verified") {
+    return {
+      ok: false,
+      error: "Verify this bank account first before making it primary.",
+    };
+  }
+  const orgId = row.org_id as string;
+  const { error: clearErr } = await sb
+    .from("mail_bank_accounts")
+    .update({ is_primary: false })
+    .eq("org_id", orgId)
+    .eq("is_primary", true);
+  if (clearErr) return { ok: false, error: clearErr.message };
+  const { error: setErr } = await sb
+    .from("mail_bank_accounts")
+    .update({ is_primary: true })
+    .eq("id", id);
+  if (setErr) return { ok: false, error: setErr.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 // Micro-deposit verification. Operator enters either two cent
 // amounts (traditional banks) or a single 6-character code starting
 // with "SM" (fintech banks). The modal picks the input shape based

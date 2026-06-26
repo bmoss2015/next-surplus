@@ -294,6 +294,7 @@ export type MailBankAccountRow = {
   last_verify_attempt_at: string | null;
   created_at: string;
   microdeposit_type: "amounts" | "descriptor_code" | null;
+  is_primary: boolean;
 };
 
 export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
@@ -306,8 +307,9 @@ export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
   const withTracking = await sb
     .from("mail_bank_accounts")
     .select(
-      "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at, verify_attempts, last_verify_error, last_verify_attempt_at, created_at, microdeposit_type"
+      "id, bank_name, account_holder_name, routing_last_four, account_last_four, status, verified_at, verify_attempts, last_verify_error, last_verify_attempt_at, created_at, microdeposit_type, is_primary"
     )
+    .order("is_primary", { ascending: false })
     .order("status", { ascending: false })
     .order("created_at", { ascending: false });
   if (withTracking.error) {
@@ -342,6 +344,7 @@ export async function fetchMailBankAccounts(): Promise<MailBankAccountRow[]> {
       last_verify_attempt_at: (r.last_verify_attempt_at as string | null) ?? null,
       created_at: (r.created_at as string | null) ?? new Date().toISOString(),
       microdeposit_type,
+      is_primary: Boolean(r.is_primary),
     };
   });
 }
