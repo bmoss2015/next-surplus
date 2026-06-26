@@ -521,13 +521,12 @@ function ManualVerifyModal({
           className="m-0"
           style={{ fontSize: 11.5, color: "var(--text-3)", lineHeight: 1.45 }}
         >
-          You have{" "}
           <strong style={{ fontVariantNumeric: "tabular-nums" }}>
-            {attemptsRemaining}
+            {attemptsRemaining} of {LOB_VERIFY_ATTEMPT_LIMIT}
           </strong>{" "}
-          of {LOB_VERIFY_ATTEMPT_LIMIT} verification attempts remaining. After
-          3 failed attempts the account is locked and you&apos;ll need to
-          remove it and re-add.
+          attempts remaining. After {LOB_VERIFY_ATTEMPT_LIMIT} failed
+          attempts the account is locked and will need to be removed and
+          re-added.
         </p>
 
         {err && (
