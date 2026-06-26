@@ -9,6 +9,32 @@ Then verify again before proceeding.
 
 Never assume the link state is correct. Always verify first. Every time. No exceptions.
 
+\## CRITICAL — UI COPY VOICE (NO "WE", "US", "OUR")
+
+All user-facing copy in the portal must be formal and product-voice, NEVER conversational.
+
+\- BANNED in UI strings, emails, modals, tooltips, error messages, helper text: "we", "us", "our", "we've", "we'll", "let us", "our team", "we make it easy", "we pre-filled".
+
+\- REPLACE WITH: passive or imperative or third-person product voice.
+
+  \- "We pre-filled 11 fields" → "11 fields pre-filled" or "Auto-filled from Company Profile"
+
+  \- "We selected Customer Care for you" → "Customer Care auto-selected" or "Use Case: Customer Care (auto)"
+
+  \- "We don't mark this up" → "Standard fee. No markup." or "Set by The Campaign Registry. Not marked up."
+
+  \- "Our wizard handles this" → "The wizard handles this" or "Handled automatically"
+
+  \- "We'll text you when approved" → "Approval triggers an SMS notification" or "You'll be texted when approved"
+
+  \- "We've done the heavy lifting" → omit, just show the result
+
+\- This rule applies EVEN when paraphrasing Bree's own request. If she says "make sure we capture company info," the resulting UI copy still uses formal voice.
+
+\- Re-read UI strings before commit. Any "we"/"us"/"our" outside of legal documents (where the org speaks AS itself) is a bug.
+
+\- Bree has corrected this multiple times across sessions. Make it stick.
+
 
 
 @AGENTS.md
