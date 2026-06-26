@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   IconPlus,
@@ -11,8 +11,11 @@ import {
   IconChevronUp,
   IconCheck,
   IconClock,
+  IconRefresh,
+  IconX,
 } from "@tabler/icons-react";
 import type { PhoneNumberRow, A2pBrand } from "@/lib/settings/fetch";
+import { syncTelnyxPhoneNumbers, searchAvailableNumbers, buyTelnyxNumber } from "../_actions";
 
 function formatE164(e164: string): string {
   const cleaned = e164.replace(/[^\d]/g, "");
@@ -62,6 +65,7 @@ function PhoneNumbersInner({
   initial: PhoneNumberRow[];
   a2pBrand: A2pBrand | null;
 }) {
+  const router = useRouter();
   const sp = useSearchParams();
   const initialState: A2PState =
     (sp.get("a2p") as A2PState | null) === "approved"
@@ -73,7 +77,23 @@ function PhoneNumbersInner({
           : brandToA2pState(a2pBrand);
   const [a2pState] = useState<A2PState>(initialState);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [syncing, startSync] = useTransition();
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const numbers = initial;
+
+  function handleSync() {
+    setSyncMsg(null);
+    startSync(async () => {
+      const res = await syncTelnyxPhoneNumbers();
+      if (!res.ok) {
+        setSyncMsg(res.error);
+        return;
+      }
+      setSyncMsg(res.synced === 0 ? "Already In Sync" : `Synced ${res.synced} Number${res.synced === 1 ? "" : "s"}`);
+      router.refresh();
+    });
+  }
 
   return (
     <div className="mx-auto w-full max-w-[960px] px-8 pb-32 pt-10">
@@ -86,15 +106,43 @@ function PhoneNumbersInner({
             Numbers your team dials from. Voice works immediately. SMS unlocks once your brand and campaign clear carrier review.
           </p>
         </div>
-        <button
-          type="button"
-          className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[7px] bg-[#0d4b3a] px-4 text-[13px] font-medium text-white"
-          style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
-        >
-          <IconPlus size={13} stroke={2.25} />
-          Buy Number
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            className="inline-flex h-10 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[7px] border border-[#ebedf0] bg-white px-3.5 text-[13px] font-medium text-[#0a0d14] transition hover:border-[#0d4b3a] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <IconRefresh size={13} stroke={2.25} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Syncing..." : "Sync From Telnyx"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setBuyOpen(true)}
+            className="inline-flex h-10 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[7px] bg-[#0d4b3a] px-4 text-[13px] font-medium text-white"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
+          >
+            <IconPlus size={13} stroke={2.25} />
+            Buy Number
+          </button>
+        </div>
       </div>
+
+      {syncMsg && (
+        <div className="mt-4 rounded-[8px] border border-[#ebedf0] bg-[#fafbfc] px-4 py-2.5 text-[12.5px] text-[#0a0d14]">
+          {syncMsg}
+        </div>
+      )}
+
+      {buyOpen && (
+        <BuyNumberDialog
+          onClose={() => setBuyOpen(false)}
+          onPurchased={() => {
+            setBuyOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       {a2pState !== "approved" && (
         <div
@@ -339,6 +387,131 @@ function ComplianceCard({
           Carriers reviewing this submission. No action needed.
         </div>
       )}
+    </div>
+  );
+}
+
+type AvailableNumber = {
+  e164: string;
+  city: string | null;
+  state: string | null;
+  monthly_cost_cents: number;
+  voice: boolean;
+  sms: boolean;
+};
+
+function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurchased: () => void }) {
+  const [areaCode, setAreaCode] = useState("");
+  const [results, setResults] = useState<AvailableNumber[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [searching, startSearch] = useTransition();
+  const [buyingNumber, setBuyingNumber] = useState<string | null>(null);
+
+  function handleSearch() {
+    setError(null);
+    setResults([]);
+    startSearch(async () => {
+      const res = await searchAvailableNumbers({ area_code: areaCode });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setResults(res.numbers);
+      if (res.numbers.length === 0) {
+        setError("No numbers available in that area code");
+      }
+    });
+  }
+
+  async function handleBuy(e164: string) {
+    setError(null);
+    setBuyingNumber(e164);
+    const res = await buyTelnyxNumber(e164);
+    setBuyingNumber(null);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    onPurchased();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-[640px] overflow-hidden rounded-[14px] bg-white" style={{ boxShadow: "0 24px 48px -8px rgba(15,23,41,0.30)" }}>
+        <div className="flex items-start justify-between gap-6 border-b border-[#f1f2f4] px-7 py-5">
+          <div>
+            <h2 className="text-[18px] font-semibold tracking-[-0.018em] text-[#0a0d14]">Buy Number</h2>
+            <p className="mt-1 text-[12.5px] text-[#5b606a]">Search inventory by US area code, then click a number to purchase.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-[#9298a3] hover:text-[#0a0d14]">
+            <IconX size={18} stroke={2} />
+          </button>
+        </div>
+
+        <div className="px-7 py-5">
+          <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Area Code</label>
+          <div className="mt-2 flex gap-2">
+            <input
+              autoFocus
+              type="text"
+              value={areaCode}
+              onChange={(e) => setAreaCode(e.target.value.replace(/[^\d]/g, "").slice(0, 3))}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
+              placeholder="678"
+              maxLength={3}
+              className="h-11 w-32 rounded-[7px] border border-[#ebedf0] bg-white px-3 text-[14px] tabular-nums text-[#0a0d14] outline-none transition focus:border-[#0d4b3a] placeholder:text-[#c2c5cc]"
+            />
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={areaCode.length !== 3 || searching}
+              className="inline-flex h-11 cursor-pointer items-center rounded-[7px] bg-[#0d4b3a] px-5 text-[13.5px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(13,75,58,0.20), 0 6px 16px -4px rgba(13,75,58,0.30)" }}
+            >
+              {searching ? "Searching..." : "Search"}
+            </button>
+          </div>
+
+          {error && (
+            <div className="mt-4 rounded-[7px] border border-[#fee4e2] bg-[#fef3f2] px-4 py-2.5 text-[12.5px] text-[#b42318]">
+              {error}
+            </div>
+          )}
+
+          {results.length > 0 && (
+            <div className="mt-5 max-h-[360px] overflow-y-auto rounded-[10px] border border-[#ebedf0]">
+              {results.map((n) => (
+                <div key={n.e164} className="flex items-center justify-between gap-3 border-b border-[#f1f2f4] px-4 py-3 last:border-b-0">
+                  <div>
+                    <div className="text-[14px] font-semibold tabular-nums text-[#0a0d14]">{formatE164(n.e164)}</div>
+                    <div className="mt-0.5 text-[11.5px] text-[#5b606a]">
+                      {n.city ?? "—"}{n.state ? `, ${n.state}` : ""} · {formatMoney(n.monthly_cost_cents)}/mo
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={["inline-flex items-center gap-1 text-[11px] font-medium", n.voice ? "text-[#0d4b3a]" : "text-[#9298a3]"].join(" ")}>
+                      <IconPhone size={11} stroke={2.25} />
+                      Voice
+                    </span>
+                    <span className={["inline-flex items-center gap-1 text-[11px] font-medium", n.sms ? "text-[#0d4b3a]" : "text-[#9298a3]"].join(" ")}>
+                      <IconMessageCircle size={11} stroke={2.25} />
+                      SMS
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleBuy(n.e164)}
+                      disabled={buyingNumber !== null}
+                      className="inline-flex h-9 cursor-pointer items-center rounded-[7px] bg-[#0d4b3a] px-3.5 text-[12px] font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {buyingNumber === n.e164 ? "Buying..." : "Buy"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

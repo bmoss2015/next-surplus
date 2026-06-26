@@ -88,6 +88,35 @@ Active priorities for the current quarter (April - June 2026). Ordered by consum
 
 Planned workstreams for July through September 2026. The telephony and monetization layer.
 
+### Power Dialer status (live audit 2026-06-26)
+
+**Shipped end-to-end**
+- Phone Numbers settings panel reads from phone_numbers DB; Sync From Telnyx button surfaces numbers purchased directly in the Telnyx console; Buy Number dialog searches inventory by area code, lists Voice + SMS feature chips, and purchases via Telnyx Number Orders API.
+- A2P 10DLC registration wizard (Brand → Campaign → Review → Success) with TCR-anchored fields, validation, and brand-identity-change confirmation flow.
+- A2P fee monitoring cron emails support@nextsurplus.com monthly if Telnyx pricing drifts from the hardcoded $19.50 figure.
+- Telnyx pricing admin settings (Telnyx cost vs customer charge).
+- Setup Wizard at /dialer/setup reads real imports + saved lists (50 each, scroll), wires Start Session and Resume Session into dialer_sessions rows, shows "Waiting On A2P 10DLC Approval" instead of stale "Not Ready Until Approved" label, exposes "Configure" links on each default row.
+- Telnyx Call Control webhook receiver verifies Ed25519 signatures and updates session_calls on call.initiated / call.answered / call.hangup / call.machine.detection.ended / call.recording.saved.
+- originateCall() server action posts to /v2/calls with record-from-answer and AMD enabled.
+
+**Outstanding for Voice testing (current blockers, not coded yet)**
+- Click-to-call audio path. The originateCall server action successfully creates the call leg at Telnyx, but the connection does not yet have a bridge or TexML application configured to route audio to the operator. Two viable approaches: (1) Telnyx Web SDK browser WebRTC + JWT auth endpoint, (2) connect-and-bridge pattern where the portal dials the operator's mobile first then bridges to the lead via webhook. Bridge approach is simpler; Web SDK approach is the better long-term UX.
+- DialerSession UI still reads from src/app/(app)/dialer/_mock-data.ts. Needs to load the active dialer_sessions row + lead_ids + leads rows and call originateCall on lead change.
+- Voicemail drop. Server-side `play_audio` action via Telnyx Call Control needs an audio_url and an upload surface in Settings → Recordings.
+- Live transcripts. Telnyx supports a `transcription` action on calls; result lands as call.transcription event. Webhook handler does not yet route this to session_calls.transcription_url.
+- Outbound number selector in Setup Wizard. pickOutboundNumber() exists but the wizard does not let operators choose a specific number or "Auto map by state".
+
+**Outstanding for SMS submission (blocked on partner enrollment)**
+- Telnyx Partner / Reseller ID. Enrollment email drafted in Gmail on 2026-06-26 by Bree; pending Telnyx reply.
+- A2P wizard submit handler. Currently stops at draft; needs to POST to Telnyx /v2/10dlc/brands and /v2/10dlc/campaigns once Reseller ID is provisioned.
+- TCR status webhook handler. Telnyx fires updates on brand and campaign decisions; needs route at /api/telnyx/a2p-webhook that writes back to a2p_brand_registrations.status.
+- Approval-state UI on Settings → Phone Numbers currently reads a2p_brand_registrations.status; works as soon as the webhook lands.
+- Authorized Rep Title field on Company Profile signup so the wizard auto-fills (currently asks each time).
+- Outbound SMS sender via Telnyx /v2/messages with carrier-required STOP append on first outbound per contact and every 30 days.
+- Inbound STOP / HELP handler at /api/telnyx/sms-webhook with contact_opt_outs table.
+
+**Status: Voice can be tested end-to-end after the bridge or Web SDK path lands. Until then, Bree can validate Phone Numbers visibility, Buy Number purchase flow, A2P wizard UX, and pricing. SMS is blocked at the Telnyx Reseller-ID milestone.**
+
 - SMS messaging via Twilio or Telnyx, A2P 10DLC carrier registration completed before launch, send and receive text messages with leads directly in the platform.
 - Done-for-you A2P 10DLC SMS verification wizard, one customer-facing form collects every required input and auto-submits to the chosen provider's API with pre-filled surplus-operator brand and campaign templates. Customer never touches a provider dashboard.
 - Voice calling, click-to-call from any phone field, automatic call logging via the same telephony provider.
