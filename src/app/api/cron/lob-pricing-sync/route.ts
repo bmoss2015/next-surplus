@@ -57,6 +57,93 @@ function dollars(cents: number | undefined): string {
   return `$${(cents / 100).toFixed(3)}`;
 }
 
+// Preserves the operator's current markup percentage against the new Lob
+// cost. If they charge $2.50 when Lob charges $1.03 (markup 142.7%), and
+// Lob's new cost is $1.06, the suggested new customer price is $2.57.
+// Rounded to the nearest cent.
+function suggestedCustomerCents(
+  currentCustomerCents: number | undefined,
+  oldLobCents: number | undefined,
+  newLobCents: number | undefined
+): number | undefined {
+  if (
+    currentCustomerCents == null ||
+    oldLobCents == null ||
+    newLobCents == null ||
+    oldLobCents <= 0
+  ) {
+    return undefined;
+  }
+  const ratio = currentCustomerCents / oldLobCents;
+  return Math.round(newLobCents * ratio);
+}
+
+const LABELED_KEYS: Array<{ key: keyof LobPricing; label: string }> = [
+  { key: "letter_first_class_bw", label: "First Class B&W Letter" },
+  { key: "letter_first_class_color", label: "First Class Color Letter" },
+  { key: "letter_standard_bw", label: "Standard B&W Letter" },
+  { key: "letter_standard_color", label: "Standard Color Letter" },
+  { key: "letter_extra_page_bw", label: "Additional B&W Page" },
+  { key: "letter_extra_page_color", label: "Additional Color Page" },
+  { key: "letter_over_6_sheet_fee", label: "Letter Over 6 Sheet Fee" },
+  { key: "letter_certified_bw", label: "Certified B&W Letter" },
+  { key: "letter_certified_color", label: "Certified Color Letter" },
+  { key: "check_base", label: "Check Base" },
+  { key: "check_extra_attachment_page", label: "Check Attachment Page" },
+];
+
+function renderUpcomingWithSuggestionsHtml(
+  effectiveDate: string,
+  currentLob: LobPricing,
+  upcomingLob: LobPricing,
+  currentCustomer: LobPricing | null
+): string {
+  const rows = LABELED_KEYS
+    .filter(({ key }) => {
+      const a = currentLob[key] as number | undefined;
+      const b = upcomingLob[key] as number | undefined;
+      return a != null || b != null;
+    })
+    .map(({ key, label }) => {
+      const oldLob = currentLob[key] as number | undefined;
+      const newLob = upcomingLob[key] as number | undefined;
+      const customer = (currentCustomer?.[key] as number | undefined) ?? undefined;
+      const suggested = suggestedCustomerCents(customer, oldLob, newLob);
+      const delta = customer != null && suggested != null ? suggested - customer : null;
+      return `<tr>
+        <td style="padding:6px 14px 6px 0;color:#0f1729;">${label}</td>
+        <td style="padding:6px 14px;font-family:monospace;color:#666;">${dollars(oldLob)}</td>
+        <td style="padding:6px 14px;font-family:monospace;color:#0d4b3a;font-weight:600;">${dollars(newLob)}</td>
+        <td style="padding:6px 14px;font-family:monospace;color:#666;">${dollars(customer)}</td>
+        <td style="padding:6px 14px;font-family:monospace;color:#0d4b3a;font-weight:600;">${dollars(suggested)}</td>
+        <td style="padding:6px 0;font-family:monospace;color:${delta != null && delta > 0 ? "#b42318" : "#666"};">${delta != null ? (delta > 0 ? "+" : "") + dollars(Math.abs(delta)) : "—"}</td>
+      </tr>`;
+    })
+    .join("");
+
+  return `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#0f1729;">
+    <p style="margin:0 0 12px 0;">Lob announced a Developer-tier rate change effective <strong>${effectiveDate}</strong>. The Suggested New Customer Rate column preserves your current markup percentage against the new Lob cost.</p>
+    <table style="border-collapse:collapse;margin:8px 0;font-size:13px;">
+      <thead><tr>
+        <th style="text-align:left;padding:6px 14px 6px 0;font-size:11px;color:#666;font-weight:600;">Item</th>
+        <th style="text-align:left;padding:6px 14px;font-size:11px;color:#666;font-weight:600;">Lob Now</th>
+        <th style="text-align:left;padding:6px 14px;font-size:11px;color:#666;font-weight:600;">Lob ${effectiveDate}</th>
+        <th style="text-align:left;padding:6px 14px;font-size:11px;color:#666;font-weight:600;">Your Current Rate</th>
+        <th style="text-align:left;padding:6px 14px;font-size:11px;color:#666;font-weight:600;">Suggested New Rate</th>
+        <th style="text-align:left;padding:6px 0;font-size:11px;color:#666;font-weight:600;">Change</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="margin:16px 0 0 0;color:#666;font-size:12px;">Adjust the per-item customer rate at Owner &rsaquo; Letters &rsaquo; Customer Pricing.</p>
+  </div>`;
+}
+
+function stableUpcomingKey(upcoming: { effective_date: string | null; pricing: LobPricing }): string {
+  const p = upcoming.pricing;
+  const keys = LABELED_KEYS.map(({ key }) => `${String(key)}:${p[key] ?? ""}`).join("|");
+  return `${upcoming.effective_date ?? "no-date"}::${keys}`;
+}
+
 function renderDiffHtml(
   before: LobPricing,
   after: LobPricing,
@@ -84,6 +171,7 @@ function renderDiffHtml(
   </div>`;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function sectionPreview(section: LobPricingSection, headerLabel: string): string {
   const p = section.pricing;
   const rows: Array<[string, number | undefined]> = [
@@ -140,10 +228,12 @@ export async function GET(req: Request) {
 
   const { data: cfg } = await admin
     .from("app_pricing_config")
-    .select("wholesale_pricing_cents")
+    .select("wholesale_pricing_cents, lob_last_announced_upcoming")
     .eq("id", 1)
     .maybeSingle();
   const previousWholesale = (cfg?.wholesale_pricing_cents as LobPricing | null) ?? null;
+  const lastAnnouncedKey =
+    (cfg?.lob_last_announced_upcoming as { key?: string } | null)?.key ?? null;
 
   await admin
     .from("app_pricing_config")
@@ -186,20 +276,40 @@ export async function GET(req: Request) {
     await admin.from("orgs").update(updates).eq("id", org.id as string);
   }
 
+  // Pull current customer-facing rates from the first org so the email can
+  // suggest new customer rates that preserve markup. Single-tenant for now
+  // (Moss Equity); multi-org would loop per org.
+  const { data: ownerOrg } = await admin
+    .from("orgs")
+    .select("lob_pricing_cents")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const currentCustomer = (ownerOrg?.lob_pricing_cents as LobPricing | null) ?? null;
+
   for (const future of upcoming) {
     if (future.missing.length > 0) continue;
+    const announcementKey = stableUpcomingKey(future);
+    if (announcementKey === lastAnnouncedKey) {
+      // Same upcoming announcement already emailed in a prior run. Skip
+      // so the cron doesn't spam every Monday until the effective date.
+      continue;
+    }
     await sendOpsAlert(
-      `Next Surplus ops: Lob announced rate change effective ${future.effective_date}`,
-      `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#0f1729;">
-        <p>Lob has published an upcoming Developer-tier rate change. The diff vs current rates is below. The wholesale column updates automatically once the effective date arrives.</p>
-        ${renderDiffHtml(
-          published,
-          future.pricing,
-          `Effective ${future.effective_date}:`
-        )}
-        ${sectionPreview(future, `Full table effective ${future.effective_date}`)}
-      </div>`
+      `Next Surplus ops: Lob rate change effective ${future.effective_date}`,
+      renderUpcomingWithSuggestionsHtml(
+        future.effective_date ?? "TBD",
+        published,
+        future.pricing,
+        currentCustomer
+      )
     );
+    await admin
+      .from("app_pricing_config")
+      .update({
+        lob_last_announced_upcoming: { key: announcementKey, sent_at: new Date().toISOString() },
+      })
+      .eq("id", 1);
   }
 
   return NextResponse.json({
