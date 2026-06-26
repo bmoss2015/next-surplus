@@ -189,8 +189,10 @@ export async function pickOutboundNumber(leadState?: string | null): Promise<{ o
   return { ok: true, phone_number_id: row?.id ?? null, e164: row?.e164 ?? null };
 }
 
-// Calls Telnyx Call Control API to originate a call. Returns the
-// call_control_id which gets stored on session_calls.
+// Calls Telnyx Call Control API to originate a call. Reads the org's
+// dialer defaults (recording + AMD) so the toggles in Settings >
+// Power Dialer > Defaults actually control what Telnyx does on every call.
+// Returns the call_control_id which gets stored on session_calls.
 export async function originateCall(input: {
   to_e164: string;
   from_e164: string;
@@ -200,21 +202,39 @@ export async function originateCall(input: {
   if (!apiKey || !connectionId) {
     return { ok: false, error: "Telnyx env not configured" };
   }
+
+  const profile = await getCurrentProfile();
+  if (!profile?.orgId) return { ok: false, error: "Not signed in" };
+
+  const sb = await createClient();
+  const { data: defaults } = await sb
+    .from("org_dialer_defaults")
+    .select("call_recording_enabled, amd_enabled, transcription_enabled")
+    .eq("org_id", profile.orgId)
+    .maybeSingle();
+  const recordingEnabled = defaults?.call_recording_enabled ?? true;
+  const amdEnabled = defaults?.amd_enabled ?? true;
+
   try {
+    const body: Record<string, unknown> = {
+      connection_id: connectionId,
+      to: input.to_e164,
+      from: input.from_e164,
+    };
+    if (recordingEnabled) {
+      body.record = "record-from-answer";
+      body.record_format = "mp3";
+    }
+    if (amdEnabled) {
+      body.answering_machine_detection = "premium";
+    }
     const res = await fetch("https://api.telnyx.com/v2/calls", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        connection_id: connectionId,
-        to: input.to_e164,
-        from: input.from_e164,
-        record: "record-from-answer",
-        record_format: "mp3",
-        answering_machine_detection: "premium",
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const text = await res.text();

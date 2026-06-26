@@ -140,6 +140,74 @@ export async function POST(req: NextRequest) {
             .from("session_calls")
             .update({ recording_url: url })
             .eq("telnyx_call_control_id", callControlId);
+
+          // If the org has transcription enabled, kick off transcription
+          // against the recording. Telnyx handles provider selection via
+          // the org_dialer_defaults.transcription_provider value.
+          const { data: callRow } = await sb
+            .from("session_calls")
+            .select("session_id")
+            .eq("telnyx_call_control_id", callControlId)
+            .maybeSingle();
+          if (callRow?.session_id) {
+            const { data: session } = await sb
+              .from("dialer_sessions")
+              .select("user_id")
+              .eq("id", callRow.session_id)
+              .maybeSingle();
+            if (session?.user_id) {
+              const { data: profile } = await sb
+                .from("profiles")
+                .select("org_id")
+                .eq("id", session.user_id)
+                .maybeSingle();
+              if (profile?.org_id) {
+                const { data: defaults } = await sb
+                  .from("org_dialer_defaults")
+                  .select("transcription_enabled, transcription_provider")
+                  .eq("org_id", profile.org_id)
+                  .maybeSingle();
+                if (defaults?.transcription_enabled) {
+                  const apiKey = process.env.TELNYX_API_KEY;
+                  if (apiKey) {
+                    await sb
+                      .from("session_calls")
+                      .update({ transcription_status: "pending" })
+                      .eq("telnyx_call_control_id", callControlId);
+                    fetch(
+                      `https://api.telnyx.com/v2/calls/${callControlId}/actions/transcription_start`,
+                      {
+                        method: "POST",
+                        headers: {
+                          Authorization: `Bearer ${apiKey}`,
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          transcription_engine: defaults.transcription_provider ?? "deepgram_nova",
+                          language: "en",
+                        }),
+                      }
+                    ).catch(() => {});
+                  }
+                }
+              }
+            }
+          }
+        }
+        break;
+      }
+      case "call.transcription": {
+        const transcript = (payload as { transcription_data?: { transcript?: string } }).transcription_data?.transcript;
+        const transcriptionUrl = (payload as { transcription_url?: string }).transcription_url ?? null;
+        if (transcript || transcriptionUrl) {
+          await sb
+            .from("session_calls")
+            .update({
+              transcription_text: transcript ?? null,
+              transcription_url: transcriptionUrl,
+              transcription_status: "completed",
+            })
+            .eq("telnyx_call_control_id", callControlId);
         }
         break;
       }

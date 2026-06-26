@@ -167,7 +167,6 @@ function PricingRow({
   unit,
   telnyx,
   customer,
-  onTelnyxChange,
   onCustomerChange,
   last,
 }: {
@@ -175,7 +174,7 @@ function PricingRow({
   unit: string;
   telnyx: string;
   customer: string;
-  onTelnyxChange: (v: string) => void;
+  onTelnyxChange?: (v: string) => void;
   onCustomerChange: (v: string) => void;
   last?: boolean;
 }) {
@@ -189,16 +188,8 @@ function PricingRow({
         <div className="mt-0.5 text-[11.5px] text-[#5b606a]">{unit}</div>
       </div>
       <div className="text-right">
-        <div className="relative inline-flex items-center">
-          <span className="absolute left-3 text-[12.5px] text-[#9298a3]">$</span>
-          <input
-            type="number"
-            step="0.001"
-            min="0"
-            value={telnyx}
-            onChange={(e) => onTelnyxChange(e.target.value)}
-            className="h-9 w-[110px] rounded-[7px] border border-[#ebedf0] bg-white pl-6 pr-3 text-right text-[13px] font-medium tabular-nums text-[#0a0d14] outline-none focus:border-[#0d4b3a]"
-          />
+        <div className="inline-flex h-9 w-[110px] items-center justify-end rounded-[7px] bg-[#f1f2f4] px-3 text-right text-[13px] font-medium tabular-nums text-[#0a0d14]" title="Read-only. Refreshed from Telnyx by Refresh Live Cost.">
+          ${telnyx}
         </div>
       </div>
       <div className="text-right">

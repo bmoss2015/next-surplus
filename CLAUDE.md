@@ -9,6 +9,34 @@ Then verify again before proceeding.
 
 Never assume the link state is correct. Always verify first. Every time. No exceptions.
 
+\## CRITICAL — SUBTITLE WIDTH (NO max-w-\[60ch\] OR SIMILAR CHARACTER CLAMPS)
+
+Never apply a `max-w-[60ch]`, `max-w-[58ch]`, `max-w-[64ch]`, or any character-based width clamp to subtitle / description / page-intro text under page headers.
+
+Subtitle text must extend to the right edge of whatever container holds it (the panel, the card, the page column). If the panel is 840px wide, the subtitle wraps at 840px, not at 60ch.
+
+The only acceptable max-width on a subtitle is when it lives inside a multi-column layout where another column constrains it visually (e.g. a sidebar column at 320px). In a single-column panel with a centered max-w-\[840px\], the subtitle has no additional width constraint.
+
+This rule has been violated repeatedly. Re-read every subtitle / description / page-intro paragraph before commit and strip any `max-w-` constraint.
+
+\## CRITICAL — NEVER EXPOSE PROVIDER NAMES TO CUSTOMERS
+
+Provider names (Telnyx, Lob, Resend, Deepgram, Stripe, Supabase, etc.) must NEVER appear in any customer-facing UI string. Banned everywhere: settings panels, modals, tooltips, helper text, error messages, emails, page subtitles.
+
+Provider is a hidden implementation detail. Replace with passive or system-level language:
+
+\- "Telnyx pass-through" → "Included" or omit cost language entirely from customer-facing UI
+
+\- "Powered by Lob" → omit; just describe the action ("Letter mailed")
+
+\- "Deepgram Nova" → omit; just describe the feature ("Transcription on")
+
+\- "Telnyx ID" → never show
+
+\- "What Telnyx charges us" → only acceptable in Owner area (admin-only). Never in customer-facing Settings.
+
+The Owner area is admin-facing and CAN reference providers by name for cost-vs-price visibility. Settings is customer-facing and CANNOT.
+
 \## CRITICAL — UI COPY VOICE (NO "WE", "US", "OUR")
 
 All user-facing copy in the portal must be formal and product-voice, NEVER conversational.

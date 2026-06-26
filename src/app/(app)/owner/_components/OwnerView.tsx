@@ -58,7 +58,7 @@ function PlaceholderReports() {
   return (
     <div className="mx-auto max-w-[960px] px-8 pt-10">
       <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.026em] text-[#0a0d14]">Power Dialer Reports</h1>
-      <p className="mt-3 max-w-[60ch] text-[14px] leading-[1.55] text-[#5b606a]">
+      <p className="mt-3 text-[14px] leading-[1.55] text-[#5b606a]">
         Volume, margin, and per-customer Power Dialer usage. Lands once SMS sending and outbound calls have real activity to summarize.
       </p>
       <div
