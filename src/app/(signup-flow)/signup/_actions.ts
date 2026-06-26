@@ -10,14 +10,26 @@ type SignupResult =
   | { ok: true; checkoutUrl: string; sessionId: string }
   | { ok: false; error: string };
 
+const AFFILIATE_COUPON_BY_REF: Record<string, string> = {
+  NICK30: "NICK30",
+};
+
+function normalizeRef(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const cleaned = raw.trim().toUpperCase().slice(0, 32);
+  return /^[A-Z0-9_-]+$/.test(cleaned) ? cleaned : null;
+}
+
 export async function signUp(input: {
   email: string;
   password: string;
   firmName: string;
+  ref?: string | null;
 }): Promise<SignupResult> {
   const email = input.email.trim().toLowerCase();
   const password = input.password;
   const firmName = input.firmName.trim();
+  const ref = normalizeRef(input.ref);
 
   const ip = await clientIp();
   const limit = rateLimit(`signup:${ip}`, 10, 60 * 1000);
@@ -102,6 +114,10 @@ export async function signUp(input: {
 
   const priceId = priceIdFor("beta_founder", "monthly");
 
+  const couponId = ref ? AFFILIATE_COUPON_BY_REF[ref] : undefined;
+  const metadata: Record<string, string> = { org_id: org.id };
+  if (ref) metadata.affiliate_ref = ref;
+
   try {
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
@@ -110,13 +126,15 @@ export async function signUp(input: {
       customer_email: email,
       subscription_data: {
         trial_period_days: 14,
-        metadata: { org_id: org.id },
+        metadata,
       },
       client_reference_id: org.id,
-      metadata: { org_id: org.id },
+      metadata,
       success_url: `${origin}/signup/verify?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/signup?canceled=1`,
-      allow_promotion_codes: true,
+      ...(couponId
+        ? { discounts: [{ coupon: couponId }] }
+        : { allow_promotion_codes: true }),
     });
 
     if (!session.url) {

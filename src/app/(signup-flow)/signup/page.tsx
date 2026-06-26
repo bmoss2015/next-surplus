@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { signUp } from "./_actions";
 import { createClient } from "@/lib/supabase/client";
@@ -118,13 +118,38 @@ function Check({ children }: { children: React.ReactNode }) {
   );
 }
 
+const REF_STORAGE_KEY = "ns_affiliate_ref";
+
 function FormPanel() {
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [ref, setRef] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [googlePending, setGooglePending] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const fromUrl = new URLSearchParams(window.location.search).get("ref");
+    const normalized =
+      fromUrl
+        ?.trim()
+        .toUpperCase()
+        .slice(0, 32)
+        .replace(/[^A-Z0-9_-]/g, "") || null;
+    if (normalized) {
+      try {
+        window.sessionStorage.setItem(REF_STORAGE_KEY, normalized);
+      } catch {}
+      setRef(normalized);
+      return;
+    }
+    try {
+      const stored = window.sessionStorage.getItem(REF_STORAGE_KEY);
+      if (stored) setRef(stored);
+    } catch {}
+  }, []);
 
   const canSubmit =
     companyName.trim() && email.trim() && passwordMeetsRequirements(password);
@@ -133,7 +158,12 @@ function FormPanel() {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await signUp({ email, password, firmName: companyName });
+      const result = await signUp({
+        email,
+        password,
+        firmName: companyName,
+        ref,
+      });
       if (result.ok) {
         window.location.assign(result.checkoutUrl);
       } else {
@@ -174,6 +204,8 @@ function FormPanel() {
             $49/month. 14 day free trial.
           </p>
         </div>
+
+        {ref ? <AffiliateBadge code={ref} /> : null}
 
         <GoogleButton onClick={continueWithGoogle} pending={googlePending} />
 
@@ -235,6 +267,20 @@ function FormPanel() {
           </Link>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AffiliateBadge({ code }: { code: string }) {
+  return (
+    <div className="mb-4 flex items-center justify-between rounded-[6px] border border-[#e5e7eb] bg-white px-3 py-2 text-[12px]">
+      <span className="font-medium text-[#04261c]">Discount Applied</span>
+      <span
+        className="text-[11px] tracking-wide text-[#374151]"
+        style={{ fontVariantNumeric: "tabular-nums" }}
+      >
+        {code}
+      </span>
     </div>
   );
 }
