@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@harbour-enterprises/superdoc": "^1.33.1",
+    "@sentry/nextjs": "^8.55.2",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "@superdoc-dev/react": "^1.4.1",

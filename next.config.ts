@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const cspDirectives = [
   "default-src 'self'",
@@ -47,4 +48,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const sentryOrg = process.env.SENTRY_ORG;
+const sentryProject = process.env.SENTRY_PROJECT;
+const hasSentry = Boolean(process.env.SENTRY_AUTH_TOKEN && sentryOrg && sentryProject);
+
+export default hasSentry
+  ? withSentryConfig(nextConfig, {
+      org: sentryOrg,
+      project: sentryProject,
+      silent: true,
+      widenClientFileUpload: true,
+      hideSourceMaps: true,
+      disableLogger: true,
+      tunnelRoute: "/monitoring",
+    })
+  : nextConfig;
