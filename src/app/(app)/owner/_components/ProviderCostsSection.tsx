@@ -32,28 +32,25 @@ export function ProviderCostsSection({ data }: { data: ProviderCostsData }) {
   const lob = data.lob.published;
 
   return (
-    <div className="mx-auto max-w-[920px] px-8 py-8">
-      <div className="mb-6">
-        <h1 className="text-[22px] font-semibold text-ink">Lob Rate</h1>
-        <p className="mt-1 text-[13px] text-gray-600">
-          What Lob charges us per piece on the Developer (pay-as-you-go)
-          tier. Internal cost data, not customer pricing. Customer
-          pricing lives in Settings.
+    <div className="mx-auto w-full max-w-[960px] px-8 pb-32 pt-10">
+      <div>
+        <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.026em] text-[#0a0d14]">Lob Rate</h1>
+        <p className="mt-3 text-[14px] leading-[1.55] text-[#5b606a]">
+          What Lob charges per piece on the Developer (pay-as-you-go) tier. Internal cost data only. Customer pricing lives under Customer Pricing.
         </p>
       </div>
 
       {/* Effective Per Letter ----------------------------------------- */}
       {lob && (
-        <section className="mb-6 rounded-lg border border-gray-200 bg-white">
-          <header className="border-b border-gray-200 px-5 py-3.5">
-            <div className="text-[14px] font-semibold text-ink">
-              Effective Cost Per Letter
-            </div>
-            <div className="mt-1 text-[11.5px] text-gray-600">
-              Every letter ships in a #10 double-window envelope. To keep
-              the user&apos;s template untouched, Lob inserts a blank
-              addressing page in front of the letter. We pay for that
-              inserted page on every send.
+        <section
+          className="mt-8 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+          style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+        >
+          <header className="border-b border-[#f1f2f4] px-7 py-5">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#0d4b3a]">Letters</div>
+            <div className="mt-1.5 text-[17px] font-semibold tracking-[-0.018em] text-[#0a0d14]">Effective Cost Per Letter</div>
+            <div className="mt-1 text-[12.5px] text-[#5b606a]">
+              Every letter ships in a #10 double-window envelope. The platform inserts a blank addressing page in front of each letter so customer templates stay untouched. That inserted page is billed on every send.
             </div>
           </header>
           <table className="w-full text-[13px]">
@@ -120,20 +117,21 @@ export function ProviderCostsSection({ data }: { data: ProviderCostsData }) {
       )}
 
       {/* Published Rate Card ----------------------------------------- */}
-      <section className="mb-6 rounded-lg border border-gray-200 bg-white">
-        <header className="flex items-center justify-between border-b border-gray-200 px-5 py-3.5">
+      <section
+        className="mt-8 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+        style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
+      >
+        <header className="flex items-start justify-between gap-6 border-b border-[#f1f2f4] px-7 py-5">
           <div>
-            <div className="text-[14px] font-semibold text-ink">
-              Lob Published Rate Card
-            </div>
-            <div className="text-[11.5px] text-gray-500">
-              Developer tier (pay-as-you-go). Rates are all inclusive
-              (printing, postage, envelope).
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#0d4b3a]">Lob Pricing</div>
+            <div className="mt-1.5 text-[17px] font-semibold tracking-[-0.018em] text-[#0a0d14]">Published Rate Card</div>
+            <div className="mt-1 text-[12.5px] text-[#5b606a]">
+              Developer tier (pay-as-you-go). Rates include printing, postage, and envelope.
             </div>
           </div>
-          <div className="text-right text-[11.5px] text-gray-500">
+          <div className="text-right text-[11.5px] text-[#9298a3]">
             <div>Source: help.lob.com</div>
-            <div>Last synced: {formatWhen(data.lob.lastCheckedAt)}</div>
+            <div className="mt-0.5">Last Synced: {formatWhen(data.lob.lastCheckedAt)}</div>
           </div>
         </header>
         {lob ? (
@@ -155,10 +153,12 @@ export function ProviderCostsSection({ data }: { data: ProviderCostsData }) {
                 ["Check", lob.check_base],
                 ["Check Attachment Page", lob.check_extra_attachment_page],
               ].map(([label, cents]) => (
-                <tr key={label as string} className="border-b border-gray-100 last:border-b-0">
-                  <td className="px-5 py-2.5 text-ink">{label}</td>
-                  <td className="px-5 py-2.5 text-right font-mono text-ink">
-                    {dollars(cents as number)}
+                <tr key={label as string} className="border-b border-[#f1f2f4] last:border-b-0">
+                  <td className="px-7 py-3 text-[13px] text-[#0a0d14]">{label}</td>
+                  <td className="px-7 py-3 text-right">
+                    <span className="inline-flex items-center rounded-[5px] bg-[#f1f2f4] px-2 py-1 text-[12.5px] tabular-nums text-[#0a0d14]">
+                      {dollars(cents as number)}
+                    </span>
                   </td>
                 </tr>
               ))}

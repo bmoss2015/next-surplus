@@ -135,21 +135,18 @@ export function CustomerPricingSection({
   useSaveBarSection("owner-customer-pricing", { isDirty, save, discard });
 
   return (
-    <div className="mx-auto max-w-[1100px] px-8 py-8">
-      <div className="mb-6">
-        <h1 className="text-[22px] font-semibold text-ink">
+    <div className="mx-auto w-full max-w-[960px] px-8 pb-32 pt-10">
+      <div>
+        <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.026em] text-[#0a0d14]">
           Customer Pricing
         </h1>
-        <p className="mt-1 text-[13px] text-gray-600">
-          What Lob charges you, what you charge customers, and the margin
-          per piece. Edit any retail price; changes save via the bar at
-          the bottom-right.
+        <p className="mt-3 text-[14px] leading-[1.55] text-[#5b606a]">
+          What Lob charges, what customers are charged, and the margin per piece. Edit any customer price. Changes save automatically.
         </p>
       </div>
 
-      {/* Letters card — B&W on the left, Color on the right ---------- */}
-      <PriceCard title="Letters">
-        <div className="grid grid-cols-2 divide-x divide-gray-200">
+      <PriceCard eyebrow="Letters" title="Black &amp; White vs Color" intro="Cheapest postage class first.">
+        <div className="grid grid-cols-2 divide-x divide-[#f1f2f4]">
           <ClassGrid
             heading="Black &amp; White"
             classes={LETTER_CLASSES}
@@ -169,8 +166,7 @@ export function CustomerPricingSection({
         </div>
       </PriceCard>
 
-      {/* Extra pages card ----------------------------------------------- */}
-      <PriceCard title="Extra Pages">
+      <PriceCard eyebrow="Letters" title="Extra Pages" intro="Per additional page when a letter exceeds the standard page count.">
         <FlatRowsTable
           rows={EXTRA_PAGE_ROWS}
           data={data}
@@ -179,8 +175,7 @@ export function CustomerPricingSection({
         />
       </PriceCard>
 
-      {/* Checks card ---------------------------------------------------- */}
-      <PriceCard title="Checks">
+      <PriceCard eyebrow="Checks" title="Check Mailing" intro="Per check sent through the platform.">
         <FlatRowsTable
           rows={CHECK_ROWS}
           data={data}
@@ -189,8 +184,7 @@ export function CustomerPricingSection({
         />
       </PriceCard>
 
-      {/* Surcharges card ------------------------------------------------ */}
-      <PriceCard title="Surcharges">
+      <PriceCard eyebrow="Surcharges" title="Weight And Special Handling" intro="Added when conditions trigger them.">
         <FlatRowsTable
           rows={SURCHARGE_ROWS}
           data={data}
@@ -203,27 +197,27 @@ export function CustomerPricingSection({
 }
 
 function PriceCard({
+  eyebrow,
   title,
-  subtitle,
+  intro,
   children,
 }: {
+  eyebrow: string;
   title: string;
-  subtitle?: string;
+  intro?: string;
   children: React.ReactNode;
 }) {
   return (
     <section
-      className="mb-5 rounded-lg bg-white"
-      style={{ border: "1px solid #ebedf0" }}
+      className="mt-8 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+      style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
     >
       <header
-        className="px-5 py-3.5"
-        style={{ borderBottom: "1px solid #ebedf0" }}
+        className="border-b border-[#f1f2f4] px-7 py-5"
       >
-        <div className="text-[14px] font-semibold text-ink">{title}</div>
-        {subtitle && (
-          <div className="text-[11.5px] text-gray-500">{subtitle}</div>
-        )}
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#0d4b3a]">{eyebrow}</div>
+        <div className="mt-1.5 text-[17px] font-semibold tracking-[-0.018em] text-[#0a0d14]" dangerouslySetInnerHTML={{ __html: title }} />
+        {intro && <div className="mt-1 text-[12.5px] text-[#5b606a]">{intro}</div>}
       </header>
       {children}
     </section>
@@ -275,8 +269,10 @@ function ClassGrid({
             return (
               <tr key={k} style={{ borderBottom: "1px solid #f1f2f4" }}>
                 <td className="py-2 pr-2 text-ink">{c.label}</td>
-                <td className="py-2 px-2 text-right tabular-nums text-gray-600">
-                  {fmtMoney(costCents)}
+                <td className="py-2 px-2 text-right">
+                  <span className="inline-flex items-center rounded-[5px] bg-[#f1f2f4] px-2 py-1 text-[12px] tabular-nums text-[#0a0d14]">
+                    {fmtMoney(costCents)}
+                  </span>
                 </td>
                 <td className="py-2 px-2 text-right">
                   <div className="inline-flex items-center gap-1">
@@ -344,8 +340,10 @@ function FlatRowsTable({
           return (
             <tr key={r.key} style={{ borderBottom: "1px solid #f1f2f4" }}>
               <td className="px-5 py-2.5 text-ink">{r.label}</td>
-              <td className="px-5 py-2.5 text-right tabular-nums text-gray-600">
-                {fmtMoney(costCents)}
+              <td className="px-5 py-2.5 text-right">
+                <span className="inline-flex items-center rounded-[5px] bg-[#f1f2f4] px-2 py-1 text-[12px] tabular-nums text-[#0a0d14]">
+                  {fmtMoney(costCents)}
+                </span>
               </td>
               <td className="px-5 py-2.5 text-right">
                 <div className="inline-flex items-center gap-1">

@@ -26,18 +26,17 @@ export function OwnerReportsSection({
       : 0;
 
   return (
-    <div className="mx-auto max-w-[1100px] px-8 py-8">
-      <div className="mb-6">
-        <h1 className="text-[22px] font-semibold text-ink">Reports</h1>
-        <p className="mt-1 text-[13px] text-gray-600">
-          Revenue, Lob cost, and margin across every customer org. Last
-          30 days by default. Sample-data rows excluded.
+    <div className="mx-auto w-full max-w-[960px] px-8 pb-32 pt-10">
+      <div>
+        <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.026em] text-[#0a0d14]">Reports</h1>
+        <p className="mt-3 text-[14px] leading-[1.55] text-[#5b606a]">
+          Revenue, Lob cost, and margin across every customer org. Last 30 days by default. Sample-data rows excluded.
         </p>
       </div>
 
-      <div className="mb-5 grid grid-cols-3 gap-3">
-        <Kpi label="Customer Revenue" value={fmtUSD(totals.spent_cents)} sub="What you billed customers" />
-        <Kpi label="Provider Cost" value={fmtUSD(totals.provider_cost_cents)} sub="What Lob charged you" />
+      <div className="mt-8 grid grid-cols-3 gap-3">
+        <Kpi label="Customer Revenue" value={fmtUSD(totals.spent_cents)} sub="What customers were billed" />
+        <Kpi label="Provider Cost" value={fmtUSD(totals.provider_cost_cents)} sub="What Lob charged" />
         <Kpi
           label="Margin"
           value={fmtUSD(totals.margin_cents)}
@@ -51,14 +50,12 @@ export function OwnerReportsSection({
       </div>
 
       <section
-        className="rounded-lg bg-white"
-        style={{ border: "1px solid #ebedf0" }}
+        className="mt-8 overflow-hidden rounded-[14px] border border-[#ebedf0] bg-white"
+        style={{ boxShadow: "0 1px 2px rgba(12,13,16,0.02)" }}
       >
-        <header
-          className="px-5 py-3.5"
-          style={{ borderBottom: "1px solid #ebedf0" }}
-        >
-          <div className="text-[14px] font-semibold text-ink">By Month</div>
+        <header className="border-b border-[#f1f2f4] px-7 py-5">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-[#0d4b3a]">Activity</div>
+          <div className="mt-1.5 text-[17px] font-semibold tracking-[-0.018em] text-[#0a0d14]">By Month</div>
         </header>
         <table className="w-full text-[12.5px]">
           <thead>
