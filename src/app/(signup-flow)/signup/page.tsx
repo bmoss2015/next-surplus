@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import {
   PasswordRequirements,
   passwordMeetsRequirements,
-} from "@/components/PasswordRequirements";
-import { InlineError } from "@/components/InlineError";
+} from "@/Components/PasswordRequirements";
+import { InlineError } from "@/Components/InlineError";
 
 const FONT =
   "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";

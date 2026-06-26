@@ -2,7 +2,7 @@ import Link from "next/link";
 import { IconCircleCheck } from "@tabler/icons-react";
 import { fetchDailyWork, type DailyWorkLead } from "@/lib/leads/fetch-daily-work";
 import { ViewToggle } from "../_components/ViewToggle";
-import { StagePill } from "@/components/StagePill";
+import { StagePill } from "@/Components/StagePill";
 import { LeadActionsMenu } from "../[id]/_components/LeadActionsMenu";
 import { formatCurrency, primaryOwner } from "@/lib/leads/format";
 

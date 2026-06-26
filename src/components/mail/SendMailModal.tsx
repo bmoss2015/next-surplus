@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Modal } from "@/components/Modal";
+import { Modal } from "@/Components/Modal";
 import {
   sendMail,
   previewMailMergeDocx,

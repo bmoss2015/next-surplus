@@ -587,10 +587,12 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
   const [searching, startSearch] = useTransition();
   const [buying, startBuy] = useTransition();
   const [boughtE164, setBoughtE164] = useState<string | null>(null);
+  const [searchedAreaCode, setSearchedAreaCode] = useState<string | null>(null);
 
   function handleSearch() {
     setError(null);
     setResults([]);
+    setSearchedAreaCode(areaCode);
     startSearch(async () => {
       const res = await searchAvailableNumbers({ area_code: areaCode });
       if (!res.ok) {
@@ -598,9 +600,6 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
         return;
       }
       setResults(res.numbers);
-      if (res.numbers.length === 0) {
-        setError("No numbers available in that area code");
-      }
     });
   }
 
@@ -690,6 +689,13 @@ function BuyNumberDialog({ onClose, onPurchased }: { onClose: () => void; onPurc
             {error && (
               <div className="mt-4 rounded-[8px] border border-[#fee4e2] bg-[#fef3f2] px-4 py-2.5 text-[12.5px] text-[#b42318]">
                 {error}
+              </div>
+            )}
+
+            {!searching && !error && searchedAreaCode && results.length === 0 && (
+              <div className="mt-6 rounded-[10px] border border-[#ebedf0] bg-[#fafbfc] px-5 py-6 text-center">
+                <div className="text-[13px] font-semibold text-[#0a0d14]">No Numbers Available In {searchedAreaCode}</div>
+                <div className="mt-1 text-[12px] text-[#5b606a]">Inventory is limited per area code. Try another area code in the same metro, or check back later.</div>
               </div>
             )}
 

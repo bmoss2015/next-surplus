@@ -12,8 +12,8 @@ import { useRouter } from "next/navigation";
 import {
   SettingsSaveProvider,
   useSaveBarSection,
-} from "@/components/SettingsSaveBar";
-import { US_STATES } from "@/components/StatesPicker";
+} from "@/Components/SettingsSaveBar";
+import { US_STATES } from "@/Components/StatesPicker";
 import {
   upsertResearchTemplate,
   deleteResearchTemplate,

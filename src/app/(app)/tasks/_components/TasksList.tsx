@@ -20,7 +20,7 @@ import {
 import type { TaskRow } from "@/lib/tasks/fetch";
 import { AddTaskModal } from "./AddTaskModal";
 import { EditTaskDrawer } from "./EditTaskDrawer";
-import { useRole } from "@/components/RoleProvider";
+import { useRole } from "@/Components/RoleProvider";
 import { cn } from "@/lib/cn";
 
 type BucketKey = "overdue" | "today" | "week" | "later" | "none";

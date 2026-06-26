@@ -24,7 +24,7 @@ const MAX_PLAYBOOK_STEPS = 20;
 import { useRouter } from "next/navigation";
 import { Drawer } from "./Drawer";
 import { MergeFieldPicker } from "./MergeFieldPicker";
-import { US_STATES as US_STATE_OPTIONS } from "@/components/StatesPicker";
+import { US_STATES as US_STATE_OPTIONS } from "@/Components/StatesPicker";
 import {
   upsertTemplate,
   deleteTemplate,

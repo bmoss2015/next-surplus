@@ -10,7 +10,7 @@ import {
   IconPhone,
   IconSettings,
 } from "@tabler/icons-react";
-import { Modal } from "@/components/Modal";
+import { Modal } from "@/Components/Modal";
 import { formatPhoneUS, formatPhoneInput, toE164 } from "@/lib/phone";
 import {
   LEAD_PARTY_ROLE_LABELS,

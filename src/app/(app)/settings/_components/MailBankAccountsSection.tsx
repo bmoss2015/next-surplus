@@ -18,7 +18,7 @@ import {
   verifyMailBankAccountWithCode,
 } from "@/app/(app)/settings/_actions";
 import { BankAccountDrawer, type BankDrawerState } from "./BankAccountDrawer";
-import { Modal } from "@/components/Modal";
+import { Modal } from "@/Components/Modal";
 
 const LOB_VERIFY_ATTEMPT_LIMIT = 3;
 

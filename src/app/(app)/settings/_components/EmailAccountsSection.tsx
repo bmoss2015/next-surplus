@@ -13,7 +13,7 @@ import {
   setEmailAccountReadSync,
   updateEmailAccountSignature,
 } from "@/app/(app)/settings/_email-actions";
-import { RichTextEditor } from "@/components/email/RichTextEditor";
+import { RichTextEditor } from "@/Components/email/RichTextEditor";
 import type { EmailAccountRow } from "@/lib/email/types";
 import { ConnectImapModal } from "./ConnectImapModal";
 

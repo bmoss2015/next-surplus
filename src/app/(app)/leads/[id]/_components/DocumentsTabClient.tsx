@@ -4,7 +4,7 @@ import { useState, useTransition, useRef } from "react";
 import { IconUpload, IconFile, IconTrash, IconEye } from "@tabler/icons-react";
 import { uploadDocument, deleteDocument } from "../_actions";
 import type { DocumentRow } from "@/lib/leads/fetch-tab-data";
-import { useRole } from "@/components/RoleProvider";
+import { useRole } from "@/Components/RoleProvider";
 import { DocumentViewerModal, type ViewerDoc } from "./DocumentViewerModal";
 
 // User-facing labels mapped onto the existing document_category enum values.

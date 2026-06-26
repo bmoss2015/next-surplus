@@ -2989,6 +2989,7 @@ export async function buyTelnyxNumber(input: {
         phone_numbers: [{ phone_number: e164 }],
         connection_id: connectionId,
         customer_reference: `next-surplus:${profile.orgId}`,
+        best_effort: true,
       }),
     });
     if (!res.ok) {

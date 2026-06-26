@@ -7,8 +7,8 @@ import { completeInviteProfile } from "@/app/(app)/settings/_actions";
 import {
   PasswordRequirements,
   passwordMeetsRequirements,
-} from "@/components/PasswordRequirements";
-import { InlineError } from "@/components/InlineError";
+} from "@/Components/PasswordRequirements";
+import { InlineError } from "@/Components/InlineError";
 
 function postSetupDestination(): string {
   if (typeof window === "undefined") return "/";

@@ -23,7 +23,7 @@ import { ComposeBox } from "@/app/(app)/inbox/_components/ComposeBox";
 import { HtmlMessage } from "@/app/(app)/inbox/_components/HtmlMessage";
 import { markThreadRead } from "@/app/(app)/inbox/_actions";
 import { upsertLeadParty } from "../_lead-parties-actions";
-import { SendEmailModal } from "@/components/email/SendEmailModal";
+import { SendEmailModal } from "@/Components/email/SendEmailModal";
 import type { ThreadDetail, ThreadMessage } from "@/lib/email/types";
 import type {
   LeadConversationMessage,

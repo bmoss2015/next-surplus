@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import { updateLeadField, assignAttorney } from "../_actions";
 import type { AttorneyOption } from "@/lib/leads/fetch-detail";
-import { CurrencyInput } from "@/components/CurrencyInput";
+import { CurrencyInput } from "@/Components/CurrencyInput";
 import { formatCurrency } from "@/lib/leads/format";
 import { cn } from "@/lib/cn";
 import { INLINE_INPUT_CLASS } from "@/lib/inline-field";

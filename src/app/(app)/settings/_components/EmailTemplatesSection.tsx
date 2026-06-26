@@ -24,7 +24,7 @@ import {
   renameEmailTemplateFolder,
   deleteEmailTemplateFolder,
 } from "../_actions";
-import { RichTextEditor } from "@/components/email/RichTextEditor";
+import { RichTextEditor } from "@/Components/email/RichTextEditor";
 import type {
   EmailTemplateRow,
   EmailTemplateFolderRow,

@@ -5,7 +5,7 @@ import { IconPlus, IconMinus } from "@tabler/icons-react";
 import type { LeadDetailWithCounts, LienRow } from "@/lib/leads/fetch-detail";
 import { updateLeadField, addDataSource, addLien, updateLien, removeLien } from "../_actions";
 import { addLeadSource } from "../../../imports/_actions";
-import { CurrencyInput } from "@/components/CurrencyInput";
+import { CurrencyInput } from "@/Components/CurrencyInput";
 import { formatCurrency, formatCurrencyOrDash, toTitleCase } from "@/lib/leads/format";
 import { US_STATE_NAMES } from "@/lib/leads/types";
 import { formatRecoveryType } from "@/lib/leads/recovery-type";

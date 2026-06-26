@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { IconX } from "@tabler/icons-react";
-import { Modal } from "@/components/Modal";
+import { Modal } from "@/Components/Modal";
 import { createTask } from "../_actions";
 import type { LeadOption } from "@/lib/leads/lead-options";
 

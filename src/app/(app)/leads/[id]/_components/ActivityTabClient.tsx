@@ -11,15 +11,18 @@ import {
   IconMail,
   IconExternalLink,
   IconChevronDown,
+  IconPhone,
+  IconFileText,
 } from "@tabler/icons-react";
 import type { ActivityFullRow, DocumentRow } from "@/lib/leads/fetch-tab-data";
 import { formatActivity, relativeTime, activityActorName } from "@/lib/leads/activity-format";
 import { DocumentViewerModal, type ViewerDoc } from "./DocumentViewerModal";
-import { MailStatusPill } from "@/components/mail/MailStatusPill";
+import { MailStatusPill } from "@/Components/mail/MailStatusPill";
 import {
   LetterPreviewModal,
   type LetterPreviewData,
-} from "@/components/mail/LetterPreviewModal";
+} from "@/Components/mail/LetterPreviewModal";
+import { TranscriptDrawer, type TranscriptCall } from "@/Components/dialer/TranscriptDrawer";
 import { fetchMailJobAction } from "@/app/(app)/mail/_fetchers";
 import type { MailStatus } from "@/lib/mail/fetch";
 
@@ -58,6 +61,7 @@ export function ActivityTabClient({
   const [letterPreview, setLetterPreview] = useState<LetterPreviewData | null>(
     null
   );
+  const [transcriptCall, setTranscriptCall] = useState<TranscriptCall | null>(null);
 
   // Adaptive timeline mode based on row count.
   // Why: visual density needs to match volume — a long list overwhelms; a short list with a headline looks empty.
@@ -89,6 +93,38 @@ export function ActivityTabClient({
   }
 
   function renderRowBody(row: ActivityFullRow) {
+    if (row.activity_type === "call") {
+      const dur = row.payload?.duration_seconds as number | null | undefined;
+      const disposition = row.payload?.disposition as string | null | undefined;
+      const hasTranscript = !!row.payload?.transcription_text;
+      const transcriptStatus = row.payload?.transcription_status as string | null | undefined;
+      const recordingUrl = row.payload?.recording_url as string | null | undefined;
+      const text = `Call · ${disposition ?? "logged"}${dur ? ` · ${Math.floor(dur / 60)}:${(dur % 60).toString().padStart(2, "0")}` : ""}`;
+      return (
+        <>
+          <span>{text}</span>
+          {(hasTranscript || transcriptStatus === "pending" || recordingUrl) && (
+            <button
+              type="button"
+              onClick={() =>
+                setTranscriptCall({
+                  callId: row.payload?.call_id as string,
+                  durationSeconds: dur ?? null,
+                  recordingUrl: recordingUrl ?? null,
+                  transcriptionText: (row.payload?.transcription_text as string | null) ?? null,
+                  transcriptionStatus: transcriptStatus ?? null,
+                  startedAt: row.created_at,
+                })
+              }
+              className="inline-flex cursor-pointer items-center gap-1 text-[11.5px] font-medium text-petrol-500 hover:text-petrol-700"
+            >
+              <IconFileText size={11} stroke={1.75} />
+              View Transcript
+            </button>
+          )}
+        </>
+      );
+    }
     const { text } = formatActivity(row, { leadSource });
     const doc = docForActivity(row);
     const mailStatus = MAIL_ACTIVITY_TO_STATUS[row.activity_type];
@@ -150,6 +186,7 @@ export function ActivityTabClient({
   }
 
   function rowIcon(row: ActivityFullRow) {
+    if (row.activity_type === "call") return IconPhone;
     if (isMailRow(row)) return IconMail;
     const { icon } = formatActivity(row, { leadSource });
     return ICONS[icon];
@@ -223,6 +260,7 @@ export function ActivityTabClient({
         data={letterPreview}
         onClose={() => setLetterPreview(null)}
       />
+      <TranscriptDrawer call={transcriptCall} onClose={() => setTranscriptCall(null)} />
     </div>
   );
 }
