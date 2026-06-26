@@ -3,11 +3,8 @@ import { createHash } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Pre-send US address verification via Lob's /v1/us_verifications endpoint.
-// Costs ~$0.20 per verification on Developer tier and catches the
-// undeliverable-address case before we ever submit a job to C2M or Lob
-// for printing. Returning early on undeliverable means we don't waste
-// the per-piece print + postage charge on mail that USPS would just
-// return.
+// Returning early on undeliverable avoids the per-piece print + postage
+// charge on mail that USPS would just return.
 //
 // The Send Mail modal calls this server action right before enabling
 // the Send button so the user gets immediate feedback on whether the

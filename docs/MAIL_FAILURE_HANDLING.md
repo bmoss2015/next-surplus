@@ -8,7 +8,7 @@ tools structure their error handling.
 
 | Failure | Owner | Detection | Response |
 |---|---|---|---|
-| **Provider outage (C2M / Lob)** | Provider | `sendMail` returns `ok: false` with HTTP 5xx | Surface "Provider unavailable, try again" in modal. **No retry loop in the action** — user retries manually. Background: auto-retry queue (future) with exponential backoff capped at 3 tries. |
+| **Provider outage (Lob)** | Provider | `sendMail` returns `ok: false` with HTTP 5xx | Surface "Provider unavailable, try again" in modal. **No retry loop in the action** — user retries manually. Background: auto-retry queue (future) with exponential backoff capped at 3 tries. |
 | **Auth failure (API key revoked / rotated / expired)** | Moss admin | `sendMail` returns 401/403 from provider | Surface in modal. **Email alert to admin** (`info@mossyland.com`) — they need to rotate the key in Vercel env. Don't auto-retry; the failure persists across attempts until key is rotated. |
 | **Rate limit hit** | Provider quota | HTTP 429 with `Retry-After` header | Surface "Send throttled, try again in N seconds" in modal. Future: queue with `Retry-After`-respecting auto-retry. |
 | **Bad address (USPS undeliverable)** | Recipient data | Provider returns 422 with validation error, OR webhook fires `returned_to_sender` after physical send | Pre-send: USPS address validation (see below) catches most before send. Post-send: webhook → `mail_returned` → Needs Attention card on the lead → Update Address & Resend flow. |

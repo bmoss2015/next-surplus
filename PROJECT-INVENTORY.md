@@ -64,7 +64,7 @@ Surplus calc: Est. Net To You = (estimated surplus × recovery fee percent) − 
 ## Mail Module
 
 - Send check via Lob — live in production since May 2026
-- Send letter via Lob — live, Click2Mail code retained as rollback but not on active path
+- Send letter via Lob — live in production since May 2026
 - Templates with merge fields, editable in `/mail/templates`
 - Bank accounts (Lob), managed in Settings, microdeposit verification flow
 - Address validation via Lob, real-time during compose
@@ -88,7 +88,6 @@ Surplus calc: Est. Net To You = (estimated surplus × recovery fee percent) − 
 - SMS send path: wired
 - SMS inbound: poller not live
 - Call logging: not built
-- Phone validation via Clearout HLR Lookup v2, env-gated by `PHONE_VALIDATION_ENABLED`, credit pool model
 
 ## Playbooks (research templates)
 
@@ -154,9 +153,7 @@ All under `/settings`. Admin-only unless noted.
 
 - Gmail API — OAuth + Vercel cron `/api/cron/email-sync`, also pinged by Moss Equity Email Poller (CF Worker) every 2 minutes
 - Lob — checks AND letters since May 2026, API + webhooks for delivery status reconciliation
-- Click2Mail — letter code retained for rollback, not on active path
 - Resend — team invite emails, notification emails
-- Clearout — phone HLR validation (env-gated, credit pool)
 - Gotenberg — docx→PDF rendering (GCP Cloud Run)
 - Internal-only QUO (OpenPhone) prototype — phone number used by the owner for prototyping, SMS send path wired against it. NOT the production direction. The customer-facing SMS / voice provider will be chosen separately (Twilio or Telnyx are the candidates).
 - Vercel Cron jobs — email-sync, lob-pricing-sync, mail reconcile (auth via `CRON_SECRET` header)
