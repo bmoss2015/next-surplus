@@ -10,6 +10,11 @@ Versions below are grouped by day rather than semver release tags. Each `## [YYY
 ## [Unreleased]
 
 
+### Security
+- Fix CSP-ENFORCE: Switched Content-Security-Policy from Report-Only to enforced. Dropped `unsafe-eval` from script-src; added explicit allowlist entries for Sentry browser SDK / CDN, PostHog (us.i.posthog.com, us-assets), Lob API, Resend API, and cdnjs.cloudflare.com. frame-ancestors is now `'none'` and X-Frame-Options is DENY (was SAMEORIGIN) since the portal should never be iframed. Added `upgrade-insecure-requests`. Inline scripts still allowed because the Next 16 RSC bootstrap relies on them; nonce-based hardening is a future pass. (2026-06-26T11:00:00-05:00)
+- Fix SIGNUP-RATE-LIMIT-TIGHTEN: Per-IP signup attempt cap lowered from 10/min to 5/min. Login (10/min), password reset (10/min), and the Stripe webhook (100/min) limits unchanged. (2026-06-26T11:00:00-05:00)
+
+
 ### Added
 - Fix BANK-ACCOUNT-PRIMARY: Adds a Primary designation to bank accounts so an org picks which verified account is the default funding source for outgoing checks. Migration 0163 adds `mail_bank_accounts.is_primary` boolean + a partial unique index `(org_id) WHERE is_primary=true` so two concurrent Set-As-Primary clicks can't end up with two primaries. New `setMailBankAccountPrimary` server action clears every other bank's `is_primary` first, then sets this one. Bank card under VERIFIED badge now shows a PRIMARY chip when applicable; verified non-primary cards show a Set As Primary button. fetchMailBankAccounts sorts is_primary first, then verified, then newest. Matches Stripe Dashboard / Mercury / Bill.com bank-account list pattern. Old "Default for outgoing checks" string in the card foot replaced by "Primary funding source for checks" tied to the is_primary flag. (2026-06-26T08:50:00-05:00)
 
