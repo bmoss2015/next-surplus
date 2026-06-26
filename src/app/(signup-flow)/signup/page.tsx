@@ -138,17 +138,18 @@ function FormPanel() {
         .toUpperCase()
         .slice(0, 32)
         .replace(/[^A-Z0-9_-]/g, "") || null;
+    let resolved: string | null = normalized;
     if (normalized) {
       try {
         window.sessionStorage.setItem(REF_STORAGE_KEY, normalized);
       } catch {}
-      setRef(normalized);
-      return;
+    } else {
+      try {
+        resolved = window.sessionStorage.getItem(REF_STORAGE_KEY);
+      } catch {}
     }
-    try {
-      const stored = window.sessionStorage.getItem(REF_STORAGE_KEY);
-      if (stored) setRef(stored);
-    } catch {}
+    if (!resolved) return;
+    queueMicrotask(() => setRef(resolved));
   }, []);
 
   const canSubmit =
