@@ -5,6 +5,7 @@ import {
   fetchProviderCosts,
 } from "@/lib/owner/fetch";
 import { fetchMailReport } from "@/lib/mail/reports";
+import { fetchTelnyxPricingSettings } from "@/lib/settings/fetch";
 import { OwnerView } from "./_components/OwnerView";
 
 // Owner area entry point. Owner-only — admins and members hit redirect.
@@ -17,13 +18,14 @@ export default async function OwnerPage() {
   if (!profile) redirect("/login");
   if (!profile.isOwner) redirect("/");
 
-  const [customerPricing, providerCosts, report] = await Promise.all([
+  const [customerPricing, providerCosts, report, telnyxPricing] = await Promise.all([
     fetchCustomerPricing(),
     fetchProviderCosts(),
     fetchMailReport({ range: "30d" }),
+    fetchTelnyxPricingSettings(),
   ]);
 
   return (
-    <OwnerView data={{ customerPricing, providerCosts, report }} />
+    <OwnerView data={{ customerPricing, providerCosts, report, telnyxPricing }} />
   );
 }

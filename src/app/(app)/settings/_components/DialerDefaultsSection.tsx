@@ -103,7 +103,7 @@ export function DialerDefaultsSection({ initial }: { initial: DialerDefaults }) 
                     <span className="text-[13px] font-semibold text-[#0a0d14]">{p.label}</span>
                     {provider === p.value && <IconCheck size={12} stroke={2.5} className="text-[#0d4b3a]" />}
                   </div>
-                  <div className="mt-1 text-[11.5px] tabular-nums font-semibold text-[#0d4b3a]">{p.cost}</div>
+                  <div className="mt-1 text-[11.5px] tabular-nums font-semibold text-[#0a0d14]">{p.cost}</div>
                   <div className="mt-0.5 text-[11px] text-[#5b606a]">{p.note}</div>
                 </button>
               ))}
@@ -186,11 +186,11 @@ function ToggleRow({
   return (
     <div className="flex items-start justify-between gap-6 border-b border-[#f1f2f4] px-7 py-5 last:border-b-0">
       <div className="flex flex-1 items-start gap-3">
-        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f4faf7] text-[#0d4b3a]">{icon}</div>
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[#0a0d14]" style={{ border: "1px solid #ebedf0" }}>{icon}</div>
         <div>
           <div className="text-[13.5px] font-semibold text-[#0a0d14]">{label}</div>
           <div className="mt-1 text-[12px] leading-[1.55] text-[#5b606a]">{subtitle}</div>
-          <div className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#0d4b3a]">{cost}</div>
+          <div className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5b606a]">{cost}</div>
         </div>
       </div>
       <button

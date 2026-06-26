@@ -121,6 +121,7 @@ function priceDriftEmailHtml(args: { orgName: string; recordedCents: number; liv
     <div style="font-size:13px;color:#5b606a;">Drift</div>
     <div style="font-size:16px;font-weight:600;color:#0d4b3a;">${args.driftPct > 0 ? "+" : ""}${args.driftPct.toFixed(1)}%</div>
   </div>
-  <p style="font-size:14px;">Telnyx ${direction} the price of local phone numbers. Review your customer-facing markup at <a href="https://app.nextsurplus.com/settings#telnyx-pricing" style="color:#0d4b3a;">Settings &rsaquo; Power Dialer &rsaquo; Pricing</a>.</p>
+  <p style="font-size:14px;">Telnyx ${direction} the price of local phone numbers. Review your customer-facing markup at <a href="https://app.nextsurplus.com/owner#dialer-pricing" style="color:#0d4b3a;">Owner &rsaquo; Power Dialer &rsaquo; Pricing</a>.</p>
+  <p style="font-size:13px;color:#5b606a;">Voice ($0.002/min), SMS ($0.005/segment), and STT transcription rates are not exposed by Telnyx as a queryable API, so they are not monitored automatically. Verify those line items on the Telnyx pricing page if the markup gap matters.</p>
 </body></html>`;
 }

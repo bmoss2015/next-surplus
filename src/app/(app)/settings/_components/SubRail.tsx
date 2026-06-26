@@ -72,7 +72,6 @@ export const GROUPS: RailGroup[] = [
     items: [
       { key: "phone-numbers", label: "Phone Numbers", adminOnly: true },
       { key: "dialer-defaults", label: "Defaults", adminOnly: true },
-      { key: "telnyx-pricing", label: "Pricing", adminOnly: true },
     ],
   },
   {

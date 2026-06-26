@@ -10,7 +10,6 @@ import {
   IconCopy,
   IconDownload,
   IconFileText,
-  IconBolt,
   IconChevronDown,
   IconChevronUp,
 } from "@tabler/icons-react";
@@ -39,18 +38,17 @@ function fmtTime(s: number): string {
 }
 
 export default function TranscriptsPreviewPage() {
-  const [variant, setVariant] = useState<"timeline" | "modal" | "side">("timeline");
+  const [variant, setVariant] = useState<"timeline" | "modal" | "side">("side");
   const [open, setOpen] = useState(true);
-  const [aiOpen, setAiOpen] = useState(true);
 
   return (
     <div className="min-h-screen bg-[#f5f6f7]">
       <Header variant={variant} setVariant={setVariant} />
 
       <div className="mx-auto max-w-[1280px] px-8 py-10">
-        {variant === "timeline" && <TimelineVariant open={open} setOpen={setOpen} aiOpen={aiOpen} setAiOpen={setAiOpen} />}
-        {variant === "modal" && <ModalVariant aiOpen={aiOpen} setAiOpen={setAiOpen} />}
-        {variant === "side" && <SidePanelVariant aiOpen={aiOpen} setAiOpen={setAiOpen} />}
+        {variant === "timeline" && <TimelineVariant open={open} setOpen={setOpen} />}
+        {variant === "modal" && <ModalVariant />}
+        {variant === "side" && <SidePanelVariant />}
       </div>
     </div>
   );
@@ -85,7 +83,7 @@ function Header({ variant, setVariant }: { variant: "timeline" | "modal" | "side
   );
 }
 
-function TimelineVariant({ open, setOpen, aiOpen, setAiOpen }: { open: boolean; setOpen: (b: boolean) => void; aiOpen: boolean; setAiOpen: (b: boolean) => void }) {
+function TimelineVariant({ open, setOpen }: { open: boolean; setOpen: (b: boolean) => void }) {
   return (
     <div>
       <SectionLabel>Lead Detail &mdash; Activity Timeline</SectionLabel>
@@ -142,8 +140,6 @@ function TimelineVariant({ open, setOpen, aiOpen, setAiOpen }: { open: boolean; 
               </div>
             )}
           </div>
-
-          <AISummaryCard open={aiOpen} setOpen={setAiOpen} />
         </TimelineItem>
 
         <TimelineDivider />
@@ -161,7 +157,7 @@ function TimelineVariant({ open, setOpen, aiOpen, setAiOpen }: { open: boolean; 
   );
 }
 
-function ModalVariant({ aiOpen, setAiOpen }: { aiOpen: boolean; setAiOpen: (b: boolean) => void }) {
+function ModalVariant() {
   return (
     <div>
       <SectionLabel>Lead Detail &mdash; Full Transcript Modal Open</SectionLabel>
@@ -183,7 +179,7 @@ function ModalVariant({ aiOpen, setAiOpen }: { aiOpen: boolean; setAiOpen: (b: b
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-[1fr_320px] gap-6">
+        <div className="mt-5 grid grid-cols-[1fr_280px] gap-6">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Transcript</div>
             <div className="mt-3 max-h-[520px] overflow-y-auto rounded-[10px] border border-[#ebedf0] bg-white p-5">
@@ -191,14 +187,12 @@ function ModalVariant({ aiOpen, setAiOpen }: { aiOpen: boolean; setAiOpen: (b: b
             </div>
           </div>
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Summary</div>
-            <AISummaryCard open={aiOpen} setOpen={setAiOpen} compact />
-            <div className="mt-4 rounded-[10px] border border-[#ebedf0] bg-white p-4">
+            <div className="rounded-[10px] border border-[#ebedf0] bg-white p-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Disposition</div>
               <div className="mt-2 inline-flex items-center gap-1.5 rounded-[5px] bg-[#0d4b3a] px-2 py-0.5 text-[11px] font-semibold text-white">
                 Interested
               </div>
-              <div className="mt-3 text-[12.5px] text-[#5b606a]">Next step</div>
+              <div className="mt-3 text-[12.5px] text-[#5b606a]">Next Step</div>
               <div className="mt-1 text-[13px] font-medium text-[#0a0d14]">Send one-pager via email</div>
             </div>
           </div>
@@ -208,7 +202,7 @@ function ModalVariant({ aiOpen, setAiOpen }: { aiOpen: boolean; setAiOpen: (b: b
   );
 }
 
-function SidePanelVariant({ aiOpen, setAiOpen }: { aiOpen: boolean; setAiOpen: (b: boolean) => void }) {
+function SidePanelVariant() {
   return (
     <div>
       <SectionLabel>Lead Detail &mdash; Side Drawer From Activity Timeline</SectionLabel>
@@ -242,7 +236,14 @@ function SidePanelVariant({ aiOpen, setAiOpen }: { aiOpen: boolean; setAiOpen: (
           </div>
 
           <div className="p-5">
-            <AISummaryCard open={aiOpen} setOpen={setAiOpen} compact />
+            <div className="rounded-[10px] border border-[#ebedf0] bg-white p-4">
+              <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Disposition</div>
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-[5px] bg-[#0d4b3a] px-2 py-0.5 text-[11px] font-semibold text-white">
+                Interested
+              </div>
+              <div className="mt-3 text-[12.5px] text-[#5b606a]">Next Step</div>
+              <div className="mt-1 text-[13px] font-medium text-[#0a0d14]">Send one-pager via email</div>
+            </div>
 
             <div className="mt-5">
               <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Transcript</div>
@@ -276,38 +277,6 @@ function TranscriptBody({ compact }: { compact?: boolean } = {}) {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function AISummaryCard({ open, setOpen, compact }: { open: boolean; setOpen: (b: boolean) => void; compact?: boolean }) {
-  return (
-    <div className={[compact ? "mt-3" : "mt-4", "overflow-hidden rounded-[10px] border border-[#0d4b3a]/15 bg-gradient-to-br from-[#f4faf7] to-[#fafbfc]"].join(" ")}>
-      <button type="button" onClick={() => setOpen(!open)} className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <IconBolt size={12} stroke={2.25} className="text-[#0d4b3a]" />
-          <span className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#0a0d14]">AI Summary</span>
-          <span className="text-[11px] text-[#9298a3]">Auto-generated</span>
-        </div>
-        {open ? <IconChevronUp size={13} stroke={2} className="text-[#9298a3]" /> : <IconChevronDown size={13} stroke={2} className="text-[#9298a3]" />}
-      </button>
-      {open && (
-        <div className="px-4 pb-4 pt-1">
-          <p className="text-[12.5px] leading-[1.55] text-[#0a0d14]">
-            James is the former owner of 1742 Sandcrest, foreclosed in March. He was unaware of the $42K surplus and assumed he had lost everything. Engaged after hearing the deadline. Requested the one-pager.
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div className="rounded-[7px] border border-[#ebedf0] bg-white px-3 py-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Sentiment</div>
-              <div className="mt-1 text-[12.5px] font-semibold text-[#0d4b3a]">Curious &middot; Cautious</div>
-            </div>
-            <div className="rounded-[7px] border border-[#ebedf0] bg-white px-3 py-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#9298a3]">Next Step</div>
-              <div className="mt-1 text-[12.5px] font-semibold text-[#0a0d14]">Send One-Pager</div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

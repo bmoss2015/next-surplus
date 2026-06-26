@@ -2603,26 +2603,84 @@ export async function syncTelnyxPhoneNumbers(): Promise<
   const sb = await createClient();
   const { data: existing } = await sb
     .from("phone_numbers")
-    .select("telnyx_phone_number_id")
+    .select("id, telnyx_phone_number_id, city, state")
     .eq("org_id", profile.orgId);
   const existingIds = new Set((existing ?? []).map((r) => r.telnyx_phone_number_id as string | null));
 
-  const rows = all
-    .filter((n) => !existingIds.has(n.id))
-    .map((n) => {
-      const features = (n.features ?? []).map((f) => f.name);
-      return {
-        org_id: profile.orgId,
-        telnyx_phone_number_id: n.id,
-        e164: n.phone_number,
-        friendly_name: n.customer_reference ?? null,
-        voice_enabled: features.includes("voice") || features.length === 0,
-        sms_enabled: features.includes("sms"),
-        status: n.status === "active" ? "active" : "pending",
-        monthly_cost_cents: 100,
-        purchased_at: n.purchased_at ?? new Date().toISOString(),
+  // Backfill city/state on existing rows that are missing them. Helps recover
+  // from earlier syncs that ran before per-number enrichment landed.
+  const needsBackfill = (existing ?? []).filter(
+    (r) => r.telnyx_phone_number_id && (!r.city || !r.state)
+  );
+  for (const r of needsBackfill) {
+    try {
+      const detail = await fetch(
+        `https://api.telnyx.com/v2/phone_numbers/${r.telnyx_phone_number_id}`,
+        { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" }
+      );
+      if (!detail.ok) continue;
+      const dj = (await detail.json()) as {
+        data?: { region_information?: Array<{ region_type?: string; region_name?: string }> };
       };
-    });
+      const regs = dj.data?.region_information ?? [];
+      const cityRegion = regs.find((rr) => rr.region_type === "rate_center" || rr.region_type === "locality");
+      const stateRegion = regs.find((rr) => rr.region_type === "state");
+      if (cityRegion?.region_name || stateRegion?.region_name) {
+        await sb
+          .from("phone_numbers")
+          .update({
+            city: r.city ?? cityRegion?.region_name ?? null,
+            state: r.state ?? stateRegion?.region_name ?? null,
+          })
+          .eq("id", r.id);
+      }
+    } catch {
+      // best-effort
+    }
+  }
+
+  // Pull per-number detail to capture city/state. The list endpoint does not
+  // include region_information; the detail endpoint does. One request per
+  // unsynced number — fine for the dozens of numbers a customer has.
+  const newNumbers = all.filter((n) => !existingIds.has(n.id));
+  const detailed = await Promise.all(
+    newNumbers.map(async (n) => {
+      try {
+        const r = await fetch(`https://api.telnyx.com/v2/phone_numbers/${n.id}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          cache: "no-store",
+        });
+        if (!r.ok) return { ...n, region_information: undefined };
+        const dj = (await r.json()) as {
+          data?: {
+            region_information?: Array<{ region_type?: string; region_name?: string }>;
+          };
+        };
+        return { ...n, region_information: dj.data?.region_information };
+      } catch {
+        return { ...n, region_information: undefined };
+      }
+    })
+  );
+
+  const rows = detailed.map((n) => {
+    const features = (n.features ?? []).map((f) => f.name);
+    const cityRegion = n.region_information?.find((r) => r.region_type === "rate_center" || r.region_type === "locality");
+    const stateRegion = n.region_information?.find((r) => r.region_type === "state");
+    return {
+      org_id: profile.orgId,
+      telnyx_phone_number_id: n.id,
+      e164: n.phone_number,
+      friendly_name: n.customer_reference ?? null,
+      city: cityRegion?.region_name ?? null,
+      state: stateRegion?.region_name ?? null,
+      voice_enabled: features.includes("voice") || features.length === 0,
+      sms_enabled: features.includes("sms"),
+      status: n.status === "active" ? "active" : "pending",
+      monthly_cost_cents: 100,
+      purchased_at: n.purchased_at ?? new Date().toISOString(),
+    };
+  });
 
   if (rows.length === 0) return { ok: true, synced: 0 };
 
