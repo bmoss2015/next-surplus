@@ -223,13 +223,20 @@ function PhoneNumbersInner({
                     type="button"
                     onClick={() => setExpandedId(expanded ? null : n.id)}
                     className={[
-                      "grid w-full cursor-pointer grid-cols-[1fr_140px_120px_140px_40px] items-center gap-4 px-6 py-3.5 text-left transition",
+                      "grid w-full cursor-pointer grid-cols-[1fr_160px_120px_140px_40px] items-center gap-4 px-6 py-3.5 text-left transition",
                       expanded ? "bg-[#fafbfc]" : "hover:bg-[#fafbfc]",
                     ].join(" ")}
                   >
-                    <div>
-                      <div className="text-[14px] font-semibold tabular-nums text-[#0a0d14]">{formatE164(n.e164)}</div>
-                      <div className="mt-0.5 text-[11.5px] text-[#5b606a]">{n.city ?? "—"}{n.state ? `, ${n.state}` : ""}</div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[14px] font-semibold tabular-nums text-[#0a0d14]">{formatE164(n.e164)}</span>
+                      {(n.city || n.state) && (
+                        <>
+                          <span className="text-[#c2c5cc]">·</span>
+                          <span className="text-[12.5px] text-[#5b606a]">
+                            {[n.city, n.state].filter(Boolean).join(", ")}
+                          </span>
+                        </>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <CapIndicator icon={<IconPhone size={12} stroke={2.25} />} label="Voice" status={n.voice_enabled ? "live" : "pending"} />

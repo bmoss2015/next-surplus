@@ -31,10 +31,12 @@ import { EmailTemplatesSection } from "./EmailTemplatesSection";
 import { PlaybooksSection } from "./PlaybooksSection";
 import { PhoneNumbersSection } from "./PhoneNumbersSection";
 import { TelnyxPricingSection } from "./TelnyxPricingSection";
+import { DialerDefaultsSection } from "./DialerDefaultsSection";
 import type {
   PhoneNumberRow,
   TelnyxPricingSettings,
   A2pBrand,
+  DialerDefaults,
 } from "@/lib/settings/fetch";
 
 import type {
@@ -86,6 +88,7 @@ export type SettingsData = {
   phoneNumbers: PhoneNumberRow[];
   telnyxPricing: TelnyxPricingSettings | null;
   a2pBrand: A2pBrand | null;
+  dialerDefaults: DialerDefaults | null;
 };
 
 const RAIL_KEYS = new Set(GROUPS.flatMap((g) => g.items.map((i) => i.key)));
@@ -261,6 +264,12 @@ function renderPanel(
     case "telnyx-pricing":
       return currentUser.isAdmin && data.telnyxPricing ? (
         <TelnyxPricingSection initial={data.telnyxPricing} />
+      ) : (
+        <AdminGate />
+      );
+    case "dialer-defaults":
+      return currentUser.isAdmin && data.dialerDefaults ? (
+        <DialerDefaultsSection initial={data.dialerDefaults} />
       ) : (
         <AdminGate />
       );

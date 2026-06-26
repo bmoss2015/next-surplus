@@ -24,7 +24,23 @@ export const GROUPS: RailGroup[] = [
       { key: "reports", label: "Reports" },
     ],
   },
+  {
+    name: "Power Dialer",
+    items: [
+      { key: "dialer-pricing", label: "Pricing" },
+      { key: "dialer-reports", label: "Reports" },
+    ],
+  },
 ];
+
+// Visual accent per group, used as a 4px left bar in the panel header
+// and a single dot next to the group name in the rail. Both groups stay
+// in the brand-emerald family — Power Dialer goes one shade darker so the
+// two groups read as distinct without ever using a tinted-green block.
+export const GROUP_ACCENTS: Record<string, string> = {
+  Letters: "#13644e",
+  "Power Dialer": "#0a3d4a",
+};
 
 export function findItem(key: string): { group: string; item: RailItem } | null {
   for (const g of GROUPS) {
@@ -62,8 +78,20 @@ export function SubRail({
               textTransform: "uppercase",
               color: "#5b606a",
               padding: "16px 18px 8px 18px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
+            <span
+              style={{
+                display: "inline-block",
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: GROUP_ACCENTS[g.name] ?? "#5b606a",
+              }}
+            />
             {g.name}
           </div>
           {g.items.map((i) => {
